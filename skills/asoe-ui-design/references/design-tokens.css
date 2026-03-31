@@ -1,0 +1,352 @@
+/* ============================================================================
+   ASOE Design System — Design Tokens
+   ============================================================================
+   Single source of truth for every visual value in the ASOE platform.
+   Import this file at the root of every ASOE application.
+   
+   Usage:  color: var(--color-text-primary);
+   Never:  color: #0F172A;
+   ============================================================================ */
+
+/* ── GOOGLE FONTS IMPORT ─────────────────────────────────────────────────── */
+/* Load Inter as the primary web font. SF Pro is used when natively available. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+
+  /* ── FONT STACKS ─────────────────────────────────────────────────────── */
+  --font-sans:  "SF Pro Display", "SF Pro Text", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:  "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
+
+  /* ── TYPE SCALE ──────────────────────────────────────────────────────── */
+  /* Display — page titles only */
+  --font-size-display:    28px;
+  --font-weight-display:  700;
+  --line-height-display:  1.15;
+
+  /* Title — card headers, modal headings */
+  --font-size-title:      20px;
+  --font-weight-title:    700;
+  --line-height-title:    1.25;
+
+  /* Heading — section headings, sidebar titles */
+  --font-size-heading:    16px;
+  --font-weight-heading:  700;
+  --line-height-heading:  1.3;
+
+  /* Subhead — subsections, table group headers */
+  --font-size-subhead:    14px;
+  --font-weight-subhead:  600;
+  --line-height-subhead:  1.35;
+
+  /* Body — primary content, descriptions, agent summaries */
+  --font-size-body:       13px;
+  --font-weight-body:     400;
+  --font-weight-body-med: 500;
+  --line-height-body:     1.6;
+
+  /* Caption — timestamps, metadata, secondary info */
+  --font-size-caption:    11px;
+  --font-weight-caption:  500;
+  --line-height-caption:  1.4;
+
+  /* Label — uppercase structural labels, badge text */
+  --font-size-label:      10px;
+  --font-weight-label:    700;
+  --line-height-label:    1.3;
+  --letter-spacing-label: 0.06em;
+
+  /* Mono Data — prices, quantities, PO numbers */
+  --font-size-mono-data:  14px;
+  --font-weight-mono-data: 600;
+  --line-height-mono-data: 1.3;
+
+  /* Mono Small — SAP codes, condition records, IDs */
+  --font-size-mono-sm:    11px;
+  --font-weight-mono-sm:  500;
+  --line-height-mono-sm:  1.3;
+
+  /* Mono Metric — large numbers in metric tiles */
+  --font-size-mono-metric: 24px;
+  --font-weight-mono-metric: 700;
+  --line-height-mono-metric: 1.1;
+
+
+  /* ── BRAND COLORS ────────────────────────────────────────────────────── */
+  --color-brand:           #007AFF;  /* Primary blue — actions, links, active states */
+  --color-brand-hover:     #0066D6;  /* Darker on hover/press */
+  --color-brand-active:    #0055B3;  /* Active/pressed state */
+  --color-brand-subtle:    #F0F5FF;  /* Selected rows, active tab fill, tinted backgrounds */
+  --color-brand-muted:     #B3D7FF;  /* Progress tracks, secondary indicators */
+  --color-brand-ring:      rgba(0, 122, 255, 0.25);  /* Focus ring glow */
+
+
+  /* ── SURFACE COLORS ──────────────────────────────────────────────────── */
+  --color-surface-page:       #F8FAFC;  /* Page / app background */
+  --color-surface-primary:    #FFFFFF;  /* Cards, panels, input backgrounds */
+  --color-surface-secondary:  #F1F5F9;  /* Table headers, nested areas, code blocks */
+  --color-surface-tertiary:   #E2E8F0;  /* Pressed states, deep nested areas */
+  --color-surface-elevated:   #FFFFFF;  /* Modals, floating panels (use with shadow-lg) */
+  --color-surface-glass:      rgba(255, 255, 255, 0.72);  /* Frosted nav/utility bar */
+  --color-surface-glass-hover: rgba(255, 255, 255, 0.85); /* Glass on hover */
+
+  /* Row states */
+  --color-surface-row-hover:  #F8FAFC;  /* Table row hover */
+  --color-surface-row-active: #F0F5FF;  /* Selected/active row */
+  --color-surface-row-stripe: #FAFBFC;  /* Alternating row (subtle) */
+
+
+  /* ── TEXT COLORS ──────────────────────────────────────────────────────── */
+  --color-text-primary:    #0F172A;  /* Headings, primary data, key values */
+  --color-text-secondary:  #475569;  /* Body text, descriptions, agent narrative */
+  --color-text-tertiary:   #94A3B8;  /* Labels, placeholders, timestamps */
+  --color-text-quaternary: #CBD5E1;  /* Disabled text, ghost content */
+  --color-text-inverse:    #FFFFFF;  /* Text on brand/status colored backgrounds */
+  --color-text-brand:      #007AFF;  /* Links, interactive text elements */
+  --color-text-brand-hover:#0066D6;  /* Link hover */
+
+
+  /* ── BORDER COLORS ───────────────────────────────────────────────────── */
+  --color-border-default:  #E2E8F0;  /* Card borders, dividers, table lines */
+  --color-border-subtle:   #F1F5F9;  /* Barely-visible internal separators */
+  --color-border-strong:   #CBD5E1;  /* Input focus borders, emphasized dividers */
+  --color-border-brand:    #007AFF;  /* Selected element borders, active indicators */
+  --color-border-brand-subtle: rgba(0, 122, 255, 0.15); /* Faint brand border */
+
+
+  /* ── STATUS COLORS ───────────────────────────────────────────────────── */
+  /* Success — resolved, fixed, approved, healthy */
+  --color-success:         #16A34A;
+  --color-success-hover:   #15803D;
+  --color-success-subtle:  #F0FDF4;
+  --color-success-muted:   #BBF7D0;
+  --color-success-border:  rgba(22, 163, 74, 0.2);
+
+  /* Warning — needs attention, partial fix, medium risk */
+  --color-warning:         #D97706;
+  --color-warning-hover:   #B45309;
+  --color-warning-subtle:  #FFFBEB;
+  --color-warning-muted:   #FDE68A;
+  --color-warning-border:  rgba(217, 119, 6, 0.2);
+
+  /* Error — blocked, failed, high risk, critical */
+  --color-error:           #DC2626;
+  --color-error-hover:     #B91C1C;
+  --color-error-subtle:    #FEF2F2;
+  --color-error-muted:     #FECACA;
+  --color-error-border:    rgba(220, 38, 38, 0.2);
+
+  /* Info — informational, in-progress, neutral callout */
+  --color-info:            #007AFF;
+  --color-info-subtle:     #F0F5FF;
+  --color-info-muted:      #B3D7FF;
+  --color-info-border:     rgba(0, 122, 255, 0.2);
+
+
+  /* ── CATEGORY COLORS (charts, root cause badges) ─────────────────────── */
+  --color-cat-blue:        #3B82F6;
+  --color-cat-blue-subtle: #EFF6FF;
+
+  --color-cat-purple:      #7C3AED;
+  --color-cat-purple-subtle: #F5F3FF;
+
+  --color-cat-teal:        #0D9488;
+  --color-cat-teal-subtle: #F0FDFA;
+
+  --color-cat-amber:       #D97706;
+  --color-cat-amber-subtle: #FFFBEB;
+
+  --color-cat-rose:        #E11D48;
+  --color-cat-rose-subtle: #FFF1F2;
+
+  --color-cat-slate:       #64748B;
+  --color-cat-slate-subtle: #F8FAFC;
+
+
+  /* ── SPACING SCALE (4px base) ────────────────────────────────────────── */
+  --space-0:   0;
+  --space-1:   1px;
+  --space-2:   2px;
+  --space-4:   4px;
+  --space-6:   6px;
+  --space-8:   8px;
+  --space-10:  10px;
+  --space-12:  12px;
+  --space-16:  16px;
+  --space-20:  20px;
+  --space-24:  24px;
+  --space-32:  32px;
+  --space-40:  40px;
+  --space-48:  48px;
+  --space-64:  64px;
+
+
+  /* ── ELEVATION / SHADOWS ─────────────────────────────────────────────── */
+  --shadow-xs:  0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md:  0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-xl:  0 16px 48px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+
+  /* Colored shadows for status-tinted elevated elements */
+  --shadow-brand: 0 4px 16px rgba(0, 122, 255, 0.12);
+  --shadow-success: 0 4px 16px rgba(22, 163, 74, 0.12);
+  --shadow-warning: 0 4px 16px rgba(217, 119, 6, 0.12);
+  --shadow-error: 0 4px 16px rgba(220, 38, 38, 0.12);
+
+
+  /* ── BORDER RADIUS ───────────────────────────────────────────────────── */
+  --radius-sm:    6px;    /* Badges, small pills, inline elements */
+  --radius-md:    10px;   /* Cards, inputs, buttons */
+  --radius-lg:    14px;   /* Modals, large cards, panels */
+  --radius-xl:    20px;   /* Hero cards, feature panels */
+  --radius-full:  9999px; /* Circular avatars, round pills, status dots */
+
+
+  /* ── BLUR / GLASS ────────────────────────────────────────────────────── */
+  --blur-sm:    8px;     /* Subtle background softening */
+  --blur-glass: 16px;    /* Nav bar, utility bar glass surface */
+  --blur-heavy: 24px;    /* Modal backdrops, overlay surfaces */
+
+
+  /* ── MOTION / TIMING ─────────────────────────────────────────────────── */
+  --dur-instant:  100ms;  /* Hover, focus, button press */
+  --dur-fast:     200ms;  /* Tooltips, badge transitions */
+  --dur-normal:   300ms;  /* Sidebar slide, card expand, tab content */
+  --dur-slow:     500ms;  /* Page transitions, modal entrance */
+
+  --ease-out:     cubic-bezier(0.16, 1, 0.3, 1);     /* Entrances */
+  --ease-in:      cubic-bezier(0.7, 0, 0.84, 0);     /* Exits */
+  --ease-in-out:  cubic-bezier(0.45, 0, 0.55, 1);    /* Expand/collapse */
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);  /* Toast bounce */
+
+
+  /* ── LAYOUT ──────────────────────────────────────────────────────────── */
+  --nav-height:     56px;
+  --sidebar-width:  480px;
+  --status-bar-height: 32px;
+  --page-max-width: 1440px;
+  --page-padding:   var(--space-32);
+  --content-padding: var(--space-24);
+
+  /* Z-index scale */
+  --z-base:     0;
+  --z-dropdown: 10;
+  --z-sticky:   20;
+  --z-sidebar:  30;
+  --z-modal:    40;
+  --z-toast:    50;
+  --z-tooltip:  60;
+
+
+  /* ── ICON SIZE ───────────────────────────────────────────────────────── */
+  --icon-sm:  16px;
+  --icon-md:  20px;
+  --icon-lg:  24px;
+
+}
+
+
+/* ── UTILITY CLASSES ───────────────────────────────────────────────────── */
+
+/* Mono data register */
+.mono-data {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-mono-data);
+  font-weight: var(--font-weight-mono-data);
+  line-height: var(--line-height-mono-data);
+}
+
+.mono-sm {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-mono-sm);
+  font-weight: var(--font-weight-mono-sm);
+  line-height: var(--line-height-mono-sm);
+}
+
+.mono-metric {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-mono-metric);
+  font-weight: var(--font-weight-mono-metric);
+  line-height: var(--line-height-mono-metric);
+}
+
+/* Uppercase label register */
+.label {
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-label);
+  line-height: var(--line-height-label);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+/* Glass surface */
+.glass {
+  background: var(--color-surface-glass);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-default);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+
+/* ── SKELETON LOADER ANIMATION ─────────────────────────────────────────── */
+@keyframes asoe-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.skeleton {
+  background: var(--color-surface-secondary);
+  border-radius: var(--radius-sm);
+  animation: asoe-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* ── AGENT ACTIVE PULSE ────────────────────────────────────────────────── */
+@keyframes asoe-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.agent-active-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+  animation: asoe-pulse 1.4s ease-in-out infinite;
+}
