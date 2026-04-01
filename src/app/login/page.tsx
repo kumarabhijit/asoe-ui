@@ -5,9 +5,9 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Logo } from "@/components/ui/Logo";
+import { GravitationalOrbs } from "@/components/ui/GravitationalOrbs";
 
 type Step = "email" | "password" | "sso-redirect";
 
@@ -23,7 +23,6 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Simulated SSO domain list — in production, fetched from FastAPI
   const SSO_DOMAINS = ["acme.com", "walmart.com", "kroger.com"];
 
   function isSSODomain(emailValue: string): boolean {
@@ -39,20 +38,14 @@ function LoginForm() {
     }
     setError("");
     setLoading(true);
-
-    // Simulate checking if the domain is SSO-enabled
     await new Promise((r) => setTimeout(r, 600));
 
     if (email.includes("@") && isSSODomain(email)) {
-      // SSO domain detected — redirect to IdP
       setStep("sso-redirect");
-      // In production: redirect to FastAPI /api/auth/sso/init
       await new Promise((r) => setTimeout(r, 2000));
-      // For demo: fall back to password since SSO isn't configured
       setError("SSO is not configured in this demo. Enter any password to continue.");
       setStep("password");
     } else {
-      // Non-SSO domain or username — show password field
       setStep("password");
     }
     setLoading(false);
@@ -92,7 +85,7 @@ function LoginForm() {
   }
 
   return (
-    <div style={{ padding: "var(--space-40) var(--space-32) var(--space-32)" }}>
+    <div style={{ padding: "44px 36px 36px" }}>
       {/* Logo */}
       <div style={{ marginBottom: "var(--space-32)", textAlign: "center" }}>
         <Logo size="lg" showTagline />
@@ -243,7 +236,7 @@ function LoginForm() {
             </span>
           </div>
 
-          {/* Help links — tertiary, NOT blue */}
+          {/* Help links */}
           <div
             style={{
               display: "flex",
@@ -253,50 +246,31 @@ function LoginForm() {
               marginTop: "var(--space-4)",
             }}
           >
-            <button
-              type="button"
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "var(--font-size-caption)",
-                color: "var(--color-text-tertiary)",
-                fontFamily: "var(--font-sans)",
-                fontWeight: 500,
-                padding: 0,
-                transition: "color var(--dur-instant)",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.color = "var(--color-text-secondary)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = "var(--color-text-tertiary)")
-              }
-            >
-              Forgot username?
-            </button>
-            <button
-              type="button"
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "var(--font-size-caption)",
-                color: "var(--color-text-tertiary)",
-                fontFamily: "var(--font-sans)",
-                fontWeight: 500,
-                padding: 0,
-                transition: "color var(--dur-instant)",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.color = "var(--color-text-secondary)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = "var(--color-text-tertiary)")
-              }
-            >
-              Need help signing in?
-            </button>
+            {["Forgot username?", "Need help signing in?"].map((text) => (
+              <button
+                key={text}
+                type="button"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "var(--font-size-caption)",
+                  color: "var(--color-text-tertiary)",
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 500,
+                  padding: 0,
+                  transition: "color var(--dur-instant)",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.color = "var(--color-text-secondary)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.color = "var(--color-text-tertiary)")
+                }
+              >
+                {text}
+              </button>
+            ))}
           </div>
         </form>
       )}
@@ -307,11 +281,10 @@ function LoginForm() {
           onSubmit={handleSignIn}
           style={{ display: "flex", flexDirection: "column", gap: "var(--space-20)" }}
         >
-          {/* Show who is signing in */}
           <div
             style={{
               padding: "var(--space-10) var(--space-12)",
-              background: "var(--color-surface-secondary)",
+              background: "rgba(0,0,0,0.03)",
               borderRadius: "var(--radius-sm)",
               fontSize: "var(--font-size-body)",
               color: "var(--color-text-secondary)",
@@ -425,63 +398,102 @@ export default function LoginPage() {
   return (
     <div
       style={{
-        minHeight: "100vh",
-        background: "var(--color-surface-page)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "var(--space-24)",
+        height: "100vh",
+        width: "100vw",
+        overflow: "hidden",
         fontFamily: "var(--font-sans)",
+        position: "relative",
       }}
     >
-      {/* Login Card */}
-      <Card elevated style={{ width: "100%", maxWidth: 420 }}>
-        <Suspense
-          fallback={
-            <div style={{ padding: 40, textAlign: "center" }}>Loading...</div>
-          }
-        >
-          <LoginForm />
-        </Suspense>
-      </Card>
+      {/* ── Gravitational Orbs Background ── */}
+      <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+        <GravitationalOrbs />
+      </div>
 
-      {/* Agent Activity Footer — The system is alive */}
+      {/* ── Login Card (Glass) ── */}
       <div
         style={{
+          position: "relative",
+          zIndex: 10,
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
-          gap: "var(--space-8)",
-          marginTop: "var(--space-32)",
+          justifyContent: "center",
+          height: "100%",
+          padding: "var(--space-24)",
+          pointerEvents: "none",
         }}
       >
-        <span className="agent-active-dot" />
-        <span
+        <div
           style={{
-            fontSize: "var(--font-size-caption)",
-            color: "var(--color-text-tertiary)",
-            fontWeight: 500,
+            pointerEvents: "auto",
+            width: "100%",
+            maxWidth: 420,
+            background: "rgba(255, 255, 255, 0.72)",
+            backdropFilter: "blur(48px) saturate(1.6)",
+            WebkitBackdropFilter: "blur(48px) saturate(1.6)",
+            borderRadius: "var(--radius-lg)",
+            border: "1px solid rgba(0, 0, 0, 0.06)",
+            boxShadow:
+              "0 20px 60px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)",
+            overflow: "hidden",
           }}
         >
-          12 agents active
-        </span>
-        <span
+          <Suspense
+            fallback={
+              <div style={{ padding: 40, textAlign: "center" }}>
+                Loading...
+              </div>
+            }
+          >
+            <LoginForm />
+          </Suspense>
+        </div>
+
+        {/* Agent Activity Footer */}
+        <div
           style={{
-            fontSize: "var(--font-size-caption)",
-            color: "var(--color-text-quaternary)",
+            pointerEvents: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-8)",
+            marginTop: "var(--space-32)",
+            padding: "var(--space-6) var(--space-12)",
+            background: "rgba(255, 255, 255, 0.6)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            borderRadius: "var(--radius-full)",
+            border: "1px solid rgba(0, 0, 0, 0.04)",
           }}
         >
-          &middot;
-        </span>
-        <span
-          style={{
-            fontSize: "var(--font-size-caption)",
-            color: "var(--color-text-tertiary)",
-            fontWeight: 500,
-          }}
-        >
-          847 exceptions resolved today
-        </span>
+          <span className="agent-active-dot" />
+          <span
+            style={{
+              fontSize: "var(--font-size-caption)",
+              color: "var(--color-text-tertiary)",
+              fontWeight: 500,
+            }}
+          >
+            12 agents active
+          </span>
+          <span
+            style={{
+              fontSize: "var(--font-size-caption)",
+              color: "var(--color-text-quaternary)",
+            }}
+          >
+            &middot;
+          </span>
+          <span
+            style={{
+              fontSize: "var(--font-size-caption)",
+              color: "var(--color-text-tertiary)",
+              fontWeight: 500,
+            }}
+          >
+            847 exceptions resolved today
+          </span>
+        </div>
       </div>
 
       <style>{`
