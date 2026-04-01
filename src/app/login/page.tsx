@@ -5,9 +5,9 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Logo } from "@/components/ui/Logo";
-import { GravitationalOrbs } from "@/components/ui/GravitationalOrbs";
 
 type Step = "email" | "password" | "sso-redirect";
 
@@ -398,102 +398,63 @@ export default function LoginPage() {
   return (
     <div
       style={{
-        height: "100vh",
-        width: "100vw",
-        overflow: "hidden",
+        minHeight: "100vh",
+        background: "var(--color-surface-page)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "var(--space-24)",
         fontFamily: "var(--font-sans)",
-        position: "relative",
       }}
     >
-      {/* ── Gravitational Orbs Background ── */}
-      <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
-        <GravitationalOrbs />
-      </div>
+      {/* Login Card */}
+      <Card elevated style={{ width: "100%", maxWidth: 420 }}>
+        <Suspense
+          fallback={
+            <div style={{ padding: 40, textAlign: "center" }}>Loading...</div>
+          }
+        >
+          <LoginForm />
+        </Suspense>
+      </Card>
 
-      {/* ── Login Card (Glass) ── */}
+      {/* Agent Activity Footer */}
       <div
         style={{
-          position: "relative",
-          zIndex: 10,
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center",
-          height: "100%",
-          padding: "var(--space-24)",
-          pointerEvents: "none",
+          gap: "var(--space-8)",
+          marginTop: "var(--space-32)",
         }}
       >
-        <div
+        <span className="agent-active-dot" />
+        <span
           style={{
-            pointerEvents: "auto",
-            width: "100%",
-            maxWidth: 420,
-            background: "rgba(255, 255, 255, 0.72)",
-            backdropFilter: "blur(48px) saturate(1.6)",
-            WebkitBackdropFilter: "blur(48px) saturate(1.6)",
-            borderRadius: "var(--radius-lg)",
-            border: "1px solid rgba(0, 0, 0, 0.06)",
-            boxShadow:
-              "0 20px 60px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)",
-            overflow: "hidden",
+            fontSize: "var(--font-size-caption)",
+            color: "var(--color-text-tertiary)",
+            fontWeight: 500,
           }}
         >
-          <Suspense
-            fallback={
-              <div style={{ padding: 40, textAlign: "center" }}>
-                Loading...
-              </div>
-            }
-          >
-            <LoginForm />
-          </Suspense>
-        </div>
-
-        {/* Agent Activity Footer */}
-        <div
+          12 agents active
+        </span>
+        <span
           style={{
-            pointerEvents: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-8)",
-            marginTop: "var(--space-32)",
-            padding: "var(--space-6) var(--space-12)",
-            background: "rgba(255, 255, 255, 0.6)",
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            borderRadius: "var(--radius-full)",
-            border: "1px solid rgba(0, 0, 0, 0.04)",
+            fontSize: "var(--font-size-caption)",
+            color: "var(--color-text-quaternary)",
           }}
         >
-          <span className="agent-active-dot" />
-          <span
-            style={{
-              fontSize: "var(--font-size-caption)",
-              color: "var(--color-text-tertiary)",
-              fontWeight: 500,
-            }}
-          >
-            12 agents active
-          </span>
-          <span
-            style={{
-              fontSize: "var(--font-size-caption)",
-              color: "var(--color-text-quaternary)",
-            }}
-          >
-            &middot;
-          </span>
-          <span
-            style={{
-              fontSize: "var(--font-size-caption)",
-              color: "var(--color-text-tertiary)",
-              fontWeight: 500,
-            }}
-          >
-            847 exceptions resolved today
-          </span>
-        </div>
+          &middot;
+        </span>
+        <span
+          style={{
+            fontSize: "var(--font-size-caption)",
+            color: "var(--color-text-tertiary)",
+            fontWeight: 500,
+          }}
+        >
+          847 exceptions resolved today
+        </span>
       </div>
 
       <style>{`
