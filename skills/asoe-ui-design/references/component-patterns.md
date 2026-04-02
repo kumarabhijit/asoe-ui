@@ -203,7 +203,7 @@ The workhorse component for order queues and line item displays.
 
 ## AgentReasoningCard
 
-The agent's structured recommendation surface. Always follows the two-layer cognition model. Distinguished by **elevation, not color** — no blue accent stripe.
+The agent's structured recommendation surface. Always follows the two-layer cognition model. Distinguished by **elevation, not color** — no purple accent stripe.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -222,12 +222,12 @@ The agent's structured recommendation surface. Always follows the two-layer cogn
 
 - **Container**: `background: var(--color-surface-primary)`, `border-radius: var(--radius-md)`, `box-shadow: var(--shadow-md)`. NO colored left border.
 - **Padding**: `var(--space-20)`
-- **Icon container**: 28×28px, `border-radius: var(--radius-sm)`, `background: var(--color-surface-secondary)`, icon in `var(--color-text-secondary)` — NOT brand blue
+- **Icon container**: 28×28px, `border-radius: var(--radius-sm)`, `background: var(--color-surface-secondary)`, icon in `var(--color-text-secondary)` — NOT brand purple
 - **Recommendation text**: `font-size: var(--font-size-body)`, `color: var(--color-text-secondary)`, `line-height: var(--line-height-body)`
 - **Confidence bar**: 120px wide, 4px tall, rounded, fill = `var(--color-text-secondary)` (gray, NOT brand blue)
-- **Confidence value**: `font-mono`, `color: var(--color-text-primary)` (NOT brand blue)
+- **Confidence value**: `font-mono`, `color: var(--color-text-primary)` (NOT brand purple)
 - **Resolution badge**: Status pill style (success/warning/slate — never brand blue)
-- **Action buttons**: Primary CTA = `brand` variant (the ONLY blue on the card), secondary = `neutral` (gray text), tertiary = `ghost` (gray text)
+- **Action buttons**: Primary CTA = `brand` variant (the ONLY brand color on the card), secondary = `neutral` (gray text), tertiary = `ghost` (gray text)
 - **Expand trigger**: Full-width clickable, `font-size: var(--font-size-caption)`, `color: var(--color-text-tertiary)`
 
 ### Layer 2 (Expanded)

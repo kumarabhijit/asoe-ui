@@ -54,7 +54,7 @@ ASOE is not a dashboard the user operates. It is a **living system the user guid
 
 - **Content First** — Typography and spacing create hierarchy. Borders and decoration are last resorts.
 - **Calm Authority** — The interface feels like a senior analyst's briefing: precise, organized, unhurried.
-- **Brand Restraint** — Brand blue (`#007AFF`) appears in exactly three places: primary CTA buttons, nav logo mark, active tab indicator. Everything else neutral. 95%+ of pixels are grays.
+- **Brand Restraint** — Brand purple (`#5A4BD6`) appears in exactly three places: primary CTA buttons, nav logo mark, active tab indicator. Everything else neutral. 95%+ of pixels are grays.
 - **Progressive Disclosure** — Summary → Expand → Deep Dive. Default to minimum information needed to act.
 - **Consistency Compounds Trust** — Design decisions are system-level constants, not per-screen choices.
 
@@ -97,42 +97,49 @@ CSS custom properties on `:root`. Every visual value is a token — never hardco
 
 ## 4. Color System
 
-Light-only. Brand blue with extreme restraint.
+Light-only. Brand purple with extreme restraint. Colour scheme aligned with `asoe-web` light theme.
 
 ### Brand — Used ONLY on Primary CTAs, Nav Logo, Active Tab
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--color-brand` | `#007AFF` | Primary CTA buttons, nav logo, active tab underline ONLY |
-| `--color-brand-hover` | `#0066D6` | Button hover |
-| `--color-brand-subtle` | `#F0F5FF` | Reserved — NOT for selected rows |
-| `--color-brand-muted` | `#B3D7FF` | Reserved — progress bars in brand context only |
+| `--color-brand` | `#5A4BD6` | Primary CTA buttons, nav logo, active tab underline ONLY |
+| `--color-brand-hover` | `#4C3FC0` | Button hover |
+| `--color-brand-active` | `#3F34A8` | Active/pressed state |
+| `--color-brand-subtle` | `#F3F1FE` | Reserved — NOT for selected rows |
+| `--color-brand-muted` | `#C4BDEF` | Reserved — progress bars in brand context only |
+| `--color-brand-ring` | `rgba(90,75,214,0.25)` | Focus ring glow |
 
 ### Surfaces · Text · Borders
 
 | Role | Token | Value |
 |------|-------|-------|
-| Page bg | `--color-surface-page` | `#F8FAFC` |
+| Page bg | `--color-surface-page` | `#FAFAFA` |
 | Cards | `--color-surface-primary` | `#FFFFFF` |
-| Headers, selected rows | `--color-surface-secondary` | `#F1F5F9` |
+| Headers, nested areas | `--color-surface-secondary` | `#F0F0F5` |
+| Pressed states, deep nested | `--color-surface-tertiary` | `#E2E2EA` |
 | Glass nav | `--color-surface-glass` | `rgba(255,255,255,0.72)` |
-| Headings, data, PO numbers | `--color-text-primary` | `#0F172A` |
-| Body, agent summaries, neutral btn labels, confidence bars | `--color-text-secondary` | `#475569` |
-| Labels, breadcrumbs, ghost btn labels | `--color-text-tertiary` | `#94A3B8` |
-| Dividers | `--color-border-default` | `#E2E8F0` |
-| Selected borders, active pills | `--color-border-strong` | `#CBD5E1` |
+| Row hover | `--color-surface-row-hover` | `#F3F3F8` |
+| Selected/active row | `--color-surface-row-active` | `#F3F1FE` |
+| Headings, data, PO numbers | `--color-text-primary` | `#111118` |
+| Body, agent summaries, neutral btn labels, confidence bars | `--color-text-secondary` | `#4A4A5A` |
+| Labels, breadcrumbs, ghost btn labels | `--color-text-tertiary` | `#7E7E92` |
+| Disabled text, ghost content | `--color-text-quaternary` | `#B0B0C0` |
+| Dividers | `--color-border-default` | `#E2E2EA` |
+| Internal separators | `--color-border-subtle` | `#F0F0F5` |
+| Selected borders, active pills | `--color-border-strong` | `#C8C8D4` |
 
 ### Status (Sacred) · Category (Muted)
 
-Status: Success `#16A34A`/`#F0FDF4` · Warning `#D97706`/`#FFFBEB` · Error `#DC2626`/`#FEF2F2`
+Status: Success `#00B860`/`#F0FDF4` · Warning `#E5C100`/`#FFFBEB` · Error `#E04040`/`#FEF2F2`
 Category: Purple `#7C3AED` · Teal `#0D9488` · Amber `#D97706` · Rose `#E11D48` · Slate `#64748B` — each with subtle bg variant.
 
 ### Color Rules
 
-1. **Brand blue is for action only.** CTAs, nav logo, active tab. Nothing else.
+1. **Brand purple is for action only.** CTAs, nav logo, active tab. Nothing else.
 2. **95%+ neutral.** Color appears only on status badges and CTA buttons.
 3. **Selected states = neutral surface + shadow.** Never `--color-brand-subtle`.
-4. **Agent cards = elevation, not color.** No blue stripe, icon, or confidence bar.
+4. **Agent cards = elevation, not color.** No purple stripe, icon, or confidence bar.
 5. **Neutral buttons = gray text.** `--color-text-secondary`, not brand.
 6. **No raw hex in components.** Tokens only.
 
@@ -169,7 +176,7 @@ Fixed components. No one-off designs.
 
 | Component | Purpose | Notes |
 |-----------|---------|-------|
-| NavBar | Glass surface, sticky, logo + nav + agent status + avatar | Brand blue only on logo |
+| NavBar | Glass surface, sticky, logo + nav + agent status + avatar | Brand purple only on logo |
 | MetricTile | Icon + label + value + subtitle | Neutral icon backgrounds |
 | Card | Primary container, borderless, shadow | Elevation varies by importance |
 | DataTable | Expandable rows, no vertical borders, mono numerics | Selected = surface-secondary |
@@ -197,7 +204,7 @@ Fixed components. No one-off designs.
 ├────────────────────────────────────────────────────────────┤
 │  METRICS STRIP (4–6 tiles, responsive grid)                │
 ├────────────────────────────────────────────────────────────┤
-│  TAB BAR (active = blue underline, text = textPrimary)     │
+│  TAB BAR (active = purple underline, text = textPrimary)   │
 ├──────────────────────────┬─────────────────────────────────┤
 │  QUEUE / CONTENT         │  SIDEBAR (480px, sticky)        │
 │  flex: 1                 │  Agent card + waterfall + action │
@@ -262,7 +269,7 @@ Build: Tokens → Reset → Primitives → Cards → DataTable → AgentCard + A
 
 | Anti-Pattern | Correct Pattern |
 |---|---|
-| Brand blue on data, links, badges, borders, confidence bars | Neutrals everywhere except CTA, logo, active tab |
+| Brand purple on data, links, badges, borders, confidence bars | Neutrals everywhere except CTA, logo, active tab |
 | Static dashboard for a dynamic system | Activity indicators, progression, dynamic descriptions |
 | AI behind "Analysis" tab | Agent output central by default |
 | Linear workflow for parallel exceptions | Full queue with parallel threads |
@@ -280,7 +287,7 @@ Build: Tokens → Reset → Primitives → Cards → DataTable → AgentCard + A
 - [ ] **Traceable:** Agent reasoning available on demand (Layer 2), structured not chat
 - [ ] **Decided:** Recommended action + alternatives + trade-offs on every agent surface
 - [ ] **Parallel:** Multiple exceptions visible simultaneously
-- [ ] **Blue ≤3:** Brand color only on CTA buttons, nav logo, active tab
+- [ ] **Purple ≤3:** Brand color only on CTA buttons, nav logo, active tab
 - [ ] **Neutral:** Buttons, badges, confidence bars, selected states — all gray/neutral
 - [ ] **Tokens:** Zero hardcoded hex. All CSS custom properties
 - [ ] **Accessible:** 4.5:1 contrast, motion-safe, keyboard-navigable, focus visible

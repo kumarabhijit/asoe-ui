@@ -10,7 +10,8 @@
 
 /* ── GOOGLE FONTS IMPORT ─────────────────────────────────────────────────── */
 /* Load Inter as the primary web font. SF Pro is used when natively available. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* In production: @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap'); */
+/* Falling back to system fonts (Inter/SF Pro) when Google Fonts is unavailable */
 
 :root {
 
@@ -73,74 +74,74 @@
 
 
   /* ── BRAND COLORS ────────────────────────────────────────────────────── */
-  --color-brand:           #007AFF;  /* Primary blue — actions, links, active states */
-  --color-brand-hover:     #0066D6;  /* Darker on hover/press */
-  --color-brand-active:    #0055B3;  /* Active/pressed state */
-  --color-brand-subtle:    #F0F5FF;  /* Selected rows, active tab fill, tinted backgrounds */
-  --color-brand-muted:     #B3D7FF;  /* Progress tracks, secondary indicators */
-  --color-brand-ring:      rgba(0, 122, 255, 0.25);  /* Focus ring glow */
+  --color-brand:           #5A4BD6;  /* Primary purple — actions, links, active states */
+  --color-brand-hover:     #4C3FC0;  /* Darker on hover/press */
+  --color-brand-active:    #3F34A8;  /* Active/pressed state */
+  --color-brand-subtle:    #F3F1FE;  /* Selected rows, active tab fill, tinted backgrounds */
+  --color-brand-muted:     #C4BDEF;  /* Progress tracks, secondary indicators */
+  --color-brand-ring:      rgba(90, 75, 214, 0.25);  /* Focus ring glow */
 
 
   /* ── SURFACE COLORS ──────────────────────────────────────────────────── */
-  --color-surface-page:       #F8FAFC;  /* Page / app background */
+  --color-surface-page:       #FAFAFA;  /* Page / app background */
   --color-surface-primary:    #FFFFFF;  /* Cards, panels, input backgrounds */
-  --color-surface-secondary:  #F1F5F9;  /* Table headers, nested areas, code blocks */
-  --color-surface-tertiary:   #E2E8F0;  /* Pressed states, deep nested areas */
+  --color-surface-secondary:  #F0F0F5;  /* Table headers, nested areas, code blocks */
+  --color-surface-tertiary:   #E2E2EA;  /* Pressed states, deep nested areas */
   --color-surface-elevated:   #FFFFFF;  /* Modals, floating panels (use with shadow-lg) */
   --color-surface-glass:      rgba(255, 255, 255, 0.72);  /* Frosted nav/utility bar */
   --color-surface-glass-hover: rgba(255, 255, 255, 0.85); /* Glass on hover */
 
   /* Row states */
-  --color-surface-row-hover:  #F8FAFC;  /* Table row hover */
-  --color-surface-row-active: #F0F5FF;  /* Selected/active row */
-  --color-surface-row-stripe: #FAFBFC;  /* Alternating row (subtle) */
+  --color-surface-row-hover:  #F3F3F8;  /* Table row hover */
+  --color-surface-row-active: #F3F1FE;  /* Selected/active row */
+  --color-surface-row-stripe: #FAFAFA;  /* Alternating row (subtle) */
 
 
   /* ── TEXT COLORS ──────────────────────────────────────────────────────── */
-  --color-text-primary:    #0F172A;  /* Headings, primary data, key values */
-  --color-text-secondary:  #475569;  /* Body text, descriptions, agent narrative */
-  --color-text-tertiary:   #94A3B8;  /* Labels, placeholders, timestamps */
-  --color-text-quaternary: #CBD5E1;  /* Disabled text, ghost content */
+  --color-text-primary:    #111118;  /* Headings, primary data, key values */
+  --color-text-secondary:  #4A4A5A;  /* Body text, descriptions, agent narrative */
+  --color-text-tertiary:   #7E7E92;  /* Labels, placeholders, timestamps */
+  --color-text-quaternary: #B0B0C0;  /* Disabled text, ghost content */
   --color-text-inverse:    #FFFFFF;  /* Text on brand/status colored backgrounds */
-  --color-text-brand:      #007AFF;  /* Links, interactive text elements */
-  --color-text-brand-hover:#0066D6;  /* Link hover */
+  --color-text-brand:      #5A4BD6;  /* Links, interactive text elements */
+  --color-text-brand-hover:#4C3FC0;  /* Link hover */
 
 
   /* ── BORDER COLORS ───────────────────────────────────────────────────── */
-  --color-border-default:  #E2E8F0;  /* Card borders, dividers, table lines */
-  --color-border-subtle:   #F1F5F9;  /* Barely-visible internal separators */
-  --color-border-strong:   #CBD5E1;  /* Input focus borders, emphasized dividers */
-  --color-border-brand:    #007AFF;  /* Selected element borders, active indicators */
-  --color-border-brand-subtle: rgba(0, 122, 255, 0.15); /* Faint brand border */
+  --color-border-default:  #E2E2EA;  /* Card borders, dividers, table lines */
+  --color-border-subtle:   #F0F0F5;  /* Barely-visible internal separators */
+  --color-border-strong:   #C8C8D4;  /* Input focus borders, emphasized dividers */
+  --color-border-brand:    #5A4BD6;  /* Selected element borders, active indicators */
+  --color-border-brand-subtle: rgba(90, 75, 214, 0.15); /* Faint brand border */
 
 
   /* ── STATUS COLORS ───────────────────────────────────────────────────── */
   /* Success — resolved, fixed, approved, healthy */
-  --color-success:         #16A34A;
-  --color-success-hover:   #15803D;
+  --color-success:         #00B860;
+  --color-success-hover:   #009A50;
   --color-success-subtle:  #F0FDF4;
   --color-success-muted:   #BBF7D0;
-  --color-success-border:  rgba(22, 163, 74, 0.2);
+  --color-success-border:  rgba(0, 184, 96, 0.2);
 
   /* Warning — needs attention, partial fix, medium risk */
-  --color-warning:         #D97706;
-  --color-warning-hover:   #B45309;
+  --color-warning:         #E5C100;
+  --color-warning-hover:   #C4A500;
   --color-warning-subtle:  #FFFBEB;
   --color-warning-muted:   #FDE68A;
-  --color-warning-border:  rgba(217, 119, 6, 0.2);
+  --color-warning-border:  rgba(229, 193, 0, 0.2);
 
   /* Error — blocked, failed, high risk, critical */
-  --color-error:           #DC2626;
-  --color-error-hover:     #B91C1C;
+  --color-error:           #E04040;
+  --color-error-hover:     #C03030;
   --color-error-subtle:    #FEF2F2;
   --color-error-muted:     #FECACA;
-  --color-error-border:    rgba(220, 38, 38, 0.2);
+  --color-error-border:    rgba(224, 64, 64, 0.2);
 
   /* Info — informational, in-progress, neutral callout */
-  --color-info:            #007AFF;
-  --color-info-subtle:     #F0F5FF;
-  --color-info-muted:      #B3D7FF;
-  --color-info-border:     rgba(0, 122, 255, 0.2);
+  --color-info:            #5A4BD6;
+  --color-info-subtle:     #F3F1FE;
+  --color-info-muted:      #C4BDEF;
+  --color-info-border:     rgba(90, 75, 214, 0.2);
 
 
   /* ── CATEGORY COLORS (charts, root cause badges) ─────────────────────── */

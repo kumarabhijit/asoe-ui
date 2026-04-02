@@ -37,8 +37,8 @@ Every ASOE page uses this outer shell. No exceptions.
 
 ### Page Header Spec
 
-- **Breadcrumb**: `font-size: 12px`, `color: var(--color-text-tertiary)`, current page in `var(--color-text-secondary)`, separator `›` with `margin: 0 var(--space-4)`. Breadcrumb links are gray, NOT brand blue.
-- **Icon**: 40×40px rounded square, `var(--color-text-primary)` (dark) background, white Lucide icon 20px. NOT brand blue.
+- **Breadcrumb**: `font-size: 12px`, `color: var(--color-text-tertiary)`, current page in `var(--color-text-secondary)`, separator `›` with `margin: 0 var(--space-4)`. Breadcrumb links are gray, NOT brand purple.
+- **Icon**: 40×40px rounded square, `var(--color-text-primary)` (dark) background, white Lucide icon 20px. NOT brand purple.
 - **Title**: `font-size: var(--font-size-display)`, `font-weight: 700`, `color: var(--color-text-primary)`, `line-height: 1.15`
 - **Subtitle**: `font-size: 12px`, `color: var(--color-text-tertiary)`, `margin-top: var(--space-4)`
 - **Actions**: Right-aligned, `gap: var(--space-8)`, secondary button + primary CTA
@@ -119,7 +119,7 @@ Used for: exception queues, order hold resolution, any list→detail workflow.
 - **Content + Sidebar**: `display: flex`, `gap: var(--space-16)`, content `flex: 1`, sidebar `width: var(--sidebar-width)` fixed
 - **Sidebar**: `position: sticky`, `top: calc(var(--nav-height) + page-header-height)`, `max-height: calc(100vh - offset)`, `overflow-y: auto`
 - **Tab bar**: `border-bottom: 1px solid var(--color-border-default)`, tabs are flex children with `padding: 10px 18px`
-- **Active tab**: `border-bottom: 2px solid var(--color-brand)`, `color: var(--color-text-primary)`, `font-weight: 700`. Only the underline is brand blue — the text is neutral.
+- **Active tab**: `border-bottom: 2px solid var(--color-brand)`, `color: var(--color-text-primary)`, `font-weight: 700`. Only the underline is brand purple — the text is neutral.
 - **Inactive tab**: `color: var(--color-text-tertiary)`, `font-weight: 600`, hover `background: var(--color-surface-secondary)`
 
 ### Sidebar Transition

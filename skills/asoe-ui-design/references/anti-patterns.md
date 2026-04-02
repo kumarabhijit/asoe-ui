@@ -9,21 +9,21 @@ Explicit examples of what NOT to do when building ASOE UI. Every anti-pattern in
 ### The Problem
 
 ```jsx
-// ❌ WRONG — brand blue on everything
-<span style={{ color: T.brand }}>{order.id}</span>           // PO number as blue link
-<span style={{ color: T.brand }}>Home</span>                 // Breadcrumb in blue
-<div style={{ borderLeft: `3px solid ${T.brand}` }}>...</div> // Agent card blue stripe
+// ❌ WRONG — brand purple on everything
+<span style={{ color: T.brand }}>{order.id}</span>           // PO number as brand link
+<span style={{ color: T.brand }}>Home</span>                 // Breadcrumb in brand color
+<div style={{ borderLeft: `3px solid ${T.brand}` }}>...</div> // Agent card brand stripe
 <div style={{ background: T.brand }}>                        // Blue confidence bar
-<button style={{ color: T.brand }}>Detail</button>           // Neutral button in blue
-<div style={{ background: T.brandSubtle }}>                  // Selected row in blue tint
+<button style={{ color: T.brand }}>Detail</button>           // Neutral button in brand color
+<div style={{ background: T.brandSubtle }}>                  // Selected row in brand tint
 ```
 
-When 26 elements on the screen are brand blue, the primary CTA buttons have zero visual priority. The screen becomes a sea of blue and the user cannot immediately see where to act. Brand color loses all meaning.
+When 26 elements on the screen are brand purple, the primary CTA buttons have zero visual priority. The screen becomes a sea of purple and the user cannot immediately see where to act. Brand color loses all meaning.
 
 ### The Fix
 
 ```jsx
-// ✅ CORRECT — brand blue on exactly 3 things
+// ✅ CORRECT — brand purple on exactly 3 things
 // 1. Nav logo mark
 <div style={{ background: T.brand }}><Logo /></div>
 
@@ -42,7 +42,7 @@ borderBottom: `2px solid ${T.brand}`
 <div style={{ background: T.surfaceSecondary }}>              // Selected row: gray tint
 ```
 
-Count blue elements on your screen. If more than 3 distinct items are blue, strip the rest to neutral.
+Count brand-colored elements on your screen. If more than 3 distinct items use brand purple, strip the rest to neutral.
 
 ---
 
@@ -404,11 +404,11 @@ Cards, buttons, and inputs share the same radius. This creates visual cohesion �
 Every ASOE pull request with UI changes should pass this visual review:
 
 1. Open the screen at 1920×1080 and squint. Can you identify the primary content area without reading any text? If the chrome/decoration competes with content, redesign.
-2. Count the blue elements. If more than 3 distinct items are brand blue (beyond CTA buttons, nav logo, active tab), strip the rest to neutral.
+2. Count the brand-colored elements. If more than 3 distinct items are brand purple (beyond CTA buttons, nav logo, active tab), strip the rest to neutral.
 3. Count the distinct colors visible. If >4 (excluding neutrals), reduce.
 4. Count the animated elements. If >1 in any viewport, remove extras.
 5. Search the code for raw hex values. If any exist, replace with tokens.
 6. Check that all agent output is in AgentReasoningCard, not prose or JSON.
 7. Verify monospace (SF Mono preferred) is used for all numeric data columns.
 8. Confirm header labels are lighter than data values.
-9. Verify neutral buttons use gray text, not blue.
+9. Verify neutral buttons use gray text, not brand purple.
