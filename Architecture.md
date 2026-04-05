@@ -66,3 +66,19 @@ Hardware Acceleration: To optimize inference costs and processing times for the 
 6. Deployment Strategy: Vercel (Initial) to Azure Container Apps (Target)
 Core Decision: Vercel for R&D speed; Azure VNet for production security.
 Board Upgrade (Zero-Trust Security): In Phase 3, implement Azure Managed Identities for passwordless authentication between the FastAPI containers and PostgreSQL/Redis. Ensure the data services utilize Private Endpoints, physically restricting all traffic to the internal VNet.
+---
+
+## Phase-Wise Development Strategy
+### Phase 1 
+The Local Sandbox (Months 1–2)
+Focus: Agentic logic, local LLM integration, and UI flow.
+Method: Full-stack docker-compose.yml with separate containers for Next.js, FastAPI, Redis, Postgres, and the Async Worker.
+### Phase 2
+The Migration Bridge (Month 3)
+Focus: Automation and environment parity.
+Method: GitHub Actions build standalone Docker images. Provision Azure infrastructure via Terraform/Bicep.
+### Phase 3
+The Production Fortress (Month 4+)
+Focus: Scalability, Zero-Trust security, and strict SLA adherence.
+Method: Deploy to Azure Container Apps inside a secured VNet. Implement Managed Identities, Private Endpoints, and HNSW vector indexing.
+
