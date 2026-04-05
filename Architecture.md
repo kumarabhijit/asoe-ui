@@ -20,7 +20,10 @@ graph TD
         subgraph "Azure Container Apps (ACA Environment)"
             API[FastAPI Web Server\nUvicorn]
             Worker[Async Python Workers\nCelery / ARQ]
-            Inference via ASOE Core FW [AI Inference Node\nvLLM / AMX Optimized]
+            subgraph "AI Inference"
+                Inference[AI Inference Node\nvLLM / AMX Optimized]
+                ASOE["ASOE Core\n(AI Inference Engine)"]
+            end
         end
 
         subgraph "Azure Managed Data Services (Private Endpoints)"
@@ -38,5 +41,7 @@ graph TD
     
     Redis -->|Dequeue Task| Worker
     Worker -->|Inference Requests| Inference
+    Inference -->|Utilizes| ASOE
     Worker -->|Update Resolution State| DB
     Worker -->|Publish Task Complete| Redis
+
