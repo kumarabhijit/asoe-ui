@@ -1,4 +1,4 @@
-# Comprehensive Architecture Proposal: ASOE UI & Core Stack (v2.0 - Board Reviewed)
+# Comprehensive Architecture Proposal: ASOE UI & Core Stack
 
 ## Executive Summary
 This document outlines the comprehensive technical architecture and phase-wise deployment strategy for the **ASOE (CPG Agentic AI Exception Management System)**. The architecture is designed to support 500 concurrent users, deliver 3-10 second real-time updates, and reliably process complex AI tasks with an 8-minute resolution SLA. 
@@ -12,7 +12,7 @@ Following a technical board review, this version incorporates advanced recommend
 ```mermaid
 graph TD
     subgraph "External/Client Edge"
-        UI[Next.js 15 Client]
+        UI[Next.js 16 Client]
         FrontDoor[Azure Front Door / CDN]
     end
 
@@ -20,7 +20,7 @@ graph TD
         subgraph "Azure Container Apps (ACA Environment)"
             API[FastAPI Web Server\nUvicorn]
             Worker[Async Python Workers\nCelery / ARQ]
-            Inference[AI Inference Node\nvLLM / AMX Optimized]
+            Inference via ASOE Core FW [AI Inference Node\nvLLM / AMX Optimized]
         end
 
         subgraph "Azure Managed Data Services (Private Endpoints)"
