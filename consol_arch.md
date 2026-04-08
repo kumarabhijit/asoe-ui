@@ -32,7 +32,7 @@ ASOE is a deterministic, compliance-first orchestration platform for resolving O
 | **Recipes** | `PriceAdjustmentRecipe.py`, `CreditHoldReleaseRecipe.py`, `DuplicatePORecipe.py` |
 | **Terminal statuses** | `COMPLETE`, `FAIL_TO_HUMAN`, `MANUAL_REVIEW_REQUIRED`, `BLOCKED`, `REJECTED` |
 | **Pipeline** | 11-node LangGraph state machine |
-| **Lifecycle** | 8-state exception lifecycle (INGESTED through CLOSED) |
+| **Lifecycle** | 10-state exception lifecycle (INGESTED through CLOSED) |
 | **Tests** | 584 passing (16 test files) |
 | **RAG** | Deferred to V2 — all context is structured and resolved via typed gateways |
 | **Continual learning** | V2 design blueprint included; not a V1 deliverable |
@@ -275,6 +275,47 @@ The complete typed state envelope passed through the pipeline. Source: `contract
 | `resolved_data` | `Dict[str, Any]` | `{}` | `resolve_dependencies` |
 | `effect_results` | `List[GatewayResponse]` | `[]` | `apply_effects` |
 
+### 5.2.1 OrderEvent Schema (Inbound Contract)
+
+Every API consumer (FastAPI endpoint, Event Hubs consumer, sandbox CLI) constructs an `OrderEvent` to feed into the pipeline. Source: `contracts/models.py`.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `order_id` | `str` | required | PO / order identifier |
+| `line_item` | `int` | `1` | Line item number within the order |
+| `sku` | `Optional[str]` | `None` | Product SKU |
+| `event_type` | `str` | `"EDI_850_PRICE_MISMATCH"` | Event classification (drives skill selection) |
+| `po_price` | `float` | required | Purchase order price from buyer |
+| `sap_base_price` | `float` | required | SAP/ERP base price (system of record) |
+| `retailer_id` | `Optional[str]` | `None` | Customer / retailer identifier |
+| `event_ts` | `Optional[str]` | `None` | Event timestamp (ISO 8601) |
+| `requester_role` | `Optional[str]` | `None` | Role of the requester (used by credit hold checks) |
+| `credit_limit` | `Optional[float]` | `None` | Customer credit limit (for CREDIT_BLOCK intent) |
+| `current_exposure` | `Optional[float]` | `None` | Current credit exposure (for CREDIT_BLOCK intent) |
+| `line_count` | `int` | `1` | Number of line items in the batch (mass-update detection) |
+| `metadata` | `Dict[str, Any]` | `{}` | Extended data (e.g., `signal_scores` for DUPLICATE_PO, `matched_po_id`) |
+
+### 5.2.2 ExecutionLog Schema (Audit Trail)
+
+Attached to `GraphState.execution_log` after recipe execution. Contains the full audit trail including human override fields added in Phase 11. Source: `contracts/models.py`.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `trace_id` | `str` | required | UUID propagated from `ComplianceDecision` |
+| `recipe_name` | `Optional[str]` | `None` | Recipe that was executed |
+| `inputs` | `Dict[str, Any]` | `{}` | Parameters passed to the recipe |
+| `outputs` | `Dict[str, Any]` | `{}` | Recipe output (includes `recommended_action`, `autonomy_level`, `notification_template` for DUPLICATE_PO) |
+| `errors` | `List[str]` | `[]` | Execution errors (non-empty → `FAIL_TO_HUMAN`) |
+| `constrained_outputs` | `Dict[str, str]` | `{}` | Map of field → schema name (e.g., `"intent" → "IntentDecision"`) |
+| `intent_selected` | `Optional[str]` | `None` | Intent enum value selected |
+| `rag_chunks` | `List[str]` | `[]` | Retrieved skill document chunks |
+| `shadow_policy_hits` | `List[str]` | `[]` | Policy identifiers matched by Compliance Shadow |
+| `skill_name` | `Optional[str]` | `None` | Loaded skill document name |
+| `shadow_verdict` | `Optional[str]` | `None` | Shadow status: `GREEN`, `YELLOW`, or `RED` |
+| `resolved_by` | `Optional[str]` | `None` | Username of human who overrode the agent (SOX audit field) |
+| `resolved_action` | `Optional[str]` | `None` | Actual action taken by human (may differ from agent recommendation) |
+| `resolution_notes` | `Optional[str]` | `None` | Free-text notes from human override |
+
 ### 5.3 Constrained Generation
 
 All LLM-generated values consumed by code are **constrained at generation time** via Pydantic Literal types. Free-form text is allowed only for human-facing explanations.
@@ -341,6 +382,64 @@ Multi-step workflows are executed by `WorkflowRunner` (`workflows/runner.py`). E
 | `COMPENSATED` | A step failed; compensation recipes invoked for completed steps |
 | `PARTIAL` | Reserved for future partial-completion modes |
 
+### 5.7 Recipe Registry
+
+Each recipe declares its spec in `recipes/registry.py`. The orchestration layer uses these specs to validate params, resolve gateway dependencies, and apply effects.
+
+#### PriceAdjustmentRecipe.py
+
+| Property | Value |
+|---|---|
+| **Allowed intents** | `CONTRACTUAL_CORRECTION`, `MASS_PRICING_ERROR` |
+| **Required params** | `order_id`, `line_item`, `po_price`, `sap_base_price`, `max_discount_allowed`, `price_condition_type` |
+| **Dependencies** | _(none in V1 — pricing data arrives in OrderEvent)_ |
+| **Effects** | _(none in V1 — SAP write-back stubbed)_ |
+| **Injected policy** | `MAX_DISCOUNT_ALLOWED` (0.15), `PRICE_CONDITION_TYPE` ("YK07") via `erp_context` |
+
+#### CreditHoldReleaseRecipe.py
+
+| Property | Value |
+|---|---|
+| **Allowed intents** | `CREDIT_BLOCK` |
+| **Required params** | `order_id`, `requester_role`, `credit_limit`, `current_exposure`, `authorized_roles`, `exposure_tolerance` |
+| **Dependencies** | _(none in V1 — credit data arrives in OrderEvent)_ |
+| **Effects** | _(none in V1 — hold release stubbed)_ |
+| **Injected policy** | `CREDIT_AUTHORIZED_ROLES`, `CREDIT_EXPOSURE_TOLERANCE` |
+
+#### DuplicatePORecipe.py
+
+| Property | Value |
+|---|---|
+| **Allowed intents** | `DUPLICATE_PO` |
+| **Required params** | `order_id`, `po_number`, `customer_id`, `signal_scores`, `threshold_auto_block`, `threshold_review_required`, `threshold_soft_flag`, `autonomy_levels` |
+| **Dependencies** | `get_fulfillment_status` (OMS gateway), `get_matched_po_details` (OMS gateway) |
+| **Effects** | `buyer_notification` (notification gateway) |
+| **Injected policy** | `DUPLICATE_PO_THRESHOLD_AUTO_BLOCK` (0.90), `DUPLICATE_PO_THRESHOLD_REVIEW_REQUIRED` (0.70), `DUPLICATE_PO_THRESHOLD_SOFT_FLAG` (0.50), `DUPLICATE_PO_AUTONOMY_LEVELS` |
+| **Resolution actions** | `BLOCK_AND_NOTIFY`, `MERGE`, `SUPERSEDE`, `ALLOW_BOTH`, `ESCALATE`, `REQUEST_BUYER_CONFIRMATION` |
+| **Notification templates** | `duplicate_po_blocked`, `duplicate_po_inquiry`, `duplicate_po_amended` |
+
+### 5.8 Autonomy Levels
+
+Autonomy levels govern whether the `execute_recipe` node auto-executes or routes to `MANUAL_REVIEW_REQUIRED` for human approval. They are defined per resolution action in `DUPLICATE_PO_AUTONOMY_LEVELS` (`contracts/policy.py`).
+
+| Level | Label | Agent Behavior | Routing in `execute_recipe` |
+|---|---|---|---|
+| **L1** | Observe | Agent flags the exception in the dashboard; takes no action | → `MANUAL_REVIEW_REQUIRED` |
+| **L2** | Recommend | Agent recommends a resolution; human must approve to execute | → `MANUAL_REVIEW_REQUIRED` |
+| **L3** | Act & Inform | Agent executes the resolution; notifies human post-action | → `COMPLETE` (auto-execute) |
+| **L4** | Full Autonomy | Agent executes the resolution silently; logs for audit | → `COMPLETE` (auto-execute) |
+
+**Default autonomy per resolution action:**
+
+| Resolution Action | Default Autonomy | Rationale |
+|---|---|---|
+| `BLOCK_AND_NOTIFY` | L3 | Low risk — blocks a duplicate and notifies buyer |
+| `ALLOW_BOTH` | L3 | Low risk — accepts both POs as distinct orders |
+| `MERGE` | L2 | High risk — modifies line items; requires human approval |
+| `SUPERSEDE` | L2 | High risk — replaces existing PO; requires human approval |
+| `ESCALATE` | L1 | Always human-driven by definition |
+| `REQUEST_BUYER_CONFIRMATION` | L2 | Outbound communication — human reviews before sending |
+
 ---
 
 ## 6. API Contract
@@ -370,6 +469,8 @@ All endpoints except `/api/auth/*` and `/api/v1/health` require a valid JWT Bear
 | `PUT` | `/api/v1/policies/{tenant_id}` | admin | Update tenant-specific policy overrides |
 | `POST` | `/api/auth/login` | public | Email/password authentication → `{ accessToken, refreshToken, user }` |
 | `POST` | `/api/auth/sso/init` | public | SSO initiation → `{ redirectUrl }` for IdP redirect |
+| `GET` | `/api/auth/sso/callback` | public | SSO callback — validates SAML assertion / OIDC token, issues JWT, redirects to UI |
+| `POST` | `/api/auth/mfa/verify` | public | MFA verification — `{ mfaToken, code }` → `{ accessToken, refreshToken, user }` |
 | `POST` | `/api/auth/refresh` | public | Token refresh → `{ accessToken }` |
 | `GET` | `/api/auth/me` | any | Current authenticated user profile |
 | `GET` | `/api/v1/health` | public | Health check: `{ status, version, kill_switch, explain_mode }` |
@@ -430,7 +531,7 @@ stateDiagram-v2
     REJECTED --> CLOSED: Disposed by manager
 ```
 
-**8 states:** INGESTED, CLASSIFYING, AUDITING, PENDING_REVIEW, EXECUTING, RESOLVED, FAILED, BLOCKED, REJECTED, CLOSED.
+**10 states:** INGESTED, CLASSIFYING, AUDITING, PENDING_REVIEW, EXECUTING, RESOLVED, FAILED, BLOCKED, REJECTED, CLOSED.
 
 ### 7.2 PostgreSQL Schema
 
