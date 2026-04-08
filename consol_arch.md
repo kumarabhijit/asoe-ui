@@ -23,6 +23,16 @@ ASOE is a deterministic, compliance-first orchestration platform for resolving O
 
 5. **Observability as a First-Class Product.** Every graph execution emits a structured TraceRecord. Every decision — intent, shadow verdict, recipe, gateway call, terminal status — is logged, correlated via trace_id, and auditable.
 
+### Non-Functional Requirements
+
+| Requirement | Target | Notes |
+|---|---|---|
+| **Concurrent users** | 500 | WebSocket connections + REST API |
+| **Real-time UI updates** | 3–10 seconds | Per-node pipeline progress via WebSocket |
+| **Resolution SLA** | 8 minutes | End-to-end from event ingestion to effects applied |
+| **Availability** | 99.9% | AKS multi-replica + topology spread |
+| **Audit retention** | 7 years | TraceRecords + policy audit log (SOX requirement) |
+
 ### V1 Scope
 
 | Dimension | V1 Boundary |
@@ -440,6 +450,30 @@ Autonomy levels govern whether the `execute_recipe` node auto-executes or routes
 | `ESCALATE` | L1 | Always human-driven by definition |
 | `REQUEST_BUYER_CONFIRMATION` | L2 | Outbound communication — human reviews before sending |
 
+### 5.9 HITL Pause/Resume Protocol
+
+When the `shadow_audit` node returns a **YELLOW** verdict, the current codebase sets `final_status = MANUAL_REVIEW_REQUIRED` and terminates the graph. The target-state architecture upgrades this to a true pause/resume model using LangGraph's `interrupt()` mechanism:
+
+**Pause (YELLOW path):**
+1. `shadow_audit` calls `interrupt()` — the graph suspends before advancing to `select_recipe`.
+2. The full `GraphState` is checkpointed to PostgreSQL via LangGraph's `PostgresSaver`, keyed by `trace_id`.
+3. The exception transitions to the `PENDING_REVIEW` lifecycle state.
+4. A WebSocket event notifies the UI: `{ node: "shadow_audit", status: "interrupted", detail: { shadow_verdict: "YELLOW" } }`.
+
+**Resume (approve):** `POST /api/v1/exceptions/{id}/approve` is the exclusive resume entry point:
+1. Validates the caller's JWT holds `manager` or `admin` role.
+2. Rehydrates the `GraphState` from the PostgreSQL checkpoint.
+3. Calls `graph.invoke(None, config)` to resume execution from the interrupt point, advancing to `select_recipe`.
+4. The exception transitions from `PENDING_REVIEW` → `EXECUTING`.
+
+**Reject:** `POST /api/v1/exceptions/{id}/reject` transitions the exception to `REJECTED` with reason `HITL_REJECTED` without resuming the graph. The checkpoint is retained for audit.
+
+**Timeout:** If no approval or rejection is received within the configured HITL window (default: 48 hours; configurable per tenant via `policy_overrides.hitl_timeout_hours`), a background scheduler marks the exception `FAILED` with reason `HITL_TIMEOUT`. The checkpoint is retained for audit.
+
+**GREEN path:** On a GREEN verdict, `interrupt()` is not called; the graph advances directly to `select_recipe` with no checkpoint or human interaction required.
+
+> **Implementation note:** This is a target-state design. The current V1 codebase terminates the graph on YELLOW. The `interrupt()` + `PostgresSaver` upgrade is planned for V1.1 when the FastAPI layer is built. The lifecycle states and API endpoints in Sections 6 and 7 already account for this design.
+
 ---
 
 ## 6. API Contract
@@ -597,6 +631,47 @@ CREATE TABLE policy_overrides (
 );
 ```
 
+#### `policy_audit_log` table
+
+Every policy override change is immutably logged before the new value takes effect. Required for SOX compliance.
+
+```sql
+CREATE TABLE policy_audit_log (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id       VARCHAR(100) NOT NULL,
+    policy_key      VARCHAR(100) NOT NULL,
+    previous_value  JSONB,
+    new_value       JSONB NOT NULL,
+    changed_by      VARCHAR(100) NOT NULL,  -- JWT sub claim of the admin
+    change_reason   TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_policy_audit_tenant ON policy_audit_log (tenant_id, created_at DESC);
+```
+
+Policy changes take effect immediately for new exceptions. In-flight exceptions use the `policy_overrides` snapshot captured in their `GraphState` at ingest time and are unaffected.
+
+#### `checkpoints` table (Target State — V1.1)
+
+LangGraph `PostgresSaver` checkpoint store for the HITL pause/resume protocol (see Section 5.9). Retains serialized `GraphState` for paused (`PENDING_REVIEW`) exceptions and post-resolution audit.
+
+```sql
+CREATE TABLE checkpoints (
+    trace_id        UUID PRIMARY KEY,
+    tenant_id       VARCHAR(100) NOT NULL,
+    graph_state     JSONB NOT NULL,         -- Serialized GraphState at interrupt point
+    interrupted_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    resumed_at      TIMESTAMPTZ,
+    resumed_by      VARCHAR(100),           -- JWT sub of approver (NULL if timeout/rejected)
+    status          VARCHAR(20) NOT NULL DEFAULT 'PENDING',  -- PENDING, RESUMED, REJECTED, TIMEOUT
+    CONSTRAINT fk_checkpoint_exception FOREIGN KEY (trace_id) REFERENCES exceptions(trace_id)
+);
+
+CREATE INDEX idx_checkpoints_pending ON checkpoints (status, interrupted_at)
+    WHERE status = 'PENDING';
+```
+
 ### 7.3 Redis Usage
 
 | Purpose | Key Structure | TTL | Details |
@@ -606,6 +681,20 @@ CREATE TABLE policy_overrides (
 | Session cache | `asoe:session:{session_id}` (hash) | 15 min | JWT validation cache |
 | Circuit breaker state | `asoe:cb:{window_id}` (key) | 5 min | Update count + variance for current window |
 | Rate limiting | `asoe:ratelimit:{client_id}` (sorted set) | 1 min | Per-client request rate |
+| Exception state cache | `asoe:exception:{id}` (hash) | 5 min | Current lifecycle_state + shadow_verdict for fast UI reads |
+
+**Write-Through Cache Strategy:** When an async worker resolves an exception, it must write to PostgreSQL **and** update the Redis cache simultaneously **before** publishing the WebSocket event. This ensures the UI never fetches stale data during the 3–10 second update window. The sequence is:
+
+```
+Worker completes graph execution
+  → BEGIN transaction
+  → Write exception state to PostgreSQL
+  → Update Redis exception cache (asoe:exception:{id})
+  → COMMIT transaction
+  → Publish WebSocket event to Redis pub/sub (asoe:ws:{tenant_id})
+```
+
+If the Redis cache update fails, the WebSocket event is still published — the UI will fall back to reading directly from PostgreSQL via the REST API.
 
 ### 7.4 pgvector Deferral
 
@@ -737,10 +826,34 @@ Roles are assigned in the backend and included in the JWT payload. Permissions f
 
 **Enforcement:** Next.js middleware protects routes server-side. FastAPI dependency injection validates JWT roles on every endpoint.
 
-### 9.3 Multi-Tenancy
+**RBAC Split by Execution Path:**
 
-- `tenant_id` derived from the JWT `org` claim
-- Every database query includes `WHERE tenant_id = :tenant_id` (RLS recommended for defense-in-depth)
+Authorization is enforced at **system entry points**, not inside graph nodes. The enforcement point differs by path:
+
+| Path | Trigger | Auth Enforcement Point | Credential |
+|---|---|---|---|
+| **GREEN (autonomous)** | Shadow returns GREEN, L3/L4 autonomy | `POST /api/v1/exceptions/resolve` or Event Hubs ingest | Service account with permanent `analyst`-scoped service token |
+| **YELLOW (HITL)** | Shadow returns YELLOW or L1/L2 autonomy | `POST /api/v1/exceptions/{id}/approve` | Human JWT with `manager` or `admin` role |
+| **Policy changes** | Admin updates thresholds | `PUT /api/v1/policies/{tenant_id}` | Human JWT with `admin` role |
+
+The `apply_effects` node operates under the established service-account context — it does not parse or re-validate a human JWT. The `execute_recipe` node likewise has no auth logic; authorization was already validated at the entry point.
+
+### 9.3 Multi-Tenancy — Two-Layer Isolation
+
+Tenant data isolation is enforced at **two independent layers** for defense-in-depth:
+
+**Layer 1 — Application (FastAPI dependency injection):**
+- The FastAPI dependency injector extracts `tenant_id` from the JWT `org` claim.
+- `tenant_id` is injected as a required parameter into every database query and Redis channel subscription.
+- Tests verify no query against the `exceptions` or `traces` tables omits the `tenant_id` predicate.
+
+**Layer 2 — Database (PostgreSQL Row-Level Security):**
+- RLS policies are active on the `exceptions`, `traces`, `policy_overrides`, and `checkpoints` tables.
+- The connection pool sets `app.current_tenant_id` as a session variable before executing any query.
+- RLS policy: `USING (tenant_id = current_setting('app.current_tenant_id'))`.
+- A bug that omits the application-layer filter is blocked by the RLS policy — it returns an empty result set rather than cross-tenant data.
+
+**Additional isolation:**
 - Redis pub/sub channels scoped by tenant: `asoe:ws:{tenant_id}`
 - Policy overrides scoped by tenant: `policy_overrides` table
 - Partner users scoped to their own orders within the tenant
@@ -777,6 +890,19 @@ Next.js UI                     FastAPI API                   Async Worker + ASOE
 | LangFuse keys | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` via Key Vault |
 
 Manifests: `k8s/core/secret-provider.yaml` (SecretProviderClass) and `k8s/core/deployment.yaml` (volume mount + `envFrom.secretRef`).
+
+### 9.6 Environment Isolation (Production vs Sandbox)
+
+Production and sandbox environments use separate security boundaries to prevent cross-environment credential use:
+
+| Dimension | Production | Sandbox |
+|---|---|---|
+| **JWT `env` claim** | `production` | `sandbox` |
+| **JWT signing keys** | Production Key Vault | Sandbox Key Vault (non-overlapping) |
+| **IdP configuration** | Corporate SSO (Okta, Azure AD) | Local email/password or dev IdP |
+| **Validation** | FastAPI checks `env` claim matches `ASOE_ENV` env var | Same check |
+
+**Enforcement:** The FastAPI dependency injector validates the JWT `env` claim against the `ASOE_ENV` environment variable at every authenticated request boundary. A `sandbox` token presented to a production service returns **403 immediately**, before any business logic executes. The two environments use separate IdP configurations and non-overlapping JWT signing keys so tokens cannot be cross-forged.
 
 ---
 
@@ -986,10 +1112,14 @@ All other elements — data, links, badges, confidence bars, selected states —
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**Non-functional targets:**
-- 500 concurrent users
-- 3-10 second real-time updates (WebSocket)
-- 8-minute resolution SLA (async worker)
+**Phase 3 hardening checklist:**
+- Azure Managed Identities for passwordless auth between containers and data services
+- Private Endpoints on PostgreSQL and Redis — no public internet access
+- Azure Key Vault CSI driver for all secrets (API keys, DB credentials, LangFuse keys)
+- PostgreSQL RLS policies enforced on all tenant-scoped tables
+- JWT `env` claim validation to prevent sandbox/production cross-use (see Section 9.6)
+- Azure Front Door WAF rules for OWASP top 10 protection
+- Uvicorn configured with multiple worker processes for 500+ concurrent WebSocket connections
 
 ---
 
@@ -1010,6 +1140,9 @@ All other elements — data, links, badges, confidence bars, selected states —
 | **ADR-011** | Constrained generation at generation time (Outlines/Guidance) | Post-hoc parsing of LLM text output | Schema-constrained generation eliminates parsing failures. Pydantic Literal types provide defense-in-depth. |
 | **ADR-012** | LangFuse-aligned traces via stdlib logging; LangFuse forwarding is additive | Direct LangFuse SDK dependency | Self-host friendly from Day 1. Stdlib logging is the authoritative audit record. LangFuse handler requires only `LANGFUSE_PUBLIC_KEY` + `LANGFUSE_SECRET_KEY`. |
 | **ADR-013** | Intel Xeon AMX (CPU) for inference, not GPU | NVIDIA GPU (NC-series) | Architecture explicitly targets "performance-per-watt without relying on expensive GPU SKUs." AMX provides sufficient throughput for Llama 3.1 8B shadow auditing at sub-200ms latency. |
+| **ADR-014** | HITL pause/resume via LangGraph `interrupt()` + `PostgresSaver` | Terminate graph on YELLOW, re-run on approval | Checkpointing to PostgreSQL ensures GraphState survives pod restarts and provides auditable record of exact state at human review. Resume is a single guarded API endpoint, keeping RBAC enforcement at the system boundary. |
+| **ADR-015** | JWT `env` claim (`production` / `sandbox`) validated at every request boundary | Network-level separation only | Separate signing keys + enforced claim check prevent sandbox credentials from reaching production. Cheaper and more auditable than network isolation alone. |
+| **ADR-016** | Two-layer tenant isolation: application-level injection + PostgreSQL RLS | Application-level only | Defense-in-depth: a bug that omits the app-layer `tenant_id` filter is caught by the RLS policy, returning empty results rather than cross-tenant data. |
 
 ---
 
