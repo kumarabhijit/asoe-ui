@@ -29,7 +29,7 @@ ASOE is a deterministic, compliance-first orchestration platform for resolving O
 |---|---|---|
 | **Concurrent users** | 500 | WebSocket connections + REST API |
 | **Real-time UI updates** | 3–10 seconds | Per-node pipeline progress via WebSocket |
-| **Resolution SLA** | 8 minutes | End-to-end from event ingestion to effects applied |
+| **Resolution SLA** | 8 min (p50), 12 min (p95), 15 min (p99) | End-to-end from event ingestion to effects applied. HITL wait time excluded from SLA measurement. |
 | **Availability** | 99.9% | AKS multi-replica + topology spread |
 | **Audit retention** | 7 years | TraceRecords + policy audit log (SOX requirement) |
 
@@ -42,10 +42,25 @@ ASOE is a deterministic, compliance-first orchestration platform for resolving O
 | **Recipes** | `PriceAdjustmentRecipe.py`, `CreditHoldReleaseRecipe.py`, `DuplicatePORecipe.py` |
 | **Terminal statuses** | `COMPLETE`, `FAIL_TO_HUMAN`, `MANUAL_REVIEW_REQUIRED`, `BLOCKED`, `REJECTED` |
 | **Pipeline** | 11-node LangGraph state machine |
-| **Lifecycle** | 10-state exception lifecycle (INGESTED through CLOSED) |
+| **Lifecycle** | 11-state exception lifecycle (INGESTED through CLOSED, including ESCALATED) |
 | **Tests** | 584 passing (16 test files) |
 | **RAG** | Deferred to V2 — all context is structured and resolved via typed gateways |
 | **Continual learning** | V2 design blueprint included; not a V1 deliverable |
+
+### Intent Extensibility Path
+
+Adding a new intent (e.g., `SHORT_SHIP`, `SUBSTITUTION`, `EDI_MAPPING_ERROR`) requires changes in exactly 4 places — no architectural refactoring:
+
+| Step | File(s) | Change |
+|---|---|---|
+| 1. Add intent enum value | `constraints/specs.py` → `AllowedIntent` | Add `"SHORT_SHIP"` to the Pydantic Literal type |
+| 2. Write recipe | `recipes/short_ship_recipe.py` | Implement `Recipe` protocol: `run(params) → RecipeResult` |
+| 3. Register recipe spec | `recipes/registry.py` | Add `RecipeSpec` with allowed intents, required params, dependencies, effects |
+| 4. Write skill definition | `skills/SHORT_SHIP.md` | Structured reasoning guidance for the new exception type |
+
+Optional: add `AllowedRecipeName` value, update `DeterministicFallbackBackend` classification rules, and add test cases. The pipeline itself (`orchestration/nodes.py`), the Compliance Shadow, the gateway layer, and the UI require **zero changes** — they operate on typed abstractions, not hardcoded intent lists.
+
+**Candidate V1.5 intents** (next tier by volume in CPG O2C): `SHORT_SHIP` (partial fulfillment discrepancies), `SUBSTITUTION` (product substitution without buyer authorization), `EDI_MAPPING_ERROR` (field mapping failures between EDI 850/810 and ERP).
 
 ---
 
@@ -118,6 +133,8 @@ ASOE **does not own:** order lifecycle, inventory, shipping, invoicing, or gener
 ## 3. Platform Architecture Overview
 
 ASOE Core is a **Python library**, not a standalone service. Both the FastAPI API server and the async worker import it directly. The inference sidecar is a separate optional container that serves constrained-generation models.
+
+> **Scaling evolution path:** The library model is a pragmatic V1 choice that eliminates network overhead and simplifies deployment. When the inference sidecar or async workers need to scale independently of the API server (expected at ~1,000+ concurrent exceptions/hour), the migration path is: (1) extract `asoe-core` into a gRPC service behind an internal load balancer, (2) define a `CoreServiceClient` that implements the same `run_graph()` interface, and (3) swap the import-based invocation for the client. The hexagonal gateway layer already enforces this boundary — no recipe or node function calls infrastructure directly.
 
 ```mermaid
 graph TD
@@ -230,7 +247,7 @@ In V1.0, the `DeterministicFallbackBackend` handles all decision points without 
 |---|---|---|
 | **ASOE UI** | Next.js 14 (App Router, TypeScript) | Agent-first frontend, WebSocket consumer, RBAC-enforced views |
 | **API Server** | FastAPI (async, Uvicorn) | REST endpoints, WebSocket hub, synchronous graph invocations, auth |
-| **Async Worker** | Celery / ARQ + asoe-core | Long-running graph executions (8-min SLA), Event Hubs consumer |
+| **Async Worker** | Celery / ARQ + asoe-core | Long-running graph executions (8-min SLA), Event Hubs consumer. **Back-pressure:** max concurrency per worker is capped at 4 concurrent `run_graph()` tasks via Celery `worker_concurrency` / ARQ `max_jobs`. When queue depth exceeds 100 pending tasks, new `POST /resolve/async` requests receive HTTP 429 with `Retry-After` header. Queue depth is exposed via `asoe_task_queue_depth` Prometheus metric. |
 | **Inference Sidecar** | Outlines + vLLM on Intel Xeon AMX | Constrained generation, Compliance Shadow model serving |
 | **Data Tier** | PostgreSQL 16 + Redis 7+ | Exception state, audit trail, policy config, real-time pub/sub |
 
@@ -306,7 +323,7 @@ Each node function has the signature `def node_name(state: GraphState) -> GraphS
 |---|---|---|---|
 | 1 | `ingest` | Validates `OrderEvent` required fields, computes `batch_total_variance`, increments `update_count` | `FAIL_TO_HUMAN` on missing `order_id`, `po_price`, or `sap_base_price` |
 | 2 | `classify` | Computes `PricingDiscrepancy`, calls `backend.classify_intent()` → constrained to `AllowedIntent` enum | Routes to `FAIL_TO_HUMAN` on UNKNOWN intent |
-| 3 | `load_skill` | Loads `skills/*.md` verbatim via `SkillLoader.select_for_event()` — no summarization | Continues with no skill if none matches |
+| 3 | `load_skill` | Loads `skills/*.md` verbatim via `SkillLoader.select_for_event()` — no summarization. **Context window budget:** V1 skill documents are capped at 4,000 tokens each. As the skill library grows beyond ~10 skills, a V1.5 upgrade will introduce skill selection by intent-to-skill mapping (deterministic index lookup) rather than loading all matching skills, preventing context window saturation before RAG is available in V2. | Continues with no skill if none matches |
 | 4 | `validate_circuit_breaker` | Checks `update_count` vs `CIRCUIT_BREAKER_MAX_UPDATES` (50) and `batch_total_variance` vs `CIRCUIT_BREAKER_MAX_VARIANCE` ($10,000) | `FAIL_TO_HUMAN` on breach |
 | 5 | `shadow_audit` | Creates `ComplianceShadow`, calls `audit()` → `ComplianceDecision`, then `enforce()` → `ShadowEnforcement` | GREEN → continue, YELLOW → `MANUAL_REVIEW_REQUIRED`, RED → `BLOCKED` |
 | 6 | `select_recipe` | Calls `backend.propose_recipe()` → constrained to `AllowedRecipeName` | `FAIL_TO_HUMAN` if no recipe available |
@@ -396,6 +413,12 @@ Custom backend (env var) → OutlinesConstrainedBackend → DeterministicFallbac
 
 Each backend implements three methods: `classify_intent()`, `propose_recipe()`, `shadow_decision()`. If `OutlinesConstrainedBackend` fails to initialize (missing `outlines` package), the router degrades gracefully to `DeterministicFallbackBackend` with a `logger.warning()`.
 
+**Fallback observability:** Every backend invocation records which tier actually served the request. The `ExecutionLog.constrained_outputs` map includes the backend tier used (e.g., `"intent" → "IntentDecision:DeterministicFallbackBackend"`). Fallback activations are surfaced as:
+- A `backend_fallback` field in the `TraceRecord` (value: `"custom"`, `"outlines"`, or `"deterministic_fallback"`)
+- A `logger.warning()` on every degradation event, including the reason (e.g., `"OutlinesConstrainedBackend: model load failed, falling back to DeterministicFallbackBackend"`)
+- A Prometheus counter `asoe_backend_fallback_total{tier="deterministic_fallback"}` for alerting on sustained degradation
+- **V2 training data flag:** TraceRecords where `backend_fallback == "deterministic_fallback"` are flagged with `is_fallback_generated: true` and **excluded from Layer 1 fine-tuning datasets** (see Section 10) to prevent hardcoded logic from contaminating the learned model
+
 | Constrained Output | Schema | Allowed Values |
 |---|---|---|
 | Intent classification | `IntentDecision` → `AllowedIntent` | `CONTRACTUAL_CORRECTION`, `CREDIT_BLOCK`, `MASS_PRICING_ERROR`, `DUPLICATE_PO` |
@@ -410,10 +433,10 @@ All business thresholds live in `contracts/policy.py`. **Recipes never import fr
 | Constant | Value | Consumed By |
 |---|---|---|
 | `MAX_DISCOUNT_ALLOWED` | `0.15` (15%) | `PriceAdjustmentRecipe` via `erp_context` |
-| `PRICE_CONDITION_TYPE` | `"YK07"` | `PriceAdjustmentRecipe` via `erp_context` |
+| `PRICE_CONDITION_TYPE` | `"YK07"` (default; **per-tenant override required**) | `PriceAdjustmentRecipe` via `erp_context`. Condition types vary by SAP client configuration (e.g., `YK07`, `ZK07`, `PR00`). This value **must** be overridable per tenant from V1 via the `policy_overrides` table (`policy_key = "PRICE_CONDITION_TYPE"`). The `validate_types` node resolves the tenant-specific value before injecting into `erp_context`. |
 | `CREDIT_AUTHORIZED_ROLES` | `("ORDER_MANAGER", "FINANCE_DIRECTOR")` | `CreditHoldReleaseRecipe` as param |
 | `CREDIT_EXPOSURE_TOLERANCE` | `5_000.0` | `CreditHoldReleaseRecipe` as param |
-| `DUPLICATE_PO_THRESHOLD_AUTO_BLOCK` | `0.90` | `DuplicatePORecipe` as param |
+| `DUPLICATE_PO_THRESHOLD_AUTO_BLOCK` | `0.90` | `DuplicatePORecipe` as param. See **Similarity Algorithm** below. |
 | `DUPLICATE_PO_THRESHOLD_REVIEW_REQUIRED` | `0.70` | `DuplicatePORecipe` as param |
 | `DUPLICATE_PO_THRESHOLD_SOFT_FLAG` | `0.50` | `DuplicatePORecipe` as param |
 | `DUPLICATE_PO_AUTONOMY_LEVELS` | dict (action → L1–L4) | `DuplicatePORecipe` as param |
@@ -421,6 +444,16 @@ All business thresholds live in `contracts/policy.py`. **Recipes never import fr
 | `CIRCUIT_BREAKER_MAX_UPDATES` | `50` | `orchestration/utils.py` |
 | `CIRCUIT_BREAKER_MAX_VARIANCE` | `10_000.0` | `orchestration/utils.py` |
 | `DISCREPANCY_THRESHOLD` | `0.15` | `orchestration/utils.py` |
+
+**Duplicate PO Similarity Algorithm:** The `signal_scores` composite score consumed by the `DUPLICATE_PO_THRESHOLD_*` thresholds is a weighted average of three deterministic signals, not a single string similarity metric:
+
+| Signal | Weight | Method | Description |
+|---|---|---|---|
+| `po_number_similarity` | 0.40 | Normalized Levenshtein distance | Character-level similarity between the candidate PO number and the matched PO number |
+| `line_item_overlap` | 0.35 | Jaccard index on `(SKU, quantity)` tuples | Measures how many line items are shared between the two POs |
+| `temporal_proximity` | 0.25 | Exponential decay over hours since `matched_po.created_at` | POs submitted within minutes of each other score higher |
+
+The composite score `= 0.40 × po_number_similarity + 0.35 × line_item_overlap + 0.25 × temporal_proximity`. All three signals are computed deterministically by the `DuplicatePORecipe` — no embedding or ML model is involved. The weights are V1 constants; the evolution path supports per-tenant weight overrides via `policy_overrides`.
 
 **Evolution path:** module constants → env vars → K8s ConfigMap → per-customer policy service. Changes at any stage require modification only in the orchestration layer and policy source, never in recipes.
 
@@ -481,10 +514,21 @@ Each recipe declares its spec in `recipes/registry.py`. The orchestration layer 
 | **Allowed intents** | `DUPLICATE_PO` |
 | **Required params** | `order_id`, `po_number`, `customer_id`, `signal_scores`, `threshold_auto_block`, `threshold_review_required`, `threshold_soft_flag`, `autonomy_levels` |
 | **Dependencies** | `get_fulfillment_status` (OMS gateway), `get_matched_po_details` (OMS gateway) |
-| **Effects** | `buyer_notification` (notification gateway) |
+| **Effects** | `buyer_notification` (notification gateway — see **Notification Channels** below) |
 | **Injected policy** | `DUPLICATE_PO_THRESHOLD_AUTO_BLOCK` (0.90), `DUPLICATE_PO_THRESHOLD_REVIEW_REQUIRED` (0.70), `DUPLICATE_PO_THRESHOLD_SOFT_FLAG` (0.50), `DUPLICATE_PO_AUTONOMY_LEVELS` |
 | **Resolution actions** | `BLOCK_AND_NOTIFY`, `MERGE`, `SUPERSEDE`, `ALLOW_BOTH`, `ESCALATE`, `REQUEST_BUYER_CONFIRMATION` |
 | **Notification templates** | `duplicate_po_blocked`, `duplicate_po_inquiry`, `duplicate_po_amended` |
+
+**Buyer Notification Channels:** The `buyer_notification` effect is dispatched through a pluggable notification gateway (`gateways/notification.py`) that supports multiple delivery channels per buyer, configured at the tenant level via `policy_overrides`:
+
+| Channel | Protocol | When Used | V1 Status |
+|---|---|---|---|
+| Email | SMTP / SendGrid API | Default fallback for all buyers | Stubbed (V1) |
+| EDI 824 (Application Advice) | AS2 / Azure Event Hubs | Large retailers (Walmart, Kroger, etc.) requiring EDI acknowledgments | Stubbed (V1) |
+| Buyer Portal | REST API webhook to partner portal | Partners with API-enabled portals | Stubbed (V1) |
+| In-App | WebSocket event to `partner`-role users | Partners logged into ASOE UI | Live (V1) |
+
+The notification gateway resolves the preferred channel(s) per `retailer_id` from the `policy_overrides` table (`policy_key = "NOTIFICATION_CHANNELS"`). If no preference is configured, the system defaults to email. Multiple channels can be configured simultaneously (e.g., EDI 824 + email). Notification delivery status is recorded in `effect_results` on the `GraphState`.
 
 ### 5.8 Autonomy Levels
 
@@ -526,9 +570,19 @@ When the `shadow_audit` node returns a **YELLOW** verdict, the current codebase 
 
 **Reject:** `POST /api/v1/exceptions/{id}/reject` transitions the exception to `REJECTED` with reason `HITL_REJECTED` without resuming the graph. The checkpoint is retained for audit.
 
-**Timeout:** If no approval or rejection is received within the configured HITL window (default: 48 hours; configurable per tenant via `policy_overrides.hitl_timeout_hours`), a background scheduler marks the exception `FAILED` with reason `HITL_TIMEOUT`. The checkpoint is retained for audit.
+**Timeout and escalation:** If no approval or rejection is received within the configured HITL window (default: 48 hours; configurable per tenant via `policy_overrides.hitl_timeout_hours`), the exception follows a **mandatory escalation path** rather than silently failing:
+1. The background scheduler transitions the exception to `ESCALATED` (not `FAILED`) with reason `HITL_TIMEOUT`.
+2. An escalation notification is sent to the configured escalation target(s) for the tenant (defined in `policy_overrides.escalation_targets` — a list of `manager`/`admin` user IDs or email addresses).
+3. The escalation event is recorded in the `policy_audit_log` as an immutable SOX artifact with `policy_key = "HITL_ESCALATION"`, `changed_by = "SYSTEM"`, and the original `trace_id`.
+4. If no action is taken within a second escalation window (default: 24 hours; configurable via `policy_overrides.escalation_timeout_hours`), the exception transitions to `FAILED` with reason `ESCALATION_TIMEOUT` and a compliance incident is logged.
+
+The checkpoint is retained for audit at all stages. This two-tier timeout model ensures that no financial exception can silently expire without a mandatory human escalation chain — a SOX audit requirement.
 
 **GREEN path:** On a GREEN verdict, `interrupt()` is not called; the graph advances directly to `select_recipe` with no checkpoint or human interaction required.
+
+**Checkpoint size budget and retention:**
+- **Size budget:** Serialized `GraphState` JSONB is estimated at 2–8 KB per checkpoint (dominated by `OrderEvent`, `SkillDocument`, and `ComplianceDecision`). The `resolved_data` dict from gateway responses may push individual checkpoints to ~50 KB in worst-case batch scenarios. A hard limit of 256 KB per serialized checkpoint is enforced; checkpoints exceeding this limit are logged as errors and the exception routes to `FAIL_TO_HUMAN`.
+- **Retention policy:** Checkpoints for `RESUMED`, `REJECTED`, and `TIMEOUT` statuses are retained for 90 days in the active `checkpoints` table for audit queries. After 90 days, they are archived to the `checkpoints_archive` partitioned table (same schema, partitioned by `interrupted_at` month). The `trace_id` foreign key to `exceptions` ensures checkpoints are always traceable. Full deletion follows the 7-year audit retention policy (see Section 7.2).
 
 > **Implementation note:** This is a target-state design. The current V1 codebase terminates the graph on YELLOW. The `interrupt()` + `PostgresSaver` upgrade is planned for V1.1 when the FastAPI layer is built. The lifecycle states and API endpoints in Sections 6 and 7 already account for this design.
 
@@ -580,6 +634,8 @@ All endpoints except `/api/auth/*` and `/api/v1/health` require a valid JWT Bear
 }
 ```
 
+**Environment-aware error responses:** When a JWT `env` claim mismatch is detected (e.g., a sandbox token reaches production), the error response returns a generic **403 Forbidden** with `code: "ENV_MISMATCH"` and `message: "Access denied."` only. The `details` field is **omitted entirely** — no stack traces, no internal state, no exception metadata. This prevents information leakage across environment boundaries. Full error details are logged server-side with the `trace_id` for debugging but never exposed in the response body.
+
 ### 6.4 Pagination
 
 Cursor-based pagination on all list endpoints:
@@ -617,13 +673,19 @@ stateDiagram-v2
     PENDING_REVIEW --> RESOLVED: Human approves override
     PENDING_REVIEW --> REJECTED: Human rejects
     PENDING_REVIEW --> EXECUTING: Human approves agent recommendation
+    PENDING_REVIEW --> ESCALATED: HITL timeout (48h default)
+    ESCALATED --> EXECUTING: Escalation target approves
+    ESCALATED --> REJECTED: Escalation target rejects
+    ESCALATED --> FAILED: Escalation timeout (24h default)
     RESOLVED --> CLOSED: Effects confirmed, buyer notified
     FAILED --> CLOSED: Manually remediated or archived
     BLOCKED --> CLOSED: Policy reviewed, exception disposed
     REJECTED --> CLOSED: Disposed by manager
 ```
 
-**10 states:** INGESTED, CLASSIFYING, AUDITING, PENDING_REVIEW, EXECUTING, RESOLVED, FAILED, BLOCKED, REJECTED, CLOSED.
+**11 states:** INGESTED, CLASSIFYING, AUDITING, PENDING_REVIEW, ESCALATED, EXECUTING, RESOLVED, FAILED, BLOCKED, REJECTED, CLOSED.
+
+> **ESCALATED state (SOX requirement):** When a `PENDING_REVIEW` exception times out, it transitions to `ESCALATED` — not `FAILED`. This ensures every financial exception has a mandatory human escalation chain before it can reach a terminal failure state. See Section 5.9 for the full timeout and escalation protocol.
 
 ### 7.2 PostgreSQL Schema
 
@@ -706,7 +768,25 @@ CREATE TABLE policy_audit_log (
 );
 
 CREATE INDEX idx_policy_audit_tenant ON policy_audit_log (tenant_id, created_at DESC);
+
+-- SOX immutability enforcement: prevent UPDATE and DELETE on audit log
+REVOKE UPDATE, DELETE ON policy_audit_log FROM asoe_app;
+REVOKE UPDATE, DELETE ON policy_audit_log FROM asoe_worker;
+
+-- Trigger-based guard: belt-and-suspenders defense against any role
+CREATE OR REPLACE FUNCTION prevent_audit_log_mutation()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'policy_audit_log is immutable — UPDATE and DELETE are prohibited (SOX requirement)';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_policy_audit_immutable
+    BEFORE UPDATE OR DELETE ON policy_audit_log
+    FOR EACH ROW EXECUTE FUNCTION prevent_audit_log_mutation();
 ```
+
+**Audit logging:** PostgreSQL `pgaudit` extension is enabled on the `policy_audit_log` table to capture all access attempts (including denied `DELETE`/`UPDATE`) to an external audit log destination, independent of application logging.
 
 Policy changes take effect immediately for new exceptions. In-flight exceptions use the `policy_overrides` snapshot captured in their `GraphState` at ingest time and are unaffected.
 
@@ -737,7 +817,7 @@ CREATE INDEX idx_checkpoints_pending ON checkpoints (status, interrupted_at)
 | Task queue | `asoe:tasks` (stream) | N/A | Celery/ARQ task broker for async resolution |
 | WebSocket fanout | `asoe:ws:{tenant_id}` (pub/sub channel) | N/A | Per-tenant channel for real-time UI updates |
 | Session cache | `asoe:session:{session_id}` (hash) | 15 min | JWT validation cache |
-| Circuit breaker state | `asoe:cb:{window_id}` (key) | 5 min | Update count + variance for current window |
+| Circuit breaker state | `asoe:cb:{window_id}` (key) | 5 min | Update count + variance for current window. **Fail-closed on Redis unavailability:** if Redis is unreachable, the circuit breaker defaults to `FAIL_TO_HUMAN` (safe but blocking) rather than allowing unbounded updates through. This is enforced by a `try/except` in `orchestration/utils.py` that treats connection errors as a breaker trip. |
 | Rate limiting | `asoe:ratelimit:{client_id}` (sorted set) | 1 min | Per-client request rate |
 | Exception state cache | `asoe:exception:{id}` (hash) | 5 min | Current lifecycle_state + shadow_verdict for fast UI reads |
 
@@ -752,13 +832,39 @@ Worker completes graph execution
   → Publish WebSocket event to Redis pub/sub (asoe:ws:{tenant_id})
 ```
 
-If the Redis cache update fails, the WebSocket event is still published — the UI will fall back to reading directly from PostgreSQL via the REST API.
+**Partial failure recovery in the write-through chain:**
+
+| Failure Point | Recovery Behavior | Consistency Impact |
+|---|---|---|
+| PostgreSQL write fails | Transaction aborts. No Redis update, no WebSocket event. Exception retried via Celery/ARQ retry policy (3 attempts, exponential backoff). | None — no state changed. |
+| Redis cache update fails | PostgreSQL COMMIT proceeds. WebSocket event is still published. UI falls back to reading directly from PostgreSQL via the REST API. Redis cache self-heals on next read (cache-aside on miss, 5-min TTL). | Transient — UI may show stale cache for up to 5 min. |
+| WebSocket publish fails | PostgreSQL and Redis are already committed. The failure is logged with `trace_id`. The UI's polling fallback (`GET /api/v1/exceptions/{id}` every 3 seconds) ensures the user sees the update within one poll cycle. A dead-letter metric (`asoe_ws_publish_failures_total`) triggers an alert if the failure rate exceeds 1% over a 5-minute window. | Transient — UI update delayed by up to 3 seconds (poll interval). |
 
 ### 7.4 pgvector Deferral
 
 The pgvector extension is installed and the `context_embedding` column exists on the `exceptions` table. **However, no HNSW index is created, no embeddings are computed, and no similarity search queries exist in V1.** This preserves the RAG deferral from `architecture_v2.md` §4C: all V1 context is structured, keyed by known identifiers (retailer_id, SKU, order_id), and resolved deterministically via the gateway dependency layer.
 
 RAG becomes justified in V2 when the system needs to search unstructured retailer contract PDFs, support free-text user queries, or ingest new document types faster than gateway adapters can be written.
+
+### 7.5 Audit Data Archival Strategy (7-Year Retention)
+
+The 7-year SOX retention requirement for `traces`, `policy_audit_log`, and `exceptions` tables demands an explicit archival strategy to prevent query performance degradation over time.
+
+**Partitioning (Year 1 onward):**
+- The `traces` and `policy_audit_log` tables are range-partitioned by `created_at` using monthly partitions (e.g., `traces_2026_01`, `traces_2026_02`).
+- The `exceptions` table is range-partitioned by `created_at` with quarterly partitions.
+- Active queries (exception queue, dashboard) target only the current + previous quarter's partitions via partition pruning.
+
+**Tiered storage (Year 2 onward):**
+
+| Age | Storage Tier | Access Pattern |
+|---|---|---|
+| 0–6 months | Active PostgreSQL (SSD-backed Azure Flexible Server) | Full query access, indexed |
+| 6 months – 2 years | Warm partitions (same PostgreSQL, detached from hot indexes) | Query-on-demand via explicit partition reference |
+| 2–7 years | Cold archive (Azure Blob Storage, Parquet export) | Restored to a read-only PostgreSQL replica on audit request. Automated monthly export job via `pg_dump` per partition → Parquet → immutable Blob container with legal hold. |
+| 7+ years | Purged per retention policy | Partition drop + Blob deletion with compliance sign-off |
+
+**Integrity:** Each archived Parquet file includes a SHA-256 checksum stored in the `policy_audit_log` for tamper detection. Azure Blob immutability policies (WORM) prevent modification or deletion during the retention period.
 
 ---
 
@@ -860,14 +966,18 @@ User clicks "Sign in with SSO"
   → User lands on exception queue
 ```
 
-**Fallback (Email/Password + MFA):**
+**Fallback (Email/Password — Admin-Only, MFA-Enforced):**
+
+> **Security constraint:** The email/password fallback is restricted to `admin`-role users only and **MFA is mandatory** (not optional). This prevents the fallback from undermining the SSO mandate for general users. The `POST /api/auth/login` endpoint validates that the email belongs to a user with `admin` role before processing credentials — non-admin users receive a 403 directing them to SSO. The login UI conditionally shows the email/password form only when SSO is unavailable (IdP outage detection via a health-check ping to the configured IdP metadata URL).
+
 ```
-User enters email + password
+Admin enters email + password
   → Next.js calls FastAPI POST /api/auth/login
-  → FastAPI validates credentials, checks MFA requirement
-  → If MFA required: returns { mfaRequired: true, mfaToken }
-  → User enters TOTP code → POST /api/auth/mfa/verify
+  → FastAPI validates credentials AND confirms user.role == "admin"
+  → MFA is ALWAYS required (no bypass): returns { mfaRequired: true, mfaToken }
+  → Admin enters TOTP code → POST /api/auth/mfa/verify
   → FastAPI issues JWT tokens → session established
+  → JWT includes auth_method: "password+mfa" claim for audit differentiation
 ```
 
 ### 9.2 RBAC
@@ -910,11 +1020,15 @@ Tenant data isolation is enforced at **two independent layers** for defense-in-d
 - The connection pool sets `app.current_tenant_id` as a session variable before executing any query.
 - RLS policy: `USING (tenant_id = current_setting('app.current_tenant_id'))`.
 - A bug that omits the application-layer filter is blocked by the RLS policy — it returns an empty result set rather than cross-tenant data.
+- **RLS misconfiguration guard:** The known PostgreSQL footgun where `current_setting('app.current_tenant_id')` returns an empty string (if the setting is never set) is explicitly guarded against. The RLS policy uses `current_setting('app.current_tenant_id', true)` (the `true` parameter returns `NULL` on missing setting instead of raising an error), and the policy includes `AND current_setting('app.current_tenant_id', true) IS NOT NULL`. This ensures that a misconfigured service account or connection that fails to set the session variable receives **zero rows** rather than all rows or an error. An integration test (`test_rls_unset_tenant.py`) explicitly validates this failure mode by executing queries without setting `app.current_tenant_id` and asserting an empty result set.
+
+**Partner-role enforcement (RLS-backed):**
+- The `partner` role's restriction to "own orders" is enforced at the database layer via an additional RLS policy on the `exceptions` table: `USING (tenant_id = current_setting('app.current_tenant_id', true) AND (current_setting('app.current_role') != 'partner' OR retailer_id = current_setting('app.current_partner_id', true)))`. This is **not application-layer filtering** — it is a defense-in-depth RLS policy that prevents a compromised or buggy application layer from leaking cross-partner data within the same tenant.
 
 **Additional isolation:**
 - Redis pub/sub channels scoped by tenant: `asoe:ws:{tenant_id}`
 - Policy overrides scoped by tenant: `policy_overrides` table
-- Partner users scoped to their own orders within the tenant
+- Partner users scoped to their own orders within the tenant (RLS-enforced, see above)
 
 ### 9.4 trace_id End-to-End Propagation
 
@@ -948,6 +1062,10 @@ Next.js UI                     FastAPI API                   Async Worker + ASOE
 | LangFuse keys | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` via Key Vault |
 
 Manifests: `k8s/core/secret-provider.yaml` (SecretProviderClass) and `k8s/core/deployment.yaml` (volume mount + `envFrom.secretRef`).
+
+**Secret scanning enforcement:** The "no static credentials in code, Dockerfiles, or defaults" policy is enforced at two levels, not just stated as policy:
+- **Pre-commit hook:** Both repositories (`asoe2`, `asoe-ui`) include a `.pre-commit-config.yaml` with `gitleaks` configured as a pre-commit hook. This scans staged changes for API keys, passwords, connection strings, and other credential patterns before any commit is accepted locally.
+- **CI gate:** The GitHub Actions CI pipeline runs `truffleHog` (with `--only-verified` for reduced false positives) against the full diff on every pull request. A credential detection finding fails the CI check and blocks merge. The CI scan covers patterns that may bypass the local pre-commit hook (e.g., base64-encoded credentials, tokens in YAML manifests).
 
 ### 9.6 Environment Isolation (Production vs Sandbox)
 
@@ -994,6 +1112,7 @@ graph TD
 - `TraceRecord.final_status` provides the reward signal (1.0 for COMPLETE, 0.0 otherwise)
 - `ExecutionLog.resolved_by` / `resolved_action` / `resolution_notes` provide correction labels when humans override agent recommendations
 - Distill validated Skill-to-Recipe mappings from the database to reduce classification latency and cost
+- **Training data quality gate:** TraceRecords where `backend_fallback == "deterministic_fallback"` (see Section 5.3) are flagged with `is_fallback_generated: true` and **excluded from fine-tuning datasets**. Deterministic fallback traces represent hardcoded rule-based outputs, not genuine model decisions — including them would teach the model to replicate static logic rather than learn from real inference patterns. Only traces generated by the Custom or Outlines backends are eligible for training.
 
 **Guardrail:** Fine-tuned models deploy to the inference sidecar only after passing the full golden test suite offline. The `DeterministicFallbackBackend` remains as the always-available safety net.
 
@@ -1045,6 +1164,16 @@ Every screen implements a two-layer information architecture:
 
 The `AgentReasoningCard` component implements this pattern: Layer 1 shows the recommendation and confidence bar; clicking "View evidence" expands Layer 2 with the full audit trail.
 
+**Verdict-specific UI states:**
+
+| Shadow Verdict | Layer 1 Behavior | Layer 2 Behavior | Action Buttons |
+|---|---|---|---|
+| **GREEN** | Green status badge, "Auto-resolved" label, confidence bar filled | Collapsed by default — expandable for audit trail | "View Details" (no intervention needed) |
+| **YELLOW** | Amber status badge, "Review Required" label, recommendation + confidence bar | Auto-expanded — evidence waterfall shown immediately so the reviewer has context | "Approve" (primary CTA), "Reject" (secondary), "Escalate" (tertiary) |
+| **RED** | Red status badge, "Blocked by Policy" label, blocking policy rule(s) listed in Layer 1 | Auto-expanded — full policy violation details shown with the specific `shadow_policy_hits` | "Acknowledge" (marks as reviewed), "Override" (admin-only, requires `resolution_notes`), "Escalate" (routes to escalation target) |
+
+> **RED verdict design rationale:** RED exceptions are rare (policy violations, penalty matrix breaches) and high-stakes. The UI auto-expands Layer 2 and removes the primary action button to prevent accidental dismissal. The "Override" button is gated to `admin` role and requires a mandatory `resolution_notes` entry that is recorded in the `policy_audit_log` for SOX compliance.
+
 ### 11.2 Component Strategy: Shadcn/ui Reconciliation
 
 Shadcn/ui is adopted **only for non-agent primitives**. All 12 agent-first components are custom-built because they implement domain-specific behavior (two-layer cognition, brand restraint, pipeline visualization) that Shadcn does not provide.
@@ -1062,13 +1191,26 @@ Shadcn/ui is adopted **only for non-agent primitives**. All 12 agent-first compo
 | **NavBar** | Custom (new) | 56px glass surface with agent status pulse dot. Brand purple on logo only. |
 | **MetricTile** | Custom (new) | KPI display: icon (40x40 tinted bg) + label + monospace value + subtitle |
 | **AgentReasoningCard** | Custom (new) | Two-layer cognition: recommendation + confidence bar (Layer 1), expandable evidence (Layer 2) |
-| **WaterfallStepper** | Custom (new) | Real-time pipeline progress driven by WebSocket events (Section 8) |
+| **WaterfallStepper** | Custom (new) | Real-time pipeline progress driven by WebSocket events (Section 8). See **Loading State UX** below. |
 | **ActivityIndicator** | Custom (new) | Dynamic text replacing static labels ("Agent analyzing 3 condition records...") |
 | **Badge/Pill** | Custom (new) | Tinted bg + colored text at rest; muted tint rules differ from Shadcn Badge |
 | **Sidebar** | Custom (new) | 480px intervention panel, slides right, primary Layer 2 surface |
 | **Toast** | Custom (new) | 4.5s auto-dismiss, status-colored — the only solid-fill element in the design system |
 
 **Rule:** When a Shadcn component exists but conflicts with ASOE brand restraint rules, the custom ASOE version takes precedence.
+
+**Loading State UX (WaterfallStepper):**
+
+The `WaterfallStepper` renders per-node execution progress in real-time via WebSocket events. Because individual nodes can take 3–10 seconds, the loading state is explicitly designed — not a generic spinner:
+
+| Node State | Visual Treatment |
+|---|---|
+| **Pending** (not yet reached) | Muted text + empty circle indicator. Node name visible but grayed out. |
+| **In Progress** (started, not completed) | Pulsing dot animation (brand purple, `--dur-slow: 1.2s` pulse). `ActivityIndicator` text below the node shows contextual status (e.g., "Checking credit exposure...", "Auditing against penalty matrix..."). A subtle skeleton shimmer on the data area below hints that results are incoming. |
+| **Completed** | Solid checkmark (green) + summary data appears inline (e.g., intent, shadow verdict). Transition uses `--ease-out` with `--dur-fast: 200ms`. |
+| **Failed** | Red X icon + error summary. Subsequent nodes render as "Skipped" (dashed border, muted). |
+
+The `ActivityIndicator` messages are node-specific and domain-aware — not generic "Loading..." text. They are defined in a `node_activity_messages` map and selected based on the current node + available `GraphState` data (e.g., after `classify`, the `shadow_audit` activity indicator can say "Auditing DUPLICATE_PO against compliance policies...").
 
 ### 11.3 Design Tokens
 
@@ -1090,6 +1232,18 @@ All visual decisions are expressed as CSS custom properties in `design-tokens.cs
 3. Active tab underline
 
 All other elements — data, links, badges, confidence bars, selected states — use neutrals. Status colors (`--color-success`, `--color-warning`, `--color-error`) are semantic and map directly to shadow verdicts (GREEN, YELLOW, RED).
+
+**WCAG 2.1 AA Compliance for Status Colors:**
+- All status color values meet WCAG 2.1 AA minimum contrast ratios: 4.5:1 for normal text, 3:1 for large text and UI components.
+- Status indicators **never rely on color alone** (WCAG 1.4.1). Every status color is paired with a secondary differentiator:
+  - **GREEN:** Checkmark icon (Lucide `Check`) + "Resolved" / "Approved" text label
+  - **YELLOW:** Warning triangle icon (Lucide `AlertTriangle`) + "Review Required" text label
+  - **RED:** Stop/shield icon (Lucide `ShieldX`) + "Blocked" text label
+- Badge/pill components use tinted backgrounds with text labels, not color-only indicators.
+- The design token values are validated against WCAG contrast ratios in CI via `jest-axe` accessibility tests on all status-related components.
+
+**Figma ↔ Code Token Sync:**
+- The `design-tokens.css` file is the **code-side source of truth**. A Figma plugin (Style Dictionary export) generates a `design-tokens.json` that is diffed against `design-tokens.css` in CI. Drift between Figma and code produces a CI warning (not a blocker in V1, upgraded to a blocker in V1.5 when the design system stabilizes). The Figma library is maintained by the design lead and exported quarterly, or on any brand-impacting change.
 
 ### 11.4 Tech Stack
 
@@ -1240,6 +1394,8 @@ Every `run_graph()` call emits a `TraceRecord` to the `asoe.observability` Pytho
 | `rag_chunks` | Reserved for V2 — always empty in V1.0 |
 | `constrained_output_schemas` | Map of layer → schema name (e.g., `intent → IntentDecision`) |
 | `gateway_calls` | Gateway operations invoked (dependency resolutions + effect applications) |
+| `backend_fallback` | Which backend tier served this request: `"custom"`, `"outlines"`, or `"deterministic_fallback"` (see Section 5.3) |
+| `is_fallback_generated` | `true` if `backend_fallback == "deterministic_fallback"` — excluded from V2 fine-tuning datasets |
 | `final_status` | `COMPLETE`, `FAIL_TO_HUMAN`, `BLOCKED`, `MANUAL_REVIEW_REQUIRED`, `REJECTED` |
 | `explanation` | Human-readable reason for the terminal decision |
 
