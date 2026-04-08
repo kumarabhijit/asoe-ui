@@ -62,6 +62,22 @@ Optional: add `AllowedRecipeName` value, update `DeterministicFallbackBackend` c
 
 **Candidate V1.5 intents** (next tier by volume in CPG O2C): `SHORT_SHIP` (partial fulfillment discrepancies), `SUBSTITUTION` (product substitution without buyer authorization), `EDI_MAPPING_ERROR` (field mapping failures between EDI 850/810 and ERP).
 
+### V1 Foundation Guardrails (V2/V3 Readiness)
+
+V1 requires zero schema changes to support V2/V3 expansion. But the following **discipline rules** must be respected during V1 development to keep the expansion path open. Violating any creates a refactoring tax that delays V2.
+
+1. **No intent-specific logic in pipeline nodes.** The `ingest`, `shadow_audit`, `select_recipe`, `execute_recipe`, and `apply_effects` nodes must operate on typed abstractions (`AllowedIntent`, `RecipeSpec`, `GatewayRequest`), never on `if intent == "DUPLICATE_PO"` branches. Intent-specific logic belongs exclusively in recipes and skill documents.
+
+2. **No hardcoded intent or lifecycle state values in the UI.** The frontend must render queue filters, status badges, and intent labels from API-provided enums or config, not from hardcoded TypeScript switch statements. Adding a new intent or lifecycle state must not require a UI code change.
+
+3. **`metadata` dict is a typed-extension bridge, not a junk drawer.** Each intent must document its expected `metadata` keys in the `RecipeSpec` (e.g., DUPLICATE_PO expects `signal_scores`, `matched_po_id`). V1 test coverage must assert that required metadata keys are present for each intent. This prevents `metadata` from drifting into an unvalidated bag as new intents are added.
+
+4. **Gateway adapters must be ERP-agnostic at the protocol boundary.** The `InfrastructureGateway` protocol must not reference SAP-specific types (BAPI names, condition type codes). SAP-specific translation lives inside the SAP adapter implementation, not in the protocol or executor. This ensures Oracle, Dynamics, or WMS adapters can implement the same protocol without modification.
+
+5. **`exceptions` table must remain intent-agnostic.** No intent-specific columns (e.g., `po_similarity_score`, `damage_type`). All intent-specific data lives in `resolution_data JSONB`. This is already true — preserve it.
+
+6. **Policy keys must use a dot-delimited hierarchical format.** V1 keys follow the convention `{scope}.{key}` (e.g., `global.MAX_DISCOUNT_ALLOWED`). V2 adds more specific scopes: `tenant.{tenant_id}.{key}`, `retailer.{retailer_id}.{key}`, `retailer.{retailer_id}.category.{category}.{key}`. The `validate_types` node resolves most-specific-first with global fallback. The `policy_overrides` table schema already supports this — the convention must be established in V1 so V2 hierarchical resolution is a code change in `validate_types`, not a data migration.
+
 ---
 
 ## 2. System Context
@@ -102,11 +118,14 @@ ASOE **does not own:** order lifecycle, inventory, shipping, invoicing, or gener
 
 ### Exception Responsibility
 
-| Exception Type | Where Managed | ASOE Role |
-|---|---|---|
-| Operational (wrong SKU, out of stock) | OMS Layer | Not in scope |
-| Financial (invoice mismatch, credit limit) | ERP Layer / EMS | **ASOE resolves** |
-| Cross-system (duplicate PO, price mismatch between OMS and ERP) | **EMS Layer (ASOE)** | **ASOE resolves** |
+| Exception Type | Where Managed | ASOE Role | Version |
+|---|---|---|---|
+| Operational (wrong SKU, out of stock) | OMS Layer | Not in scope | — |
+| Financial (invoice mismatch, credit limit) | ERP Layer / EMS | **ASOE resolves** | V1 |
+| Cross-system (duplicate PO, price mismatch between OMS and ERP) | **EMS Layer (ASOE)** | **ASOE resolves** | V1 |
+| Trade/promotional (deductions, chargebacks, off-invoice claims) | TPM + EMS | **ASOE orchestrates** resolution, TPM validates promotion terms | V2 |
+| Physical supply chain (short-ship, broken pallet, damage claim) | WMS/TMS + EMS | **ASOE orchestrates** classification and routing; claims lifecycle managed by WMS/TMS | V3 |
+| Retailer compliance (OTIF penalties, routing guide violations) | Retailer Portal + EMS | **ASOE orchestrates** dispute workflows against retailer-specific compliance programs | V3 |
 
 ### Human Actors
 
@@ -120,13 +139,17 @@ ASOE **does not own:** order lifecycle, inventory, shipping, invoicing, or gener
 
 ### External System Integration
 
-| System | Protocol | Direction | Adapter Status (V1) |
+| System | Protocol | Direction | Adapter Status |
 |---|---|---|---|
-| SAP S/4HANA | RFC/BAPI via gateway adapter | Read (pricing, credit) + Write (condition records, hold release) | Stubbed |
-| OMS (generic) | REST API via gateway adapter | Read (fulfillment status, PO details) | Stubbed |
-| EDI Gateway | Azure Event Hubs (EDI 850 → JSON) | Inbound events | Stubbed |
-| Buyer Portal | Notification gateway effect | Outbound notifications | Stubbed |
-| LangFuse | HTTP SDK (optional) | Trace forwarding | Live (tested against self-hosted v2.95.1) |
+| SAP S/4HANA | RFC/BAPI via gateway adapter | Read (pricing, credit) + Write (condition records, hold release) | Stubbed (V1) |
+| OMS (generic) | REST API via gateway adapter | Read (fulfillment status, PO details) | Stubbed (V1) |
+| EDI Gateway | Azure Event Hubs (EDI 850 → JSON) | Inbound events | Stubbed (V1) |
+| Buyer Portal | Notification gateway effect | Outbound notifications | Stubbed (V1) |
+| LangFuse | HTTP SDK (optional) | Trace forwarding | Live (V1) |
+| TPM System (SAP TPM, Vistex) | REST / RFC via gateway adapter | Read (promotion terms, proof-of-performance) | V2 |
+| EDI 810/820/824/856/860/861 | Azure Event Hubs (multi-document) | Inbound events + correlation | V2 |
+| WMS / TMS | REST API via gateway adapter | Read (shipment status, inspection data, carrier claims) | V3 |
+| Retailer Portals (Retail Link, Vendor Central) | REST API / scraping adapter | Read (chargebacks, compliance penalties, dispute status) | V3 |
 
 ---
 
@@ -363,6 +386,8 @@ The complete typed state envelope passed through the pipeline. Source: `contract
 ### 5.2.1 OrderEvent Schema (Inbound Contract)
 
 Every API consumer (FastAPI endpoint, Event Hubs consumer, sandbox CLI) constructs an `OrderEvent` to feed into the pipeline. Source: `contracts/models.py`.
+
+> **V2 evolution:** `OrderEvent` is a V1-specific specialization. V2 introduces a discriminated union `ExceptionEvent = OrderEvent | ShipmentEvent | PaymentEvent | ReceivingEvent`, where each variant carries domain-specific required fields (e.g., `ShipmentEvent` requires `shipment_id`, `carrier_id`, `damage_type` instead of `po_price`, `sap_base_price`). The `event_type` field serves as the discriminator. The `ingest` node dispatches validation per variant. Existing V1 callers are unaffected because `OrderEvent` remains a valid variant. See Section 15 for the full roadmap.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -1355,6 +1380,10 @@ All other elements — data, links, badges, confidence bars, selected states —
 | **ADR-014** | HITL pause/resume via LangGraph `interrupt()` + `PostgresSaver` | Terminate graph on YELLOW, re-run on approval | Checkpointing to PostgreSQL ensures GraphState survives pod restarts and provides auditable record of exact state at human review. Resume is a single guarded API endpoint, keeping RBAC enforcement at the system boundary. |
 | **ADR-015** | JWT `env` claim (`production` / `sandbox`) validated at every request boundary | Network-level separation only | Separate signing keys + enforced claim check prevent sandbox credentials from reaching production. Cheaper and more auditable than network isolation alone. |
 | **ADR-016** | Two-layer tenant isolation: application-level injection + PostgreSQL RLS | Application-level only | Defense-in-depth: a bug that omits the app-layer `tenant_id` filter is caught by the RLS policy, returning empty results rather than cross-tenant data. |
+| **ADR-017** | ASOE is an exception orchestration platform, not a domain system | Build WMS/TPM/claims capabilities into ASOE | ASOE expands vocabulary (intents, recipes, gateways), not identity. Domain-specific systems are accessed through the gateway layer. This keeps the core pipeline stable across V1→V3. |
+| **ADR-018** | Lifecycle sub-states (V3) over exception-type-specific state machines | Separate state machine per exception type | Sub-states within the canonical 11 lifecycle states avoid state machine explosion. The pipeline routes on parent states only; sub-states are advisory for UI and reporting. |
+| **ADR-019** | Discriminated union `ExceptionEvent` (V2) over expanding `OrderEvent` | Add all fields to `OrderEvent` with most Optional | Discriminated union preserves compile-time type safety per domain. Each variant enforces its own required fields. `OrderEvent` remains a valid variant — V1 callers unaffected. |
+| **ADR-020** | Dot-delimited hierarchical policy keys from V1 | Flat keys now, add hierarchy later | Establishing the `scope.key` convention in V1 means V2 hierarchical policy resolution is a code change in `validate_types`, not a data migration of existing keys. |
 
 ---
 
@@ -1375,6 +1404,155 @@ These 11 invariants are enforced by code, not configuration. Violating any requi
 | 9 | **Skill definitions are loaded verbatim — no summarization or rewriting.** `SkillLoader` reads `skills/*.md` files as-is and injects them into context. | `skills/loader.py::SkillLoader` | `test_skill_loader.py` |
 | 10 | **All constrained outputs are validated by Pydantic before state advances.** `IntentDecision`, `ShadowDecision`, `RecipeProposal` all use Pydantic Literal types. A value outside the allowed set raises `ValidationError`. | `constraints/specs.py`, all backends | `test_constraints.py` |
 | 11 | **Recipes never import from the policy module.** All thresholds are injected by the orchestration layer (`validate_types` node). This ensures recipe logic is immutable across customer/vendor threshold sets. | `contracts/policy.py` (structural) | `TestRecipePolicyDecoupling` |
+
+---
+
+## 15. V2/V3 Platform Scalability Roadmap
+
+### 15.1 Platform Evolution Thesis
+
+ASOE is an **exception orchestration platform**, not a domain system. It does not become a warehouse management system, a trade promotion engine, or a claims lifecycle manager. It expands by growing its **vocabulary** — more intents, recipes, gateways, and skill documents — while the **grammar** remains unchanged: the 11-node pipeline, the Skill-Shadow-Recipe pattern, the hexagonal gateway layer, the Compliance Shadow, and the typed constraint system.
+
+V2/V3 exception domains are orchestrated by ASOE but resolved in collaboration with domain-specific systems (TPM, WMS, TMS, retailer portals) accessed through the gateway layer.
+
+```
+V1: Financial exceptions (pricing, credit, duplicate PO)
+      ↓ same pipeline, new intents + recipes + gateways
+V2: Trade & document exceptions (deductions, chargebacks, multi-EDI correlation)
+      ↓ same pipeline, new event types + lifecycle extensions + external integrations
+V3: Physical & compliance exceptions (damage claims, short-ship, retailer penalties)
+```
+
+### 15.2 V2: Multi-Domain Exception Orchestration
+
+**New exception domains:**
+
+| Domain | Intent(s) | Recipe(s) | New Gateway Adapters |
+|---|---|---|---|
+| Trade promotion deductions | `DEDUCTION_CLAIM`, `OFF_INVOICE_DISPUTE` | `DeductionValidationRecipe.py` | TPM system (SAP TPM, Vistex): read promotion terms, proof-of-performance |
+| Retailer chargebacks | `CHARGEBACK_DISPUTE` | `ChargebackDisputeRecipe.py` | Retailer portals (Retail Link, Vendor Central): read chargeback details, submit disputes |
+| Invoice discrepancies | `INVOICE_MISMATCH` | `InvoiceReconciliationRecipe.py` | EDI 810 ingest via Event Hubs; ERP read for invoice line details |
+| EDI mapping errors | `EDI_MAPPING_ERROR` | `EDIMappingCorrectionRecipe.py` | EDI Gateway: read raw 850/810 segments for field-level comparison |
+
+**Architectural additions (V2 only):**
+
+**1. Polymorphic event model.** Replace the single `OrderEvent` with a discriminated union:
+
+```python
+ExceptionEvent = Annotated[
+    OrderEvent | ShipmentEvent | PaymentEvent | ReceivingEvent,
+    Field(discriminator="event_category")
+]
+```
+
+Each variant carries domain-specific required fields. `OrderEvent` remains unchanged — V1 callers are unaffected. The `ingest` node dispatches validation per variant via `event_category`. `GraphState.event` changes type from `OrderEvent` to `ExceptionEvent`. This is the largest V2 code change — contained to `contracts/models.py` and `orchestration/nodes.py::ingest()`.
+
+**2. Cross-document event correlation.** A pre-pipeline correlation stage links related EDI documents (850 PO + 810 Invoice + 820 Remittance) into a single exception before the graph starts. This runs as a stateless function in the Event Hubs consumer, not as a new pipeline node. Output: a single `ExceptionEvent` with `metadata.correlated_documents[]` listing the linked document references. The pipeline itself does not change.
+
+**3. Hierarchical policy resolution.** The `validate_types` node resolves policy values most-specific-first:
+
+```
+retailer.{retailer_id}.category.{cat}.{key}
+  → retailer.{retailer_id}.{key}
+    → tenant.{tenant_id}.{key}
+      → global.{key}
+```
+
+The `policy_overrides` table schema is unchanged — only the resolution logic in `validate_types` expands. V1's dot-delimited key format (see V1 Foundation Guardrails §6) ensures zero data migration.
+
+**4. RAG on contracts.** Already planned for V2 (see Section 10, Layer 3). Enables the `load_skill` node to retrieve relevant contract clauses for deduction validation, promotional terms, and retailer-specific compliance rules via pgvector similarity search. Addresses the gap where V1 skill documents (static markdown) cannot encode the semi-structured promotional calendars and contractual terms needed for trade promotion auditing.
+
+**5. Compound exception spawning.** When the `classify` node identifies a compound case (e.g., a short-ship that is simultaneously a `SHORT_SHIP` + `CREDIT_BLOCK`), it returns the primary intent and records secondary intents in `metadata.secondary_intents[]`. The `apply_effects` node spawns child exceptions for each secondary intent via `POST /api/v1/exceptions/resolve/async`. Parent-child linkage is tracked via a nullable `parent_exception_id` column added to the `exceptions` table. This is a single ALTER TABLE + a small addition to `apply_effects` — no pipeline restructuring.
+
+### 15.3 V3: Physical Supply Chain & Claims Lifecycle
+
+**Prerequisite:** V2 polymorphic event model and cross-document correlation must be in place.
+
+**New exception domains:**
+
+| Domain | Intent(s) | Recipe(s) | New Gateway Adapters |
+|---|---|---|---|
+| Short-ship | `SHORT_SHIP` | `ShortShipReconciliationRecipe.py` | WMS: read ASN vs. receiving quantities; TMS: read carrier BOL |
+| Damage / broken pallet | `DAMAGE_CLAIM` | `DamageClaimRoutingRecipe.py` | WMS: read inspection reports; TMS: read carrier claims portal |
+| Temperature excursion | `TEMP_EXCURSION` | `TempExcursionDispositionRecipe.py` | IoT gateway: read temperature logger data |
+| Retailer OTIF penalties | `OTIF_PENALTY` | `OTIFDisputeRecipe.py` | Retailer portals: read penalty details, submit dispute with evidence |
+
+**Architectural additions (V3 only):**
+
+**1. Binary evidence attachments.** Physical exceptions carry photos, POD documents, and temperature logs. An `attachments` table links binary evidence (stored in Azure Blob Storage) to exceptions:
+
+```sql
+CREATE TABLE attachments (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    exception_id    UUID NOT NULL REFERENCES exceptions(id),
+    tenant_id       VARCHAR(100) NOT NULL,
+    file_type       VARCHAR(20) NOT NULL,  -- 'image/jpeg', 'application/pdf', 'text/csv'
+    blob_url        TEXT NOT NULL,          -- Azure Blob SAS URL (time-limited)
+    uploaded_by     VARCHAR(100) NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+`GraphState` gains an `attachment_refs: List[str]` field (UUIDs pointing to the `attachments` table). Recipes that need photos or documents request them via a new `blob_storage` gateway adapter.
+
+**2. Exception-type-specific lifecycle extensions.** Rather than replacing the shared lifecycle state machine, V3 adds **sub-states** scoped to specific exception types. The `exceptions` table gains a nullable `sub_state VARCHAR(30)` column. The core 11 lifecycle states remain the canonical routing states; sub-states provide domain-specific granularity within `EXECUTING` and `PENDING_REVIEW`:
+
+| Parent State | Sub-State (Damage Claims) | Sub-State (OTIF Disputes) |
+|---|---|---|
+| EXECUTING | `INSPECTING`, `ATTRIBUTING`, `CLAIMING` | `EVIDENCE_GATHERING`, `DISPUTE_FILED` |
+| PENDING_REVIEW | `CARRIER_RESPONSE_PENDING`, `MULTI_PARTY_REVIEW` | `RETAILER_RESPONSE_PENDING` |
+
+Sub-states are advisory (for UI rendering and reporting) — the pipeline routes on parent states only. This avoids state machine explosion while giving domain teams the specificity they need.
+
+**3. Multi-party review workflows.** Damage claims require input from the carrier, the warehouse, and the claims analyst. V3 extends the HITL model with a `review_parties` field on the `checkpoints` table:
+
+```sql
+ALTER TABLE checkpoints ADD COLUMN review_parties JSONB DEFAULT '[]';
+-- Example: [{"party": "carrier", "status": "pending"}, {"party": "warehouse", "status": "approved"}]
+```
+
+The `approve` endpoint validates that all required parties have responded before resuming the graph. This builds on the existing HITL pause/resume protocol (Section 5.9) without changing the graph structure — the `shadow_audit` interrupt just waits for multiple approvals instead of one.
+
+**4. Exception-type-specific SLA routing.** Time-critical exceptions (temperature excursions on perishables) need priority queue routing. The async worker gains priority lanes:
+
+| Priority | SLA Target | Exception Types | Queue |
+|---|---|---|---|
+| P1 (Critical) | 30 minutes | `TEMP_EXCURSION`, food safety | `asoe:tasks:p1` |
+| P2 (Standard) | 8 min p50 | All V1 financial exceptions | `asoe:tasks:p2` (default) |
+| P3 (Extended) | 24 hours | Damage claims, OTIF disputes (require evidence gathering) | `asoe:tasks:p3` |
+
+Priority is determined by `event_type` at ingestion time, before the graph starts. Worker concurrency is allocated proportionally (e.g., 2 workers on P1, 4 on P2, 2 on P3).
+
+### 15.4 Architectural Seams: V1 Foundations → V2/V3 Capabilities
+
+Each V2/V3 capability maps to an existing V1 seam. No V1 architectural redesign is required.
+
+| V2/V3 Capability | V1 Seam That Enables It | V2/V3 Change |
+|---|---|---|
+| Polymorphic event model | `event_type` field + `metadata` dict on `OrderEvent` | Add `ExceptionEvent` discriminated union; `ingest` dispatches by variant |
+| New intents + recipes | Intent Extensibility Path (4-step recipe) | Add enum values, recipes, specs, skills — no pipeline changes |
+| Cross-document correlation | Event Hubs consumer (pre-pipeline) | Add correlation function before `run_graph()` call |
+| Hierarchical policy | `policy_overrides` table + dot-delimited key format | Expand `validate_types` lookup logic |
+| RAG on contracts | pgvector installed, `context_embedding` column exists | Build HNSW index, add embedding computation, expand `load_skill` |
+| Compound exceptions | `WorkflowRunner` saga pattern | Add `parent_exception_id` FK, spawn children from `apply_effects` |
+| New gateway adapters (TPM, WMS, TMS, retailer portals) | Hexagonal gateway layer + adapter registry | Implement new adapters behind the existing `InfrastructureGateway` protocol |
+| Binary evidence | `resolution_data JSONB` + `metadata` dict | Add `attachments` table + `blob_storage` gateway adapter |
+| Lifecycle sub-states | `lifecycle_state` enum + `resolution_data JSONB` | Add `sub_state` column; UI renders from API, not hardcoded |
+| Multi-party review | HITL pause/resume + `checkpoints` table | Add `review_parties` JSONB to `checkpoints`; multi-approval gate in `approve` endpoint |
+| Priority SLA routing | Celery/ARQ task queue + `event_type` field | Add priority queues; route by `event_type` at ingestion |
+| Per-retailer compliance profiles | `policy_overrides` table + `retailer_id` on `exceptions` | Use `retailer.{id}.{key}` policy keys; resolve in `validate_types` |
+
+### 15.5 What ASOE Does Not Become
+
+ASOE expands its exception vocabulary, not its system identity. The following remain out of scope regardless of version:
+
+| System | ASOE Relationship | Why Not |
+|---|---|---|
+| Warehouse Management (WMS) | ASOE reads inspection data via gateway; does not manage inventory or warehouse operations | WMS is a real-time operational system; ASOE is an exception orchestration layer |
+| Trade Promotion Management (TPM) | ASOE validates deductions against TPM data via gateway; does not plan or budget promotions | TPM is a planning and budgeting system; ASOE resolves exceptions that arise from promotions |
+| Transportation Management (TMS) | ASOE reads carrier claims via gateway; does not manage shipments or carriers | TMS is a logistics execution system; ASOE orchestrates exception resolution |
+| Master Data Management (MDM) | ASOE may identify master data as a root cause (V3); does not maintain master data | MDM is a governance system; ASOE resolves symptoms and flags root causes |
+| Retailer Compliance Portal | ASOE submits disputes via gateway; does not aggregate or report on compliance metrics | Retailer portals are the system of record for chargebacks; ASOE is the dispute orchestration layer |
 
 ---
 
