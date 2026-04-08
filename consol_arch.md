@@ -153,6 +153,64 @@ graph TD
     WORKER -->|"Publish node-complete events"| REDIS
 ```
 
+### Consolidated Platform View
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          ASOE PLATFORM                              │
+│                                                                     │
+│  ┌────────────┐   ┌───────────────┐    ┌───────────────────────┐   │
+│  │ Azure Front │   │               │    │                       │   │
+│  │ Door (CDN + │──►│   NEXT.JS UI  │    │    POSTGRESQL 16      │   │
+│  │ WAF + SSL)  │   │  (Agent-First │◄──►│  (State, Audit,       │   │
+│  └────────────┘   │   Design Sys) │    │   Lifecycle, RLS,     │   │
+│                    └───────┬───────┘    │   Checkpoints)        │   │
+│                            │            └───────────────────────┘   │
+│                    ┌───────▼───────┐              ▲                 │
+│                    │   FASTAPI     │              │                 │
+│                    │  (REST + WS   │──────────────┘                 │
+│                    │   + RBAC)     │                                │
+│                    └───────┬───────┘                                │
+│                            │                                       │
+│                    ┌───────▼───────┐                                │
+│                    │   REDIS 7+    │                                │
+│                    │  (Pub/Sub +   │                                │
+│                    │   Task Queue  │                                │
+│                    │   + Cache)    │                                │
+│                    └───────┬───────┘                                │
+│                            │                                       │
+│                    ┌───────▼─────────────────────────────────┐      │
+│                    │  ASYNC WORKER                           │      │
+│                    │  ┌───────────────────────────────────┐  │      │
+│                    │  │  ASOE CORE (run_graph)            │  │      │
+│                    │  │  ┌───────┐ ┌────────┐ ┌────────┐ │  │      │
+│                    │  │  │ Skill │→│ Shadow │→│ Recipe │ │  │      │
+│                    │  │  └───────┘ └────────┘ └────────┘ │  │      │
+│                    │  │  Gateway Layer (OMS / ERP)        │  │      │
+│                    │  └───────────────────────────────────┘  │      │
+│                    │            ↕ (optional)                 │      │
+│                    │  ┌───────────────────────────────────┐  │      │
+│                    │  │  INFERENCE SIDECAR                │  │      │
+│                    │  │  Outlines + vLLM on Intel AMX     │  │      │
+│                    │  │  (Compliance Shadow target)       │  │      │
+│                    │  └───────────────────────────────────┘  │      │
+│                    └─────────────────────────────────────────┘      │
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  CONTINUAL LEARNING LOOP (offline, V2 scope)                  │  │
+│  │  TraceRecords + Override signals → Analysis → Propose         │  │
+│  │  updates to: policy.py | SKILL.md | Shadow thresholds         │  │
+│  │  Human architect reviews → Approved changes deployed          │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  OBSERVABILITY (stdlib logging + LangFuse)                    │  │
+│  │  Correlated traces: API → Worker → Core → Gateway             │  │
+│  │  TraceRecord per run_graph() · trace_id end-to-end            │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
 ### Key Clarifications
 
 **ASOE Core is not an "AI Inference Engine."** It is a deterministic state machine that:
