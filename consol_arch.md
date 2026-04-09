@@ -11,6 +11,8 @@
 
 ASOE is a deterministic, compliance-first orchestration platform for resolving Order-to-Cash (O2C) exceptions in Consumer Packaged Goods (CPG) supply chains. It sits between Order Management Systems (OMS) and Enterprise Resource Planning systems (SAP, Oracle) as an independent Exception Management System — a "Control Tower" that catches what neither upstream nor downstream can resolve alone.
 
+**Why ASOE exists (the cross-domain gap):** A trade promotion deduction may originate in a TPM system, manifest as a payment shortfall on an EDI 820, and relate to a short-ship flagged by the WMS. No individual domain system — not the TPM, not the ERP, not the WMS — has visibility across all three. ASOE is the only system with the cross-domain context to correlate these signals into a single exception, audit it against compliance policy, and orchestrate resolution across the systems involved. This cross-domain correlation and unified audit trail is the platform's unique value — it does not replace domain systems, it bridges the gaps between them.
+
 ### Platform Principles
 
 1. **Determinism Over Autonomy.** AI reasoning is constrained to classification and context loading. All execution flows through immutable, pre-validated Python recipes. The LLM never writes code, guesses thresholds, or invents business logic.
@@ -62,6 +64,67 @@ Optional: add `AllowedRecipeName` value, update `DeterministicFallbackBackend` c
 
 **Candidate V1.5 intents** (next tier by volume in CPG O2C): `SHORT_SHIP` (partial fulfillment discrepancies), `SUBSTITUTION` (product substitution without buyer authorization), `EDI_MAPPING_ERROR` (field mapping failures between EDI 850/810 and ERP).
 
+**Extensibility proof: adding `SHORT_SHIP` end-to-end.**
+
+The following demonstrates that the 4-step path works with no pipeline, shadow, gateway layer, or UI changes.
+
+**Step 1 — Add intent enum value** (`constraints/specs.py`):
+```python
+AllowedIntent = Literal[
+    "CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR",
+    "DUPLICATE_PO", "SHORT_SHIP"  # ← one line added
+]
+```
+
+**Step 2 — Write recipe** (`recipes/short_ship_recipe.py`):
+```python
+class ShortShipReconciliationRecipe:
+    def run(self, params: dict) -> RecipeResult:
+        ordered_qty = params["ordered_quantity"]
+        received_qty = params["received_quantity"]
+        shortfall = ordered_qty - received_qty
+        shortfall_pct = shortfall / ordered_qty if ordered_qty > 0 else 0
+
+        if shortfall_pct > params["auto_credit_threshold"]:
+            return RecipeResult(action="ISSUE_CREDIT", credit_amount=shortfall * params["unit_price"])
+        elif shortfall_pct > params["review_threshold"]:
+            return RecipeResult(action="MANUAL_REVIEW", shortfall_qty=shortfall)
+        else:
+            return RecipeResult(action="ACCEPT_VARIANCE", shortfall_qty=shortfall)
+```
+
+**Step 3 — Register recipe spec** (`recipes/registry.py`):
+```python
+RecipeSpec(
+    name="ShortShipReconciliationRecipe.py",
+    allowed_intents=["SHORT_SHIP"],
+    required_params=["order_id", "line_item", "sku", "ordered_quantity",
+                     "received_quantity", "unit_price",
+                     "auto_credit_threshold", "review_threshold"],
+    dependencies=[("oms", "get_receiving_details")],  # new gateway op
+    effects=[("erp", "issue_credit_memo")],            # new gateway op
+    injected_policy={"auto_credit_threshold": "global.SHORT_SHIP_AUTO_CREDIT_PCT",
+                     "review_threshold": "global.SHORT_SHIP_REVIEW_PCT"},
+)
+```
+
+**Step 4 — Write skill definition** (`skills/SHORT_SHIP.md`):
+```markdown
+# SHORT_SHIP Skill
+## When to apply
+EDI 861 Receiving Advice shows received_quantity < ordered_quantity.
+## Reasoning guidance
+Compare ordered vs. received quantities. Check if partial shipment was pre-authorized.
+## Thresholds
+- Auto-credit if shortfall > {auto_credit_threshold} of order value
+- Manual review if shortfall > {review_threshold}
+- Accept variance below review threshold
+```
+
+**What required zero changes:** `orchestration/nodes.py` (all 11 nodes), `ComplianceShadow`, `GatewayExecutor`, `RecipeExecutor`, `GraphState` schema, the FastAPI API, the Next.js UI, WebSocket events, Redis pub/sub, the lifecycle state machine. The new gateway operations (`get_receiving_details`, `issue_credit_memo`) are registered as new entries in `gateways/registry.py` with stubbed adapters — the executor already dispatches by name.
+
+**What also needed changes (acknowledged):** The `DeterministicFallbackBackend` needs a classification rule for `SHORT_SHIP` (a 5th `if event_type` branch). The `AllowedRecipeName` literal needs `"ShortShipReconciliationRecipe.py"` added. Two new policy constants need entries in `contracts/policy.py`. These are mechanical additions, not architectural changes. Total: ~6 files touched, ~40 lines added, zero lines modified in the pipeline.
+
 ### V1 Foundation Guardrails (V2/V3 Readiness)
 
 V1 requires zero schema changes to support V2/V3 expansion. But the following **discipline rules** must be respected during V1 development to keep the expansion path open. Violating any creates a refactoring tax that delays V2.
@@ -76,7 +139,7 @@ V1 requires zero schema changes to support V2/V3 expansion. But the following **
 
 5. **`exceptions` table must remain intent-agnostic.** No intent-specific columns (e.g., `po_similarity_score`, `damage_type`). All intent-specific data lives in `resolution_data JSONB`. This is already true — preserve it.
 
-6. **Policy keys must use a dot-delimited hierarchical format.** V1 keys follow the convention `{scope}.{key}` (e.g., `global.MAX_DISCOUNT_ALLOWED`). V2 adds more specific scopes: `tenant.{tenant_id}.{key}`, `retailer.{retailer_id}.{key}`, `retailer.{retailer_id}.category.{category}.{key}`. The `validate_types` node resolves most-specific-first with global fallback. The `policy_overrides` table schema already supports this — the convention must be established in V1 so V2 hierarchical resolution is a code change in `validate_types`, not a data migration.
+6. **Policy keys must support future hierarchical resolution.** V1 `contracts/policy.py` uses flat constant names (`MAX_DISCOUNT_ALLOWED`, `DUPLICATE_PO_THRESHOLD_AUTO_BLOCK`). These are module-level constants, not database rows — they don't need a prefix. However, the `policy_overrides` table (where per-tenant overrides live) must use the dot-delimited hierarchical format from V1: `policy_key = "global.MAX_DISCOUNT_ALLOWED"` for the global default, `policy_key = "tenant.acme.MAX_DISCOUNT_ALLOWED"` for a tenant override. The `validate_types` node already resolves from `policy_overrides` first, falling back to `contracts/policy.py` constants when no override exists. **V1→V2 migration:** When V2 adds retailer-scoped and category-scoped keys (`retailer.{id}.{key}`, `retailer.{id}.category.{cat}.{key}`), the `validate_types` lookup expands to most-specific-first resolution. Existing `global.*` and `tenant.*` rows remain valid — zero data migration. The `contracts/policy.py` constants become the hardcoded fallback-of-last-resort, used only when no `policy_overrides` row matches at any scope.
 
 ---
 
@@ -121,11 +184,13 @@ ASOE **does not own:** order lifecycle, inventory, shipping, invoicing, or gener
 | Exception Type | Where Managed | ASOE Role | Version |
 |---|---|---|---|
 | Operational (wrong SKU, out of stock) | OMS Layer | Not in scope | — |
-| Financial (invoice mismatch, credit limit) | ERP Layer / EMS | **ASOE resolves** | V1 |
-| Cross-system (duplicate PO, price mismatch between OMS and ERP) | **EMS Layer (ASOE)** | **ASOE resolves** | V1 |
-| Trade/promotional (deductions, chargebacks, off-invoice claims) | TPM + EMS | **ASOE orchestrates** resolution, TPM validates promotion terms | V2 |
-| Physical supply chain (short-ship, broken pallet, damage claim) | WMS/TMS + EMS | **ASOE orchestrates** classification and routing; claims lifecycle managed by WMS/TMS | V3 |
-| Retailer compliance (OTIF penalties, routing guide violations) | Retailer Portal + EMS | **ASOE orchestrates** dispute workflows against retailer-specific compliance programs | V3 |
+| Financial (invoice mismatch, credit limit) | ERP Layer / EMS | **ASOE orchestrates** classification, audit, and resolution via gateway effects to ERP | V1 |
+| Cross-system (duplicate PO, price mismatch between OMS and ERP) | **EMS Layer (ASOE)** | **ASOE orchestrates** cross-system correlation and resolution via gateway effects to OMS + ERP | V1 |
+| Trade/promotional (deductions, chargebacks, off-invoice claims) | TPM + EMS | **ASOE orchestrates** resolution; TPM validates promotion terms via gateway | V2 |
+| Physical supply chain (short-ship, broken pallet, damage claim) | WMS/TMS + EMS | **ASOE orchestrates** classification and routing; claims lifecycle managed by WMS/TMS via gateway | V3 |
+| Retailer compliance (OTIF penalties, routing guide violations) | Retailer Portal + EMS | **ASOE orchestrates** dispute workflows against retailer-specific compliance programs via gateway | V3 |
+
+> **Language note:** ASOE always "orchestrates" — in every version. The pattern is identical: classify → audit → select recipe → execute via gateway → apply effects. V1 gateway adapters are stubbed, V2/V3 adapters connect to real external systems. The architecture does not change; only the vocabulary (intents, recipes, adapters) expands.
 
 ### Human Actors
 
@@ -1360,6 +1425,49 @@ All other elements — data, links, badges, confidence bars, selected states —
 
 ---
 
+## 12.1 Production Operations
+
+### Failure Scenarios and Runbook
+
+| # | Scenario | Detection | Severity | Response |
+|---|---|---|---|---|
+| **F1** | Celery/ARQ queue depth > 100 (back-pressure triggered, HTTP 429s firing) | `asoe_task_queue_depth` Prometheus alert | P2 | 1. Check worker health (`kubectl get pods -l app=asoe-worker`). 2. If workers healthy but saturated: scale workers (`kubectl scale deployment asoe-worker --replicas=4`). 3. If workers crash-looping: check Redis connectivity, inspect worker logs for OOM. 4. If sustained: pause Event Hubs consumer to stop inbound flow, drain queue, then resume. |
+| **F2** | Inference sidecar OOM or unresponsive | Health check failure on `/health` endpoint; `asoe_backend_fallback_total{tier="deterministic_fallback"}` spike | P3 | The 3-tier backend chain auto-degrades to `DeterministicFallbackBackend`. Page on-call only if fallback rate sustains > 50% for > 15 minutes. Restart sidecar: `kubectl rollout restart deployment asoe-inference`. If persistent OOM: increase memory limit in `k8s/inference/deployment.yaml` (current: 20Gi). |
+| **F3** | Tenant reports "no data" (suspected RLS misconfiguration) | Support ticket; verify via `SELECT current_setting('app.current_tenant_id', true)` on the affected connection | P2 | 1. Check if `app.current_tenant_id` is set on the connection pool (`asoe-api` logs at DEBUG level include the session variable). 2. Verify the tenant exists in JWT `org` claim. 3. Test RLS directly: `SET app.current_tenant_id = '{tenant_id}'; SELECT count(*) FROM exceptions;`. 4. If RLS returns 0 but data exists: check if tenant_id values match (case-sensitive). |
+| **F4** | HITL escalation scheduler stops running; exceptions pile up in PENDING_REVIEW | `asoe_pending_review_age_hours` Prometheus gauge alerts when max age > 50 hours (exceeds 48h timeout) | P1 | 1. Check scheduler health (`kubectl logs deployment/asoe-api -c scheduler`). 2. Manually trigger escalation sweep: `POST /api/v1/admin/escalation-sweep` (admin-only). 3. If scheduler pod is down: restart API deployment. 4. Audit all PENDING_REVIEW exceptions older than 48h and escalate manually if needed. |
+| **F5** | PostgreSQL connection pool exhaustion | `pg_stat_activity` count exceeds pool max; API returns 503 | P1 | 1. Check for long-running queries: `SELECT pid, now() - pg_stat_activity.query_start AS duration, query FROM pg_stat_activity WHERE state != 'idle' ORDER BY duration DESC;`. 2. Kill long-runners if safe: `SELECT pg_terminate_backend(pid);`. 3. If chronic: increase pool size in `DATABASE_URL` params or add read replica for dashboard queries. |
+
+### Unified Monitoring Strategy
+
+All observability signals converge on a single stack. No fragmented dashboards.
+
+| Signal Type | Source | Destination | Alerting |
+|---|---|---|---|
+| Application logs | stdlib `logging` (JSON structured) | Azure Monitor Logs (Log Analytics workspace) | Log-based alerts on `ERROR` level, filtered by `trace_id` |
+| LLM/pipeline traces | LangFuse SDK (optional forwarding) | Self-hosted LangFuse instance | LangFuse dashboard; no direct alerting (analysis tool) |
+| Infrastructure metrics | Prometheus (`asoe_*` custom metrics + default pod metrics) | Azure Monitor Metrics (Prometheus scrape endpoint) → Grafana | Grafana alert rules → PagerDuty/Opsgenie |
+| Audit logs | PostgreSQL `pgaudit` | Azure Monitor Logs (separate retention policy: 7 years) | Alert on any `DELETE`/`UPDATE` attempt on `policy_audit_log` |
+| Uptime | Azure Front Door health probes → `/api/v1/health` | Azure Monitor Availability | Page on-call if health check fails for > 2 minutes |
+
+**Grafana dashboards (V1 minimum):**
+1. **Operations Overview** — queue depth, active workers, resolution rate, p50/p95 latency, error rate
+2. **Exception Lifecycle** — funnel from INGESTED → CLOSED by intent, with FAIL_TO_HUMAN and ESCALATED breakouts
+3. **Per-Tenant Health** — exceptions per tenant, resolution SLA compliance, HITL timeout rate
+
+### Capacity Planning Model
+
+| Dimension | V1 Baseline | Scaling Trigger | Action |
+|---|---|---|---|
+| API replicas | 2 | CPU > 70% sustained 5 min OR p95 response time > 2s | HPA scales to max 6 replicas |
+| Worker replicas | 2 | Queue depth > 50 sustained 5 min | HPA scales to max 8 replicas |
+| PostgreSQL | Flexible Server GP (4 vCores, 32 GB) | Connection count > 80% of pool OR query p95 > 500ms | Scale to 8 vCores; add read replica for dashboard queries |
+| Redis | C3 Standard (6 GB) | Memory > 80% OR pub/sub latency > 10ms | Scale to C4 (13 GB) |
+| Inference sidecar | 1 (20 Gi memory) | Not auto-scaled — single replica sufficient for Llama 3.1 8B at < 200ms | Manual scale if multi-model serving required (V2) |
+
+**Throughput estimate:** 2 API replicas + 2 workers (4 concurrent tasks each) = ~480 exceptions/hour at p50 resolution time of 8 minutes. This exceeds the V1 target of 500 concurrent users (not all concurrent users generate exceptions simultaneously).
+
+---
+
 ## 13. Architecture Decision Log
 
 | ADR | Decision | Alternatives Considered | Rationale |
@@ -1381,7 +1489,7 @@ All other elements — data, links, badges, confidence bars, selected states —
 | **ADR-015** | JWT `env` claim (`production` / `sandbox`) validated at every request boundary | Network-level separation only | Separate signing keys + enforced claim check prevent sandbox credentials from reaching production. Cheaper and more auditable than network isolation alone. |
 | **ADR-016** | Two-layer tenant isolation: application-level injection + PostgreSQL RLS | Application-level only | Defense-in-depth: a bug that omits the app-layer `tenant_id` filter is caught by the RLS policy, returning empty results rather than cross-tenant data. |
 | **ADR-017** | ASOE is an exception orchestration platform, not a domain system | Build WMS/TPM/claims capabilities into ASOE | ASOE expands vocabulary (intents, recipes, gateways), not identity. Domain-specific systems are accessed through the gateway layer. This keeps the core pipeline stable across V1→V3. |
-| **ADR-018** | Lifecycle sub-states (V3) over exception-type-specific state machines | Separate state machine per exception type | Sub-states within the canonical 11 lifecycle states avoid state machine explosion. The pipeline routes on parent states only; sub-states are advisory for UI and reporting. |
+| **ADR-018** | Lifecycle sub-states (V3) over exception-type-specific state machines | Separate state machine per exception type | Sub-states within the canonical 11 lifecycle states avoid state machine explosion. The pipeline routes on parent states only. Sub-states serve two roles: advisory (UI labels, reporting) and API-boundary gating (multi-party quorum checks in the `approve` endpoint). Neither role involves pipeline graph routing. |
 | **ADR-019** | Discriminated union `ExceptionEvent` (V2) over expanding `OrderEvent` | Add all fields to `OrderEvent` with most Optional | Discriminated union preserves compile-time type safety per domain. Each variant enforces its own required fields. `OrderEvent` remains a valid variant — V1 callers unaffected. |
 | **ADR-020** | Dot-delimited hierarchical policy keys from V1 | Flat keys now, add hierarchy later | Establishing the `scope.key` convention in V1 means V2 hierarchical policy resolution is a code change in `validate_types`, not a data migration of existing keys. |
 
@@ -1415,6 +1523,13 @@ ASOE is an **exception orchestration platform**, not a domain system. It does no
 
 V2/V3 exception domains are orchestrated by ASOE but resolved in collaboration with domain-specific systems (TPM, WMS, TMS, retailer portals) accessed through the gateway layer.
 
+**Version entry criteria (market-driven, not calendar-driven):**
+
+| Version | Entry Criteria | Rationale |
+|---|---|---|
+| **V2 begins when** | V1 has ≥ 2 production tenants, ≥ 1,000 exceptions resolved end-to-end, ≥ 1 live (non-stubbed) gateway adapter, AND a signed LOI or customer request for trade/deduction use case | Proves V1 pipeline works in production with real data before expanding vocabulary. First live gateway validates the adapter pattern under real latency/error conditions. |
+| **V3 begins when** | V2 polymorphic event model is deployed, ≥ 1 V2 intent in production, cross-document correlation is live with ≥ 2 EDI document types, AND a signed LOI for physical supply chain or retailer compliance use case | V3 depends on V2 foundations (polymorphic events, correlation). Starting V3 before V2 is proven creates compounding risk. |
+
 ```
 V1: Financial exceptions (pricing, credit, duplicate PO)
       ↓ same pipeline, new intents + recipes + gateways
@@ -1447,7 +1562,15 @@ ExceptionEvent = Annotated[
 
 Each variant carries domain-specific required fields. `OrderEvent` remains unchanged — V1 callers are unaffected. The `ingest` node dispatches validation per variant via `event_category`. `GraphState.event` changes type from `OrderEvent` to `ExceptionEvent`. This is the largest V2 code change — contained to `contracts/models.py` and `orchestration/nodes.py::ingest()`.
 
-**2. Cross-document event correlation.** A pre-pipeline correlation stage links related EDI documents (850 PO + 810 Invoice + 820 Remittance) into a single exception before the graph starts. This runs as a stateless function in the Event Hubs consumer, not as a new pipeline node. Output: a single `ExceptionEvent` with `metadata.correlated_documents[]` listing the linked document references. The pipeline itself does not change.
+**Checkpoint migration strategy (V1→V2):** The `checkpoints` table stores serialized `GraphState` as JSONB. Changing `event` from `OrderEvent` to `ExceptionEvent` means old checkpoints can't be deserialized with the new Pydantic model. The migration is:
+1. Add a `schema_version INT DEFAULT 1` column to `checkpoints` before the V2 deploy.
+2. V2 `GraphState` model includes a `model_validator(mode="before")` that checks `schema_version`: if v1, it wraps the raw `event` dict in `{"event_category": "order", ...existing_fields}` to make it a valid `OrderEvent` variant of the `ExceptionEvent` union.
+3. All V1 checkpoints in `PENDING` status are drained (resolved or escalated) before the V2 deploy window. The 48h HITL timeout ensures no checkpoint persists indefinitely. The V2 deploy is scheduled ≥ 48h after freezing new YELLOW verdicts (by temporarily routing YELLOW → FAIL_TO_HUMAN).
+4. Post-deploy, any residual V1 checkpoints are migrated by a one-time backfill script that adds `schema_version = 1` and validates deserialization. Checkpoints that fail deserialization are logged and their exceptions transitioned to `FAILED` with reason `SCHEMA_MIGRATION`.
+
+This is operationally safe because checkpoints are transient (90-day active retention) and the drain window ensures near-zero residual V1 checkpoints at deploy time.
+
+**2. Cross-document event correlation.** A pre-pipeline correlation stage links related EDI documents (850 PO + 810 Invoice + 820 Remittance) into a single exception before the graph starts. This runs as a **stateful windowed join** in the Event Hubs consumer (not a stateless function — correlation requires holding documents in a buffer until matching documents arrive or a window expires). Implementation: a Redis sorted set keyed by `order_id` with a configurable correlation window (default: 72 hours). When a new EDI document arrives, the consumer checks for existing correlated documents; if a quorum is met (e.g., 850 + 810 pair), a single `ExceptionEvent` is emitted with `metadata.correlated_documents[]` listing the linked document references. If the window expires without a match, the individual document is processed as a standalone exception. The pipeline itself does not change — it receives a single event regardless of how many source documents were correlated.
 
 **3. Hierarchical policy resolution.** The `validate_types` node resolves policy values most-specific-first:
 
@@ -1462,7 +1585,21 @@ The `policy_overrides` table schema is unchanged — only the resolution logic i
 
 **4. RAG on contracts.** Already planned for V2 (see Section 10, Layer 3). Enables the `load_skill` node to retrieve relevant contract clauses for deduction validation, promotional terms, and retailer-specific compliance rules via pgvector similarity search. Addresses the gap where V1 skill documents (static markdown) cannot encode the semi-structured promotional calendars and contractual terms needed for trade promotion auditing.
 
-**5. Compound exception spawning.** When the `classify` node identifies a compound case (e.g., a short-ship that is simultaneously a `SHORT_SHIP` + `CREDIT_BLOCK`), it returns the primary intent and records secondary intents in `metadata.secondary_intents[]`. The `apply_effects` node spawns child exceptions for each secondary intent via `POST /api/v1/exceptions/resolve/async`. Parent-child linkage is tracked via a nullable `parent_exception_id` column added to the `exceptions` table. This is a single ALTER TABLE + a small addition to `apply_effects` — no pipeline restructuring.
+**5. Compound exception spawning.** When the `classify` node identifies a compound case (e.g., a short-ship that is simultaneously a `SHORT_SHIP` + `CREDIT_BLOCK`), it returns the primary intent and records secondary intents in `metadata.secondary_intents[]`. The `apply_effects` node spawns child exceptions for each secondary intent via `POST /api/v1/exceptions/resolve/async`. Parent-child linkage is tracked via a nullable `parent_exception_id` column added to the `exceptions` table. This is a single ALTER TABLE + a small addition to `apply_effects` — no pipeline restructuring. Note: the parent's `final_status` must reflect child outcomes — a parent records `COMPLETE_WITH_CHILDREN` (not `COMPLETE`) when children are spawned, and the TraceRecord links parent and child `trace_id` values so the 7-year audit trail shows the full resolution tree.
+
+**6. Dispute deadline tracking.** Retailer-specific dispute windows are hard business constraints — missing a deadline means unrecoverable revenue. V2 adds:
+
+```sql
+ALTER TABLE exceptions ADD COLUMN dispute_deadline TIMESTAMPTZ;
+ALTER TABLE exceptions ADD COLUMN dispute_source VARCHAR(50);  -- e.g., 'WALMART_OTIF', 'AMAZON_SHORTAGE'
+```
+
+The `ingest` node populates `dispute_deadline` from retailer-specific rules stored in `policy_overrides` (e.g., `retailer.walmart.DISPUTE_WINDOW_DAYS = 30`). A background scheduler monitors approaching deadlines:
+- **7 days before deadline:** Warning alert to assigned analyst + manager. Exception badge changes in UI.
+- **48 hours before deadline:** Escalation to manager. If exception is still `PENDING_REVIEW`, auto-escalate per the HITL escalation protocol (Section 5.9).
+- **Deadline passed:** Exception flagged `DISPUTE_EXPIRED` (new terminal status). TraceRecord records the revenue impact for reporting.
+
+This is low effort (one column, one scheduler job, one policy key pattern) but high impact — it directly prevents revenue leakage on trade deductions and retailer chargebacks.
 
 ### 15.3 V3: Physical Supply Chain & Claims Lifecycle
 
@@ -1502,7 +1639,12 @@ CREATE TABLE attachments (
 | EXECUTING | `INSPECTING`, `ATTRIBUTING`, `CLAIMING` | `EVIDENCE_GATHERING`, `DISPUTE_FILED` |
 | PENDING_REVIEW | `CARRIER_RESPONSE_PENDING`, `MULTI_PARTY_REVIEW` | `RETAILER_RESPONSE_PENDING` |
 
-Sub-states are advisory (for UI rendering and reporting) — the pipeline routes on parent states only. This avoids state machine explosion while giving domain teams the specificity they need.
+**Sub-state semantics — two distinct roles, clearly separated:**
+
+- **Rendering role (advisory):** Sub-states drive UI labels, dashboard filtering, and reporting. The `WaterfallStepper` and exception queue render sub-state labels from API responses. The pipeline **never** branches on `sub_state`. The core 11 lifecycle states remain the only routing states in `orchestration/nodes.py`.
+- **Gate role (control flow at the API boundary, not the pipeline):** Multi-party review gates (see §15.3.3 below) are enforced in the `approve` REST endpoint, not inside the pipeline graph. The `approve` endpoint checks `review_parties` before calling `graph.invoke()` to resume. This is API-level validation — identical in nature to checking JWT roles before allowing approval. The pipeline itself sees a simple resume signal; it does not know or care about multi-party state.
+
+This distinction matters: the pipeline routes on parent states only. The API layer may enforce additional pre-conditions (role checks, multi-party quorum) before triggering a state transition. Sub-states are metadata that the API layer and UI consume — they do not participate in graph routing decisions.
 
 **3. Multi-party review workflows.** Damage claims require input from the carrier, the warehouse, and the claims analyst. V3 extends the HITL model with a `review_parties` field on the `checkpoints` table:
 
@@ -1511,7 +1653,7 @@ ALTER TABLE checkpoints ADD COLUMN review_parties JSONB DEFAULT '[]';
 -- Example: [{"party": "carrier", "status": "pending"}, {"party": "warehouse", "status": "approved"}]
 ```
 
-The `approve` endpoint validates that all required parties have responded before resuming the graph. This builds on the existing HITL pause/resume protocol (Section 5.9) without changing the graph structure — the `shadow_audit` interrupt just waits for multiple approvals instead of one.
+The `approve` endpoint validates that all required parties have responded before calling `graph.invoke()` to resume. This is a pre-condition check at the API boundary — structurally identical to the existing JWT role check (`manager` or `admin` required). The graph itself receives a single resume signal and advances to `select_recipe` as in the V1 HITL protocol. The pipeline has no knowledge of multi-party logic; it just sees "approved." This builds on the existing HITL pause/resume protocol (Section 5.9) without changing the graph structure.
 
 **4. Exception-type-specific SLA routing.** Time-critical exceptions (temperature excursions on perishables) need priority queue routing. The async worker gains priority lanes:
 
