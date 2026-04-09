@@ -42,7 +42,7 @@ ASOE is a deterministic, compliance-first orchestration platform for resolving O
 | **Exception types** | Pricing discrepancies, promotional corrections, credit blocks, duplicate purchase orders |
 | **Intents** | `CONTRACTUAL_CORRECTION`, `CREDIT_BLOCK`, `MASS_PRICING_ERROR`, `DUPLICATE_PO` |
 | **Recipes** | `PriceAdjustmentRecipe.py`, `CreditHoldReleaseRecipe.py`, `DuplicatePORecipe.py` |
-| **Terminal statuses** | `COMPLETE`, `FAIL_TO_HUMAN`, `MANUAL_REVIEW_REQUIRED`, `BLOCKED`, `REJECTED` |
+| **Terminal statuses** | `COMPLETE`, `COMPLETE_WITH_CHILDREN`, `FAIL_TO_HUMAN`, `MANUAL_REVIEW_REQUIRED`, `BLOCKED`, `REJECTED` |
 | **Pipeline** | 11-node LangGraph state machine |
 | **Lifecycle** | 11-state exception lifecycle (INGESTED through CLOSED, including ESCALATED) |
 | **Tests** | 584 passing (16 test files) |
@@ -140,6 +140,19 @@ V1 requires zero schema changes to support V2/V3 expansion. But the following **
 5. **`exceptions` table must remain intent-agnostic.** No intent-specific columns (e.g., `po_similarity_score`, `damage_type`). All intent-specific data lives in `resolution_data JSONB`. This is already true — preserve it.
 
 6. **Policy keys must support future hierarchical resolution.** V1 `contracts/policy.py` uses flat constant names (`MAX_DISCOUNT_ALLOWED`, `DUPLICATE_PO_THRESHOLD_AUTO_BLOCK`). These are module-level constants, not database rows — they don't need a prefix. However, the `policy_overrides` table (where per-tenant overrides live) must use the dot-delimited hierarchical format from V1: `policy_key = "global.MAX_DISCOUNT_ALLOWED"` for the global default, `policy_key = "tenant.acme.MAX_DISCOUNT_ALLOWED"` for a tenant override. The `validate_types` node already resolves from `policy_overrides` first, falling back to `contracts/policy.py` constants when no override exists. **V1→V2 migration:** When V2 adds retailer-scoped and category-scoped keys (`retailer.{id}.{key}`, `retailer.{id}.category.{cat}.{key}`), the `validate_types` lookup expands to most-specific-first resolution. Existing `global.*` and `tenant.*` rows remain valid — zero data migration. The `contracts/policy.py` constants become the hardcoded fallback-of-last-resort, used only when no `policy_overrides` row matches at any scope.
+
+**Guardrail enforcement (CI-automated, not honor-system):**
+
+These guardrails are enforced in CI — they are not optional code review suggestions.
+
+| Guardrail | Enforcement Mechanism | CI Gate? |
+|---|---|---|
+| #1 No intent-specific logic in nodes | `grep -rn "intent ==" orchestration/nodes.py` in CI. Any match on a string literal intent value (e.g., `"DUPLICATE_PO"`) fails the build. Additionally, an architectural fitness test (`test_node_intent_agnostic.py`) uses AST inspection to verify no node function contains `if/elif` branches on `state.intent` against literal values. | Yes — build fails |
+| #2 No hardcoded values in UI | ESLint custom rule (`no-hardcoded-enums`) that flags string literals matching known intent or lifecycle state patterns in `.tsx` files. Intent and state values must come from API response types or a shared `enums.ts` generated from the backend schema. | Yes — lint fails |
+| #3 Metadata keys documented | Each `RecipeSpec` in `recipes/registry.py` declares `expected_metadata_keys: list[str]`. A test (`test_metadata_contracts.py`) verifies that every intent's test fixtures include all declared keys and that `ingest` validates their presence when the corresponding `event_type` is used. | Yes — test fails |
+| #4 ERP-agnostic gateway protocol | A test (`test_gateway_protocol_agnostic.py`) imports `gateways/base.py` and asserts no SAP/Oracle/Dynamics-specific strings appear in the `InfrastructureGateway` protocol, `GatewayRequest`, or `GatewayResponse` type definitions. | Yes — test fails |
+| #5 Intent-agnostic exceptions table | A migration guard (`test_schema_agnostic.py`) introspects the `exceptions` table columns and asserts no column name matches a known intent-specific pattern (e.g., `*_similarity*`, `*damage*`, `*deduction*`). `resolution_data JSONB` is the only permitted extensibility column. | Yes — test fails |
+| #6 Hierarchical policy key format | A test (`test_policy_key_format.py`) validates that all rows in `policy_overrides` match the regex `^(global\|tenant\.[a-z0-9_]+\|retailer\.[a-z0-9_]+(\\.category\\.[a-z0-9_]+)?)\\.\\w+$`. Rows with flat keys (no scope prefix) fail. | Yes — test fails |
 
 ---
 
@@ -956,6 +969,12 @@ The 7-year SOX retention requirement for `traces`, `policy_audit_log`, and `exce
 
 **Integrity:** Each archived Parquet file includes a SHA-256 checksum stored in the `policy_audit_log` for tamper detection. Azure Blob immutability policies (WORM) prevent modification or deletion during the retention period.
 
+**Operational ownership and monitoring:**
+- The monthly Parquet export is an automated Azure Function triggered on the 1st of each month. It is NOT a cron job that fails silently.
+- **Success signal:** The function writes a `{"partition": "traces_2026_01", "rows": 12345, "sha256": "abc...", "exported_at": "..."}` record to `policy_audit_log` on completion. A Grafana alert fires if no export record appears by the 3rd of the month.
+- **Failure signal:** Export failures are logged to Azure Monitor and trigger a PagerDuty alert to the platform/DevOps on-call. The partition remains in warm PostgreSQL until the export succeeds — no data loss risk from a failed export.
+- **Ownership:** The platform/DevOps engineer owns the archival pipeline. The compliance officer reviews the monthly `policy_audit_log` export records quarterly to verify no gaps in the 7-year chain.
+
 ---
 
 ## 8. Real-Time Communication Protocol
@@ -1353,8 +1372,32 @@ All other elements — data, links, badges, confidence bars, selected states —
 | Login | Centered card | SSO + email/password, agent activity footer (system is alive) |
 | Exception Queue | Queue + Sidebar (Layout A) | Flagship view: metrics strip, tab bar, DataTable, Sidebar for detail |
 | Exception Detail | Sidebar expand | AgentReasoningCard (Layer 1/2), WaterfallStepper, side-by-side PO comparison |
-| Dashboard | 2-column grid (Layout B) | Analytics: resolution rates, agent performance, exception trends |
+| Dashboard | 2-column grid (Layout B) | Analytics: resolution rates, agent performance, exception trends. See **Analytics Data Isolation** below. |
 | Settings / Admin | Standard layout | User management, SSO config, policy overrides, agent settings |
+
+### 11.6 Analytics Data Isolation
+
+Dashboard queries (resolution rates, agent performance, exception trends) must not contend with the OLTP workload that powers the exception queue and real-time pipeline.
+
+**V1 strategy (simple, no read replica):**
+- Dashboard queries run against **materialized views** refreshed every 5 minutes by a background task. The materialized views pre-aggregate data by intent, tenant, time period, and status.
+- Materialized views: `mv_resolution_stats` (resolution rate, avg time by intent/tenant/day), `mv_exception_funnel` (count per lifecycle state by intent/day), `mv_agent_performance` (auto-resolved vs. HITL vs. failed by day).
+- The dashboard API endpoints read from these views, not from the `exceptions` or `traces` tables directly. This eliminates complex aggregation queries from the OLTP hot path.
+- Refresh is triggered by the background scheduler (same process as HITL escalation sweep) and takes < 2 seconds against the partition-pruned current quarter.
+
+**V1.1+ strategy (when query volume justifies):**
+- Add a PostgreSQL read replica (Azure Flexible Server built-in). Dashboard endpoints route to the read replica. OLTP endpoints stay on the primary. Connection pool routing is handled by a `read_only=True` flag on the dashboard dependency injector.
+
+**Key dashboard KPIs (V1):**
+
+| KPI | Source | Aggregation |
+|---|---|---|
+| Resolution rate | `exceptions.final_status` | `COMPLETE` + `COMPLETE_WITH_CHILDREN` / total, by intent, by tenant |
+| Avg time-to-resolution | `exceptions.created_at` → `updated_at` (where `lifecycle_state = 'CLOSED'`) | p50, p95 by intent |
+| Auto-resolved % | `exceptions` where `resolved_by IS NULL AND final_status = 'COMPLETE'` | By intent, by tenant |
+| HITL intervention rate | `exceptions` where `lifecycle_state` passed through `PENDING_REVIEW` | By intent, by shadow_verdict |
+| Dollar value recovered | `resolution_data->>'credit_amount'` (where applicable) | Sum by intent, by tenant, by period |
+| FAIL_TO_HUMAN rate | `exceptions.final_status = 'FAIL_TO_HUMAN'` | By intent — high rate signals recipe or gateway issues |
 
 ---
 
@@ -1378,6 +1421,22 @@ All other elements — data, links, badges, confidence bars, selected states —
 - Terraform/Bicep for Azure infrastructure provisioning
 - Next.js `output: 'standalone'` for container deployment
 - Integration tests against real PostgreSQL and Redis (not SQLite)
+
+### Phase 2.5: First Live Gateway + Inference Readiness (Month 3-4)
+
+**Focus:** Validate the gateway abstraction and inference sidecar under real conditions before production.
+
+**First live gateway adapter (V1.1 gate):** All V1 gateways are stubbed. The stub pattern hides real-world latency, error modes, pagination, retry semantics, and data shape mismatches. The first live gateway adapter must be deployed and validated before declaring V1 production-ready.
+
+- **Candidate:** SAP S/4HANA pricing read (`get_pricing_conditions` via RFC/BAPI). This is the highest-value gateway because pricing data is the core dependency for 2 of 4 V1 intents (`CONTRACTUAL_CORRECTION`, `MASS_PRICING_ERROR`).
+- **Validation criteria:** (1) End-to-end resolution with live SAP data. (2) Latency p95 < 3 seconds for RFC call. (3) Gateway timeout and retry behavior tested under SAP unavailability. (4) `GatewayResponse` error codes map correctly to SAP return codes.
+- **Architectural stress test:** If the live adapter exposes that the `GatewayRequest`/`GatewayResponse` contract is insufficient (e.g., SAP returns paginated condition records, or requires a session token), fix the protocol now — not in V2 when 5 more adapters depend on it.
+
+**Inference sidecar readiness (LLM ops capability):** The inference sidecar is "optional" in V1, and the `DeterministicFallbackBackend` handles all decisions. But V1.1 targets the Compliance Shadow running on Llama 3.1 8B (real model), and V2 adds RAG. Operating an LLM in production requires capabilities that must be built incrementally — not learned under V2 deadline pressure:
+
+- **V1 milestone:** Deploy the inference sidecar with a Llama 3.1 8B model in sandbox, serving the `shadow_decision()` method alongside the deterministic fallback. Run both in shadow mode (deterministic is authoritative; model output is logged but not acted on) to compare verdicts and measure latency.
+- **Capabilities to build:** Model versioning (which model served which trace), prompt versioning (prompt templates tracked alongside code), latency monitoring (`asoe_inference_latency_ms` histogram), model health checks (sidecar `/health` endpoint), and graceful fallback (sidecar failure → automatic degradation to deterministic, already designed).
+- **V1.1 gate:** Model verdict matches deterministic fallback on > 95% of test cases. p95 latency < 200ms. Zero OOM events over 72-hour soak test.
 
 ### Phase 3: Production Fortress (Month 4+)
 
@@ -1540,14 +1599,14 @@ V3: Physical & compliance exceptions (damage claims, short-ship, retailer penalt
 
 ### 15.2 V2: Multi-Domain Exception Orchestration
 
-**New exception domains:**
+**New exception domains (priority order — ship incrementally, not all at once):**
 
-| Domain | Intent(s) | Recipe(s) | New Gateway Adapters |
-|---|---|---|---|
-| Trade promotion deductions | `DEDUCTION_CLAIM`, `OFF_INVOICE_DISPUTE` | `DeductionValidationRecipe.py` | TPM system (SAP TPM, Vistex): read promotion terms, proof-of-performance |
-| Retailer chargebacks | `CHARGEBACK_DISPUTE` | `ChargebackDisputeRecipe.py` | Retailer portals (Retail Link, Vendor Central): read chargeback details, submit disputes |
-| Invoice discrepancies | `INVOICE_MISMATCH` | `InvoiceReconciliationRecipe.py` | EDI 810 ingest via Event Hubs; ERP read for invoice line details |
-| EDI mapping errors | `EDI_MAPPING_ERROR` | `EDIMappingCorrectionRecipe.py` | EDI Gateway: read raw 850/810 segments for field-level comparison |
+| Priority | Domain | Intent(s) | Recipe(s) | New Gateway Adapters | Rationale |
+|---|---|---|---|---|---|
+| **V2.1** | Trade promotion deductions | `DEDUCTION_CLAIM`, `OFF_INVOICE_DISPUTE` | `DeductionValidationRecipe.py` | TPM system (SAP TPM, Vistex): read promotion terms, proof-of-performance | Highest dollar value. Trade deductions are 2-5% of gross revenue at most CPG companies — often $50M+ annually. |
+| **V2.2** | Retailer chargebacks | `CHARGEBACK_DISPUTE` | `ChargebackDisputeRecipe.py` | Retailer portals (Retail Link, Vendor Central): read chargeback details, submit disputes | Highest volume. Requires dispute_deadline tracking (§15.2.6) to prevent revenue leakage. |
+| **V2.3** | Invoice discrepancies | `INVOICE_MISMATCH` | `InvoiceReconciliationRecipe.py` | EDI 810 ingest via Event Hubs; ERP read for invoice line details | Natural extension of V1 pricing exceptions. Requires cross-document correlation (EDI 850 ↔ 810). |
+| **V2.4** | EDI mapping errors | `EDI_MAPPING_ERROR` | `EDIMappingCorrectionRecipe.py` | EDI Gateway: read raw 850/810 segments for field-level comparison | Lowest dollar impact per exception but high volume. Can ship after correlation engine is proven by V2.3. |
 
 **Architectural additions (V2 only):**
 
@@ -1716,7 +1775,7 @@ Every `run_graph()` call emits a `TraceRecord` to the `asoe.observability` Pytho
 | `gateway_calls` | Gateway operations invoked (dependency resolutions + effect applications) |
 | `backend_fallback` | Which backend tier served this request: `"custom"`, `"outlines"`, or `"deterministic_fallback"` (see Section 5.3) |
 | `is_fallback_generated` | `true` if `backend_fallback == "deterministic_fallback"` — excluded from V2 fine-tuning datasets |
-| `final_status` | `COMPLETE`, `FAIL_TO_HUMAN`, `BLOCKED`, `MANUAL_REVIEW_REQUIRED`, `REJECTED` |
+| `final_status` | `COMPLETE`, `COMPLETE_WITH_CHILDREN`, `FAIL_TO_HUMAN`, `BLOCKED`, `MANUAL_REVIEW_REQUIRED`, `REJECTED` |
 | `explanation` | Human-readable reason for the terminal decision |
 
 **LangFuse mapping:**
