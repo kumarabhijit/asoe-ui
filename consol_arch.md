@@ -45,7 +45,7 @@ ASOE is a deterministic, compliance-first orchestration platform for resolving O
 | **Terminal statuses** | `COMPLETE`, `COMPLETE_WITH_CHILDREN`, `FAIL_TO_HUMAN`, `MANUAL_REVIEW_REQUIRED`, `BLOCKED`, `REJECTED` |
 | **Pipeline** | 11-node LangGraph state machine |
 | **Lifecycle** | 11-state exception lifecycle (INGESTED through CLOSED, including ESCALATED) |
-| **Tests** | 584 passing (16 test files) |
+| **Tests** | Full suite must pass (`python -m pytest` for core, `npm test` for UI) |
 | **RAG** | Deferred to V2 — all context is structured and resolved via typed gateways |
 | **Continual learning** | V2 design blueprint included; not a V1 deliverable |
 
@@ -235,12 +235,12 @@ ASOE **does not own:** order lifecycle, inventory, shipping, invoicing, or gener
 
 ASOE Core is a **Python library**, not a standalone service. Both the FastAPI API server and the async worker import it directly. The inference sidecar is a separate optional container that serves constrained-generation models.
 
-> **Scaling evolution path:** The library model is a pragmatic V1 choice that eliminates network overhead and simplifies deployment. When the inference sidecar or async workers need to scale independently of the API server (expected at ~1,000+ concurrent exceptions/hour), the migration path is: (1) extract `asoe-core` into a gRPC service behind an internal load balancer, (2) define a `CoreServiceClient` that implements the same `run_graph()` interface, and (3) swap the import-based invocation for the client. The hexagonal gateway layer already enforces this boundary — no recipe or node function calls infrastructure directly.
+> **Scaling evolution path:** The library model is a deliberate V1 choice — see [ADR-001: Core Deployment Model](https://github.com/kumarabhijit/asoe2/blob/main/docs/adr/ADR-001-core-deployment-model.md) in the `asoe2` repository for the full rationale, alternatives considered (in-process library vs. versioned package vs. standalone service), and staged evolution triggers. In summary: the library model does not block horizontal scaling (multiple worker pods import `asoe-core` independently), the extraction seam already exists (`run_graph()` typed interface + hexagonal gateway layer), and premature service extraction would add operational complexity with no proportional benefit at V1 scale. The migration path from library → versioned package → gRPC service requires zero changes to recipes, gateways, or the compliance shadow.
 
 ```mermaid
 graph TD
     subgraph "Client Edge"
-        UI["Next.js 14 UI<br/>(Agent-First Control Tower)"]
+        UI["Next.js 16 UI<br/>(Agent-First Control Tower)"]
         FD["Azure Front Door<br/>(CDN + WAF)"]
     end
 
@@ -346,7 +346,7 @@ In V1.0, the `DeterministicFallbackBackend` handles all decision points without 
 
 | Domain | Technology | Responsibility |
 |---|---|---|
-| **ASOE UI** | Next.js 14 (App Router, TypeScript) | Agent-first frontend, WebSocket consumer, RBAC-enforced views |
+| **ASOE UI** | Next.js 16 (App Router, TypeScript) | Agent-first frontend, WebSocket consumer, RBAC-enforced views |
 | **API Server** | FastAPI (async, Uvicorn) | REST endpoints, WebSocket hub, synchronous graph invocations, auth |
 | **Async Worker** | Celery / ARQ + asoe-core | Long-running graph executions (8-min SLA), Event Hubs consumer. **Back-pressure:** max concurrency per worker is capped at 4 concurrent `run_graph()` tasks via Celery `worker_concurrency` / ARQ `max_jobs`. When queue depth exceeds 100 pending tasks, new `POST /resolve/async` requests receive HTTP 429 with `Retry-After` header. Queue depth is exposed via `asoe_task_queue_depth` Prometheus metric. |
 | **Inference Sidecar** | Outlines + vLLM on Intel Xeon AMX | Constrained generation, Compliance Shadow model serving |
@@ -363,7 +363,7 @@ In V1.0, the `DeterministicFallbackBackend` handles all decision points without 
 | `asoe-core` | `asoe2/Dockerfile.core` | FastAPI dev server + asoe-core library (LangGraph, recipes, Compliance Shadow) | Yes |
 | `asoe-ui-sandbox` | `asoe2/Dockerfile.ui` | Streamlit sandbox UI (for core-only development) | Yes |
 | `asoe-inference` | `asoe2/Dockerfile.inference` | Outlines + torch + transformers (local LLM) | Optional (`--profile inference`) |
-| `asoe-ui` | `asoe-ui/` (npm dev) | Next.js 14 dev server (runs outside Docker for hot reload) | Manual |
+| `asoe-ui` | `asoe-ui/` (npm dev) | Next.js 16 dev server (runs outside Docker for hot reload) | Manual |
 | `postgres` | Official image | PostgreSQL 16 + pgvector | Yes |
 | `redis` | Official image | Redis 7+ | Yes |
 
@@ -1209,7 +1209,7 @@ graph TD
     L2 --> |"Proposed PRs"| PR["Code Review<br/>(human architect)"]
     L3 --> |"Staged overrides"| PO["policy_overrides table<br/>(human-reviewed)"]
 
-    INF --> |"Must pass"| GOLDEN["Golden Test Suite<br/>(584 tests)"]
+    INF --> |"Must pass"| GOLDEN["Golden Test Suite"]
     PR --> |"Must pass"| GOLDEN
 ```
 
@@ -1235,7 +1235,7 @@ graph TD
 - Proposes PRs to `skills/*.md` (new reasoning patterns), `contracts/policy.py` (threshold adjustments), or new `RecipeSpec` entries
 - This is analogous to OpenClaw's "dreaming" — offline batch analysis that updates the system's "soul"
 
-**Guardrail:** Proposed changes are pull requests, never auto-merged. The existing test suite (584 tests) gates all changes. A human architect reviews every PR.
+**Guardrail:** Proposed changes are pull requests, never auto-merged. The full test suite gates all changes. A human architect reviews every PR.
 
 ### Layer 3: Learning Context (Per-Tenant Memory)
 
@@ -1358,7 +1358,7 @@ All other elements — data, links, badges, confidence bars, selected states —
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 14+ (App Router, React 18, TypeScript) |
+| Framework | Next.js 16 (App Router, React 19, TypeScript) |
 | Styling | CSS custom properties (`design-tokens.css`) + Tailwind CSS |
 | Icons | Lucide React (16/20/24px — never emoji) |
 | Fonts | SF Pro Display / Inter (sans), SF Mono / JetBrains Mono (mono) |
@@ -1417,7 +1417,7 @@ Dashboard queries (resolution rates, agent performance, exception trends) must n
 
 **Focus:** Automation, environment parity, CI/CD.
 
-- GitHub Actions: lint, type-check, test (584 Python + frontend tests), build Docker images
+- GitHub Actions: lint, type-check, test (Python + frontend test suites), build Docker images
 - Terraform/Bicep for Azure infrastructure provisioning
 - Next.js `output: 'standalone'` for container deployment
 - Integration tests against real PostgreSQL and Redis (not SQLite)
@@ -1538,7 +1538,7 @@ All observability signals converge on a single stack. No fragmented dashboards.
 | **ADR-005** | Custom agent-first components over full Shadcn/ui adoption | Shadcn for everything | Brand restraint, two-layer cognition, agent activity patterns, WaterfallStepper have no Shadcn equivalent. Shadcn adopted only for non-agent primitives. |
 | **ADR-006** | CSS custom properties as token source of truth | Tailwind-only theming | Tokens work without Tailwind; design system is framework-agnostic. 45+ tokens in `design-tokens.css`. |
 | **ADR-007** | Policy externalization with injection; recipes never import policy | Recipes read policy directly | Same recipe code serves different threshold sets. Single injection point (`validate_types`) for audit. Evolution: constants → env vars → ConfigMap → per-customer service. |
-| **ADR-008** | Next.js 14 (App Router, stable) | Next.js 16 (proposed in draft) | 14 is LTS and battle-tested. No features in 16 are required for V1. |
+| **ADR-008** | Next.js 16 (App Router, active LTS) | Next.js 15 (prior stable) | 16 is the current active LTS with React 19 support, improved performance, and Turbopack stable. |
 | **ADR-009** | Per-node WebSocket events with typed envelope | HTTP polling, SSE | Essential for the control tower experience. WaterfallStepper requires per-node granularity. Bidirectional WebSocket supports future intervention commands. |
 | **ADR-010** | Multi-tenancy from Day 1 via JWT `org` claim | Single-tenant first, retrofit later | Row-level `tenant_id` isolation from Day 1 avoids painful migration. Redis channels and policy overrides are tenant-scoped. |
 | **ADR-011** | Constrained generation at generation time (Outlines/Guidance) | Post-hoc parsing of LLM text output | Schema-constrained generation eliminates parsing failures. Pydantic Literal types provide defense-in-depth. |
@@ -1556,7 +1556,7 @@ All observability signals converge on a single stack. No fragmented dashboards.
 
 ## 14. Appendix: Execution Invariants
 
-These 11 invariants are enforced by code, not configuration. Violating any requires modifying and re-reviewing source code. They are validated by 584 tests across 16 test files.
+These 11 invariants are enforced by code, not configuration. Violating any requires modifying and re-reviewing source code. They are validated by the full test suite.
 
 | # | Invariant | Enforced By | Tested By |
 |---|---|---|---|
