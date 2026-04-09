@@ -240,7 +240,7 @@ ASOE Core is a **Python library**, not a standalone service. Both the FastAPI AP
 ```mermaid
 graph TD
     subgraph "Client Edge"
-        UI["Next.js 14 UI<br/>(Agent-First Control Tower)"]
+        UI["Next.js 16 UI<br/>(Agent-First Control Tower)"]
         FD["Azure Front Door<br/>(CDN + WAF)"]
     end
 
@@ -346,7 +346,7 @@ In V1.0, the `DeterministicFallbackBackend` handles all decision points without 
 
 | Domain | Technology | Responsibility |
 |---|---|---|
-| **ASOE UI** | Next.js 14 (App Router, TypeScript) | Agent-first frontend, WebSocket consumer, RBAC-enforced views |
+| **ASOE UI** | Next.js 16 (App Router, TypeScript) | Agent-first frontend, WebSocket consumer, RBAC-enforced views |
 | **API Server** | FastAPI (async, Uvicorn) | REST endpoints, WebSocket hub, synchronous graph invocations, auth |
 | **Async Worker** | Celery / ARQ + asoe-core | Long-running graph executions (8-min SLA), Event Hubs consumer. **Back-pressure:** max concurrency per worker is capped at 4 concurrent `run_graph()` tasks via Celery `worker_concurrency` / ARQ `max_jobs`. When queue depth exceeds 100 pending tasks, new `POST /resolve/async` requests receive HTTP 429 with `Retry-After` header. Queue depth is exposed via `asoe_task_queue_depth` Prometheus metric. |
 | **Inference Sidecar** | Outlines + vLLM on Intel Xeon AMX | Constrained generation, Compliance Shadow model serving |
@@ -363,7 +363,7 @@ In V1.0, the `DeterministicFallbackBackend` handles all decision points without 
 | `asoe-core` | `asoe2/Dockerfile.core` | FastAPI dev server + asoe-core library (LangGraph, recipes, Compliance Shadow) | Yes |
 | `asoe-ui-sandbox` | `asoe2/Dockerfile.ui` | Streamlit sandbox UI (for core-only development) | Yes |
 | `asoe-inference` | `asoe2/Dockerfile.inference` | Outlines + torch + transformers (local LLM) | Optional (`--profile inference`) |
-| `asoe-ui` | `asoe-ui/` (npm dev) | Next.js 14 dev server (runs outside Docker for hot reload) | Manual |
+| `asoe-ui` | `asoe-ui/` (npm dev) | Next.js 16 dev server (runs outside Docker for hot reload) | Manual |
 | `postgres` | Official image | PostgreSQL 16 + pgvector | Yes |
 | `redis` | Official image | Redis 7+ | Yes |
 
@@ -1358,7 +1358,7 @@ All other elements — data, links, badges, confidence bars, selected states —
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 14+ (App Router, React 18, TypeScript) |
+| Framework | Next.js 16 (App Router, React 19, TypeScript) |
 | Styling | CSS custom properties (`design-tokens.css`) + Tailwind CSS |
 | Icons | Lucide React (16/20/24px — never emoji) |
 | Fonts | SF Pro Display / Inter (sans), SF Mono / JetBrains Mono (mono) |
@@ -1538,7 +1538,7 @@ All observability signals converge on a single stack. No fragmented dashboards.
 | **ADR-005** | Custom agent-first components over full Shadcn/ui adoption | Shadcn for everything | Brand restraint, two-layer cognition, agent activity patterns, WaterfallStepper have no Shadcn equivalent. Shadcn adopted only for non-agent primitives. |
 | **ADR-006** | CSS custom properties as token source of truth | Tailwind-only theming | Tokens work without Tailwind; design system is framework-agnostic. 45+ tokens in `design-tokens.css`. |
 | **ADR-007** | Policy externalization with injection; recipes never import policy | Recipes read policy directly | Same recipe code serves different threshold sets. Single injection point (`validate_types`) for audit. Evolution: constants → env vars → ConfigMap → per-customer service. |
-| **ADR-008** | Next.js 14 (App Router, stable) | Next.js 16 (proposed in draft) | 14 is LTS and battle-tested. No features in 16 are required for V1. |
+| **ADR-008** | Next.js 16 (App Router, active LTS) | Next.js 15 (prior stable) | 16 is the current active LTS with React 19 support, improved performance, and Turbopack stable. |
 | **ADR-009** | Per-node WebSocket events with typed envelope | HTTP polling, SSE | Essential for the control tower experience. WaterfallStepper requires per-node granularity. Bidirectional WebSocket supports future intervention commands. |
 | **ADR-010** | Multi-tenancy from Day 1 via JWT `org` claim | Single-tenant first, retrofit later | Row-level `tenant_id` isolation from Day 1 avoids painful migration. Redis channels and policy overrides are tenant-scoped. |
 | **ADR-011** | Constrained generation at generation time (Outlines/Guidance) | Post-hoc parsing of LLM text output | Schema-constrained generation eliminates parsing failures. Pydantic Literal types provide defense-in-depth. |

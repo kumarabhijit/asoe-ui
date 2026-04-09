@@ -12,7 +12,7 @@ This plan covers the login screen implementation — the first screen users see.
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | **Next.js 14+** (App Router, React 18, TypeScript) |
+| Frontend | **Next.js 16** (App Router, React 19, TypeScript) |
 | Backend | **FastAPI** (Python, to be built separately) |
 | Styling | CSS custom properties (design-tokens.css) + Tailwind CSS |
 | Icons | Lucide React |

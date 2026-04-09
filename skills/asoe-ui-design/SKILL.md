@@ -254,7 +254,7 @@ Contrast: WCAG 2.1 AA (4.5:1 body, 3:1 large). Glass → solid fallback. Keyboar
 
 | Layer | Stack |
 |-------|-------|
-| Framework | React 18+ (hooks) |
+| Framework | React 19 (hooks) |
 | Styling | CSS custom properties + Tailwind |
 | Font | Inter (Google Fonts), SF Mono (system) |
 | Icons | Lucide React (24px) |

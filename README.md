@@ -54,7 +54,7 @@ Use `prompts/asoe-ui-design-system.md` as a session prompt to reproduce or exten
 
 | Layer | Choice |
 |-------|--------|
-| Framework | React 18+ |
+| Framework | React 19 (Next.js 16) |
 | Styling | CSS custom properties + Tailwind |
 | Sans Font | SF Pro Display → Inter (Google Fonts fallback) |
 | Mono Font | SF Mono → JetBrains Mono (Google Fonts fallback) |
