@@ -14,6 +14,7 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle,
+  ChevronRight,
   ShieldX,
   Users,
 } from "lucide-react";
@@ -27,9 +28,19 @@ import { exceptionsApi } from "@/lib/api";
 import type { StatsResponse } from "@/types/api";
 
 const NAV_TABS = [
+  { id: "inbox", label: "Customer Inbox", href: "/inbox" },
   { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
   { id: "dashboard", label: "Dashboard", href: "/dashboard" },
   { id: "settings", label: "Settings", href: "/settings" },
+];
+
+const RECENT_ACTIVITY = [
+  { time: "11:02", orderId: "SO-3100", action: "Pipeline executing — PriceAdjustmentRecipe", status: "EXECUTING", badge: "info", color: "var(--color-info)" },
+  { time: "10:31", orderId: "SO-2200", action: "Blocked by Compliance Shadow — PENALTY_MATRIX_VIOLATION", status: "BLOCKED", badge: "error", color: "var(--color-error)" },
+  { time: "09:13", orderId: "SO-1042", action: "Pending human review — duplicate PO detected", status: "REVIEW", badge: "warning", color: "var(--color-warning)" },
+  { time: "08:45", orderId: "SO-5010", action: "Escalated to manager — manual review required", status: "ESCALATED", badge: "warning", color: "var(--color-warning)" },
+  { time: "08:20", orderId: "SO-1001", action: "Auto-resolved — price adjustment applied via YK07", status: "RESOLVED", badge: "success", color: "var(--color-success)" },
+  { time: "07:22", orderId: "SO-6001", action: "Pending review — credit hold release needs approval", status: "REVIEW", badge: "warning", color: "var(--color-warning)" },
 ];
 
 export default function DashboardPage() {
@@ -67,40 +78,68 @@ export default function DashboardPage() {
         tabs={NAV_TABS}
         activeTab="dashboard"
         onTabChange={(id) => {
-          if (id === "exceptions") window.location.href = "/exceptions";
-          if (id === "settings") window.location.href = "/settings";
+          const tab = NAV_TABS.find((t) => t.id === id);
+          if (tab?.href) window.location.href = tab.href;
         }}
         userName="Jane Doe"
         userInitials="JD"
         agentCount={3}
       />
 
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "var(--space-24)" }}>
+      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "var(--space-24) var(--space-32)" }}>
+        {/* Breadcrumb */}
+        <div
+          style={{
+            fontSize: "var(--font-size-caption)",
+            color: "var(--color-text-tertiary)",
+            marginBottom: "var(--space-12)",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-6)",
+          }}
+        >
+          <span>Home</span>
+          <ChevronRight size={10} />
+          <span style={{ color: "var(--color-text-secondary)" }}>Dashboard</span>
+        </div>
+
         {/* Header */}
-        <div style={{ marginBottom: "var(--space-24)" }}>
-          <h1
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-16)", marginBottom: "var(--space-24)" }}>
+          <div
             style={{
-              fontSize: "var(--font-size-title)",
-              fontWeight: 700,
-              color: "var(--color-text-primary)",
-              margin: 0,
+              width: 42,
+              height: 42,
+              borderRadius: "var(--radius-md)",
+              background: "var(--color-text-primary)",
               display: "flex",
               alignItems: "center",
-              gap: "var(--space-8)",
+              justifyContent: "center",
+              flexShrink: 0,
             }}
           >
-            <BarChart3 size={22} />
-            Dashboard
-          </h1>
-          <p
-            style={{
-              fontSize: "var(--font-size-body)",
-              color: "var(--color-text-tertiary)",
-              margin: "var(--space-4) 0 0",
-            }}
-          >
-            Resolution analytics and agent performance metrics
-          </p>
+            <BarChart3 size={22} color="var(--color-text-inverse)" />
+          </div>
+          <div>
+            <h1
+              style={{
+                fontSize: "var(--font-size-title)",
+                fontWeight: 700,
+                color: "var(--color-text-primary)",
+                margin: 0,
+              }}
+            >
+              Dashboard
+            </h1>
+            <p
+              style={{
+                fontSize: "var(--font-size-body)",
+                color: "var(--color-text-tertiary)",
+                margin: "var(--space-4) 0 0",
+              }}
+            >
+              Resolution analytics and agent performance metrics
+            </p>
+          </div>
         </div>
 
         {/* Top KPI Tiles */}
@@ -127,7 +166,7 @@ export default function DashboardPage() {
                 ? `${Math.round(stats.avg_resolution_time_seconds / 60)}m`
                 : "—"}
               subtitle="p50 target: 8m"
-              tint="var(--color-category-teal)"
+              tint="var(--color-cat-teal)"
             />
             <MetricTile
               icon={<Users size={20} />}
@@ -142,7 +181,7 @@ export default function DashboardPage() {
               icon={<Zap size={20} />}
               label="Total Processed"
               value={stats.total_exceptions}
-              tint="var(--color-category-blue)"
+              tint="var(--color-cat-blue)"
             />
           </div>
         )}
@@ -256,6 +295,66 @@ export default function DashboardPage() {
             ) : (
               <div className="skeleton" style={{ height: 80, borderRadius: "var(--radius-sm)" }} />
             )}
+          </Card>
+
+          {/* Recent Activity */}
+          <Card elevated style={{ padding: "var(--space-20)", gridColumn: "span 2" }}>
+            <h3 style={{ fontSize: "var(--font-size-subhead)", fontWeight: 600, color: "var(--color-text-primary)", margin: "0 0 var(--space-16)" }}>
+              Recent Activity
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {RECENT_ACTIVITY.map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "var(--space-12)",
+                    padding: "var(--space-10) 0",
+                    borderBottom: idx < RECENT_ACTIVITY.length - 1 ? "1px solid var(--color-border-subtle)" : "none",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: item.color,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "var(--font-size-label)",
+                      color: "var(--color-text-quaternary)",
+                      minWidth: 50,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {item.time}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "var(--font-size-caption)",
+                      fontWeight: 600,
+                      color: "var(--color-text-secondary)",
+                      minWidth: 70,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {item.orderId}
+                  </span>
+                  <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)", flex: 1 }}>
+                    {item.action}
+                  </span>
+                  <Badge variant={item.badge as "success" | "warning" | "error" | "info" | "neutral"} size="sm">
+                    {item.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
           </Card>
         </div>
       </div>
