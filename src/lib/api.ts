@@ -320,6 +320,7 @@ export const exceptionsApi = {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
+    const ts = new Date().toISOString();
     // Backend resumes graph execution to completion on approve
     return {
       ...exc,
@@ -328,6 +329,8 @@ export const exceptionsApi = {
       resolution_data: {
         action: "APPROVED_BY_REVIEWER",
         recipe_result: "Resolution applied successfully",
+        reviewer_comment: request?.notes || null,
+        reviewed_at: ts,
       },
       resolved_by: "jane.doe@acme.com",
       resolution_notes: request?.notes,
@@ -338,11 +341,18 @@ export const exceptionsApi = {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
+    const ts = new Date().toISOString();
     return {
       ...exc,
       lifecycle_state: "REJECTED",
       final_status: "REJECTED",
-      resolution_data: {},
+      resolution_data: {
+        action: "REJECTED_BY_REVIEWER",
+        rejection_reason: request?.reason || "No reason provided",
+        reviewed_at: ts,
+      },
+      resolved_by: "jane.doe@acme.com",
+      resolution_notes: request?.reason,
     };
   },
 
