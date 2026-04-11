@@ -713,6 +713,10 @@ All endpoints except `/api/auth/*` and `/api/v1/health` require a valid JWT Bear
 | `GET` | `/api/v1/exceptions/{id}` | analyst+ | Exception detail including lifecycle state and GraphState |
 | `PATCH` | `/api/v1/exceptions/{id}/override` | manager+ | Human override: `{ action, notes, resolved_by }` |
 | `GET` | `/api/v1/exceptions/{id}/trace` | analyst+ | Full `TraceRecord` JSON for audit |
+| `GET` | `/api/v1/exceptions/{id}/line-items` | analyst+ | Line-item detail for exception queue expansion and detail panel |
+| `GET` | `/api/v1/exceptions/{id}/analysis` | analyst+ | Agent analysis with per-line diagnosis and pricing waterfall data |
+| `POST` | `/api/v1/exceptions/{id}/approve` | manager+ | Resume paused HITL exception — rehydrates checkpoint, transitions PENDING_REVIEW → EXECUTING |
+| `POST` | `/api/v1/exceptions/{id}/reject` | manager+ | Reject paused HITL exception — transitions to REJECTED with reason HITL_REJECTED |
 | `POST` | `/api/v1/workflows` | manager+ | Multi-step workflow: `WorkflowDefinition` + events → `WorkflowResult` |
 | `GET` | `/api/v1/exceptions/stats` | analyst+ | Dashboard metrics (open count, auto-resolved, avg resolution time) |
 | `PUT` | `/api/v1/policies/{tenant_id}` | admin | Update tenant-specific policy overrides |
@@ -754,6 +758,15 @@ Cursor-based pagination on all list endpoints:
 ### 6.5 WebSocket Endpoint
 
 `ws://host/api/v1/ws` — detailed in Section 8.
+
+### 6.6 Versioning Policy
+
+All endpoints are prefixed with `/api/v1/`. The V1 contract is stable for the current consumer set (asoe-ui, sandbox CLI). A version bump to `/api/v2/` is triggered when:
+- A field rename or removal would break an existing production consumer
+- A response schema change is not backward-compatible (removing fields, changing types)
+- A new authentication mechanism replaces the current JWT model
+
+Pre-production field renames within V1 are permitted when the only consumer (asoe-ui) is updated in the same release.
 
 ---
 
@@ -1285,7 +1298,7 @@ The `AgentReasoningCard` component implements this pattern: Layer 1 shows the re
 
 ### 11.2 Component Strategy: Shadcn/ui Reconciliation
 
-Shadcn/ui is adopted **only for non-agent primitives**. All 12 agent-first components are custom-built because they implement domain-specific behavior (two-layer cognition, brand restraint, pipeline visualization) that Shadcn does not provide.
+Shadcn/ui is adopted **only for non-agent primitives**. All 14 agent-first components are custom-built because they implement domain-specific behavior (two-layer cognition, brand restraint, pipeline visualization, pricing condition analysis) that Shadcn does not provide.
 
 | Component Need | Source | Rationale |
 |---|---|---|
@@ -1302,9 +1315,11 @@ Shadcn/ui is adopted **only for non-agent primitives**. All 12 agent-first compo
 | **AgentReasoningCard** | Custom (new) | Two-layer cognition: recommendation + confidence bar (Layer 1), expandable evidence (Layer 2) |
 | **WaterfallStepper** | Custom (new) | Real-time pipeline progress driven by WebSocket events (Section 8). See **Loading State UX** below. |
 | **ActivityIndicator** | Custom (new) | Dynamic text replacing static labels ("Agent analyzing 3 condition records...") |
-| **Badge/Pill** | Custom (new) | Tinted bg + colored text at rest; muted tint rules differ from Shadcn Badge |
+| **Badge/Pill** | Custom (new) | Tinted bg + colored text at rest; muted tint rules differ from Shadcn Badge. 5 variant mappers (`verdictVariant`, `lifecycleVariant`, `rootCauseVariant`, `categoryVariant`, `inboxStatusVariant`) — all with `default` fallback for unknown values per Guardrail #2 |
 | **Sidebar** | Custom (new) | 480px intervention panel, slides right, primary Layer 2 surface |
 | **Toast** | Custom (new) | 4.5s auto-dismiss, status-colored — the only solid-fill element in the design system |
+| **PricingWaterfall** | Custom (new) | Pricing condition chain visualization (BASE → CONTRACT → TPR → UOM → RESULT/ERROR) for CPG pricing exceptions. Distinct from WaterfallStepper (which visualizes pipeline nodes). |
+| **GravitationalOrbs** | Custom (pre-existing) | Canvas-based animated background for login page |
 
 **Rule:** When a Shadcn component exists but conflicts with ASOE brand restraint rules, the custom ASOE version takes precedence.
 
@@ -1370,9 +1385,10 @@ All other elements — data, links, badges, confidence bars, selected states —
 | Page | Layout | Purpose |
 |---|---|---|
 | Login | Centered card | SSO + email/password, agent activity footer (system is alive) |
-| Exception Queue | Queue + Sidebar (Layout A) | Flagship view: metrics strip, tab bar, DataTable, Sidebar for detail |
+| Exception Queue | Queue + Sidebar (Layout A) | Flagship view: metrics strip, tab bar, card-based expandable rows with line-item grids, Sidebar for detail |
 | Exception Detail | Sidebar expand | AgentReasoningCard (Layer 1/2), WaterfallStepper, side-by-side PO comparison |
 | Dashboard | 2-column grid (Layout B) | Analytics: resolution rates, agent performance, exception trends. See **Analytics Data Isolation** below. |
+| Customer Inbox | Two-pane (queue + detail) | AI-powered email triage — inbound customer communication analysis, agent recommendations, category/status tracking |
 | Settings / Admin | Standard layout | User management, SSO config, policy overrides, agent settings |
 
 ### 11.6 Analytics Data Isolation
@@ -1551,6 +1567,20 @@ All observability signals converge on a single stack. No fragmented dashboards.
 | **ADR-018** | Lifecycle sub-states (V3) over exception-type-specific state machines | Separate state machine per exception type | Sub-states within the canonical 11 lifecycle states avoid state machine explosion. The pipeline routes on parent states only. Sub-states serve two roles: advisory (UI labels, reporting) and API-boundary gating (multi-party quorum checks in the `approve` endpoint). Neither role involves pipeline graph routing. |
 | **ADR-019** | Discriminated union `ExceptionEvent` (V2) over expanding `OrderEvent` | Add all fields to `OrderEvent` with most Optional | Discriminated union preserves compile-time type safety per domain. Each variant enforces its own required fields. `OrderEvent` remains a valid variant — V1 callers unaffected. |
 | **ADR-020** | Dot-delimited hierarchical policy keys from V1 | Flat keys now, add hierarchy later | Establishing the `scope.key` convention in V1 means V2 hierarchical policy resolution is a code change in `validate_types`, not a data migration of existing keys. |
+| **ADR-021** | ASOE Core Deployment: in-process library (V1), staged extraction to versioned package (V2), standalone service (V3) | Service extraction from Day 1 | Maximum dev velocity at V1 scale. `run_graph()` interface + hexagonal gateway layer provide the extraction seam. Full record: `asoe2/docs/adr/ADR-021-core-deployment-model.md` |
+| **ADR-022** | Database Access: raw SQL with Repository pattern (V1), SQLAlchemy Core migration path (V1.5+) | ORM, SQLModel | SQL is auditable (SOX requirement), zero additional dependencies, narrow repository interface. Full record: `asoe2/docs/adr/ADR-022-database-access-pattern.md` |
+
+> **ADR file convention:** ADRs with a "Full record" reference contain detailed rationale, alternatives considered, expert perspectives, migration triggers, and review criteria in standalone files in `asoe2/docs/adr/`. All other ADRs are documented inline above.
+
+### 13.1 Specification Governance
+
+**Authority:** `consol_arch.md` is the single source of truth for cross-cutting architectural decisions.
+
+**Cascade rule:** Any change to `consol_arch.md` that affects backend contracts must be reflected in `architecture_v3.md` (asoe2) in the same PR or immediately after. Frontend-specific changes are reflected in `ui_architecture.md` (asoe-ui).
+
+**Drift register:** `ui_architecture.md` §9 maintains a living register of intentional drift and type contract drift. New UI enrichments must be logged here before implementation. Drift items must be resolved (incorporated into `consol_arch.md` or reverted) within one release cycle.
+
+**ADR discipline:** New architectural decisions are assigned the next sequential number in `consol_arch.md` §13 (currently ADR-022). Decisions requiring full rationale get a standalone file in `asoe2/docs/adr/` using the same number.
 
 ---
 

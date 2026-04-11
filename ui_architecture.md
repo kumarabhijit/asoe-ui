@@ -309,12 +309,12 @@ Row click → Sidebar opens
 | `exceptionsApi.resolveAsync()` | `POST /api/v1/exceptions/resolve/async` | analyst+ | Mock | ALIGNED |
 | `exceptionsApi.explain()` | `POST /api/v1/exceptions/resolve/explain` | analyst+ | Mock | ALIGNED |
 | `exceptionsApi.override()` | `PATCH /api/v1/exceptions/{id}/override` | manager+ | Mock | ALIGNED |
-| `exceptionsApi.approve()` | `POST /api/v1/exceptions/{id}/approve` | analyst+ | Mock | ALIGNED |
-| `exceptionsApi.reject()` | `POST /api/v1/exceptions/{id}/reject` | analyst+ | Mock | ALIGNED |
+| `exceptionsApi.approve()` | `POST /api/v1/exceptions/{id}/approve` | manager+ | Mock | ALIGNED |
+| `exceptionsApi.reject()` | `POST /api/v1/exceptions/{id}/reject` | manager+ | Mock | ALIGNED |
 | `exceptionsApi.trace()` | `GET /api/v1/exceptions/{id}/trace` | analyst+ | Mock | ALIGNED |
-| `exceptionsApi.stats()` | `GET /api/v1/exceptions/stats` | analyst+ | Mock | **DRIFTED** (field mismatch) |
-| `exceptionsApi.lineItems()` | **NOT IN SPEC** | — | Mock | **DRIFT — new endpoint needed** |
-| `exceptionsApi.orderAnalysis()` | **NOT IN SPEC** | — | Mock | **DRIFT — new endpoint needed** |
+| `exceptionsApi.stats()` | `GET /api/v1/exceptions/stats` | analyst+ | Mock | ALIGNED |
+| `exceptionsApi.lineItems()` | `GET /api/v1/exceptions/{id}/line-items` | analyst+ | Mock | ALIGNED |
+| `exceptionsApi.orderAnalysis()` | `GET /api/v1/exceptions/{id}/analysis` | analyst+ | Mock | ALIGNED |
 
 ### Error Envelope (from spec)
 
@@ -337,18 +337,20 @@ Cursor-based on all list endpoints: `{ data: [...], cursor: "...", has_more: tru
 
 ### Type Contract Drift
 
-| UI Type | Backend Type | Drift |
-|---|---|---|
-| `StatsResponse` | `StatsResponse` (schemas.py) | **DRIFTED** — see Section 10.1 |
-| `TerminalStatus` | `TerminalStatus` (models.py) | **DRIFTED** — UI has `COMPLETE_WITH_CHILDREN`, backend does not |
-| `OverrideRequest.notes` | Optional in backend | UI marks as required — minor |
-| `ExceptionUpdatePayload.updated_fields` | `List[str]` in backend | UI has `Record<string, unknown>` — type mismatch |
-| `TaskCompletePayload.explanation` | Optional in backend | UI marks as required — minor |
-| `LineItem` | **No backend type** | UI-only display type (mock data) |
-| `PricingWaterfallStep` | **No backend type** | UI-only display type (mock data) |
-| `OrderAnalysis` | **No backend type** | UI-only display type (mock data) |
+All type contract drift items resolved during architecture alignment (2026-04-11):
 
-**Alignment status:** PARTIALLY ALIGNED. Core CRUD endpoints aligned. Stats, line-item, and analysis endpoints drifted.
+| UI Type | Backend Type | Status |
+|---|---|---|
+| `StatsResponse` | `StatsResponse` (schemas.py) | **ALIGNED** — fields renamed and added in backend (T1-T5) |
+| `TerminalStatus` | `TerminalStatus` (models.py) | **ALIGNED** — `COMPLETE_WITH_CHILDREN` added to backend (T6) |
+| `OverrideRequest.notes` | `Optional[str]` in backend | **ALIGNED** — UI updated to optional (T7) |
+| `ExceptionUpdatePayload.updated_fields` | `List[str]` in backend | **ALIGNED** — UI updated to `string[]` (T8) |
+| `TaskCompletePayload.explanation` | `Optional[str]` in backend | **ALIGNED** — UI updated to optional (T9) |
+| `LineItem` | `LineItem` (schemas.py) | **ALIGNED** — Pydantic model added to backend (D3) |
+| `PricingWaterfallStep` | `PricingWaterfallStep` (schemas.py) | **ALIGNED** — Pydantic model added to backend (D4) |
+| `OrderAnalysis` / `AnalysisResponse` | `AnalysisResponse` (schemas.py) | **ALIGNED** — Pydantic model added to backend (D4) |
+
+**Alignment status:** FULLY ALIGNED. All 21 endpoints aligned. All type contracts aligned.
 
 ---
 
@@ -458,49 +460,43 @@ Summary of all alignments and drifts between `consol_arch.md` and the actual `as
 |---|---|---|
 | Design paradigm (agent-first, two-layer) | Section 11.1 | Fully implemented |
 | Verdict-specific UI states | Section 11.1 | GREEN/YELLOW/RED behavior matches |
-| 12 spec'd custom components | Section 11.2 | All 12 built and operational |
+| 14 custom components | Section 11.2 | All 14 built and operational (updated from 12 during alignment) |
 | Design tokens (149 tokens, 45+ minimum) | Section 11.3 | Exceeds spec |
 | Brand restraint (purple in 3 places only) | Section 11.3 | Enforced |
 | WCAG 2.1 AA (icon + text on all status) | Section 11.3 | Enforced |
 | Tech stack (Next.js 16, React 19, Tailwind) | Section 11.4 | Exact match |
-| Core REST endpoints (16 of 17) | Section 6.2 | All mock-implemented |
+| All 21 REST endpoints | Section 6.2 | All mock-implemented (approve/reject, line-items, analysis added to spec) |
 | WebSocket protocol + reconnection | Section 8 | Implemented in useWebSocket |
 | RBAC roles + permissions | Section 9.2 | Exact match with asoe2 |
 | Auth flows (SSO + password + MFA) | Section 9.1 | Mock-implemented |
 | Multi-tenancy model | Section 9.3 | JWT org claim + scoped queries |
 | trace_id propagation | Section 9.4 | X-Trace-ID header support |
+| Customer Inbox page (D1) | Section 11.5 | Incorporated into consol_arch.md during alignment |
+| PricingWaterfall component (D2) | Section 11.2 | Incorporated into consol_arch.md during alignment |
+| Line-item API (D3) | Section 6.2 | Endpoint added to spec + backend implementation |
+| Order analysis API (D4) | Section 6.2 | Endpoint added to spec + backend implementation |
+| Expandable order rows (D5) | Section 11.5 | Description updated in consol_arch.md |
+| Badge variant mappers (D6) | Section 11.2 | 5 mappers documented in consol_arch.md |
+| Component count (D7) | Section 11.2 | Updated to 14 in consol_arch.md |
+| StatsResponse fields (T1-T5) | Section 6.2 | Backend renamed + UI fields added |
+| TerminalStatus COMPLETE_WITH_CHILDREN (T6) | Section 1 V1 Scope | Added to backend enum |
+| OverrideRequest.notes optional (T7) | Section 6.2 | UI updated to optional |
+| ExceptionUpdatePayload.updated_fields (T8) | Section 8 | UI updated to `string[]` |
+| TaskCompletePayload.explanation optional (T9) | Section 8 | UI updated to optional |
 
 ### INTENTIONAL DRIFT (UI enrichment — needs spec update)
 
-| ID | Area | Spec Says | Implementation | Rationale | Action Needed |
-|---|---|---|---|---|---|
-| **D1** | Customer Inbox page | Not mentioned | `/inbox` — full two-pane AI email triage | Natural extension of agent-first control tower for inbound communications | Add to consol_arch.md Section 11.5 |
-| **D2** | PricingWaterfall component | Not mentioned | `src/components/ui/PricingWaterfall.tsx` | CPG pricing disputes require condition-level visibility (from sample screen) | Add to consol_arch.md Section 11.2 |
-| **D3** | Line-item API | Not mentioned | `exceptionsApi.lineItems()` (mock) | Expandable rows need per-exception line items | Add endpoint to Section 6.2 |
-| **D4** | Order analysis API | Not mentioned | `exceptionsApi.orderAnalysis()` (mock) | Detail panel needs agent diagnosis + waterfall data | Add endpoint to Section 6.2 |
-| **D5** | Expandable order rows | Spec says "DataTable" | Card-based expandable rows with line-item grids | Richer data density for CPG pricing exceptions | Update Section 11.5 description |
-| **D6** | Badge variant mappers (5 total) | Spec implies verdict + lifecycle only | Added rootCause, category, inboxStatus mappers | Visual mappings with default fallback — Guardrail #2 compliant | Document in Section 11.2 |
-| **D7** | 14 components (vs spec's 12) | 12 custom | +PricingWaterfall, +GravitationalOrbs (pre-existing) | GravitationalOrbs predates spec; PricingWaterfall is D2 | Update count in Section 11.2 |
+_No active drift items. All D1-D7 items resolved during architecture alignment (2026-04-11)._
 
 ### TYPE CONTRACT DRIFT (needs code or backend fix)
 
-| ID | Type | UI Field | Backend Field | Fix Owner |
-|---|---|---|---|---|
-| **T1** | `StatsResponse` | `total_exceptions` | `total` | **asoe2** — rename or UI adapts (see Section 10.1) |
-| **T2** | `StatsResponse` | `open_exceptions` | `open` | **asoe2** — rename or UI adapts |
-| **T3** | `StatsResponse` | `avg_resolution_time_seconds` | Missing | **asoe2** — add field |
-| **T4** | `StatsResponse` | `by_intent`, `by_lifecycle_state`, `by_shadow_verdict` | Missing | **asoe2** — add aggregation fields |
-| **T5** | `StatsResponse` | Missing | `manual_review`, `blocked`, `failed` | **asoe-ui** — add missing fields |
-| **T6** | `TerminalStatus` | `COMPLETE_WITH_CHILDREN` | Missing from enum | **asoe2** — add to enum (it's in spec Section 1 V1 scope) |
-| **T7** | `OverrideRequest.notes` | Required | `Optional[str]` | **asoe-ui** — make optional |
-| **T8** | `ExceptionUpdatePayload.updated_fields` | `Record<string, unknown>` | `List[str]` | **asoe-ui** — change to `string[]` |
-| **T9** | `TaskCompletePayload.explanation` | Required | `Optional[str]` | **asoe-ui** — make optional |
+_No active drift items. All T1-T9 items resolved during architecture alignment (2026-04-11)._
 
 ---
 
 ## 10. Proposed Backend Changes (asoe2)
 
-These changes are needed to align the backend with the UI implementation and close the drift items identified in Section 9. **No changes should be made to asoe2 without explicit approval.**
+> **Status: IMPLEMENTED** — All proposed changes below were implemented during architecture alignment (2026-04-11). See `asoe2` branch `claude/align-architecture-specs-YBgh9` for the code changes.
 
 ### 10.1 StatsResponse Enhancement (T1-T5)
 
