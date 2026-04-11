@@ -24,14 +24,16 @@ export const authOptions: NextAuthOptions = {
             email: credentials.email,
             password: credentials.password,
           });
+          const user = res.user;
+          if (!user) return null;
           return {
-            id: res.user.id,
-            email: res.user.email,
-            name: res.user.name,
-            roles: res.user.roles,
-            org: res.user.org,
-            permissions: res.user.permissions,
-            accessToken: res.accessToken,
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            roles: user.roles,
+            org: user.org,
+            permissions: user.permissions,
+            accessToken: res.access_token,
           };
         } catch {
           return null;

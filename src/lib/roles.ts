@@ -1,36 +1,51 @@
+/**
+ * RBAC permissions — aligned with asoe2/api/deps.py _ROLE_PERMISSIONS
+ *
+ * Permission format: {resource}:{action} per Section 9.2
+ */
 import type { AuthUser, Role } from "@/types/auth";
 
 export const PERMISSIONS = {
-  ORDERS_READ: "orders:read",
-  ORDERS_APPROVE: "orders:approve",
-  ORDERS_OVERRIDE: "orders:override",
-  ORDERS_BULK: "orders:bulk",
-  RULES_READ: "rules:read",
+  EXCEPTIONS_READ: "exceptions:read",
+  EXCEPTIONS_APPROVE: "exceptions:approve",
+  EXCEPTIONS_OVERRIDE: "exceptions:override",
   RULES_WRITE: "rules:write",
-  AGENT_CONFIG: "agent:config",
   USERS_MANAGE: "users:manage",
+  POLICY_WRITE: "policy:write",
   AUDIT_READ: "audit:read",
+  DASHBOARD_READ: "dashboard:read",
 } as const;
 
 export const ROLE_PERMISSIONS: Record<Role, string[]> = {
   analyst: [
-    PERMISSIONS.ORDERS_READ,
-    PERMISSIONS.ORDERS_APPROVE,
-    PERMISSIONS.ORDERS_OVERRIDE,
-    PERMISSIONS.AUDIT_READ,
+    PERMISSIONS.EXCEPTIONS_READ,
+    PERMISSIONS.EXCEPTIONS_APPROVE,
+    PERMISSIONS.DASHBOARD_READ,
   ],
   manager: [
-    PERMISSIONS.ORDERS_READ,
-    PERMISSIONS.ORDERS_APPROVE,
-    PERMISSIONS.ORDERS_OVERRIDE,
-    PERMISSIONS.ORDERS_BULK,
-    PERMISSIONS.RULES_READ,
+    PERMISSIONS.EXCEPTIONS_READ,
+    PERMISSIONS.EXCEPTIONS_APPROVE,
+    PERMISSIONS.EXCEPTIONS_OVERRIDE,
     PERMISSIONS.RULES_WRITE,
-    PERMISSIONS.AUDIT_READ,
+    PERMISSIONS.DASHBOARD_READ,
   ],
-  admin: Object.values(PERMISSIONS),
-  viewer: [PERMISSIONS.ORDERS_READ, PERMISSIONS.AUDIT_READ],
-  partner: [PERMISSIONS.ORDERS_READ],
+  admin: [
+    PERMISSIONS.EXCEPTIONS_READ,
+    PERMISSIONS.EXCEPTIONS_APPROVE,
+    PERMISSIONS.EXCEPTIONS_OVERRIDE,
+    PERMISSIONS.RULES_WRITE,
+    PERMISSIONS.USERS_MANAGE,
+    PERMISSIONS.POLICY_WRITE,
+    PERMISSIONS.AUDIT_READ,
+    PERMISSIONS.DASHBOARD_READ,
+  ],
+  viewer: [
+    PERMISSIONS.EXCEPTIONS_READ,
+    PERMISSIONS.DASHBOARD_READ,
+  ],
+  partner: [
+    PERMISSIONS.EXCEPTIONS_READ,
+  ],
 };
 
 export function hasRole(user: AuthUser | null, role: Role): boolean {
