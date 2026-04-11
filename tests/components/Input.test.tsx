@@ -18,7 +18,7 @@ describe("Input", () => {
 
   it("handles user input", async () => {
     const user = userEvent.setup();
-    const onChange = jest.fn();
+    const onChange = vi.fn();
     render(<Input label="Name" onChange={onChange} />);
     await user.type(screen.getByLabelText("Name"), "test");
     expect(onChange).toHaveBeenCalled();
