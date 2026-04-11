@@ -371,7 +371,7 @@ export default function ExceptionQueuePage() {
                       {formatTime(exc.created_at)}
                     </td>
                     <td style={{ padding: "var(--space-10) var(--space-16)" }}>
-                      <Button variant="ghost" size="sm">View</Button>
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleRowClick(exc); }}>View</Button>
                     </td>
                   </tr>
                 ))
