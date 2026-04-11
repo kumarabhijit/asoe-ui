@@ -1,0 +1,151 @@
+# tasks.md — ASOE UI Implementation Progress
+
+Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `consol_arch.md` Section 11 requirements.
+
+---
+
+## Completed Phases
+
+### [x] PHASE 0: Foundation
+- [x] Design tokens CSS (`src/styles/design-tokens.css`) — 45+ CSS custom properties
+- [x] Global styles (`src/app/globals.css`) — resets, typography defaults, animation keyframes
+- [x] Tailwind config (`tailwind.config.ts`) — content paths for `.ts`/`.tsx`
+- [x] PostCSS config (`postcss.config.js`) — Tailwind + Autoprefixer
+- [x] TypeScript config (`tsconfig.json`) — strict mode, `@/*` path alias
+- [x] Next.js config (`next.config.mjs`) — standalone output, strict mode
+
+✅ Outcome: Design system tokens operational. Build passes. (Pre-existing)
+
+---
+
+### [x] PHASE 1: Auth Flow
+- [x] Login page (`src/app/login/page.tsx`) — multi-step: email → password → SSO redirect
+- [x] SSO callback handler (`src/app/auth/callback/page.tsx`)
+- [x] NextAuth configuration (`src/lib/auth.ts`) — credentials provider, JWT callbacks
+- [x] Auth API route (`src/app/api/auth/[...nextauth]/route.ts`)
+- [x] Route protection middleware (`src/middleware.ts`) — JWT check on all protected routes
+- [x] RBAC system (`src/lib/roles.ts`) — 5 roles, permissions aligned with `asoe2/api/deps.py`
+- [x] Auth types (`src/types/auth.ts`) — AuthUser, LoginResponse, Role
+- [x] Auth hook (`src/hooks/useAuth.ts`) — typed session wrapper
+- [x] Mock auth API (`src/lib/api.ts` authApi section) — login, SSO, me, refresh
+
+✅ Outcome: Full auth flow with SSO detection, RBAC, middleware protection. (Pre-existing + updated 2026-04-11)
+
+---
+
+### [x] PHASE 2: Base Components
+- [x] Button (`src/components/ui/Button.tsx`) — 5 variants, 3 sizes, loading state
+- [x] Card (`src/components/ui/Card.tsx`) — borderless shadow elevation
+- [x] Input (`src/components/ui/Input.tsx`) — label, error, right icon, brand focus ring
+- [x] Logo (`src/components/ui/Logo.tsx`) — 3 sizes, optional tagline
+- [x] GravitationalOrbs (`src/components/ui/GravitationalOrbs.tsx`) — canvas animated background
+
+✅ Outcome: Base component library operational. All use design tokens. (Pre-existing)
+
+---
+
+### [x] PHASE 3: Agent-First Components
+- [x] NavBar (`src/components/ui/NavBar.tsx`) — 56px glass, tabs, agent status pulse, brand purple restraint
+- [x] MetricTile (`src/components/ui/MetricTile.tsx`) — KPI: 40x40 tinted icon + monospace value
+- [x] Badge (`src/components/ui/Badge.tsx`) — tinted bg + icon + text, `verdictVariant()`, `lifecycleVariant()`
+- [x] Toast (`src/components/ui/Toast.tsx`) — 4.5s auto-dismiss, solid-fill, context provider
+- [x] Sidebar (`src/components/ui/Sidebar.tsx`) — 480px slide-right, escape-to-close, focus trap
+- [x] ActivityIndicator (`src/components/ui/ActivityIndicator.tsx`) — node-specific domain-aware messages
+- [x] WaterfallStepper (`src/components/ui/WaterfallStepper.tsx`) — 10-node pipeline visualization
+- [x] AgentReasoningCard (`src/components/ui/AgentReasoningCard.tsx`) — Layer 1/2, verdict-specific behavior
+
+✅ Outcome: All 8 Section 11.2 custom components built. Two-layer cognition operational. (2026-04-11)
+
+---
+
+### [x] PHASE 4: Types & API Client
+- [x] Exception types (`src/types/exceptions.ts`) — Intent, LifecycleState, ShadowVerdict, PipelineNode, ExceptionSummary, ExceptionDetail, TraceRecord, HealthResponse
+- [x] API types (`src/types/api.ts`) — ResolveRequest/Response, PaginatedResponse, StatsResponse, TraceResponse, WorkflowResult, APIError
+- [x] WebSocket types (`src/types/websocket.ts`) — WSEvent, PipelineProgressPayload, ExceptionUpdatePayload
+- [x] Auth types updated (`src/types/auth.ts`) — aligned with asoe2 AuthTokenResponse, UserProfile
+- [x] RBAC updated (`src/lib/roles.ts`) — permissions match asoe2/api/deps.py exactly
+- [x] Full API client (`src/lib/api.ts`) — mock data for all Section 6.2 endpoints
+- [x] Health hook (`src/hooks/useHealth.ts`) — runtime enum fetching per Guardrail #2
+
+✅ Outcome: TypeScript types mirror asoe2 Pydantic models. API client covers all endpoints. (2026-04-11)
+
+---
+
+### [x] PHASE 5: Exception Queue Page
+- [x] Exception Queue page (`src/app/exceptions/page.tsx`) — Layout A: queue + sidebar
+- [x] Metrics strip — 4 KPI tiles (total, open, auto-resolved, avg resolution time)
+- [x] Filter dropdowns — state and intent sourced from `useHealth()` (Guardrail #2)
+- [x] Search — client-side filter by order ID, intent, event type
+- [x] DataTable — order ID, event type, intent badge, state badge, verdict badge, recipe, created
+- [x] Row click → Sidebar opens with ExceptionDetailPanel
+- [x] Root redirect updated (`src/app/page.tsx`) — `/` → `/exceptions`
+
+✅ Outcome: Flagship view operational. Filters from health endpoint. Row click opens detail. (2026-04-11)
+
+---
+
+### [x] PHASE 6: Exception Detail
+- [x] ExceptionDetailPanel (`src/app/exceptions/ExceptionDetailPanel.tsx`) — sidebar content
+- [x] Header info — order ID, event type, tenant, timestamps
+- [x] AgentReasoningCard integration — verdict-specific Layer 1/2 behavior
+- [x] WaterfallStepper integration — pipeline progress from lifecycle state
+- [x] Resolution data — JSON display for completed exceptions
+- [x] Trace data — fetched and displayed in Layer 2
+
+✅ Outcome: Two-layer cognition operational in sidebar. GREEN "View Details" toggles Layer 2. (2026-04-11)
+
+---
+
+### [x] PHASE 7: Dashboard
+- [x] Dashboard page (`src/app/dashboard/page.tsx`) — Layout B: 2-column grid
+- [x] KPI tiles — resolution rate, avg time, HITL rate, total processed
+- [x] By-intent breakdown — bar segments per intent
+- [x] By-state breakdown — badges + bar segments per lifecycle state
+- [x] By-verdict breakdown — colored bars (GREEN/YELLOW/RED)
+- [x] Platform health — status, version, kill switch, explain mode from `useHealth()`
+
+✅ Outcome: Analytics dashboard operational. All KPIs from Section 11.6. (2026-04-11)
+
+---
+
+### [x] PHASE 8: WebSocket Integration
+- [x] useWebSocket hook (`src/hooks/useWebSocket.ts`) — Section 8 protocol
+- [x] Auth message — `{ type: "auth", token, last_seen }`
+- [x] Reconnection — exponential backoff (1s → 30s max)
+- [x] Event replay — sends `last_seen_timestamp` on reconnect
+- [x] Event types — pipeline_progress, exception_update, task_complete, error
+
+✅ Outcome: WebSocket hook operational with reconnection. Ready for real backend. (2026-04-11)
+
+---
+
+## Remaining Phases
+
+### [ ] PHASE 9: Settings & Admin Page
+**Scope:** Section 11.5 — user management, SSO config, policy overrides, agent settings.
+- [ ] Settings page (`src/app/settings/page.tsx`)
+- [ ] User management (admin-only) — list users, assign roles
+- [ ] Policy overrides (admin-only) — `PUT /api/v1/policies/{tenant_id}`
+- [ ] Agent settings — kill switch toggle, explain mode toggle
+- [ ] RBAC enforcement — settings page gated to admin role
+
+---
+
+### [ ] PHASE 10: Testing
+**Scope:** Test infrastructure and baseline coverage.
+- [ ] Jest + React Testing Library setup
+- [ ] Component unit tests for all 13 components
+- [ ] `jest-axe` accessibility tests on status-related components (Badge, Toast, AgentReasoningCard)
+- [ ] Guardrail #2 lint rule (`no-hardcoded-enums` ESLint custom rule)
+- [ ] Type contract tests — verify TypeScript types compile against mock API data
+- [ ] Page integration tests — Exception Queue render, filter, sidebar open
+
+---
+
+### [ ] PHASE 11: Deployment
+**Scope:** Container build, CI/CD, pre-commit hooks.
+- [ ] Dockerfile (standalone Next.js build, non-root user)
+- [ ] `.pre-commit-config.yaml` with `gitleaks` for secret scanning
+- [ ] GitHub Actions CI: lint, type-check, test, build
+- [ ] `truffleHog` CI scan for credential detection
+- [ ] Docker Compose integration with `asoe2` containers

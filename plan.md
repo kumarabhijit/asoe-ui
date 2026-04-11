@@ -1,3 +1,7 @@
+> **SUPERSEDED:** This document was the initial login screen implementation plan.
+> It is preserved for historical reference. Current progress tracking is in `tasks.md`.
+> Phase-specific build instructions are in `prompts/`.
+
 # ASOE Login Screen — Implementation Plan
 
 ## Context

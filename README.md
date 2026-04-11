@@ -1,62 +1,106 @@
-# ASOE UI Design System
+# ASOE UI — Agent-First Control Tower
 
-Design system, skills, and reference implementation for the ASOE (Agentic System of Engagement) platform UI.
+Frontend for the **ASOE (Agentic System of Engagement)** platform — a deterministic, compliance-first orchestration system for resolving Order-to-Cash exceptions in CPG supply chains.
+
+The UI is a **control tower where the system is the primary actor**. Agents classify, audit, and resolve exceptions autonomously. Humans intervene at decision points — approvals, overrides, escalations.
+
+---
+
+## Quick Start
+
+```bash
+npm install
+npm run dev
+# Navigate to http://localhost:3000/exceptions
+# Login: jane@acme.com / password
+```
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 15 (App Router, React 19, TypeScript) |
+| Styling | CSS custom properties (`design-tokens.css`) + Tailwind CSS |
+| Icons | Lucide React (16/20/24px — never emoji) |
+| Auth | NextAuth.js → FastAPI auth endpoints (`asoe2`) |
+| Validation | Zod |
+| Backend | FastAPI (`asoe2` repository) |
+
+---
 
 ## Repository Structure
 
 ```
 asoe-ui/
+├── src/
+│   ├── app/                      # Pages (Next.js App Router)
+│   │   ├── exceptions/           # Exception Queue (flagship) + detail panel
+│   │   ├── dashboard/            # Analytics dashboard
+│   │   ├── login/                # Multi-step login (email → password → SSO)
+│   │   └── auth/callback/        # SSO callback handler
+│   ├── components/ui/            # 13 reusable components (Section 11.2)
+│   ├── hooks/                    # useAuth, useHealth, useWebSocket
+│   ├── lib/                      # API client, auth config, RBAC
+│   ├── types/                    # TypeScript types (mirrors asoe2 Pydantic models)
+│   └── styles/                   # design-tokens.css (45+ CSS custom properties)
+├── docs/
+│   └── AUDITOR_GUIDE.md          # Frontend compliance controls (SOX/SOC2)
 ├── prompts/
-│   └── asoe-ui-design-system.md      # Reproducible prompt for regenerating the design system
+│   ├── asoe-ui-design-system.md  # Reproducible design system generation prompt
+│   ├── update_docs.md            # Documentation maintenance protocol
+│   ├── pre_code_session.md       # Pre-session checklist
+│   └── full_project_sequence.md  # Master phase index
 ├── skills/
-│   └── asoe-ui-design/
-│       ├── SKILL.md                   # Core design system skill (310 lines)
-│       └── references/
-│           ├── design-tokens.css      # CSS custom properties — colors, spacing, shadows, motion
-│           ├── component-patterns.md  # Component anatomy, spacing, behavior specs
-│           ├── layout-templates.md    # Page layouts, grid specs, ASCII mockups
-│           └── anti-patterns.md       # 13 "never do this" patterns with code examples
+│   └── asoe-ui-design/           # Design system skill + references
 ├── samples/
-│   └── asoe-sample-screen.jsx        # Reference implementation — Exception Resolution Queue
-└── README.md
+│   └── asoe-sample-screen.jsx    # Reference implementation
+├── CLAUDE.md                     # Engineering guardrails
+├── DESIGN.md                     # Code-to-architecture map
+├── tasks.md                      # Phase-based progress tracker
+├── consol_arch.md                # Platform architecture (shared reference)
+└── plan.md                       # Historical login plan (superseded by tasks.md)
 ```
 
-## Design Principles
+---
 
-### Agent-First (Not Dashboard-First)
+## Documentation
 
-ASOE is a living system the user guides, not a dashboard the user operates. AI agents are the primary actors. The human is the decision authority who intervenes at key moments.
+| Document | Audience | Purpose |
+|---|---|---|
+| `CLAUDE.md` | Developers | Engineering guardrails (Guardrail #2, design tokens, types, agent-first) |
+| `DESIGN.md` | Engineers | Code-to-architecture map (components, pages, types, API client) |
+| `docs/AUDITOR_GUIDE.md` | Auditors | 10 frontend compliance controls (RBAC, session, trace, tenancy) |
+| `tasks.md` | Team | Phase-based progress (Phases 0-8 complete, 9-11 pending) |
+| `consol_arch.md` | All | Platform architecture — Section 11 covers UI |
 
-### Brand Restraint
+---
 
-Brand blue (`#007AFF`) appears in exactly 3 places: primary CTA buttons, the nav logo mark, and the active tab indicator. Everything else is neutral. 95%+ of screen pixels are grays.
+## Design System
 
-### Two-Layer Cognition
+The visual design system is defined in `skills/asoe-ui-design/`:
 
-- **Layer 1 (default):** Agent recommendation, confidence, 2–3 data points, action button. Scannable in <3 seconds.
-- **Layer 2 (expandable):** Evidence waterfall, structured reasoning, precedents. On demand only.
+- **`SKILL.md`** — Design philosophy, token architecture, component library, anti-patterns, quality gates
+- **`references/design-tokens.css`** — CSS custom properties (colors, spacing, shadows, motion)
+- **`references/component-patterns.md`** — Component anatomy and spacing specs
+- **`references/layout-templates.md`** — Page layouts and grid specifications
+- **`references/anti-patterns.md`** — 13 "never do this" patterns with corrections
 
-## Usage
+**Key principles:**
+- **Agent-first** — system is alive, humans intervene at decision points
+- **Brand restraint** — brand purple (`#5A4BD6`) in exactly 3 places: primary CTA, nav logo, active tab underline
+- **Two-layer cognition** — Layer 1 (scannable recommendation) + Layer 2 (expandable evidence)
 
-### As a Claude Skill
+---
 
-Copy `skills/asoe-ui-design/` into your Claude project's skills directory. The skill will trigger automatically when building any ASOE UI screen.
+## Architecture
 
-### Regenerating the Design System
+The UI implements `consol_arch.md` Section 11. Key patterns:
 
-Use `prompts/asoe-ui-design-system.md` as a session prompt to reproduce or extend the design system from scratch.
+- **13 custom components** — agent-first components (NavBar, WaterfallStepper, AgentReasoningCard) are custom; Shadcn adopted only for non-agent primitives (Section 11.2)
+- **Health-driven enums** — filter dropdowns source values from `GET /api/v1/health` at runtime (Guardrail #2 — no hardcoded intents or lifecycle states)
+- **WebSocket real-time** — pipeline progress via `useWebSocket` hook (Section 8 protocol with reconnection backoff)
+- **Types mirror backend** — `src/types/` matches `asoe2` Pydantic models field-for-field
 
-### Reference Implementation
-
-`samples/asoe-sample-screen.jsx` is a working React component demonstrating the Exception Resolution Queue with all design system patterns applied.
-
-## Tech Stack
-
-| Layer | Choice |
-|-------|--------|
-| Framework | React 19 (Next.js 16) |
-| Styling | CSS custom properties + Tailwind |
-| Sans Font | SF Pro Display → Inter (Google Fonts fallback) |
-| Mono Font | SF Mono → JetBrains Mono (Google Fonts fallback) |
-| Icons | Lucide React |
-| Charts | Recharts |
+See `DESIGN.md` for the full code-to-architecture mapping.
