@@ -13,6 +13,7 @@ import type { AuthUser } from "@/types/auth";
 
 export const ANALYST_USER: AuthUser = {
   id: "usr_analyst",
+  sub: "usr_analyst",
   email: "analyst@acme.com",
   name: "Alice Analyst",
   roles: ["analyst"],
@@ -23,6 +24,7 @@ export const ANALYST_USER: AuthUser = {
 
 export const MANAGER_USER: AuthUser = {
   id: "usr_manager",
+  sub: "usr_manager",
   email: "manager@acme.com",
   name: "Mike Manager",
   roles: ["manager"],
@@ -33,6 +35,7 @@ export const MANAGER_USER: AuthUser = {
 
 export const ADMIN_USER: AuthUser = {
   id: "usr_admin",
+  sub: "usr_admin",
   email: "admin@acme.com",
   name: "Ada Admin",
   roles: ["admin"],
@@ -43,6 +46,7 @@ export const ADMIN_USER: AuthUser = {
 
 export const VIEWER_USER: AuthUser = {
   id: "usr_viewer",
+  sub: "usr_viewer",
   email: "viewer@acme.com",
   name: "Victor Viewer",
   roles: ["viewer"],
@@ -53,6 +57,7 @@ export const VIEWER_USER: AuthUser = {
 
 export const PARTNER_USER: AuthUser = {
   id: "usr_partner",
+  sub: "usr_partner",
   email: "partner@retailer.com",
   name: "Pat Partner",
   roles: ["partner"],

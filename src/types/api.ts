@@ -71,6 +71,16 @@ export interface OverrideRequest {
   resolved_by: string;
 }
 
+/* ── Approve / Reject (HITL) ──────────────────────────────────────── */
+
+export interface ApproveRequest {
+  notes?: string;
+}
+
+export interface RejectRequest {
+  reason?: string;
+}
+
 /* ── Stats (dashboard) ─────────────────────────────────────────────── */
 
 export interface StatsResponse {
@@ -123,6 +133,7 @@ export interface WorkflowRequest {
 
 export interface WorkflowStepResult {
   step_id: string;
+  intent: string;
   status: string;
   exception_id?: string;
   explanation?: string;
@@ -141,16 +152,15 @@ export interface WorkflowResult {
 export interface PolicyOverrideRequest {
   policy_key: string;
   value: unknown;
-  effective_from?: string;
-  effective_until?: string;
+  change_reason?: string;
 }
 
 export interface PolicyOverrideResponse {
+  id: string;
   tenant_id: string;
   policy_key: string;
   value: unknown;
   effective_from: string;
-  effective_until?: string;
   created_by: string;
 }
 

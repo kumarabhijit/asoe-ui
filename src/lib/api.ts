@@ -16,8 +16,14 @@ import type {
   ExceptionListResponse,
   ExceptionDetailResponse,
   OverrideRequest,
+  ApproveRequest,
+  RejectRequest,
   StatsResponse,
   TraceResponse,
+  WorkflowRequest,
+  WorkflowResult,
+  PolicyOverrideRequest,
+  PolicyOverrideResponse,
   APIError,
 } from "@/types/api";
 import type { HealthResponse, ExceptionSummary, LineItem, OrderAnalysis } from "@/types/exceptions";
@@ -34,6 +40,7 @@ function delay(ms: number): Promise<void> {
 
 const MOCK_USER: AuthUser = {
   id: "usr_001",
+  sub: "usr_001",
   email: "jane.doe@acme.com",
   name: "Jane Doe",
   roles: ["analyst", "manager"],
@@ -309,7 +316,7 @@ export const exceptionsApi = {
     };
   },
 
-  async approve(id: string): Promise<ExceptionDetailResponse> {
+  async approve(id: string, request?: ApproveRequest): Promise<ExceptionDetailResponse> {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
@@ -317,10 +324,11 @@ export const exceptionsApi = {
       ...exc,
       lifecycle_state: "EXECUTING",
       resolution_data: {},
+      resolution_notes: request?.notes,
     };
   },
 
-  async reject(id: string): Promise<ExceptionDetailResponse> {
+  async reject(id: string, request?: RejectRequest): Promise<ExceptionDetailResponse> {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
@@ -403,6 +411,42 @@ export const exceptionsApi = {
   async orderAnalysis(id: string): Promise<OrderAnalysis | null> {
     await delay(MOCK_DELAY);
     return MOCK_ORDER_ANALYSES[id] ?? null;
+  },
+};
+
+/* ── Workflow API (/api/v1/workflows) ──────────────────────────────── */
+
+export const workflowApi = {
+  async execute(request: WorkflowRequest): Promise<WorkflowResult> {
+    await delay(MOCK_DELAY);
+    return {
+      workflow_id: request.workflow_id,
+      workflow_name: request.name,
+      status: "COMPLETE",
+      step_results: request.steps.map((s) => ({
+        step_id: s.step_id,
+        intent: s.intent,
+        status: "COMPLETE",
+        exception_id: `exc-wf-${s.step_id}`,
+      })),
+      compensation_log: [],
+    };
+  },
+};
+
+/* ── Policy API (/api/v1/policies) ─────────────────────────────────── */
+
+export const policyApi = {
+  async update(tenantId: string, request: PolicyOverrideRequest): Promise<PolicyOverrideResponse> {
+    await delay(MOCK_DELAY);
+    return {
+      id: `pol-${Date.now()}`,
+      tenant_id: tenantId,
+      policy_key: request.policy_key,
+      value: request.value,
+      effective_from: new Date().toISOString(),
+      created_by: MOCK_USER.sub,
+    };
   },
 };
 
