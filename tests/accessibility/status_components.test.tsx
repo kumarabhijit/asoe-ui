@@ -1,5 +1,5 @@
 /**
- * Accessibility tests — jest-axe on status-related components.
+ * Accessibility tests — vitest-axe on status-related components.
  *
  * Per Section 11.3 WCAG 2.1 AA Compliance:
  * - Status indicators never rely on color alone (icon + text)
@@ -8,14 +8,12 @@
  * - dialog semantics on Sidebar
  */
 import { render } from "@testing-library/react";
-import { axe, toHaveNoViolations } from "jest-axe";
+import { axe } from "vitest-axe";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { MetricTile } from "@/components/ui/MetricTile";
 import { Input } from "@/components/ui/Input";
-
-expect.extend(toHaveNoViolations);
 
 describe("Accessibility: Badge (status indicator)", () => {
   const variants = ["success", "warning", "error", "info", "neutral"] as const;
@@ -31,9 +29,7 @@ describe("Accessibility: Badge (status indicator)", () => {
   it("all variants include both icon and text (WCAG 1.4.1)", () => {
     for (const variant of variants) {
       const { container, unmount } = render(<Badge variant={variant}>Label</Badge>);
-      // Icon (SVG) present
       expect(container.querySelector("svg")).toBeInTheDocument();
-      // Text present
       expect(container.textContent).toContain("Label");
       unmount();
     }

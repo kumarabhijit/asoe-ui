@@ -19,7 +19,7 @@ describe("NavBar", () => {
 
   it("calls onTabChange when tab clicked", async () => {
     const user = userEvent.setup();
-    const onTabChange = jest.fn();
+    const onTabChange = vi.fn();
     render(<NavBar tabs={TABS} onTabChange={onTabChange} />);
     await user.click(screen.getByText("Dashboard"));
     expect(onTabChange).toHaveBeenCalledWith("dashboard");

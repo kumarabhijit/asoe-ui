@@ -8,7 +8,7 @@ import { Sidebar } from "@/components/ui/Sidebar";
 describe("Sidebar", () => {
   it("renders children when open", () => {
     render(
-      <Sidebar open={true} onClose={jest.fn()} title="Detail">
+      <Sidebar open={true} onClose={vi.fn()} title="Detail">
         <p>Panel content</p>
       </Sidebar>
     );
@@ -17,7 +17,7 @@ describe("Sidebar", () => {
 
   it("renders title when provided", () => {
     render(
-      <Sidebar open={true} onClose={jest.fn()} title="Exception Detail">
+      <Sidebar open={true} onClose={vi.fn()} title="Exception Detail">
         <p>Content</p>
       </Sidebar>
     );
@@ -26,7 +26,7 @@ describe("Sidebar", () => {
 
   it("has dialog role and aria-modal for accessibility", () => {
     render(
-      <Sidebar open={true} onClose={jest.fn()} title="Panel">
+      <Sidebar open={true} onClose={vi.fn()} title="Panel">
         <p>Content</p>
       </Sidebar>
     );
@@ -36,7 +36,7 @@ describe("Sidebar", () => {
 
   it("calls onClose when Escape is pressed", async () => {
     const user = userEvent.setup();
-    const onClose = jest.fn();
+    const onClose = vi.fn();
     render(
       <Sidebar open={true} onClose={onClose} title="Panel">
         <p>Content</p>
@@ -48,13 +48,12 @@ describe("Sidebar", () => {
 
   it("calls onClose when overlay is clicked", async () => {
     const user = userEvent.setup();
-    const onClose = jest.fn();
+    const onClose = vi.fn();
     const { container } = render(
       <Sidebar open={true} onClose={onClose} title="Panel">
         <p>Content</p>
       </Sidebar>
     );
-    // The overlay is the first div (before the panel)
     const overlay = container.firstChild as HTMLElement;
     if (overlay) await user.click(overlay);
     expect(onClose).toHaveBeenCalled();
@@ -62,11 +61,10 @@ describe("Sidebar", () => {
 
   it("is hidden when not open", () => {
     render(
-      <Sidebar open={false} onClose={jest.fn()} title="Panel">
+      <Sidebar open={false} onClose={vi.fn()} title="Panel">
         <p>Hidden content</p>
       </Sidebar>
     );
-    // Dialog exists in DOM but is translated off-screen
     const dialog = screen.getByRole("dialog");
     expect(dialog).toBeInTheDocument();
   });

@@ -54,7 +54,6 @@ describe("AgentReasoningCard", () => {
 
     it("Layer 2 is collapsed by default", () => {
       render(<AgentReasoningCard verdict="GREEN" trace={MOCK_TRACE} />);
-      // Layer 2 content (trace fields) should not be visible initially
       expect(screen.queryByText("deterministic_fallback")).not.toBeInTheDocument();
     });
 
@@ -62,11 +61,9 @@ describe("AgentReasoningCard", () => {
       const user = userEvent.setup();
       render(<AgentReasoningCard verdict="GREEN" trace={MOCK_TRACE} />);
 
-      // Click View Details → Layer 2 expands
       await user.click(screen.getByText("View Details"));
       expect(screen.getByText("deterministic_fallback")).toBeInTheDocument();
 
-      // Click Hide Details → Layer 2 collapses
       await user.click(screen.getByText("Hide Details"));
       expect(screen.queryByText("deterministic_fallback")).not.toBeInTheDocument();
     });
@@ -82,9 +79,9 @@ describe("AgentReasoningCard", () => {
       render(
         <AgentReasoningCard
           verdict="YELLOW"
-          onApprove={jest.fn()}
-          onReject={jest.fn()}
-          onEscalate={jest.fn()}
+          onApprove={vi.fn()}
+          onReject={vi.fn()}
+          onEscalate={vi.fn()}
         />
       );
       expect(screen.getByText("Approve")).toBeInTheDocument();
@@ -99,7 +96,7 @@ describe("AgentReasoningCard", () => {
 
     it("fires onApprove when Approve clicked", async () => {
       const user = userEvent.setup();
-      const onApprove = jest.fn();
+      const onApprove = vi.fn();
       render(<AgentReasoningCard verdict="YELLOW" onApprove={onApprove} />);
       await user.click(screen.getByText("Approve"));
       expect(onApprove).toHaveBeenCalledTimes(1);
@@ -129,9 +126,9 @@ describe("AgentReasoningCard", () => {
         <AgentReasoningCard
           verdict="RED"
           isAdmin={false}
-          onApprove={jest.fn()}
-          onOverride={jest.fn()}
-          onEscalate={jest.fn()}
+          onApprove={vi.fn()}
+          onOverride={vi.fn()}
+          onEscalate={vi.fn()}
         />
       );
       expect(screen.getByText("Acknowledge")).toBeInTheDocument();
@@ -144,8 +141,8 @@ describe("AgentReasoningCard", () => {
         <AgentReasoningCard
           verdict="RED"
           isAdmin={true}
-          onOverride={jest.fn()}
-          onEscalate={jest.fn()}
+          onOverride={vi.fn()}
+          onEscalate={vi.fn()}
         />
       );
       expect(screen.getByText("Override")).toBeInTheDocument();

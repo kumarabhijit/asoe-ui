@@ -37,8 +37,7 @@ describe("Toast", () => {
   });
 
   it("auto-dismisses after duration", async () => {
-    jest.useFakeTimers();
-    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
 
     render(
       <ToastProvider>
@@ -46,13 +45,16 @@ describe("Toast", () => {
       </ToastProvider>
     );
 
-    await user.click(screen.getByText("Show Toast"));
+    // Click without userEvent (fake timers conflict with userEvent's internal delays)
+    await act(async () => {
+      screen.getByText("Show Toast").click();
+    });
     expect(screen.getByText("Auto dismiss test")).toBeInTheDocument();
 
     // Advance past 4.5s auto-dismiss
-    act(() => { jest.advanceTimersByTime(5000); });
+    await act(async () => { vi.advanceTimersByTime(5000); });
     expect(screen.queryByText("Auto dismiss test")).not.toBeInTheDocument();
 
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 });

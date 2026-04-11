@@ -20,9 +20,7 @@ describe("Badge", () => {
   });
 
   it("renders default icon per variant (WCAG 1.4.1 — never color alone)", () => {
-    // Each variant renders an icon by default — status is never conveyed by color alone
     const { container } = render(<Badge variant="success">Resolved</Badge>);
-    // Icon (SVG) + text both present
     expect(container.querySelector("svg")).toBeInTheDocument();
     expect(screen.getByText("Resolved")).toBeInTheDocument();
   });

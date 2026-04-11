@@ -13,7 +13,7 @@ describe("Button", () => {
 
   it("handles click events", async () => {
     const user = userEvent.setup();
-    const onClick = jest.fn();
+    const onClick = vi.fn();
     render(<Button onClick={onClick}>Click</Button>);
     await user.click(screen.getByRole("button"));
     expect(onClick).toHaveBeenCalledTimes(1);
@@ -31,14 +31,13 @@ describe("Button", () => {
 
   it("shows loader icon when loading", () => {
     const { container } = render(<Button loading>Submit</Button>);
-    // Loading replaces children with Loader2 icon (SVG)
     expect(container.querySelector("svg")).toBeInTheDocument();
     expect(screen.queryByText("Submit")).not.toBeInTheDocument();
   });
 
   it("does not fire onClick when disabled", async () => {
     const user = userEvent.setup();
-    const onClick = jest.fn();
+    const onClick = vi.fn();
     render(<Button disabled onClick={onClick}>Click</Button>);
     await user.click(screen.getByRole("button"));
     expect(onClick).not.toHaveBeenCalled();
