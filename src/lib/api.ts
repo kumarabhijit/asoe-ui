@@ -20,7 +20,7 @@ import type {
   TraceResponse,
   APIError,
 } from "@/types/api";
-import type { HealthResponse, ExceptionSummary } from "@/types/exceptions";
+import type { HealthResponse, ExceptionSummary, LineItem, OrderAnalysis } from "@/types/exceptions";
 import { ROLE_PERMISSIONS } from "./roles";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -384,5 +384,118 @@ export const exceptionsApi = {
         RED: 1,
       },
     };
+  },
+
+  async lineItems(id: string): Promise<LineItem[]> {
+    await delay(MOCK_DELAY);
+    return MOCK_LINE_ITEMS[id] ?? [];
+  },
+
+  async orderAnalysis(id: string): Promise<OrderAnalysis | null> {
+    await delay(MOCK_DELAY);
+    return MOCK_ORDER_ANALYSES[id] ?? null;
+  },
+};
+
+/* ── Mock line-item data (adapted from samples/asoe-sample-screen.jsx) ── */
+
+const MOCK_LINE_ITEMS: Record<string, LineItem[]> = {
+  "exc-001": [
+    { line_id: "L1", sku: "SKU-0042", description: "12-pk Cola", uom: "CS", quantity: 240, erp_price: 14.88, po_price: 13.20, root_cause: "PROMO_EXPIRED" },
+    { line_id: "L2", sku: "SKU-0043", description: "12-pk Diet Cola", uom: "CS", quantity: 120, erp_price: 14.88, po_price: 13.20, root_cause: "PROMO_EXPIRED" },
+    { line_id: "L3", sku: "SKU-0051", description: "12-pk Zero Sugar", uom: "CS", quantity: 96, erp_price: 14.88, po_price: 14.90, root_cause: "EDI_MISMATCH" },
+  ],
+  "exc-002": [
+    { line_id: "L1", sku: "SKU-1180", description: "24-pk Water", uom: "CS", quantity: 500, erp_price: 9.60, po_price: 9.62, root_cause: "EDI_MISMATCH" },
+    { line_id: "L2", sku: "SKU-1181", description: "12-pk Sparkling", uom: "CS", quantity: 200, erp_price: 11.40, po_price: 10.00, root_cause: "CONTRACT_GAP" },
+  ],
+  "exc-003": [
+    { line_id: "L1", sku: "SKU-3310", description: "Snack Bar 48ct", uom: "CS", quantity: 300, erp_price: 28.44, po_price: 25.00, root_cause: "CONTRACT_GAP" },
+    { line_id: "L2", sku: "SKU-3312", description: "Protein Bar 36ct", uom: "CS", quantity: 150, erp_price: 24.00, po_price: 21.50, root_cause: "PROMO_EXPIRED" },
+    { line_id: "L3", sku: "SKU-3315", description: "Granola Bar 60ct", uom: "CS", quantity: 80, erp_price: 32.00, po_price: 32.00, root_cause: "EDI_MISMATCH" },
+    { line_id: "L4", sku: "SKU-3320", description: "Kids Bar 24ct", uom: "CS", quantity: 200, erp_price: 18.00, po_price: 15.00, root_cause: "MASTER_DATA" },
+  ],
+  "exc-004": [
+    { line_id: "L1", sku: "SKU-5521", description: "Family Pack x6", uom: "CS", quantity: 180, erp_price: 42.00, po_price: 36.00, root_cause: "UOM_ERROR" },
+    { line_id: "L2", sku: "SKU-5525", description: "Mega Pack x12", uom: "CS", quantity: 90, erp_price: 82.00, po_price: 72.00, root_cause: "UOM_ERROR" },
+  ],
+  "exc-005": [
+    { line_id: "L1", sku: "SKU-0099", description: "Juice 1L x12", uom: "CS", quantity: 360, erp_price: 19.20, po_price: 17.28, root_cause: "ERP_NOT_LOADED" },
+  ],
+  "exc-006": [
+    { line_id: "L1", sku: "SKU-7701", description: "Energy Drink 4pk", uom: "CS", quantity: 480, erp_price: 8.96, po_price: 8.50, root_cause: "MASTER_DATA" },
+    { line_id: "L2", sku: "SKU-7705", description: "Energy Drink 8pk", uom: "CS", quantity: 240, erp_price: 17.50, po_price: 16.00, root_cause: "MASTER_DATA" },
+  ],
+  "exc-007": [
+    { line_id: "L1", sku: "SKU-2210", description: "Sports Drink 12pk", uom: "CS", quantity: 400, erp_price: 12.60, po_price: 11.00, root_cause: "CONTRACT_GAP" },
+  ],
+  "exc-008": [
+    { line_id: "L1", sku: "SKU-8801", description: "Organic Tea 6pk", uom: "CS", quantity: 150, erp_price: 22.50, po_price: 20.00, root_cause: "PROMO_EXPIRED" },
+    { line_id: "L2", sku: "SKU-8805", description: "Green Tea 12pk", uom: "CS", quantity: 200, erp_price: 18.00, po_price: 18.00 },
+  ],
+};
+
+const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
+  "exc-001": {
+    diagnosis: "Two line items reference promo pricing from an expired Q4 trade promotion (ZPROM condition valid through 12/31). One line has a $0.02 EDI rounding variance within tolerance. Recommend auto-override for the rounding and promo reload for the expired conditions.",
+    confidence: 92,
+    risk: "MEDIUM",
+    resolution: "AUTO_OVERRIDE",
+    lines: [
+      {
+        line_id: "L1",
+        diagnosis: "TPR discount ZPROM expired 12/31. PO reflects promo price $13.20 but ERP reverted to base $14.88.",
+        resolution: "AUTO_OVERRIDE",
+        risk: "MEDIUM",
+        waterfall: [
+          { type: "BASE", label: "Base Price (PR00)", record: "PR00/10", value: 14.88, running: 14.88, detail: "SAP list price, material group 042, effective 01/01/2025" },
+          { type: "CONTRACT", label: "Contract Price (ZA01)", record: "ZA01/620", value: 0, running: 14.88, detail: "Active contract #4600012840 — no additional discount at this tier" },
+          { type: "TPR", label: "Trade Promo (ZPROM)", record: "ZPROM/155", value: -1.68, running: 13.20, detail: "Q4 promo: 11.3% off-invoice. Valid 10/01–12/31/2025." },
+          { type: "ERROR", label: "Promo Validity Check", record: "ZPROM/155", value: null, running: null, detail: "Condition expired 12/31/2025. Current date outside validity.", error: "Promotional condition expired. PO $13.20 reflects promo price, ERP $14.88 reflects reverted base. Delta: -$1.68/unit." },
+          { type: "RESULT", label: "ERP Computed Price", record: "—", value: 14.88, running: 14.88, detail: "Final ERP price after condition chain (promo excluded)" },
+        ],
+      },
+      {
+        line_id: "L2",
+        diagnosis: "Same expired ZPROM condition as L1. Identical root cause.",
+        resolution: "AUTO_OVERRIDE",
+        risk: "MEDIUM",
+        waterfall: [],
+      },
+      {
+        line_id: "L3",
+        diagnosis: "EDI transmission rounding: $14.90 vs $14.88. Within ±$0.05 tolerance.",
+        resolution: "AUTO_OVERRIDE",
+        risk: "LOW",
+        waterfall: [],
+      },
+    ],
+  },
+  "exc-004": {
+    diagnosis: "UOM conversion factor mismatch on both line items. Pack-size to case conversion not loaded in ERP master data.",
+    confidence: 97,
+    risk: "LOW",
+    resolution: "AUTO_OVERRIDE",
+    lines: [
+      {
+        line_id: "L1",
+        diagnosis: "UOM conversion factor mismatch: 6-pack case factor not loaded.",
+        resolution: "AUTO_OVERRIDE",
+        risk: "LOW",
+        waterfall: [
+          { type: "BASE", label: "Base Price (PR00)", record: "PR00/55", value: 42.00, running: 42.00, detail: "SAP list price per case (6-pack)" },
+          { type: "UOM", label: "UOM Conversion", record: "QUOM/12", value: -6.00, running: 36.00, detail: "Pack-size conversion factor CS→EA" },
+          { type: "ERROR", label: "UOM Validation", record: "QUOM/12", value: null, running: null, detail: "Conversion factor not loaded in material master.", error: "UOM conversion factor missing. PO price $36.00 uses EA unit, ERP price $42.00 uses CS unit." },
+          { type: "RESULT", label: "ERP Computed Price", record: "—", value: 42.00, running: 42.00, detail: "ERP price without UOM conversion applied" },
+        ],
+      },
+      {
+        line_id: "L2",
+        diagnosis: "Same UOM conversion issue for 12-pack variant.",
+        resolution: "AUTO_OVERRIDE",
+        risk: "LOW",
+        waterfall: [],
+      },
+    ],
   },
 };

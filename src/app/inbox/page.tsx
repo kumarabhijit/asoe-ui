@@ -1,53 +1,40 @@
+/**
+ * Customer Inbox — AI-powered email triage and classification.
+ *
+ * Rich two-pane layout: 380px inbox queue + detail panel.
+ * Refactored to use shared component library while preserving
+ * the original visual design.
+ */
 "use client";
 
 import { useState } from "react";
 import {
-  Layers, Mail, AlertTriangle, BarChart3, Settings, Shield,
-  ChevronRight, Search, Zap, CheckCircle2, Clock, Package,
-  FileText, ArrowUpRight, Activity, RefreshCw, User,
+  Mail, ChevronRight, Search, Zap, CheckCircle2,
+  Clock, FileText, AlertTriangle, RefreshCw,
 } from "lucide-react";
+import { NavBar } from "@/components/ui/NavBar";
+import { MetricTile } from "@/components/ui/MetricTile";
+import { Badge, categoryVariant, inboxStatusVariant } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 
-/* ── ASOE Design Tokens (inline for self-contained page) ─────────── */
-const T = {
-  brand: "var(--color-brand)", brandHover: "var(--color-brand-hover)",
-  surfacePage: "var(--color-surface-page)", surfacePrimary: "var(--color-surface-primary)",
-  surfaceSecondary: "var(--color-surface-secondary)", surfaceGlass: "var(--color-surface-glass)",
-  textPrimary: "var(--color-text-primary)", textSecondary: "var(--color-text-secondary)",
-  textTertiary: "var(--color-text-tertiary)", textQuaternary: "var(--color-text-quaternary)",
-  textInverse: "var(--color-text-inverse)",
-  borderDefault: "var(--color-border-default)", borderSubtle: "var(--color-border-subtle)",
-  borderStrong: "var(--color-border-strong)",
-  success: "var(--color-success)", successSubtle: "var(--color-success-subtle)",
-  warning: "var(--color-warning)", warningSubtle: "var(--color-warning-subtle)",
-  error: "var(--color-error)", errorSubtle: "var(--color-error-subtle)",
-  catPurple: "var(--color-cat-purple)", catPurpleSubtle: "var(--color-cat-purple-subtle)",
-  catTeal: "var(--color-cat-teal)", catTealSubtle: "var(--color-cat-teal-subtle)",
-  catAmber: "var(--color-cat-amber)", catAmberSubtle: "var(--color-cat-amber-subtle)",
-  catRose: "var(--color-cat-rose)", catRoseSubtle: "var(--color-cat-rose-subtle)",
-  catSlate: "var(--color-cat-slate)", catSlateSubtle: "var(--color-cat-slate-subtle)",
-  shadowSm: "var(--shadow-sm)", shadowMd: "var(--shadow-md)", shadowLg: "var(--shadow-lg)",
-  radiusSm: "var(--radius-sm)", radiusMd: "var(--radius-md)", radiusLg: "var(--radius-lg)",
-  radiusFull: "var(--radius-full)",
-  sans: "var(--font-sans)", mono: "var(--font-mono)",
+/* ── Display label maps (visual mapping with default fallback) ────── */
+const CATEGORY_LABELS: Record<string, string> = {
+  ORDER_CHANGE: "Order Change",
+  SHIPMENT_INQUIRY: "Shipment Inquiry",
+  NEW_ORDER: "New Order",
+  COMPLAINT: "Complaint",
+  INVOICE_QUERY: "Invoice Query",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  NEEDS_APPROVAL: "Needs Approval",
+  IN_QUEUE: "In Queue",
+  AUTO_RESOLVED: "Auto-Resolved",
+  ESCALATED: "Escalated",
+  ANALYZING: "Agent Analyzing",
 };
 
 /* ── Data ─────────────────────────────────────────────────────────── */
-const CATEGORIES: Record<string, { label: string; color: string; bg: string }> = {
-  ORDER_CHANGE:     { label: "Order Change",      color: T.catPurple,  bg: T.catPurpleSubtle },
-  SHIPMENT_INQUIRY: { label: "Shipment Inquiry",  color: T.catTeal,    bg: T.catTealSubtle },
-  NEW_ORDER:        { label: "New Order",          color: T.success,    bg: T.successSubtle },
-  COMPLAINT:        { label: "Complaint",          color: T.error,      bg: T.errorSubtle },
-  INVOICE_QUERY:    { label: "Invoice Query",      color: T.catAmber,   bg: T.catAmberSubtle },
-};
-
-const STATUSES: Record<string, { label: string; color: string; bg: string }> = {
-  NEEDS_APPROVAL: { label: "Needs Approval",  color: T.warning,   bg: T.warningSubtle },
-  IN_QUEUE:       { label: "In Queue",         color: T.catSlate,  bg: T.catSlateSubtle },
-  AUTO_RESOLVED:  { label: "Auto-Resolved",    color: T.success,   bg: T.successSubtle },
-  ESCALATED:      { label: "Escalated",        color: T.error,     bg: T.errorSubtle },
-  ANALYZING:      { label: "Agent Analyzing",  color: T.catTeal,   bg: T.catTealSubtle },
-};
-
 interface InboxItem {
   id: string;
   sender: string;
@@ -128,41 +115,12 @@ const INBOX: InboxItem[] = [
   },
 ];
 
-/* ── Small components ─────────────────────────────────────────────── */
-function Badge({ color, bg, children }: { color: string; bg: string; children: React.ReactNode }) {
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px",
-      borderRadius: T.radiusSm, background: bg, color, fontSize: 10, fontWeight: 700,
-      letterSpacing: "0.02em", textTransform: "uppercase" as const, whiteSpace: "nowrap" as const,
-      border: `1px solid color-mix(in srgb, ${color} 20%, transparent)`, lineHeight: 1.3,
-    }}>{children}</span>
-  );
-}
-
-function StatusDot({ color }: { color: string }) {
-  return <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />;
-}
-
-function MetricTile({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
-  return (
-    <div style={{
-      background: T.surfacePrimary, borderRadius: T.radiusMd, boxShadow: T.shadowSm,
-      padding: 20, display: "flex", gap: 16, alignItems: "flex-start",
-    }}>
-      <div style={{
-        width: 40, height: 40, borderRadius: T.radiusMd, background: T.surfaceSecondary,
-        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        color: T.textSecondary,
-      }}>{icon}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: T.textTertiary, marginBottom: 4 }}>{label}</div>
-        <div style={{ fontSize: 24, fontWeight: 700, fontFamily: T.mono, color: T.textPrimary, lineHeight: 1.1 }}>{value}</div>
-        {sub && <div style={{ color: T.textTertiary, fontSize: 11, marginTop: 5, fontWeight: 500 }}>{sub}</div>}
-      </div>
-    </div>
-  );
-}
+const NAV_TABS = [
+  { id: "inbox", label: "Customer Inbox", href: "/inbox" },
+  { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
+  { id: "dashboard", label: "Dashboard", href: "/dashboard" },
+  { id: "settings", label: "Settings", href: "/settings" },
+];
 
 /* ── Main Page ────────────────────────────────────────────────────── */
 export default function InboxPage() {
@@ -171,176 +129,312 @@ export default function InboxPage() {
   const [detailTab, setDetailTab] = useState("email");
 
   const selected = INBOX.find((i) => i.id === selectedId) || INBOX[0];
-  const cat = CATEGORIES[selected.category];
   const needsAttention = INBOX.filter((i) => i.status === "NEEDS_APPROVAL" || i.status === "ESCALATED").length;
   const autoResolved = INBOX.filter((i) => i.status === "AUTO_RESOLVED").length;
 
   return (
-    <div style={{ minHeight: "100vh", background: T.surfacePage, fontFamily: T.sans, fontSize: 13, color: T.textPrimary, lineHeight: 1.5 }}>
-      <style>{`
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-        .inbox-row:hover{background:var(--color-surface-row-hover)!important}
-      `}</style>
-
-      {/* ── NAV BAR ── */}
-      <div style={{
-        background: T.surfaceGlass, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-        height: 56, display: "flex", alignItems: "center", padding: "0 24px",
-        position: "sticky", top: 0, zIndex: 100, borderBottom: `1px solid ${T.borderSubtle}`,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 32 }}>
-          <div style={{ width: 32, height: 32, borderRadius: T.radiusMd, background: T.brand, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Layers size={18} color={T.textInverse} strokeWidth={2.5} />
-          </div>
-          <span style={{ fontWeight: 700, fontSize: 15, color: T.textPrimary }}>ASOE</span>
-        </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          {[
-            { n: "Customer Inbox", icon: <Mail size={14} />, active: true },
-            { n: "Exception Queue", icon: <AlertTriangle size={14} />, active: false },
-            { n: "Quota Mgmt", icon: <Package size={14} />, active: false },
-            { n: "Insights", icon: <BarChart3 size={14} />, active: false },
-            { n: "Performance", icon: <Activity size={14} />, active: false },
-          ].map((item) => (
-            <button key={item.n} style={{
-              padding: "6px 14px", borderRadius: T.radiusSm, border: "none",
-              background: item.active ? T.surfaceSecondary : "transparent",
-              color: item.active ? T.textPrimary : T.textTertiary,
-              fontSize: 13, fontWeight: item.active ? 600 : 500, cursor: "pointer",
-              fontFamily: T.sans, display: "flex", alignItems: "center", gap: 6,
-            }}>{item.icon}{item.n}</button>
-          ))}
-        </div>
-        <div style={{ flex: 1 }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-success)", animation: "pulse 1.4s ease-in-out infinite" }} />
-            <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: T.textTertiary }}>Agent Live</span>
-          </div>
-          <div style={{ width: 32, height: 32, borderRadius: T.radiusFull, background: T.surfaceSecondary, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: T.textSecondary }}>
-            JD
-          </div>
-        </div>
-      </div>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--color-surface-page)",
+        fontFamily: "var(--font-sans)",
+        fontSize: "var(--font-size-body)",
+        color: "var(--color-text-primary)",
+        lineHeight: 1.5,
+      }}
+    >
+      {/* ── NAV BAR (shared component) ── */}
+      <NavBar
+        tabs={NAV_TABS}
+        activeTab="inbox"
+        onTabChange={(id) => {
+          const tab = NAV_TABS.find((t) => t.id === id);
+          if (tab?.href) window.location.href = tab.href;
+        }}
+        userName="Jane Doe"
+        userInitials="JD"
+        agentCount={3}
+      />
 
       {/* ── PAGE HEADER ── */}
-      <div style={{ background: T.surfacePrimary, borderBottom: `1px solid ${T.borderDefault}`, boxShadow: "var(--shadow-xs)" }}>
-        <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 32px" }}>
-          <div style={{ padding: "8px 0" }}>
-            <span style={{ fontSize: 12, color: T.textTertiary }}>Home</span>
-            <span style={{ fontSize: 12, color: T.textTertiary, margin: "0 4px" }}>›</span>
-            <span style={{ fontSize: 12, color: T.textSecondary }}>Customer Inbox</span>
+      <div
+        style={{
+          background: "var(--color-surface-primary)",
+          borderBottom: "1px solid var(--color-border-default)",
+          boxShadow: "var(--shadow-xs)",
+        }}
+      >
+        <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 var(--space-32)" }}>
+          {/* Breadcrumb */}
+          <div style={{ padding: "var(--space-8) 0" }}>
+            <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-tertiary)" }}>Home</span>
+            <ChevronRight size={10} style={{ margin: "0 var(--space-4)", color: "var(--color-text-tertiary)", verticalAlign: "middle" }} />
+            <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)" }}>Customer Inbox</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0 16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: T.radiusMd, background: T.textPrimary, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Mail size={20} color={T.textInverse} />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "var(--space-8) 0 var(--space-16)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-12)" }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "var(--radius-md)",
+                  background: "var(--color-text-primary)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Mail size={20} color="var(--color-text-inverse)" />
               </div>
               <div>
-                <h1 style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.15, margin: 0 }}>Customer Inbox</h1>
-                <span style={{ fontSize: 12, color: T.textTertiary }}>AI-powered email triage and classification</span>
+                <h1 style={{ fontSize: "var(--font-size-display)", fontWeight: 700, lineHeight: 1.15, margin: 0 }}>
+                  Customer Inbox
+                </h1>
+                <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-tertiary)" }}>
+                  AI-powered email triage and classification
+                </span>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button style={{ padding: "8px 16px", borderRadius: T.radiusMd, border: `1px solid ${T.borderDefault}`, background: T.surfacePrimary, color: T.textSecondary, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: T.sans, display: "flex", alignItems: "center", gap: 6 }}>
-                <RefreshCw size={14} />Refresh
-              </button>
-              <button style={{ padding: "8px 16px", borderRadius: T.radiusMd, border: "none", background: T.brand, color: T.textInverse, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: T.sans, display: "flex", alignItems: "center", gap: 6 }}>
-                <Zap size={14} />Process All
-              </button>
+            <div style={{ display: "flex", gap: "var(--space-8)" }}>
+              <Button variant="neutral" size="md">
+                <RefreshCw size={14} />
+                Refresh
+              </Button>
+              <Button variant="brand" size="md">
+                <Zap size={14} />
+                Process All
+              </Button>
             </div>
           </div>
         </div>
       </div>
 
       {/* ── METRICS STRIP ── */}
-      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "16px 32px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-          <MetricTile icon={<Mail size={20} />} label="Total Inbound" value={String(INBOX.length)} sub="Last 24 hours" />
-          <MetricTile icon={<AlertTriangle size={20} />} label="Need Attention" value={String(needsAttention)} sub="Approval or escalation" />
-          <MetricTile icon={<CheckCircle2 size={20} />} label="Auto-Resolved" value={String(autoResolved)} sub="No human action needed" />
-          <MetricTile icon={<Zap size={20} />} label="Avg Response" value="< 2m" sub="Agent classification time" />
+      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "var(--space-16) var(--space-32)" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "var(--space-16)",
+          }}
+        >
+          <MetricTile icon={<Mail size={20} />} label="Total Inbound" value={String(INBOX.length)} subtitle="Last 24 hours" tint="var(--color-cat-blue)" />
+          <MetricTile icon={<AlertTriangle size={20} />} label="Need Attention" value={String(needsAttention)} subtitle="Approval or escalation" tint="var(--color-warning)" />
+          <MetricTile icon={<CheckCircle2 size={20} />} label="Auto-Resolved" value={String(autoResolved)} subtitle="No human action needed" tint="var(--color-success)" />
+          <MetricTile icon={<Zap size={20} />} label="Avg Response" value="< 2m" subtitle="Agent classification time" tint="var(--color-cat-teal)" />
         </div>
       </div>
 
       {/* ── TAB BAR ── */}
-      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 32px" }}>
-        <div style={{ borderBottom: `1px solid ${T.borderDefault}`, display: "flex", gap: 0 }}>
+      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 var(--space-32)" }}>
+        <div style={{ borderBottom: "1px solid var(--color-border-default)", display: "flex", gap: 0 }}>
           {[
             { id: "inbox", label: "Inbox", count: INBOX.length },
             { id: "ai-flow", label: "AI Intake Flow", count: undefined },
           ].map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-              padding: "10px 18px", border: "none", background: "transparent", cursor: "pointer",
-              fontFamily: T.sans, fontSize: 13, fontWeight: activeTab === tab.id ? 700 : 600,
-              color: activeTab === tab.id ? T.textPrimary : T.textTertiary,
-              borderBottom: activeTab === tab.id ? `2px solid ${T.brand}` : "2px solid transparent",
-              marginBottom: -1, display: "flex", alignItems: "center", gap: 6,
-              transition: "all 0.1s ease",
-            }}>
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: "var(--space-10) var(--space-16)",
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--font-size-body)",
+                fontWeight: activeTab === tab.id ? 700 : 600,
+                color: activeTab === tab.id ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
+                borderBottom: activeTab === tab.id ? "2px solid var(--color-brand)" : "2px solid transparent",
+                marginBottom: -1,
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-6)",
+                transition: "all var(--dur-fast)",
+              }}
+            >
               {tab.label}
               {tab.count != null && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: T.textTertiary, background: T.surfaceSecondary, padding: "1px 6px", borderRadius: T.radiusFull }}>{tab.count}</span>
+                <span
+                  style={{
+                    fontSize: "var(--font-size-caption)",
+                    fontWeight: 600,
+                    color: "var(--color-text-tertiary)",
+                    background: "var(--color-surface-secondary)",
+                    padding: "1px 6px",
+                    borderRadius: "var(--radius-full)",
+                  }}
+                >
+                  {tab.count}
+                </span>
               )}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── CONTENT: QUEUE + SIDEBAR ── */}
-      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "16px 32px", display: "flex", gap: 16 }}>
-
+      {/* ── CONTENT: QUEUE + DETAIL PANEL ── */}
+      <div
+        style={{
+          maxWidth: 1440,
+          margin: "0 auto",
+          padding: "var(--space-16) var(--space-32)",
+          display: "flex",
+          gap: "var(--space-16)",
+        }}
+      >
         {/* ── LEFT: Inbox Queue ── */}
-        <div style={{ width: 380, flexShrink: 0, background: T.surfacePrimary, borderRadius: T.radiusMd, boxShadow: T.shadowSm, overflow: "hidden" }}>
+        <div
+          style={{
+            width: 380,
+            flexShrink: 0,
+            background: "var(--color-surface-primary)",
+            borderRadius: "var(--radius-md)",
+            boxShadow: "var(--shadow-sm)",
+            overflow: "hidden",
+          }}
+        >
           {/* Search */}
-          <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.borderSubtle}`, display: "flex", alignItems: "center", gap: 8 }}>
-            <Search size={16} style={{ color: T.textTertiary, flexShrink: 0 }} />
-            <span style={{ fontSize: 13, color: T.textTertiary }}>Search inbox...</span>
+          <div
+            style={{
+              padding: "var(--space-12) var(--space-16)",
+              borderBottom: "1px solid var(--color-border-subtle)",
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--space-8)",
+            }}
+          >
+            <Search size={16} style={{ color: "var(--color-text-tertiary)", flexShrink: 0 }} />
+            <span style={{ fontSize: "var(--font-size-body)", color: "var(--color-text-tertiary)" }}>
+              Search inbox...
+            </span>
             <div style={{ flex: 1 }} />
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", color: T.textTertiary, textTransform: "uppercase" as const }}>All Inboxes</span>
+            <span
+              style={{
+                fontSize: "var(--font-size-label)",
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                color: "var(--color-text-tertiary)",
+                textTransform: "uppercase",
+              }}
+            >
+              All Inboxes
+            </span>
           </div>
 
           {/* Inbox items */}
           <div style={{ maxHeight: "calc(100vh - 370px)", overflowY: "auto" }}>
             {INBOX.map((item) => {
               const isSelected = item.id === selectedId;
-              const itemCat = CATEGORIES[item.category];
-              const itemStatus = STATUSES[item.status];
               return (
                 <div
                   key={item.id}
-                  className="inbox-row"
                   onClick={() => setSelectedId(item.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter") setSelectedId(item.id); }}
                   style={{
-                    padding: "14px 16px", cursor: "pointer",
-                    borderBottom: `1px solid ${T.borderSubtle}`,
-                    background: isSelected ? T.surfaceSecondary : T.surfacePrimary,
-                    borderLeft: isSelected ? `3px solid ${T.brand}` : "3px solid transparent",
-                    transition: "background 0.1s ease",
+                    padding: "var(--space-12) var(--space-16)",
+                    cursor: "pointer",
+                    borderBottom: "1px solid var(--color-border-subtle)",
+                    background: isSelected ? "var(--color-surface-secondary)" : "var(--color-surface-primary)",
+                    borderLeft: isSelected ? "3px solid var(--color-brand)" : "3px solid transparent",
+                    transition: "background var(--dur-fast)",
                   }}
                 >
-                  <div style={{ display: "flex", gap: 10 }}>
+                  <div style={{ display: "flex", gap: "var(--space-10)" }}>
                     {/* Avatar */}
-                    <div style={{
-                      width: 36, height: 36, borderRadius: T.radiusFull, flexShrink: 0,
-                      background: `color-mix(in srgb, ${item.initialsColor} 15%, white)`,
-                      color: item.initialsColor, display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 12, fontWeight: 700,
-                    }}>{item.initials}</div>
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: "var(--radius-full)",
+                        flexShrink: 0,
+                        background: `color-mix(in srgb, ${item.initialsColor} 15%, white)`,
+                        color: item.initialsColor,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "var(--font-size-caption)",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {item.initials}
+                    </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 2 }}>
-                        <span style={{ fontWeight: 600, fontSize: 13, color: T.textPrimary }}>{item.sender}</span>
-                        <span style={{ fontSize: 11, color: T.textTertiary, fontFamily: T.mono, flexShrink: 0 }}>{item.time}</span>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "baseline",
+                          marginBottom: 2,
+                        }}
+                      >
+                        <span style={{ fontWeight: 600, fontSize: "var(--font-size-body)", color: "var(--color-text-primary)" }}>
+                          {item.sender}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "var(--font-size-caption)",
+                            color: "var(--color-text-tertiary)",
+                            fontFamily: "var(--font-mono)",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {item.time}
+                        </span>
                       </div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: T.textPrimary, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis", marginBottom: 4 }}>{item.subject}</div>
-                      <div style={{ fontSize: 12, color: T.textTertiary, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis", marginBottom: 8 }}>{item.preview}</div>
+                      <div
+                        style={{
+                          fontSize: "var(--font-size-body)",
+                          fontWeight: 500,
+                          color: "var(--color-text-primary)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          marginBottom: "var(--space-4)",
+                        }}
+                      >
+                        {item.subject}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "var(--font-size-caption)",
+                          color: "var(--color-text-tertiary)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          marginBottom: "var(--space-8)",
+                        }}
+                      >
+                        {item.preview}
+                      </div>
                       {/* Badges */}
-                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" as const, alignItems: "center" }}>
-                        {itemCat && <Badge color={itemCat.color} bg={itemCat.bg}>{itemCat.label}</Badge>}
-                        {itemStatus && <Badge color={itemStatus.color} bg={itemStatus.bg}>{itemStatus.label}</Badge>}
+                      <div style={{ display: "flex", gap: "var(--space-4)", flexWrap: "wrap", alignItems: "center" }}>
+                        <Badge variant={categoryVariant(item.category)} size="sm" icon={null}>
+                          {CATEGORY_LABELS[item.category] ?? item.category}
+                        </Badge>
+                        <Badge variant={inboxStatusVariant(item.status)} size="sm">
+                          {STATUS_LABELS[item.status] ?? item.status}
+                        </Badge>
                         {item.lineCount && (
-                          <span style={{ fontSize: 10, color: T.textTertiary, display: "flex", alignItems: "center", gap: 3 }}>
-                            <FileText size={10} />{item.lineCount}
+                          <span
+                            style={{
+                              fontSize: "var(--font-size-label)",
+                              color: "var(--color-text-tertiary)",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 3,
+                            }}
+                          >
+                            <FileText size={10} />
+                            {item.lineCount}
                           </span>
                         )}
                       </div>
@@ -352,125 +446,294 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {/* ── RIGHT: Detail Sidebar ── */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
-
+        {/* ── RIGHT: Detail Panel ── */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--space-16)" }}>
           {/* Email Header Card */}
-          <div style={{ background: T.surfacePrimary, borderRadius: T.radiusMd, boxShadow: T.shadowSm, padding: 20 }}>
-            <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: T.radiusFull, flexShrink: 0,
-                background: `color-mix(in srgb, ${selected.initialsColor} 15%, white)`,
-                color: selected.initialsColor, display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 15, fontWeight: 700,
-              }}>{selected.initials}</div>
+          <div
+            style={{
+              background: "var(--color-surface-primary)",
+              borderRadius: "var(--radius-md)",
+              boxShadow: "var(--shadow-sm)",
+              padding: "var(--space-20)",
+            }}
+          >
+            <div style={{ display: "flex", gap: "var(--space-12)", marginBottom: "var(--space-16)" }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: "var(--radius-full)",
+                  flexShrink: 0,
+                  background: `color-mix(in srgb, ${selected.initialsColor} 15%, white)`,
+                  color: selected.initialsColor,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "var(--font-size-subhead)",
+                  fontWeight: 700,
+                }}
+              >
+                {selected.initials}
+              </div>
               <div style={{ flex: 1 }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, lineHeight: 1.3 }}>{selected.subject}</h2>
-                <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>
-                  {selected.sender} {selected.email && <span style={{ color: T.textTertiary }}>&lt;{selected.email.from}&gt;</span>}
-                  {selected.email && <span style={{ color: T.textTertiary }}> · {selected.email.org} · {selected.email.received}</span>}
+                <h2 style={{ fontSize: "var(--font-size-heading)", fontWeight: 700, margin: 0, lineHeight: 1.3 }}>
+                  {selected.subject}
+                </h2>
+                <div style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)", marginTop: 2 }}>
+                  {selected.sender}{" "}
+                  {selected.email && (
+                    <span style={{ color: "var(--color-text-tertiary)" }}>
+                      &lt;{selected.email.from}&gt; · {selected.email.org} · {selected.email.received}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
             {/* Metadata badges */}
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, alignItems: "center" }}>
-              {cat && <Badge color={cat.color} bg={cat.bg}>{cat.label}</Badge>}
-              {STATUSES[selected.status] && <Badge color={STATUSES[selected.status].color} bg={STATUSES[selected.status].bg}>{STATUSES[selected.status].label}</Badge>}
+            <div style={{ display: "flex", gap: "var(--space-6)", flexWrap: "wrap", alignItems: "center" }}>
+              <Badge variant={categoryVariant(selected.category)} size="sm" icon={null}>
+                {CATEGORY_LABELS[selected.category] ?? selected.category}
+              </Badge>
+              <Badge variant={inboxStatusVariant(selected.status)} size="sm">
+                {STATUS_LABELS[selected.status] ?? selected.status}
+              </Badge>
               {selected.amount && (
-                <span style={{ fontFamily: T.mono, fontSize: 13, fontWeight: 600, color: T.textPrimary }}>{selected.amount}</span>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--font-size-body)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                  {selected.amount}
+                </span>
               )}
             </div>
             {/* Source metadata row */}
             {selected.email && (
-              <div style={{ display: "flex", gap: 32, marginTop: 16, padding: "12px 16px", background: T.surfaceSecondary, borderRadius: T.radiusSm }}>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: T.textTertiary, marginBottom: 2 }}>Source Mailbox</div>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: T.textSecondary, display: "flex", alignItems: "center", gap: 4 }}>
-                    <StatusDot color="var(--color-success)" />{selected.email.mailbox}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: T.textTertiary, marginBottom: 2 }}>Received</div>
-                  <div style={{ fontSize: 12, fontWeight: 500, fontFamily: T.mono, color: T.textSecondary }}>{selected.email.received}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: T.textTertiary, marginBottom: 2 }}>Attachments</div>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: T.textTertiary }}>None</div>
-                </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "var(--space-32)",
+                  marginTop: "var(--space-16)",
+                  padding: "var(--space-12) var(--space-16)",
+                  background: "var(--color-surface-secondary)",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
+                <MetaField label="Source Mailbox">
+                  <span style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--color-success)", flexShrink: 0 }} />
+                    {selected.email.mailbox}
+                  </span>
+                </MetaField>
+                <MetaField label="Received">
+                  <span style={{ fontFamily: "var(--font-mono)" }}>{selected.email.received}</span>
+                </MetaField>
+                <MetaField label="Attachments">
+                  <span style={{ color: "var(--color-text-tertiary)" }}>None</span>
+                </MetaField>
               </div>
             )}
           </div>
 
           {/* ── AGENT REASONING CARD (Layer 1 — always visible) ── */}
-          <div style={{ background: T.surfacePrimary, borderRadius: T.radiusMd, boxShadow: T.shadowMd, padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <div style={{ width: 28, height: 28, borderRadius: T.radiusSm, background: T.surfaceSecondary, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Zap size={14} style={{ color: T.textSecondary }} />
+          <div
+            style={{
+              background: "var(--color-surface-primary)",
+              borderRadius: "var(--radius-md)",
+              boxShadow: "var(--shadow-md)",
+              padding: "var(--space-20)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-8)", marginBottom: "var(--space-12)" }}>
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--color-surface-secondary)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Zap size={14} style={{ color: "var(--color-text-secondary)" }} />
               </div>
-              <span style={{ fontWeight: 600, fontSize: 14, color: T.textPrimary }}>Agent Analysis</span>
+              <span style={{ fontWeight: 600, fontSize: "var(--font-size-subhead)", color: "var(--color-text-primary)" }}>
+                Agent Analysis
+              </span>
               <div style={{ flex: 1 }} />
               {selected.agentConfidence && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 80, height: 4, borderRadius: T.radiusFull, background: T.surfaceSecondary, overflow: "hidden" }}>
-                    <div style={{ width: `${selected.agentConfidence}%`, height: "100%", borderRadius: T.radiusFull, background: T.textSecondary }} />
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-8)" }}>
+                  <div
+                    style={{
+                      width: 80,
+                      height: 4,
+                      borderRadius: "var(--radius-full)",
+                      background: "var(--color-surface-secondary)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${selected.agentConfidence}%`,
+                        height: "100%",
+                        borderRadius: "var(--radius-full)",
+                        background: "var(--color-text-secondary)",
+                      }}
+                    />
                   </div>
-                  <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.textPrimary }}>{selected.agentConfidence}%</span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "var(--font-size-caption)",
+                      fontWeight: 600,
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
+                    {selected.agentConfidence}%
+                  </span>
                 </div>
               )}
             </div>
-            <p style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.6, margin: "0 0 12px" }}>{selected.agentSummary}</p>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <div style={{ padding: "4px 10px", borderRadius: T.radiusSm, background: T.surfaceSecondary, fontSize: 12, fontWeight: 600, color: T.textSecondary }}>
+            <p
+              style={{
+                fontSize: "var(--font-size-body)",
+                color: "var(--color-text-secondary)",
+                lineHeight: 1.6,
+                margin: "0 0 var(--space-12)",
+              }}
+            >
+              {selected.agentSummary}
+            </p>
+            <div style={{ display: "flex", gap: "var(--space-8)", alignItems: "center" }}>
+              <div
+                style={{
+                  padding: "var(--space-4) var(--space-10)",
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--color-surface-secondary)",
+                  fontSize: "var(--font-size-caption)",
+                  fontWeight: 600,
+                  color: "var(--color-text-secondary)",
+                }}
+              >
                 {selected.agentRecommendation}
               </div>
               <div style={{ flex: 1 }} />
               {selected.status === "NEEDS_APPROVAL" && (
                 <>
-                  <button style={{ padding: "6px 12px", borderRadius: T.radiusMd, border: "none", background: T.brand, color: T.textInverse, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: T.sans, display: "flex", alignItems: "center", gap: 4 }}>
-                    <CheckCircle2 size={12} />Approve
-                  </button>
-                  <button style={{ padding: "6px 12px", borderRadius: T.radiusMd, border: `1px solid ${T.borderDefault}`, background: T.surfacePrimary, color: T.textSecondary, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: T.sans }}>
-                    Override
-                  </button>
-                  <button style={{ padding: "6px 12px", borderRadius: T.radiusMd, border: "none", background: "transparent", color: T.textTertiary, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: T.sans }}>
-                    Escalate
-                  </button>
+                  <Button variant="brand" size="sm">
+                    <CheckCircle2 size={12} />
+                    Approve
+                  </Button>
+                  <Button variant="neutral" size="sm">Override</Button>
+                  <Button variant="ghost" size="sm">Escalate</Button>
                 </>
               )}
             </div>
             {/* Layer 2 trigger */}
-            <button style={{
-              marginTop: 12, width: "100%", padding: "8px 0", border: "none", background: "transparent",
-              cursor: "pointer", fontSize: 11, color: T.textTertiary, fontFamily: T.sans, fontWeight: 500,
-              borderTop: `1px solid ${T.borderSubtle}`, paddingTop: 12,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-            }}>
-              <ChevronRight size={12} />View Evidence & Reasoning
+            <button
+              style={{
+                marginTop: "var(--space-12)",
+                width: "100%",
+                padding: "var(--space-8) 0",
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                fontSize: "var(--font-size-caption)",
+                color: "var(--color-text-tertiary)",
+                fontFamily: "var(--font-sans)",
+                fontWeight: 500,
+                borderTop: "1px solid var(--color-border-subtle)",
+                paddingTop: "var(--space-12)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "var(--space-4)",
+              }}
+            >
+              <ChevronRight size={12} />
+              View Evidence & Reasoning
             </button>
           </div>
 
           {/* ── DETAIL TABS ── */}
-          <div style={{ background: T.surfacePrimary, borderRadius: T.radiusMd, boxShadow: T.shadowSm, overflow: "hidden" }}>
-            <div style={{ borderBottom: `1px solid ${T.borderSubtle}`, display: "flex", padding: "0 16px" }}>
-              {["email", "entities", "sap-data", "change-analysis", "knowledge-graph"].map((tab) => {
-                const labels: Record<string, string> = { email: "Email", entities: "Entities", "sap-data": "SAP Data", "change-analysis": "Change Analysis", "knowledge-graph": "Knowledge Graph" };
-                return (
-                  <button key={tab} onClick={() => setDetailTab(tab)} style={{
-                    padding: "10px 14px", border: "none", background: "transparent", cursor: "pointer",
-                    fontFamily: T.sans, fontSize: 12, fontWeight: detailTab === tab ? 700 : 500,
-                    color: detailTab === tab ? T.textPrimary : T.textTertiary,
-                    borderBottom: detailTab === tab ? `2px solid ${T.brand}` : "2px solid transparent",
+          <div
+            style={{
+              background: "var(--color-surface-primary)",
+              borderRadius: "var(--radius-md)",
+              boxShadow: "var(--shadow-sm)",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ borderBottom: "1px solid var(--color-border-subtle)", display: "flex", padding: "0 var(--space-16)" }}>
+              {[
+                { id: "email", label: "Email" },
+                { id: "entities", label: "Entities" },
+                { id: "sap-data", label: "SAP Data" },
+                { id: "change-analysis", label: "Change Analysis" },
+                { id: "knowledge-graph", label: "Knowledge Graph" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setDetailTab(tab.id)}
+                  style={{
+                    padding: "var(--space-10) var(--space-12)",
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    fontFamily: "var(--font-sans)",
+                    fontSize: "var(--font-size-caption)",
+                    fontWeight: detailTab === tab.id ? 700 : 500,
+                    color: detailTab === tab.id ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
+                    borderBottom: detailTab === tab.id ? "2px solid var(--color-brand)" : "2px solid transparent",
                     marginBottom: -1,
-                  }}>{labels[tab]}</button>
-                );
-              })}
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-            {/* Email body */}
-            <div style={{ padding: 20, fontSize: 13, color: T.textSecondary, lineHeight: 1.7, whiteSpace: "pre-wrap" as const, maxHeight: 300, overflowY: "auto" }}>
-              {selected.email?.body || "Email content not available. Agent processed this item automatically."}
+            {/* Content */}
+            <div
+              style={{
+                padding: "var(--space-20)",
+                fontSize: "var(--font-size-body)",
+                color: "var(--color-text-secondary)",
+                lineHeight: 1.7,
+                whiteSpace: "pre-wrap",
+                maxHeight: 300,
+                overflowY: "auto",
+              }}
+            >
+              {detailTab === "email"
+                ? (selected.email?.body || "Email content not available. Agent processed this item automatically.")
+                : `${
+                    { entities: "Entities", "sap-data": "SAP Data", "change-analysis": "Change Analysis", "knowledge-graph": "Knowledge Graph" }[detailTab] ?? detailTab
+                  } — coming soon.`
+              }
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Helper components ────────────────────────────────────────────── */
+
+function MetaField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: "var(--font-size-label)",
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "var(--color-text-tertiary)",
+          marginBottom: 2,
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ fontSize: "var(--font-size-caption)", fontWeight: 500, color: "var(--color-text-secondary)" }}>
+        {children}
       </div>
     </div>
   );

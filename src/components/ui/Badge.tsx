@@ -84,6 +84,43 @@ export function lifecycleVariant(state?: string): BadgeVariant {
   }
 }
 
+/** Map root cause strings to badge variants (visual mapping with fallback) */
+export function rootCauseVariant(cause?: string): BadgeVariant {
+  switch (cause) {
+    case "PROMO_EXPIRED": return "warning";
+    case "ERP_NOT_LOADED": return "error";
+    case "MASTER_DATA": return "brand";
+    case "CONTRACT_GAP": return "info";
+    case "EDI_MISMATCH": return "info";
+    case "UOM_ERROR": return "error";
+    default: return "neutral";
+  }
+}
+
+/** Map inbox category strings to badge variants (visual mapping with fallback) */
+export function categoryVariant(category?: string): BadgeVariant {
+  switch (category) {
+    case "ORDER_CHANGE": return "brand";
+    case "SHIPMENT_INQUIRY": return "info";
+    case "NEW_ORDER": return "success";
+    case "COMPLAINT": return "error";
+    case "INVOICE_QUERY": return "warning";
+    default: return "neutral";
+  }
+}
+
+/** Map inbox status strings to badge variants (visual mapping with fallback) */
+export function inboxStatusVariant(status?: string): BadgeVariant {
+  switch (status) {
+    case "NEEDS_APPROVAL": return "warning";
+    case "IN_QUEUE": return "neutral";
+    case "AUTO_RESOLVED": return "success";
+    case "ESCALATED": return "error";
+    case "ANALYZING": return "info";
+    default: return "neutral";
+  }
+}
+
 /** Default icon per variant (WCAG: status not conveyed by color alone) */
 const DEFAULT_ICONS: Record<BadgeVariant, ReactNode> = {
   success: <Check size={12} />,

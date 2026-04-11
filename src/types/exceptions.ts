@@ -173,6 +173,62 @@ export interface TraceRecord {
   explanation?: string;
 }
 
+/* ── UI display types (not backend contract types) ───────────────────
+   These types support the enriched UI views (line-item grids, pricing
+   waterfall). When asoe2 adds line-item endpoints, these will be
+   aligned to match the Pydantic models. Until then they are UI-only.
+   ──────────────────────────────────────────────────────────────────── */
+
+/** Pricing condition type for waterfall visualization */
+export type PricingConditionType =
+  | "BASE"
+  | "CONTRACT"
+  | "TPR"
+  | "UOM"
+  | "RESULT"
+  | "ERROR";
+
+/** A single step in a pricing waterfall (condition chain) */
+export interface PricingWaterfallStep {
+  type: PricingConditionType;
+  label: string;
+  record: string;
+  value: number | null;
+  running: number | null;
+  detail: string;
+  error?: string;
+}
+
+/** Order line item for the exception queue line-item grid */
+export interface LineItem {
+  line_id: string;
+  sku: string;
+  description: string;
+  uom: string;
+  quantity: number;
+  erp_price: number;
+  po_price: number;
+  root_cause?: string;
+}
+
+/** Per-line agent analysis with optional pricing waterfall */
+export interface LineItemAnalysis {
+  line_id: string;
+  diagnosis: string;
+  resolution: string;
+  risk: "LOW" | "MEDIUM" | "HIGH";
+  waterfall: PricingWaterfallStep[];
+}
+
+/** Order-level agent analysis (drives detail panel enrichments) */
+export interface OrderAnalysis {
+  diagnosis: string;
+  confidence: number;
+  risk: "LOW" | "MEDIUM" | "HIGH";
+  resolution: string;
+  lines: LineItemAnalysis[];
+}
+
 /* ── Health endpoint (dynamic enum source per Guardrail #2) ────────── */
 
 export interface HealthResponse {
