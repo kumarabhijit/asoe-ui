@@ -8,6 +8,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   CheckCircle,
@@ -65,6 +66,7 @@ function formatTime(iso: string): string {
 }
 
 export default function ExceptionQueuePage() {
+  const router = useRouter();
   const { health } = useHealth();
   const [exceptions, setExceptions] = useState<ExceptionSummary[]>([]);
   const [stats, setStats] = useState<StatsResponse | null>(null);
@@ -627,6 +629,7 @@ export default function ExceptionQueuePage() {
       <Sidebar
         open={sidebarOpen}
         onClose={closeSidebar}
+        onExpand={selectedId ? () => router.push(`/exceptions/${selectedId}`) : undefined}
         title={selectedId ? `Exception ${selectedId}` : undefined}
       >
         {selectedId && (
