@@ -3,7 +3,7 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label: string;
+  label?: string;
   error?: string;
   rightIcon?: ReactNode;
 }
@@ -16,24 +16,26 @@ export function Input({
   style,
   ...props
 }: InputProps) {
-  const inputId = id || label.toLowerCase().replace(/\s+/g, "-");
-  const errorId = `${inputId}-error`;
+  const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
+  const errorId = inputId ? `${inputId}-error` : undefined;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
-      <label
-        htmlFor={inputId}
-        style={{
-          fontSize: "var(--font-size-label)",
-          fontWeight: 700,
-          textTransform: "uppercase" as const,
-          letterSpacing: "var(--letter-spacing-label)",
-          color: "var(--color-text-tertiary)",
-          lineHeight: "var(--line-height-label)",
-        }}
-      >
-        {label}
-      </label>
+      {label && (
+        <label
+          htmlFor={inputId}
+          style={{
+            fontSize: "var(--font-size-label)",
+            fontWeight: 700,
+            textTransform: "uppercase" as const,
+            letterSpacing: "var(--letter-spacing-label)",
+            color: "var(--color-text-tertiary)",
+            lineHeight: "var(--line-height-label)",
+          }}
+        >
+          {label}
+        </label>
+      )}
       <div style={{ position: "relative" }}>
         <input
           id={inputId}

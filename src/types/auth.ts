@@ -1,13 +1,21 @@
+/**
+ * Auth types — aligned with asoe2/api/deps.py and api/schemas.py
+ */
+
 export type Role = "analyst" | "manager" | "admin" | "viewer" | "partner";
 
+/** Mirrors UserProfile in asoe2/api/schemas.py */
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
   avatarUrl?: string;
   roles: Role[];
-  org: string;
+  org: string; // tenant_id from JWT org claim
   permissions: string[];
+  env?: "sandbox" | "production";
+  auth_method?: "password+mfa" | "sso";
+  retailer_id?: string; // partner-role scoping
 }
 
 export interface LoginCredentials {
@@ -15,14 +23,21 @@ export interface LoginCredentials {
   password: string;
 }
 
+/** Mirrors AuthTokenResponse in asoe2/api/schemas.py */
 export interface LoginResponse {
-  accessToken: string;
-  refreshToken: string;
-  user: AuthUser;
-  mfaRequired?: boolean;
-  mfaToken?: string;
+  access_token: string;
+  refresh_token?: string;
+  token_type: string;
+  user?: AuthUser;
+  mfa_required: boolean;
+  mfa_token?: string;
+}
+
+export interface MFAVerifyRequest {
+  mfa_token: string;
+  code: string;
 }
 
 export interface SSOInitResponse {
-  redirectUrl: string;
+  redirect_url: string;
 }
