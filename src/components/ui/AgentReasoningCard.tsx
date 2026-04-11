@@ -249,8 +249,8 @@ export function AgentReasoningCard({
         {/* Action buttons — verdict-specific per Section 11.1 */}
         <div style={{ display: "flex", gap: "var(--space-8)", flexWrap: "wrap" }}>
           {verdict === "GREEN" && (
-            <Button variant="neutral" size="sm" onClick={onApprove}>
-              View Details
+            <Button variant="neutral" size="sm" onClick={() => setExpanded(!expanded)}>
+              {expanded ? "Hide Details" : "View Details"}
             </Button>
           )}
           {verdict === "YELLOW" && (
