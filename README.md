@@ -72,6 +72,7 @@ asoe-ui/
 |---|---|---|
 | `CLAUDE.md` | Developers | Engineering guardrails (Guardrail #2, design tokens, types, agent-first) |
 | `DESIGN.md` | Engineers | Code-to-architecture map (components, pages, types, API client) |
+| `ui_architecture.md` | Engineers / Architects | UI architecture extraction — alignment, drift register, proposed backend changes |
 | `docs/AUDITOR_GUIDE.md` | Auditors | 10 frontend compliance controls (RBAC, session, trace, tenancy) |
 | `tasks.md` | Team | Phase-based progress (Phases 0-8.5 complete, 9-11 pending) |
 | `consol_arch.md` | All | Platform architecture — Section 11 covers UI |
