@@ -8,12 +8,13 @@
  */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { FileText, Package } from "lucide-react";
 import { AgentReasoningCard } from "@/components/ui/AgentReasoningCard";
 import { WaterfallStepper, type NodeState } from "@/components/ui/WaterfallStepper";
 import { PricingWaterfall } from "@/components/ui/PricingWaterfall";
 import { Badge, lifecycleVariant, rootCauseVariant } from "@/components/ui/Badge";
+import { useToast } from "@/components/ui/Toast";
 import { exceptionsApi } from "@/lib/api";
 import type {
   ExceptionDetail,
@@ -102,8 +103,10 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [analysis, setAnalysis] = useState<OrderAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [selectedLine, setSelectedLine] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState("evidence");
+  const { addToast } = useToast();
 
   useEffect(() => {
     let cancelled = false;
@@ -154,6 +157,36 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
       </p>
     );
   }
+
+  const handleApprove = useCallback(async () => {
+    setActionLoading(true);
+    try {
+      const updated = await exceptionsApi.approve(exceptionId);
+      setDetail(updated);
+      addToast("success", `Exception ${exceptionId} approved — resuming execution.`);
+    } catch (err) {
+      addToast("error", `Failed to approve: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setActionLoading(false);
+    }
+  }, [exceptionId, addToast]);
+
+  const handleReject = useCallback(async () => {
+    setActionLoading(true);
+    try {
+      const updated = await exceptionsApi.reject(exceptionId, { reason: "Rejected by reviewer" });
+      setDetail(updated);
+      addToast("warning", `Exception ${exceptionId} rejected.`);
+    } catch (err) {
+      addToast("error", `Failed to reject: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setActionLoading(false);
+    }
+  }, [exceptionId, addToast]);
+
+  const handleEscalate = useCallback(() => {
+    addToast("info", `Exception ${exceptionId} escalated to management.`);
+  }, [exceptionId, addToast]);
 
   const nodeStates = buildNodeStates(detail, trace ?? undefined);
   const selectedAnalysis = analysis?.lines?.find((l) => l.line_id === selectedLine);
@@ -309,9 +342,9 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
             final_status: trace.final_status,
             explanation: trace.explanation,
           } : undefined}
-          onApprove={() => console.log("Approve", exceptionId)}
-          onReject={() => console.log("Reject", exceptionId)}
-          onEscalate={() => console.log("Escalate", exceptionId)}
+          onApprove={actionLoading ? undefined : handleApprove}
+          onReject={actionLoading ? undefined : handleReject}
+          onEscalate={actionLoading ? undefined : handleEscalate}
         />
       )}
 
