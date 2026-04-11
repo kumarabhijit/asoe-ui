@@ -21,7 +21,7 @@ npm run dev
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 15 (App Router, React 19, TypeScript) |
+| Framework | Next.js 16 (App Router, React 19, TypeScript) |
 | Styling | CSS custom properties (`design-tokens.css`) + Tailwind CSS |
 | Icons | Lucide React (16/20/24px — never emoji) |
 | Auth | NextAuth.js → FastAPI auth endpoints (`asoe2`) |
