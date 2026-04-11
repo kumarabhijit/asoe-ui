@@ -5,17 +5,19 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode, type CSSProperties } from "react";
-import { X } from "lucide-react";
+import { X, Maximize2 } from "lucide-react";
 
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
+  /** Called when the expand button is clicked (opens full-page view) */
+  onExpand?: () => void;
   title?: string;
   children: ReactNode;
   style?: CSSProperties;
 }
 
-export function Sidebar({ open, onClose, title, children, style }: SidebarProps) {
+export function Sidebar({ open, onClose, onExpand, title, children, style }: SidebarProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Close on Escape
@@ -97,22 +99,43 @@ export function Sidebar({ open, onClose, title, children, style }: SidebarProps)
             >
               {title}
             </h2>
-            <button
-              onClick={onClose}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "var(--color-text-tertiary)",
-                padding: "var(--space-4)",
-                display: "flex",
-                borderRadius: "var(--radius-sm)",
-                transition: "color var(--dur-fast)",
-              }}
-              aria-label="Close panel"
-            >
-              <X size={18} />
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+              {onExpand && (
+                <button
+                  onClick={onExpand}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--color-text-tertiary)",
+                    padding: "var(--space-4)",
+                    display: "flex",
+                    borderRadius: "var(--radius-sm)",
+                    transition: "color var(--dur-fast)",
+                  }}
+                  aria-label="Open full page"
+                  title="Open full page"
+                >
+                  <Maximize2 size={16} />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--color-text-tertiary)",
+                  padding: "var(--space-4)",
+                  display: "flex",
+                  borderRadius: "var(--radius-sm)",
+                  transition: "color var(--dur-fast)",
+                }}
+                aria-label="Close panel"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
         )}
 
