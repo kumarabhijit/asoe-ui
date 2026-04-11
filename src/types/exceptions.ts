@@ -192,10 +192,10 @@ export type PricingConditionType =
 export interface PricingWaterfallStep {
   type: PricingConditionType;
   label: string;
-  record: string;
+  record?: string;
   value: number | null;
   running: number | null;
-  detail: string;
+  detail?: string;
   error?: string;
 }
 

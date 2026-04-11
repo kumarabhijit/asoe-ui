@@ -6,7 +6,8 @@ export type Role = "analyst" | "manager" | "admin" | "viewer" | "partner";
 
 /** Mirrors UserProfile in asoe2/api/schemas.py */
 export interface AuthUser {
-  id: string;
+  id: string; // NextAuth session identifier (mapped from JWT sub)
+  sub: string; // JWT subject claim — backend UserProfile.sub
   email: string;
   name: string;
   avatarUrl?: string;
