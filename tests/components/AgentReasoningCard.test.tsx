@@ -94,12 +94,18 @@ describe("AgentReasoningCard", () => {
       expect(screen.getByText("deterministic_fallback")).toBeInTheDocument();
     });
 
-    it("fires onApprove when Approve clicked", async () => {
+    it("fires onApprove with comment when Approve confirmed", async () => {
       const user = userEvent.setup();
       const onApprove = vi.fn();
       render(<AgentReasoningCard verdict="YELLOW" onApprove={onApprove} />);
+      // Step 1: Click Approve to open comment input
       await user.click(screen.getByText("Approve"));
+      expect(screen.getByText("Approval Comment")).toBeInTheDocument();
+      // Step 2: Type a comment and confirm
+      await user.type(screen.getByPlaceholderText("Add approval notes (optional)..."), "Looks correct");
+      await user.click(screen.getByText("Confirm Approval"));
       expect(onApprove).toHaveBeenCalledTimes(1);
+      expect(onApprove).toHaveBeenCalledWith("Looks correct");
     });
   });
 

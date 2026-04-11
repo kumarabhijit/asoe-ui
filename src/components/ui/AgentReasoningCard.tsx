@@ -11,12 +11,11 @@
  */
 "use client";
 
-import { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp, Zap, Check, AlertTriangle, ShieldX } from "lucide-react";
+import { useState, useEffect, type CSSProperties, type ReactNode } from "react";
+import { ChevronDown, ChevronUp, Zap, Check, AlertTriangle, ShieldX, MessageSquare } from "lucide-react";
 import { Badge, verdictVariant } from "./Badge";
 import { Button } from "./Button";
 import type { ShadowVerdict, TraceRecord } from "@/types/exceptions";
-import type { ReactNode, CSSProperties } from "react";
 
 interface AgentReasoningCardProps {
   verdict: ShadowVerdict;
@@ -26,10 +25,14 @@ interface AgentReasoningCardProps {
   explanation?: string;
   policyHits?: string[];
   trace?: TraceRecord;
-  onApprove?: () => void;
-  onReject?: () => void;
+  /** Called with reviewer comment when Approve is confirmed */
+  onApprove?: (comment: string) => void;
+  /** Called with reviewer comment when Reject is confirmed */
+  onReject?: (comment: string) => void;
   onEscalate?: () => void;
   onOverride?: () => void;
+  /** Whether an action is in progress (disables buttons) */
+  actionLoading?: boolean;
   /** Whether user has admin role (enables Override on RED) */
   isAdmin?: boolean;
   style?: CSSProperties;
@@ -109,16 +112,34 @@ export function AgentReasoningCard({
   onReject,
   onEscalate,
   onOverride,
+  actionLoading = false,
   isAdmin = false,
   style,
 }: AgentReasoningCardProps) {
   const config = VERDICT_CONFIG[verdict];
   const [expanded, setExpanded] = useState(config.autoExpand);
+  const [pendingAction, setPendingAction] = useState<"approve" | "reject" | null>(null);
+  const [comment, setComment] = useState("");
 
   // Auto-expand for YELLOW and RED verdicts
   useEffect(() => {
     if (config.autoExpand) setExpanded(true);
   }, [config.autoExpand]);
+
+  function confirmAction() {
+    if (pendingAction === "approve" && onApprove) {
+      onApprove(comment);
+    } else if (pendingAction === "reject" && onReject) {
+      onReject(comment);
+    }
+    setPendingAction(null);
+    setComment("");
+  }
+
+  function cancelAction() {
+    setPendingAction(null);
+    setComment("");
+  }
 
   return (
     <div
@@ -247,29 +268,91 @@ export function AgentReasoningCard({
         )}
 
         {/* Action buttons — verdict-specific per Section 11.1 */}
-        <div style={{ display: "flex", gap: "var(--space-8)", flexWrap: "wrap" }}>
-          {verdict === "GREEN" && (
-            <Button variant="neutral" size="sm" onClick={() => setExpanded(!expanded)}>
-              {expanded ? "Hide Details" : "View Details"}
-            </Button>
-          )}
-          {verdict === "YELLOW" && (
-            <>
-              {onApprove && <Button variant="brand" size="sm" onClick={onApprove}>Approve</Button>}
-              {onReject && <Button variant="neutral" size="sm" onClick={onReject}>Reject</Button>}
-              {onEscalate && <Button variant="ghost" size="sm" onClick={onEscalate}>Escalate</Button>}
-            </>
-          )}
-          {verdict === "RED" && (
-            <>
-              <Button variant="neutral" size="sm" onClick={onApprove}>Acknowledge</Button>
-              {isAdmin && onOverride && (
-                <Button variant="destructive" size="sm" onClick={onOverride}>Override</Button>
-              )}
-              {onEscalate && <Button variant="ghost" size="sm" onClick={onEscalate}>Escalate</Button>}
-            </>
-          )}
-        </div>
+        {!pendingAction && (
+          <div style={{ display: "flex", gap: "var(--space-8)", flexWrap: "wrap" }}>
+            {verdict === "GREEN" && (
+              <Button variant="neutral" size="sm" onClick={() => setExpanded(!expanded)}>
+                {expanded ? "Hide Details" : "View Details"}
+              </Button>
+            )}
+            {verdict === "YELLOW" && (
+              <>
+                {onApprove && <Button variant="brand" size="sm" disabled={actionLoading} onClick={() => setPendingAction("approve")}>Approve</Button>}
+                {onReject && <Button variant="neutral" size="sm" disabled={actionLoading} onClick={() => setPendingAction("reject")}>Reject</Button>}
+                {onEscalate && <Button variant="ghost" size="sm" disabled={actionLoading} onClick={onEscalate}>Escalate</Button>}
+              </>
+            )}
+            {verdict === "RED" && (
+              <>
+                <Button variant="neutral" size="sm" disabled={actionLoading} onClick={() => setPendingAction("approve")}>Acknowledge</Button>
+                {isAdmin && onOverride && (
+                  <Button variant="destructive" size="sm" disabled={actionLoading} onClick={onOverride}>Override</Button>
+                )}
+                {onEscalate && <Button variant="ghost" size="sm" disabled={actionLoading} onClick={onEscalate}>Escalate</Button>}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Comment input — shown when Approve or Reject is clicked */}
+        {pendingAction && (
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-8)",
+            padding: "var(--space-12)",
+            background: "var(--color-surface-secondary)",
+            borderRadius: "var(--radius-sm)",
+          }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--space-6)",
+              fontSize: "var(--font-size-caption)",
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+            }}>
+              <MessageSquare size={14} />
+              {pendingAction === "approve" ? "Approval" : "Rejection"} Comment
+            </div>
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder={pendingAction === "approve"
+                ? "Add approval notes (optional)..."
+                : "Provide rejection reason..."
+              }
+              autoFocus
+              rows={3}
+              style={{
+                width: "100%",
+                padding: "var(--space-8) var(--space-12)",
+                border: "1px solid var(--color-border-default)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: "var(--font-size-caption)",
+                fontFamily: "var(--font-sans)",
+                color: "var(--color-text-primary)",
+                background: "var(--color-surface-primary)",
+                resize: "vertical",
+                outline: "none",
+              }}
+              onFocus={(e) => { e.target.style.borderColor = "var(--color-brand)"; }}
+              onBlur={(e) => { e.target.style.borderColor = "var(--color-border-default)"; }}
+              onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) confirmAction(); }}
+            />
+            <div style={{ display: "flex", gap: "var(--space-8)", justifyContent: "flex-end" }}>
+              <Button variant="ghost" size="sm" onClick={cancelAction}>Cancel</Button>
+              <Button
+                variant={pendingAction === "approve" ? "brand" : "neutral"}
+                size="sm"
+                disabled={actionLoading}
+                onClick={confirmAction}
+              >
+                {actionLoading ? "Processing..." : pendingAction === "approve" ? "Confirm Approval" : "Confirm Rejection"}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Layer 2 toggle ──────────────────────────────────────────── */}

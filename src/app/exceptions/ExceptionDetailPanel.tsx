@@ -106,10 +106,10 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
   const [selectedLine, setSelectedLine] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState("evidence");
 
-  async function handleApprove() {
+  async function handleApprove(comment: string) {
     setActionLoading(true);
     try {
-      const updated = await exceptionsApi.approve(exceptionId);
+      const updated = await exceptionsApi.approve(exceptionId, { notes: comment || undefined });
       setDetail(updated);
     } catch (err) {
       console.error("Approve failed:", err);
@@ -118,10 +118,10 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
     }
   }
 
-  async function handleReject() {
+  async function handleReject(comment: string) {
     setActionLoading(true);
     try {
-      const updated = await exceptionsApi.reject(exceptionId, { reason: "Rejected by reviewer" });
+      const updated = await exceptionsApi.reject(exceptionId, { reason: comment || "Rejected by reviewer" });
       setDetail(updated);
     } catch (err) {
       console.error("Reject failed:", err);
@@ -338,9 +338,10 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
             final_status: trace.final_status,
             explanation: trace.explanation,
           } : undefined}
-          onApprove={actionLoading ? undefined : handleApprove}
-          onReject={actionLoading ? undefined : handleReject}
-          onEscalate={actionLoading ? undefined : handleEscalate}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onEscalate={handleEscalate}
+          actionLoading={actionLoading}
         />
       )}
 
