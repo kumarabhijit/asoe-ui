@@ -119,6 +119,23 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `consol_arch.
 
 ---
 
+### [x] PHASE 8.5: UI Enrichment — Pre-Merge Visual Designs
+- [x] Fixed token naming bugs (`--color-category-*` → `--color-cat-*`) in exceptions + dashboard pages
+- [x] UI display types (`src/types/exceptions.ts`) — LineItem, PricingWaterfallStep, LineItemAnalysis, OrderAnalysis
+- [x] Mock line-item data (`src/lib/api.ts`) — 8 exceptions with 18 line items, 2 with full waterfall data
+- [x] Mock API methods — `exceptionsApi.lineItems()`, `exceptionsApi.orderAnalysis()`
+- [x] Badge variant mappers — `rootCauseVariant()`, `categoryVariant()`, `inboxStatusVariant()`
+- [x] PricingWaterfall component (`src/components/ui/PricingWaterfall.tsx`) — pricing condition chain timeline
+- [x] Exception Queue enhanced — expandable card rows with line-item grids, breadcrumb, tab bar, enriched header
+- [x] ExceptionDetailPanel enhanced — order summary card, mini-metrics, line selector, PricingWaterfall, tabbed detail
+- [x] Inbox page aligned — refactored to use shared NavBar, Badge, MetricTile, Button; removed inline T object
+- [x] Dashboard enhanced — consistent nav tabs, breadcrumb, Recent Activity feed card
+- [x] Consistent nav tabs across all pages (Customer Inbox, Exception Queue, Dashboard, Settings)
+
+✅ Outcome: All pages use shared component library. Rich data density from pre-merge designs restored. 14 reusable components. 128 tests pass. (2026-04-11)
+
+---
+
 ## Remaining Phases
 
 ### [ ] PHASE 9: Settings & Admin Page
@@ -132,13 +149,13 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `consol_arch.
 ---
 
 ### [ ] PHASE 10: Testing
-**Scope:** Test infrastructure and baseline coverage.
-- [ ] Jest + React Testing Library setup
-- [ ] Component unit tests for all 13 components
-- [ ] `jest-axe` accessibility tests on status-related components (Badge, Toast, AgentReasoningCard)
+**Scope:** Expand test coverage (Vitest + React Testing Library already configured, 128 tests passing).
+- [ ] Component unit tests for PricingWaterfall (new component)
+- [ ] `vitest-axe` accessibility tests on status-related components (Badge, Toast, AgentReasoningCard)
 - [ ] Guardrail #2 lint rule (`no-hardcoded-enums` ESLint custom rule)
 - [ ] Type contract tests — verify TypeScript types compile against mock API data
-- [ ] Page integration tests — Exception Queue render, filter, sidebar open
+- [ ] Page integration tests — Exception Queue expand, line-item grid, sidebar open
+- [ ] Inbox page integration tests — shared component rendering, badge variants
 
 ---
 
