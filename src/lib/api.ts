@@ -363,6 +363,15 @@ export const exceptionsApi = {
       auto_resolved: MOCK_EXCEPTIONS.filter(
         (e) => e.final_status === "COMPLETE" && e.shadow_verdict === "GREEN"
       ).length,
+      manual_review: MOCK_EXCEPTIONS.filter(
+        (e) => e.final_status === "MANUAL_REVIEW_REQUIRED"
+      ).length,
+      blocked: MOCK_EXCEPTIONS.filter(
+        (e) => e.final_status === "BLOCKED"
+      ).length,
+      failed: MOCK_EXCEPTIONS.filter(
+        (e) => e.final_status === "FAIL_TO_HUMAN"
+      ).length,
       avg_resolution_time_seconds: 480,
       by_intent: {
         CONTRACTUAL_CORRECTION: 3,

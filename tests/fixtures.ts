@@ -156,6 +156,9 @@ export const MOCK_STATS: StatsResponse = {
   total_exceptions: 8,
   open_exceptions: 4,
   auto_resolved: 3,
+  manual_review: 2,
+  blocked: 1,
+  failed: 0,
   avg_resolution_time_seconds: 480,
   by_intent: {
     CONTRACTUAL_CORRECTION: 3,

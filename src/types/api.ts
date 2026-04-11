@@ -67,7 +67,7 @@ export type ExceptionDetailResponse = ExceptionDetail;
 
 export interface OverrideRequest {
   action: string;
-  notes: string;
+  notes?: string;
   resolved_by: string;
 }
 
@@ -77,6 +77,9 @@ export interface StatsResponse {
   total_exceptions: number;
   open_exceptions: number;
   auto_resolved: number;
+  manual_review: number;
+  blocked: number;
+  failed: number;
   avg_resolution_time_seconds?: number;
   by_intent: Record<string, number>;
   by_lifecycle_state: Record<string, number>;

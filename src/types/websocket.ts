@@ -43,13 +43,13 @@ export interface PipelineProgressPayload {
 
 export interface ExceptionUpdatePayload {
   lifecycle_state: string;
-  updated_fields: Record<string, unknown>;
+  updated_fields: string[];
 }
 
 export interface TaskCompletePayload {
   task_id: string;
   final_status: string;
-  explanation: string;
+  explanation?: string;
 }
 
 export interface WSErrorPayload {
