@@ -320,10 +320,16 @@ export const exceptionsApi = {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
+    // Backend resumes graph execution to completion on approve
     return {
       ...exc,
-      lifecycle_state: "EXECUTING",
-      resolution_data: {},
+      lifecycle_state: "RESOLVED",
+      final_status: "COMPLETE",
+      resolution_data: {
+        action: "APPROVED_BY_REVIEWER",
+        recipe_result: "Resolution applied successfully",
+      },
+      resolved_by: "jane.doe@acme.com",
       resolution_notes: request?.notes,
     };
   },
