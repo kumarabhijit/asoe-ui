@@ -2,6 +2,8 @@
 
 Maps `consol_arch.md` Section 11 (UI Architecture) to concrete source files. Read this to understand how the codebase is organized and where to find things.
 
+> **See also:** `ui_architecture.md` — extracts the full UI architecture from `consol_arch.md`, documents alignment vs intentional drift, and proposes backend changes needed in `asoe2`.
+
 ---
 
 ## 1. Module Structure
@@ -14,15 +16,15 @@ src/
 │   ├── login/page.tsx            # Multi-step login (email → password → SSO redirect)
 │   ├── auth/callback/page.tsx    # SSO callback handler
 │   ├── exceptions/
-│   │   ├── page.tsx              # Exception Queue — flagship view (Layout A)
-│   │   └── ExceptionDetailPanel.tsx  # Sidebar content: reasoning + waterfall + trace
-│   ├── dashboard/page.tsx        # Analytics dashboard (Layout B)
-│   ├── inbox/page.tsx            # Legacy email-triage view (pre-architecture)
+│   │   ├── page.tsx              # Exception Queue — flagship view (Layout A, expandable rows)
+│   │   └── ExceptionDetailPanel.tsx  # Sidebar: order summary, reasoning, waterfall, line selector
+│   ├── dashboard/page.tsx        # Analytics dashboard (Layout B) + recent activity feed
+│   ├── inbox/page.tsx            # Customer Inbox — AI email triage (two-pane layout)
 │   └── api/auth/[...nextauth]/route.ts  # NextAuth API route
 ├── components/ui/                # Reusable UI components (Section 11.2)
 │   ├── ActivityIndicator.tsx     # Domain-aware loading text per pipeline node
 │   ├── AgentReasoningCard.tsx    # Two-layer cognition: Layer 1 + Layer 2
-│   ├── Badge.tsx                 # Tinted bg + icon + text, verdict/lifecycle helpers
+│   ├── Badge.tsx                 # Tinted bg + icon + text, verdict/lifecycle/rootCause helpers
 │   ├── Button.tsx                # 5 variants (brand/neutral/success/ghost/destructive)
 │   ├── Card.tsx                  # Borderless shadow-elevated container
 │   ├── GravitationalOrbs.tsx     # Canvas animated background (login page)
@@ -30,6 +32,7 @@ src/
 │   ├── Logo.tsx                  # ASOE brand mark with optional tagline
 │   ├── MetricTile.tsx            # KPI: icon + label + monospace value + subtitle
 │   ├── NavBar.tsx                # 56px glass surface, tabs, agent status pulse
+│   ├── PricingWaterfall.tsx      # Vertical pricing condition chain timeline
 │   ├── Sidebar.tsx               # 480px slide-right intervention panel
 │   ├── Toast.tsx                 # 4.5s auto-dismiss, status-colored, solid-fill
 │   └── WaterfallStepper.tsx      # 10-node pipeline progress visualization
@@ -38,12 +41,13 @@ src/
 │   ├── useHealth.ts              # Fetches runtime enums from /api/v1/health
 │   └── useWebSocket.ts           # Section 8 protocol with reconnection backoff
 ├── lib/
-│   ├── api.ts                    # API client: auth + health + exceptions endpoints
+│   ├── api.ts                    # API client: auth + health + exceptions + line items
 │   ├── auth.ts                   # NextAuth options (credentials provider, JWT callbacks)
 │   └── roles.ts                  # RBAC permissions aligned with asoe2/api/deps.py
 ├── types/
 │   ├── auth.ts                   # AuthUser, LoginResponse, Role (← asoe2 schemas)
-│   ├── exceptions.ts             # Intent, LifecycleState, ShadowVerdict, ExceptionSummary, etc.
+│   ├── exceptions.ts             # Intent, LifecycleState, ShadowVerdict, ExceptionSummary,
+│   │                             # LineItem, PricingWaterfallStep, OrderAnalysis (UI display types)
 │   ├── api.ts                    # ResolveRequest/Response, StatsResponse, PaginatedResponse
 │   └── websocket.ts              # WSEvent, PipelineProgressPayload, WSAuthMessage
 ├── styles/
@@ -58,18 +62,23 @@ src/
 | Component | Source | Section 11.2 | Used By |
 |---|---|---|---|
 | `Button` | Custom | 5 ASOE variants with brand restraint | All pages |
-| `Card` | Custom | Borderless, shadow-only (Shadcn uses borders) | Login, Dashboard |
+| `Card` | Custom | Borderless, shadow-only (Shadcn uses borders) | Login, Dashboard, Detail |
 | `Input` | Custom | ASOE label typography, brand focus ring | Login, Exception Queue |
 | `Logo` | Custom | Brand mark with tagline | NavBar, Login |
-| `NavBar` | Custom (new) | 56px glass, agent pulse, brand purple on logo only | Exception Queue, Dashboard |
-| `MetricTile` | Custom (new) | KPI: 40x40 tinted icon + monospace value | Exception Queue, Dashboard |
-| `Badge` | Custom (new) | Tinted bg + icon + text (not Shadcn Badge) | Exception Queue, Detail |
-| `Toast` | Custom (new) | 4.5s auto-dismiss, solid-fill (only one in system) | Via ToastProvider |
-| `Sidebar` | Custom (new) | 480px panel, escape-to-close, focus trap | Exception Queue |
-| `ActivityIndicator` | Custom (new) | Node-specific domain-aware messages | WaterfallStepper |
-| `WaterfallStepper` | Custom (new) | 10-node pipeline with per-node states | ExceptionDetailPanel |
-| `AgentReasoningCard` | Custom (new) | Layer 1/2, verdict-specific behavior | ExceptionDetailPanel |
+| `NavBar` | Custom | 56px glass, agent pulse, brand purple on logo only | All pages (consistent tabs) |
+| `MetricTile` | Custom | KPI: 40x40 tinted icon + monospace value | Exception Queue, Dashboard, Inbox |
+| `Badge` | Custom | Tinted bg + icon + text, 6 variant mappers | Exception Queue, Detail, Inbox, Dashboard |
+| `Toast` | Custom | 4.5s auto-dismiss, solid-fill (only one in system) | Via ToastProvider |
+| `Sidebar` | Custom | 480px panel, escape-to-close, focus trap | Exception Queue |
+| `ActivityIndicator` | Custom | Node-specific domain-aware messages | WaterfallStepper |
+| `WaterfallStepper` | Custom | 10-node pipeline with per-node states | ExceptionDetailPanel |
+| `AgentReasoningCard` | Custom | Layer 1/2, verdict-specific behavior | ExceptionDetailPanel |
+| `PricingWaterfall` | Custom | Pricing condition chain timeline | ExceptionDetailPanel |
 | `GravitationalOrbs` | Custom | Canvas animated background | Login |
+
+**Badge variant mappers** (`Badge.tsx`): `verdictVariant()`, `lifecycleVariant()`, `rootCauseVariant()`, `categoryVariant()`, `inboxStatusVariant()` — all follow the same pattern: map API-provided strings to CSS variants with a `default` fallback.
+
+**PricingWaterfall vs WaterfallStepper:** WaterfallStepper visualizes the 10-node pipeline execution (WebSocket-driven). PricingWaterfall visualizes pricing condition chains for line items (API data-driven). They share a timeline visual metaphor but differ in data model and purpose.
 
 **Shadcn adopted (not yet installed):** DataTable (Tanstack Table), Dialog/Sheet, Select/Dropdown, Tooltip. Re-themed with ASOE tokens per Section 11.2.
 
@@ -81,37 +90,69 @@ src/
 
 ```
 NavBar (sticky top)
-├── Tabs: Exception Queue | Dashboard | Settings
+├── Tabs: Customer Inbox | Exception Queue | Dashboard | Settings
 ├── Agent status badge + user avatar
-Page Content (max-width 1280px)
-├── Page Header (title + refresh button)
+Page Content (max-width 1440px)
+├── Breadcrumb (Home > Order Management > Exception Queue)
+├── Page Header (icon + title + dynamic subtitle + refresh button)
 ├── Metrics Strip (4x MetricTile: total, open, auto-resolved, avg time)
+├── Tab Bar (Orders | Root Cause Insights | Agent Activity)
 ├── Filters (search + state dropdown + intent dropdown)
 │   └── Dropdowns sourced from useHealth() — Guardrail #2
-├── DataTable (order ID, event type, intent, state, verdict, recipe, created)
+├── Expandable Exception Cards
+│   ├── Collapsed: order ID, event type, intent badge, line count, state, verdict, time
+│   ├── Expand chevron → line-item grid (fetched on demand)
+│   │   └── Columns: Line, SKU, Product, UOM, Qty, ERP, PO, Σ ERP, Σ PO, Root Cause
 │   └── Row click → opens Sidebar
 └── Sidebar (480px right panel)
     └── ExceptionDetailPanel
-        ├── Header info (order ID, event type, tenant, timestamps)
+        ├── Order Summary Card (icon, order ID, state, event type, tenant)
+        │   ├── Mini-metrics (lines, ERP total, PO total, delta)
+        │   └── Agent diagnosis (left border accent)
         ├── AgentReasoningCard (Layer 1/2)
+        ├── Line-Item Selector (pill buttons per line, risk badge)
+        ├── PricingWaterfall (selected line's condition chain)
         ├── WaterfallStepper (10-node pipeline)
+        ├── Detail Tabs (Evidence | SAP Data | Change Analysis)
         └── Resolution data (JSON)
 ```
 
-**Data flow:** `exceptionsApi.list()` + `exceptionsApi.stats()` → state → render. Filters trigger re-fetch. Row click fetches `exceptionsApi.get(id)` + `exceptionsApi.trace(id)`.
+**Data flow:** `exceptionsApi.list()` + `exceptionsApi.stats()` → state → render. Filters trigger re-fetch. Row click fetches `exceptionsApi.get(id)` + `exceptionsApi.trace(id)` + `exceptionsApi.lineItems(id)` + `exceptionsApi.orderAnalysis(id)`. Expand chevron fetches `exceptionsApi.lineItems(id)`.
+
+### Customer Inbox (`/inbox`) — Two-Pane Layout
+
+```
+NavBar (shared component, consistent tabs)
+Page Header (breadcrumb + icon + title + Refresh + Process All buttons)
+Metrics Strip (4x MetricTile: total inbound, need attention, auto-resolved, avg response)
+Tab Bar (Inbox | AI Intake Flow)
+Two-Pane Content
+├── Left (380px): Inbox queue
+│   ├── Search bar
+│   └── Inbox items (avatar, sender, subject, preview, category badge, status badge)
+└── Right (flex): Detail panel
+    ├── Email header card (avatar, subject, metadata, category + status badges)
+    ├── Agent Analysis card (confidence bar, summary, recommendation, action buttons)
+    │   └── "View Evidence & Reasoning" Layer 2 trigger
+    └── Detail tabs (Email | Entities | SAP Data | Change Analysis | Knowledge Graph)
+```
+
+**Data flow:** Mock `INBOX` data → state → render. Uses shared NavBar, Badge (via `categoryVariant()`, `inboxStatusVariant()`), MetricTile, Button components.
 
 ### Dashboard (`/dashboard`) — Layout B: 2-Column Grid
 
 ```
-NavBar
-Page Content
-├── Page Header
+NavBar (shared component, consistent tabs)
+Page Content (max-width 1440px)
+├── Breadcrumb (Home > Dashboard)
+├── Page Header (icon + title + subtitle)
 ├── Metrics Strip (4x MetricTile: resolution rate, avg time, HITL rate, total)
 └── 2-column Grid
     ├── By Intent (bar segments)
     ├── By State (badges + bar segments)
     ├── By Verdict (colored bar segments)
-    └── Platform Health (from useHealth)
+    ├── Platform Health (from useHealth)
+    └── Recent Activity (full-width timeline feed, 6 recent events)
 ```
 
 **Data flow:** `exceptionsApi.stats()` + `healthApi.get()` → state → render.
@@ -146,6 +187,16 @@ Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 | `LoginResponse` | `AuthTokenResponse` schema | auth.ts |
 | `Role` | Role strings from api/deps.py | auth.ts |
 
+**UI display types** (not backend contract mirrors — see CLAUDE.md):
+
+| UI Type | Purpose | File |
+|---|---|---|
+| `LineItem` | Order line-item grid display | exceptions.ts |
+| `PricingConditionType` | Pricing condition type enum (BASE/CONTRACT/TPR/UOM/RESULT/ERROR) | exceptions.ts |
+| `PricingWaterfallStep` | Single step in pricing waterfall visualization | exceptions.ts |
+| `LineItemAnalysis` | Per-line agent analysis with waterfall | exceptions.ts |
+| `OrderAnalysis` | Order-level agent analysis (drives detail panel) | exceptions.ts |
+
 ---
 
 ## 5. API Client (`src/lib/api.ts`)
@@ -170,8 +221,12 @@ Maps to Section 6.2 REST endpoints:
 | `exceptionsApi.reject()` | `POST /api/v1/exceptions/{id}/reject` | 6.2 |
 | `exceptionsApi.trace()` | `GET /api/v1/exceptions/{id}/trace` | 6.2 |
 | `exceptionsApi.stats()` | `GET /api/v1/exceptions/stats` | 6.2 |
+| `exceptionsApi.lineItems()` | Line items for an exception (UI mock) | — |
+| `exceptionsApi.orderAnalysis()` | Order-level agent analysis (UI mock) | — |
 
 **Mock strategy:** All endpoints return mock data with simulated latency. To connect to real FastAPI, replace the mock implementations with `fetch()` calls to `NEXT_PUBLIC_API_URL`. The interface (function signatures and return types) stays the same.
+
+**UI-only endpoints:** `lineItems()` and `orderAnalysis()` serve mock data for the enriched line-item grids and pricing waterfall. When `asoe2` adds corresponding endpoints, these will be wired to real `fetch()` calls.
 
 ---
 

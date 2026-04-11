@@ -36,14 +36,15 @@ npm run dev
 asoe-ui/
 ├── src/
 │   ├── app/                      # Pages (Next.js App Router)
-│   │   ├── exceptions/           # Exception Queue (flagship) + detail panel
-│   │   ├── dashboard/            # Analytics dashboard
+│   │   ├── exceptions/           # Exception Queue (expandable rows) + detail panel
+│   │   ├── dashboard/            # Analytics dashboard + recent activity feed
+│   │   ├── inbox/                # Customer Inbox (AI email triage, two-pane)
 │   │   ├── login/                # Multi-step login (email → password → SSO)
 │   │   └── auth/callback/        # SSO callback handler
-│   ├── components/ui/            # 13 reusable components (Section 11.2)
+│   ├── components/ui/            # 14 reusable components (Section 11.2)
 │   ├── hooks/                    # useAuth, useHealth, useWebSocket
 │   ├── lib/                      # API client, auth config, RBAC
-│   ├── types/                    # TypeScript types (mirrors asoe2 Pydantic models)
+│   ├── types/                    # TypeScript types (mirrors asoe2 + UI display types)
 │   └── styles/                   # design-tokens.css (45+ CSS custom properties)
 ├── docs/
 │   └── AUDITOR_GUIDE.md          # Frontend compliance controls (SOX/SOC2)
@@ -71,8 +72,9 @@ asoe-ui/
 |---|---|---|
 | `CLAUDE.md` | Developers | Engineering guardrails (Guardrail #2, design tokens, types, agent-first) |
 | `DESIGN.md` | Engineers | Code-to-architecture map (components, pages, types, API client) |
+| `ui_architecture.md` | Engineers / Architects | UI architecture extraction — alignment, drift register, proposed backend changes |
 | `docs/AUDITOR_GUIDE.md` | Auditors | 10 frontend compliance controls (RBAC, session, trace, tenancy) |
-| `tasks.md` | Team | Phase-based progress (Phases 0-8 complete, 9-11 pending) |
+| `tasks.md` | Team | Phase-based progress (Phases 0-8.5 complete, 9-11 pending) |
 | `consol_arch.md` | All | Platform architecture — Section 11 covers UI |
 
 ---
@@ -98,7 +100,7 @@ The visual design system is defined in `skills/asoe-ui-design/`:
 
 The UI implements `consol_arch.md` Section 11. Key patterns:
 
-- **13 custom components** — agent-first components (NavBar, WaterfallStepper, AgentReasoningCard) are custom; Shadcn adopted only for non-agent primitives (Section 11.2)
+- **14 custom components** — agent-first components (NavBar, WaterfallStepper, AgentReasoningCard, PricingWaterfall) are custom; Shadcn adopted only for non-agent primitives (Section 11.2)
 - **Health-driven enums** — filter dropdowns source values from `GET /api/v1/health` at runtime (Guardrail #2 — no hardcoded intents or lifecycle states)
 - **WebSocket real-time** — pipeline progress via `useWebSocket` hook (Section 8 protocol with reconnection backoff)
 - **Types mirror backend** — `src/types/` matches `asoe2` Pydantic models field-for-field
