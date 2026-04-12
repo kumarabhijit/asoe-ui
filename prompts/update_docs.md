@@ -10,7 +10,7 @@ Read these documents first:
 1. `CLAUDE.md` — engineering guardrails (know what rules you're enforcing)
 2. `DESIGN.md` — current code structure (know what's already documented)
 3. `tasks.md` — phase progress (know which phase this change belongs to)
-4. `consol_arch.md` Section 11 — architecture spec (know what the UI should implement)
+4. `ui_architecture.md` — authoritative UI architecture (layouts, components, data flows, drift register)
 
 ---
 
@@ -22,6 +22,7 @@ Update **only** the documents affected by the change:
 |---|---|
 | `DESIGN.md` | New/removed components, pages, hooks, types, or API endpoints |
 | `tasks.md` | Phase completed or new phase items discovered |
+| `ui_architecture.md` | Page layout changes, new component patterns, governance model changes, drift register items. **This is the single authoritative UI architecture document.** `consol_arch.md` Section 11 is a stub pointer — do not duplicate detail there. |
 | `docs/AUDITOR_GUIDE.md` | New role-gated actions, auth changes, new data display for audit trail, new compliance controls |
 | `README.md` | New pages, changed quick-start steps, new dependencies |
 | `prompts/full_project_sequence.md` | New phase added or phase dependencies changed |
@@ -32,7 +33,7 @@ Update **only** the documents affected by the change:
 
 | Document | Reason |
 |---|---|
-| `consol_arch.md` | Shared platform architecture — changes require explicit coordination |
+| `consol_arch.md` | Shared platform architecture. Section 11 is a stub pointer to `ui_architecture.md` — do not expand it. Sections 1-10, 12-13 require explicit coordination. |
 | `skills/asoe-ui-design/SKILL.md` | Design system rules — separate maintenance cycle |
 | `skills/asoe-ui-design/references/*` | Design token and component specs — updated with design system changes only |
 | `plan.md` | Superseded — historical reference only |
@@ -54,6 +55,8 @@ Update **only** the documents affected by the change:
 6. **Match asoe2 field names.** When updating `src/types/`, verify field names match the corresponding Pydantic model in `asoe2`. Document the mapping in DESIGN.md Section 4.
 
 7. **AUDITOR_GUIDE discipline.** When adding a new role-gated action (e.g., a new button visible only to managers), add it to AUDITOR_GUIDE Section 1 (RBAC UI Enforcement). When adding a new API call, verify X-Trace-ID propagation and update Section 3 if needed.
+
+8. **UI architecture is in `ui_architecture.md` only.** When changing page layouts, component patterns, or governance models, update `ui_architecture.md` (the single authoritative UI architecture doc). Do NOT expand `consol_arch.md` Section 11 — it is a stub pointer. If a change evolves a previously documented pattern (e.g., layout shift, governance change), add a resolved drift entry in `ui_architecture.md` Section 9 documenting the evolution.
 
 ---
 

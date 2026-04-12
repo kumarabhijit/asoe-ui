@@ -1,7 +1,7 @@
 # Phase 3: Agent-First Components
 
 **Prerequisite:** Phase 0 (design tokens), Phase 2 (base components Button, Card, Input, Logo)
-**Architecture reference:** `consol_arch.md` Section 11.2 (Component Strategy: Shadcn/ui Reconciliation)
+**Architecture reference:** `ui_architecture.md` Section 2 (Component Strategy: Shadcn/ui Reconciliation)
 **Design reference:** `skills/asoe-ui-design/SKILL.md`, `skills/asoe-ui-design/references/component-patterns.md`
 
 ---

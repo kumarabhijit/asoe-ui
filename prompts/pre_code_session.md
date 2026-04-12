@@ -19,7 +19,7 @@ Run through this checklist before starting any asoe-ui coding session.
 
 ## 3. Read Architecture (if relevant)
 
-- [ ] `consol_arch.md` Section 11 — if building a page, component, or layout
+- [ ] `ui_architecture.md` — if building a page, component, or layout (authoritative UI architecture)
 - [ ] `consol_arch.md` Section 6 — if adding/modifying API calls
 - [ ] `consol_arch.md` Section 8 — if touching WebSocket integration
 - [ ] `consol_arch.md` Section 9 — if touching auth, RBAC, or security

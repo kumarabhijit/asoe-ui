@@ -1,6 +1,6 @@
 # tasks.md — ASOE UI Implementation Progress
 
-Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `consol_arch.md` Section 11 requirements.
+Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architecture.md` requirements (originally derived from `consol_arch.md` Section 11).
 
 ---
 

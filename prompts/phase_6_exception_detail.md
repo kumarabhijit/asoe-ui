@@ -1,7 +1,7 @@
 # Phase 6: Exception Detail
 
 **Prerequisite:** Phase 3 (AgentReasoningCard, WaterfallStepper), Phase 4 (types), Phase 5 (Exception Queue + Sidebar)
-**Architecture reference:** `consol_arch.md` Section 11.1 (Two-Layer Cognition), Section 11.5 (Exception Detail)
+**Architecture reference:** `ui_architecture.md` Section 1 (Design Paradigm — Two-Layer Cognition), Section 5.2 (Exception Detail Panel)
 
 ---
 

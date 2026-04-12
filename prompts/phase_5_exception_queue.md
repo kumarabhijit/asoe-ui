@@ -1,7 +1,7 @@
 # Phase 5: Exception Queue Page
 
 **Prerequisite:** Phase 3 (agent-first components), Phase 4 (types + API client)
-**Architecture reference:** `consol_arch.md` Section 11.5 (Key Pages — Layout A: Queue + Sidebar)
+**Architecture reference:** `ui_architecture.md` Section 5.1 (Exception Queue — Three-Pane Outlook Master-Detail)
 **Design reference:** `skills/asoe-ui-design/references/layout-templates.md` (Layout A)
 
 ---

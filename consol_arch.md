@@ -1266,130 +1266,27 @@ graph TD
 
 ## 11. UI Architecture
 
-### 11.1 Agent-First Design Paradigm
+> **Complete UI architecture documentation lives in `ui_architecture.md`.**
+> This section provides the platform-level summary. For component strategy, design tokens, page layouts, data flows, alignment tracking, and drift register, see `ui_architecture.md`.
 
-ASOE UI is not a dashboard. It is a **control tower** where the system is the primary actor and humans intervene at decision points.
+**Tech stack:** Next.js 16 (App Router), React 19, TypeScript, CSS custom properties (`design-tokens.css`), Tailwind CSS, Lucide React icons, NextAuth.js, Zod.
 
-| Traditional Dashboard | ASOE Agent-First |
-|---|---|
-| User initiates every action | System active by default — agents always working |
-| Static screens, manual refresh | UI in motion — real-time pipeline progress |
-| AI hidden in a separate tab | AI activity visible everywhere (pulse dots, activity indicators) |
-| Linear workflows | Multiple concurrent exception threads |
+**Design paradigm:** Agent-first control tower with two-layer cognition (Layer 1: recommendation + confidence in <3s; Layer 2: expandable evidence). Implemented via `AgentReasoningCard` component with verdict-specific behavior (GREEN: collapsed, YELLOW/RED: auto-expanded).
 
-**Two-Layer Cognition Model:**
+**Governance:** Human acts as **Review Authority** — Approve, Reject, or Escalate. No manual execution triggers in the UI. Shadow Verdict displayed as read-only badge. Execution is triggered by the backend upon approval.
 
-Every screen implements a two-layer information architecture:
+**Key pages:**
 
-- **Layer 1 (Always visible):** Agent recommendation + confidence, 2-3 key data points, action button. Answerable in under 3 seconds: "What do I do?"
-- **Layer 2 (Expandable on demand):** Evidence waterfall, structured reasoning trace, precedents, raw signals. Triggered by click/expand — never shown by default.
-
-The `AgentReasoningCard` component implements this pattern: Layer 1 shows the recommendation and confidence bar; clicking "View evidence" expands Layer 2 with the full audit trail.
-
-**Verdict-specific UI states:**
-
-| Shadow Verdict | Layer 1 Behavior | Layer 2 Behavior | Action Buttons |
-|---|---|---|---|
-| **GREEN** | Green status badge, "Auto-resolved" label, confidence bar filled | Collapsed by default — expandable for audit trail | "View Details" (no intervention needed) |
-| **YELLOW** | Amber status badge, "Review Required" label, recommendation + confidence bar | Auto-expanded — evidence waterfall shown immediately so the reviewer has context | "Approve" (primary CTA), "Reject" (secondary), "Escalate" (tertiary) |
-| **RED** | Red status badge, "Blocked by Policy" label, blocking policy rule(s) listed in Layer 1 | Auto-expanded — full policy violation details shown with the specific `shadow_policy_hits` | "Acknowledge" (marks as reviewed), "Override" (admin-only, requires `resolution_notes`), "Escalate" (routes to escalation target) |
-
-> **RED verdict design rationale:** RED exceptions are rare (policy violations, penalty matrix breaches) and high-stakes. The UI auto-expands Layer 2 and removes the primary action button to prevent accidental dismissal. The "Override" button is gated to `admin` role and requires a mandatory `resolution_notes` entry that is recorded in the `policy_audit_log` for SOX compliance.
-
-### 11.2 Component Strategy: Shadcn/ui Reconciliation
-
-Shadcn/ui is adopted **only for non-agent primitives**. All 14 agent-first components are custom-built because they implement domain-specific behavior (two-layer cognition, brand restraint, pipeline visualization, pricing condition analysis) that Shadcn does not provide.
-
-| Component Need | Source | Rationale |
+| Page | Layout | Route |
 |---|---|---|
-| **Button** | Custom (exists: `Button.tsx`) | 5 ASOE variants (brand/neutral/success/ghost/destructive) with brand restraint rules |
-| **Card** | Custom (exists: `Card.tsx`) | Borderless, shadow-only elevation. Shadcn Card uses borders. |
-| **Input** | Custom (exists: `Input.tsx`) | ASOE label typography (10px, uppercase, tracked), brand focus ring |
-| **Logo** | Custom (exists: `Logo.tsx`) | Brand mark with tagline |
-| **DataTable** | Shadcn (adopted) | Tanstack Table integration. Re-themed with ASOE tokens, mono numerics, no vertical borders. |
-| **Dialog / Sheet** | Shadcn (adopted) | Standard overlay behavior, styled with ASOE tokens |
-| **Select / Dropdown** | Shadcn (adopted) | Standard form controls, styled with ASOE tokens |
-| **Tooltip** | Shadcn (adopted) | Standard behavior |
-| **NavBar** | Custom (new) | 56px glass surface with agent status pulse dot. Brand purple on logo only. |
-| **MetricTile** | Custom (new) | KPI display: icon (40x40 tinted bg) + label + monospace value + subtitle |
-| **AgentReasoningCard** | Custom (new) | Two-layer cognition: recommendation + confidence bar (Layer 1), expandable evidence (Layer 2) |
-| **WaterfallStepper** | Custom (new) | Real-time pipeline progress driven by WebSocket events (Section 8). See **Loading State UX** below. |
-| **ActivityIndicator** | Custom (new) | Dynamic text replacing static labels ("Agent analyzing 3 condition records...") |
-| **Badge/Pill** | Custom (new) | Tinted bg + colored text at rest; muted tint rules differ from Shadcn Badge. 5 variant mappers (`verdictVariant`, `lifecycleVariant`, `rootCauseVariant`, `categoryVariant`, `inboxStatusVariant`) — all with `default` fallback for unknown values per Guardrail #2 |
-| **Sidebar** | Custom (new) | 480px intervention panel, slides right, primary Layer 2 surface |
-| **Toast** | Custom (new) | 4.5s auto-dismiss, status-colored — the only solid-fill element in the design system |
-| **PricingWaterfall** | Custom (new) | Pricing condition chain visualization (BASE → CONTRACT → TPR → UOM → RESULT/ERROR) for CPG pricing exceptions. Distinct from WaterfallStepper (which visualizes pipeline nodes). |
-| **GravitationalOrbs** | Custom (pre-existing) | Canvas-based animated background for login page |
+| Exception Queue | Three-pane Outlook master-detail (resizable) | `/exceptions` |
+| Exception Detail | Inline pane or full-page | `/exceptions/[id]` |
+| Dashboard | 2-column grid | `/dashboard` |
+| Customer Inbox | Two-pane (queue + detail) | `/inbox` |
+| Login | Centered card | `/login` |
+| Settings / Admin | Standard layout | `/settings` |
 
-**Rule:** When a Shadcn component exists but conflicts with ASOE brand restraint rules, the custom ASOE version takes precedence.
-
-**Loading State UX (WaterfallStepper):**
-
-The `WaterfallStepper` renders per-node execution progress in real-time via WebSocket events. Because individual nodes can take 3–10 seconds, the loading state is explicitly designed — not a generic spinner:
-
-| Node State | Visual Treatment |
-|---|---|
-| **Pending** (not yet reached) | Muted text + empty circle indicator. Node name visible but grayed out. |
-| **In Progress** (started, not completed) | Pulsing dot animation (brand purple, `--dur-slow: 1.2s` pulse). `ActivityIndicator` text below the node shows contextual status (e.g., "Checking credit exposure...", "Auditing against penalty matrix..."). A subtle skeleton shimmer on the data area below hints that results are incoming. |
-| **Completed** | Solid checkmark (green) + summary data appears inline (e.g., intent, shadow verdict). Transition uses `--ease-out` with `--dur-fast: 200ms`. |
-| **Failed** | Red X icon + error summary. Subsequent nodes render as "Skipped" (dashed border, muted). |
-
-The `ActivityIndicator` messages are node-specific and domain-aware — not generic "Loading..." text. They are defined in a `node_activity_messages` map and selected based on the current node + available `GraphState` data (e.g., after `classify`, the `shadow_audit` activity indicator can say "Auditing DUPLICATE_PO against compliance policies...").
-
-### 11.3 Design Tokens
-
-All visual decisions are expressed as CSS custom properties in `design-tokens.css`. **Zero hardcoded hex values in component code.**
-
-| Token Category | Prefix | Count | Examples |
-|---|---|---|---|
-| Colors (brand, surface, text, border, status, category) | `--color-*` | 45+ | `--color-brand: #5A4BD6`, `--color-surface-page: #FAFAFA`, `--color-text-primary: #111118` |
-| Typography | `--font-*` | 18+ | `--font-size-body: 13px`, `--font-sans`, `--font-mono` |
-| Spacing | `--space-*` | 15 | `--space-4: 4px` through `--space-64: 64px` (4px base unit) |
-| Elevation | `--shadow-*` | 5+4 | `--shadow-sm` through `--shadow-xl`, plus status shadows |
-| Radius | `--radius-*` | 5 | `--radius-sm: 6px`, `--radius-md: 10px`, `--radius-lg: 14px`, `--radius-full: 9999px` |
-| Motion | `--dur-*`, `--ease-*` | 8 | `--dur-fast: 200ms`, `--ease-out: cubic-bezier(0.16, 1, 0.3, 1)` |
-| Layout | `--nav-height`, `--sidebar-width`, `--z-*` | 10+ | `--nav-height: 56px`, `--sidebar-width: 480px` |
-
-**Brand Restraint:** `--color-brand: #5A4BD6` (purple) appears in exactly **3 element types**:
-1. Primary CTA button (`brand` variant)
-2. Nav logo mark
-3. Active tab underline
-
-All other elements — data, links, badges, confidence bars, selected states — use neutrals. Status colors (`--color-success`, `--color-warning`, `--color-error`) are semantic and map directly to shadow verdicts (GREEN, YELLOW, RED).
-
-**WCAG 2.1 AA Compliance for Status Colors:**
-- All status color values meet WCAG 2.1 AA minimum contrast ratios: 4.5:1 for normal text, 3:1 for large text and UI components.
-- Status indicators **never rely on color alone** (WCAG 1.4.1). Every status color is paired with a secondary differentiator:
-  - **GREEN:** Checkmark icon (Lucide `Check`) + "Resolved" / "Approved" text label
-  - **YELLOW:** Warning triangle icon (Lucide `AlertTriangle`) + "Review Required" text label
-  - **RED:** Stop/shield icon (Lucide `ShieldX`) + "Blocked" text label
-- Badge/pill components use tinted backgrounds with text labels, not color-only indicators.
-- The design token values are validated against WCAG contrast ratios in CI via `jest-axe` accessibility tests on all status-related components.
-
-**Figma ↔ Code Token Sync:**
-- The `design-tokens.css` file is the **code-side source of truth**. A Figma plugin (Style Dictionary export) generates a `design-tokens.json` that is diffed against `design-tokens.css` in CI. Drift between Figma and code produces a CI warning (not a blocker in V1, upgraded to a blocker in V1.5 when the design system stabilizes). The Figma library is maintained by the design lead and exported quarterly, or on any brand-impacting change.
-
-### 11.4 Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router, React 19, TypeScript) |
-| Styling | CSS custom properties (`design-tokens.css`) + Tailwind CSS |
-| Icons | Lucide React (16/20/24px — never emoji) |
-| Fonts | SF Pro Display / Inter (sans), SF Mono / JetBrains Mono (mono) |
-| Auth | NextAuth.js (frontend session) → FastAPI auth endpoints |
-| Validation | Zod (form validation) |
-
-### 11.5 Key Pages
-
-| Page | Layout | Purpose |
-|---|---|---|
-| Login | Centered card | SSO + email/password, agent activity footer (system is alive) |
-| Exception Queue | Queue + Sidebar (Layout A) | Flagship view: metrics strip, tab bar, card-based expandable rows with line-item grids, Sidebar for detail |
-| Exception Detail | Sidebar expand | AgentReasoningCard (Layer 1/2), WaterfallStepper, side-by-side PO comparison |
-| Dashboard | 2-column grid (Layout B) | Analytics: resolution rates, agent performance, exception trends. See **Analytics Data Isolation** below. |
-| Customer Inbox | Two-pane (queue + detail) | AI-powered email triage — inbound customer communication analysis, agent recommendations, category/status tracking |
-| Settings / Admin | Standard layout | User management, SSO config, policy overrides, agent settings |
+**14 custom components** — all agent-first, design-token driven. 4 Shadcn primitives adopted (not yet installed). Full component table in `ui_architecture.md` Section 2.
 
 ### 11.6 Analytics Data Isolation
 

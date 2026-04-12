@@ -76,7 +76,7 @@ asoe-ui/
 | `ui_architecture.md` | Engineers / Architects | UI architecture extraction — alignment, drift register, proposed backend changes |
 | `docs/AUDITOR_GUIDE.md` | Auditors | 10 frontend compliance controls (RBAC, session, trace, tenancy) |
 | `tasks.md` | Team | Phase-based progress (Phases 0-8.6 complete, 9-11 pending) |
-| `consol_arch.md` | All | Platform architecture — Section 11 covers UI |
+| `consol_arch.md` | All | Platform architecture — Section 11 is a stub pointer to `ui_architecture.md` |
 
 ---
 
@@ -99,7 +99,7 @@ The visual design system is defined in `skills/asoe-ui-design/`:
 
 ## Architecture
 
-The UI implements `consol_arch.md` Section 11. Key patterns:
+The UI implements the architecture defined in `ui_architecture.md`. Key patterns:
 
 - **14 custom components** — agent-first components (NavBar, WaterfallStepper, AgentReasoningCard, PricingWaterfall) are custom; Shadcn adopted only for non-agent primitives (Section 11.2)
 - **Health-driven enums** — filter dropdowns source values from `GET /api/v1/health` at runtime (Guardrail #2 — no hardcoded intents or lifecycle states)
