@@ -125,16 +125,25 @@ describe("Guardrail #2: Badge variant functions have default fallback", () => {
 });
 
 describe("Guardrail #2: Exception Queue filters source from health endpoint", () => {
-  it("Exception Queue page does not contain hardcoded intent option values", () => {
+  it("Exception Queue sources filter values from health endpoint (not hardcoded)", () => {
     const rootDir = path.resolve(__dirname, "../../");
     const pagePath = path.join(rootDir, "src/app/exceptions/page.tsx");
-    const content = stripComments(fs.readFileSync(pagePath, "utf-8"));
+    const listPanePath = path.join(rootDir, "src/app/exceptions/ExceptionListPane.tsx");
+    const pageContent = stripComments(fs.readFileSync(pagePath, "utf-8"));
 
-    expect(content).toContain("useHealth");
-    expect(content).toMatch(/health\??\.(allowed_intents|lifecycle_states)/);
+    // The page orchestrator must import useHealth
+    expect(pageContent).toContain("useHealth");
 
+    // The list pane (or page) must reference health.allowed_intents / lifecycle_states
+    const listPaneContent = fs.existsSync(listPanePath)
+      ? stripComments(fs.readFileSync(listPanePath, "utf-8"))
+      : pageContent;
+    expect(listPaneContent).toMatch(/health\??\.(allowed_intents|lifecycle_states)/);
+
+    // Neither file should hardcode intent option values
     for (const intent of INTENT_LITERALS) {
-      expect(content).not.toMatch(new RegExp(`<option[^>]*value=["']${intent}["']`));
+      expect(pageContent).not.toMatch(new RegExp(`<option[^>]*value=["']${intent}["']`));
+      expect(listPaneContent).not.toMatch(new RegExp(`<option[^>]*value=["']${intent}["']`));
     }
   });
 });

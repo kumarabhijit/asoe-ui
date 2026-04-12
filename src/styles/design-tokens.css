@@ -230,6 +230,11 @@
   --page-padding:   var(--space-32);
   --content-padding: var(--space-24);
 
+  /* Pane layout (three-pane "Outlook" pattern) */
+  --list-pane-default: 35%;
+  --pane-handle-width: 4px;
+  --pane-handle-hover: var(--color-brand-muted);
+
   /* Z-index scale */
   --z-base:     0;
   --z-dropdown: 10;

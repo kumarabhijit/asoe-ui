@@ -1,19 +1,28 @@
 /**
- * ExceptionDetailPanel — sidebar content for exception detail.
- * Section 11.5: AgentReasoningCard (Layer 1/2), WaterfallStepper,
- * plus enriched order summary, line selector, and PricingWaterfall
- * adapted from samples/asoe-sample-screen.jsx.
+ * ExceptionDetailPanel — Right pane of the three-pane "Outlook" layout.
  *
- * Renders inside the Sidebar component on the Exception Queue page.
+ * Structured into four sections per the master-detail specification:
+ *   A — Agent Analysis  (confidence score, intent/recipe mapping)
+ *   B — Pipeline Progress  (vertical stepper: Ingest → Compliance Shadow)
+ *   C — AI Narrative & Order Details  (line items, pricing waterfall)
+ *   D — Evidence & Next Steps  (trace tabs, resolution data)
+ *
+ * Sticky header shows: SO ID, Total Value, lifecycle badge, and the
+ * compliance-gated "Execute Recipe" button (disabled until Compliance
+ * Shadow returns GREEN or YELLOW verdict).
+ *
+ * Data fetching: receives exceptionId from parent. Fetches detail,
+ * trace, line items, and order analysis in parallel on mount.
  */
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Package } from "lucide-react";
+import { FileText, Package, Play, AlertTriangle } from "lucide-react";
 import { AgentReasoningCard } from "@/components/ui/AgentReasoningCard";
 import { WaterfallStepper, type NodeState } from "@/components/ui/WaterfallStepper";
 import { PricingWaterfall } from "@/components/ui/PricingWaterfall";
 import { Badge, lifecycleVariant, rootCauseVariant } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { exceptionsApi } from "@/lib/api";
 import type {
   ExceptionDetail,
@@ -26,10 +35,12 @@ import type { TraceResponse } from "@/types/api";
 
 interface ExceptionDetailPanelProps {
   exceptionId: string;
-  onClose: () => void;
+  /** Optional — used in full-page view for back navigation */
+  onClose?: () => void;
 }
 
-/** Build WaterfallStepper node states from exception + trace data */
+/* ── Pipeline node state builder ─────────────────────────────────────── */
+
 function buildNodeStates(exc: ExceptionDetail, trace?: TraceResponse): NodeState[] {
   const NODES: PipelineNode[] = [
     "ingest", "classify", "load_skill", "validate_circuit_breaker",
@@ -77,7 +88,11 @@ function buildNodeStates(exc: ExceptionDetail, trace?: TraceResponse): NodeState
   });
 }
 
-function buildNodeData(node: PipelineNode, exc: ExceptionDetail, trace?: TraceResponse): Record<string, unknown> | undefined {
+function buildNodeData(
+  node: PipelineNode,
+  exc: ExceptionDetail,
+  _trace?: TraceResponse,
+): Record<string, unknown> | undefined {
   switch (node) {
     case "classify":
       return exc.intent ? { intent: exc.intent, confidence: 0.92 } : undefined;
@@ -96,6 +111,8 @@ function fmtPrice(n: number): string {
   return `$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/* ── Component ───────────────────────────────────────────────────────── */
+
 export default function ExceptionDetailPanel({ exceptionId, onClose }: ExceptionDetailPanelProps) {
   const [detail, setDetail] = useState<ExceptionDetail | null>(null);
   const [trace, setTrace] = useState<TraceResponse | null>(null);
@@ -105,6 +122,8 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
   const [actionLoading, setActionLoading] = useState(false);
   const [selectedLine, setSelectedLine] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState("evidence");
+
+  /* ── Actions ─────────────────────────────────────────────────────── */
 
   async function handleApprove(comment: string) {
     setActionLoading(true);
@@ -134,9 +153,11 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
     console.log("Escalate", exceptionId);
   }
 
+  /* ── Data Fetching ───────────────────────────────────────────────── */
+
   useEffect(() => {
     let cancelled = false;
-    async function fetch() {
+    async function fetchDetail() {
       setLoading(true);
       try {
         const [excData, traceData, items, analysisData] = await Promise.all([
@@ -162,35 +183,60 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
         if (!cancelled) setLoading(false);
       }
     }
-    fetch();
+    fetchDetail();
     return () => { cancelled = true; };
   }, [exceptionId]);
 
+  /* ── Loading / Empty states ──────────────────────────────────────── */
+
   if (loading) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-16)" }}>
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="skeleton" style={{ height: 60, borderRadius: "var(--radius-sm)" }} />
-        ))}
+      <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+        <div
+          style={{
+            padding: "var(--space-16)",
+            borderBottom: "1px solid var(--color-border-default)",
+            background: "var(--color-surface-primary)",
+          }}
+        >
+          <div className="skeleton" style={{ height: 20, width: 200, borderRadius: "var(--radius-sm)" }} />
+        </div>
+        <div style={{ flex: 1, padding: "var(--space-16)", display: "flex", flexDirection: "column", gap: "var(--space-12)" }}>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="skeleton" style={{ height: 80, borderRadius: "var(--radius-sm)" }} />
+          ))}
+        </div>
       </div>
     );
   }
 
   if (!detail) {
     return (
-      <p style={{ color: "var(--color-text-quaternary)", fontSize: "var(--font-size-body)" }}>
+      <div
+        style={{
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--color-text-quaternary)",
+          fontSize: "var(--font-size-body)",
+        }}
+      >
         Exception not found.
-      </p>
+      </div>
     );
   }
 
+  /* ── Derived values ──────────────────────────────────────────────── */
+
   const nodeStates = buildNodeStates(detail, trace ?? undefined);
   const selectedAnalysis = analysis?.lines?.find((l) => l.line_id === selectedLine);
-
-  // Compute line-item totals
   const totalErp = lineItems.reduce((s, l) => s + l.erp_price * l.quantity, 0);
   const totalPo = lineItems.reduce((s, l) => s + l.po_price * l.quantity, 0);
   const delta = totalPo - totalErp;
+
+  // Pro-tip: Execute Recipe gated by Compliance Shadow verdict
+  const canExecuteRecipe = detail.shadow_verdict === "GREEN" || detail.shadow_verdict === "YELLOW";
 
   const DETAIL_TABS = [
     { id: "evidence", label: "Evidence" },
@@ -198,23 +244,29 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
     { id: "changes", label: "Change Analysis" },
   ];
 
+  /* ── Render ──────────────────────────────────────────────────────── */
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-20)" }}>
-      {/* Order Summary Card */}
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", fontFamily: "var(--font-sans)" }}>
+
+      {/* ━━ Sticky Header ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div
         style={{
+          padding: "var(--space-12) var(--space-16)",
+          borderBottom: "1px solid var(--color-border-default)",
           background: "var(--color-surface-primary)",
-          borderRadius: "var(--radius-md)",
-          boxShadow: "var(--shadow-sm)",
-          padding: "var(--space-16)",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--space-12)",
         }}
       >
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-12)", marginBottom: "var(--space-12)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-10)", minWidth: 0 }}>
           <div
             style={{
-              width: 40,
-              height: 40,
+              width: 32,
+              height: 32,
               borderRadius: "var(--radius-sm)",
               background: "var(--color-text-primary)",
               display: "flex",
@@ -223,340 +275,541 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
               flexShrink: 0,
             }}
           >
-            <Package size={20} color="var(--color-text-inverse)" />
+            <Package size={16} color="var(--color-text-inverse)" />
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-8)" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", flexWrap: "wrap" }}>
               <span
                 style={{
                   fontFamily: "var(--font-mono)",
-                  fontSize: "var(--font-size-subhead)",
                   fontWeight: 700,
+                  fontSize: "var(--font-size-subhead)",
                   color: "var(--color-text-primary)",
                 }}
               >
                 {detail.order_id}
               </span>
-              <Badge variant={lifecycleVariant(detail.lifecycle_state)}>
+              <Badge variant={lifecycleVariant(detail.lifecycle_state)} size="sm">
                 {detail.lifecycle_state.replace(/_/g, " ")}
               </Badge>
             </div>
-            <div
-              style={{
-                fontSize: "var(--font-size-caption)",
-                color: "var(--color-text-tertiary)",
-                marginTop: "var(--space-2)",
-              }}
-            >
-              {detail.event_type.replace(/_/g, " ")} · {detail.tenant_id}
+            <div style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-tertiary)", marginTop: 2 }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                {fmtPrice(totalPo)}
+              </span>
+              {delta !== 0 && (
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontWeight: 600,
+                    color: "var(--color-error)",
+                    marginLeft: "var(--space-6)",
+                  }}
+                >
+                  {"\u0394"} {fmtPrice(Math.abs(delta))}
+                </span>
+              )}
+              <span style={{ marginLeft: "var(--space-6)" }}>
+                {" \u00B7 "}{detail.event_type.replace(/_/g, " ")}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* 4-metric mini-grid */}
-        {lineItems.length > 0 && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr 1fr",
-              gap: "var(--space-8)",
-              marginBottom: "var(--space-12)",
-            }}
-          >
-            <MiniMetric label="Lines" value={String(lineItems.length)} />
-            <MiniMetric label="ERP Total" value={fmtPrice(totalErp)} />
-            <MiniMetric label="PO Total" value={fmtPrice(totalPo)} />
-            <MiniMetric
-              label="Delta"
-              value={fmtPrice(Math.abs(delta))}
-              color={delta !== 0 ? "var(--color-error)" : undefined}
-            />
-          </div>
-        )}
-
-        {/* Diagnosis */}
-        {analysis && (
-          <div
-            style={{
-              borderLeft: "3px solid var(--color-brand)",
-              paddingLeft: "var(--space-12)",
-              fontSize: "var(--font-size-caption)",
-              color: "var(--color-text-secondary)",
-              lineHeight: 1.6,
-            }}
-          >
-            {analysis.diagnosis}
-          </div>
-        )}
-
-        {/* Metadata grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "var(--space-8)",
-            fontSize: "var(--font-size-caption)",
-            marginTop: "var(--space-12)",
-          }}
+        {/* Execute Recipe (compliance-gated) */}
+        <Button
+          variant="brand"
+          size="sm"
+          disabled={!canExecuteRecipe}
+          title={
+            canExecuteRecipe
+              ? "Execute the selected recipe"
+              : "Requires Compliance Shadow approval (GREEN or YELLOW verdict)"
+          }
         >
-          <div>
-            <span style={{ color: "var(--color-text-quaternary)" }}>Created</span>
-            <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, marginTop: 2, fontFamily: "var(--font-mono)" }}>
-              {new Date(detail.created_at).toLocaleString()}
-            </div>
-          </div>
-          <div>
-            <span style={{ color: "var(--color-text-quaternary)" }}>Updated</span>
-            <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, marginTop: 2, fontFamily: "var(--font-mono)" }}>
-              {new Date(detail.updated_at).toLocaleString()}
-            </div>
-          </div>
-        </div>
+          <Play size={14} />
+          Execute Recipe
+        </Button>
       </div>
 
-      {/* Agent Reasoning Card */}
-      {detail.shadow_verdict && (
-        <AgentReasoningCard
-          verdict={detail.shadow_verdict as ShadowVerdict}
-          intent={detail.intent ?? undefined}
-          confidence={analysis?.confidence ? analysis.confidence / 100 : 0.92}
-          recipeName={detail.selected_recipe ?? undefined}
-          explanation={trace?.explanation ?? analysis?.diagnosis ?? "Deterministic execution completed successfully."}
-          policyHits={trace?.shadow_policy_hits}
-          trace={trace ? {
-            trace_id: trace.trace_id,
-            event_id: trace.event_id,
-            skill_name: trace.skill_name,
-            intent_selected: trace.intent_selected,
-            shadow_verdict: trace.shadow_verdict,
-            shadow_policy_hits: trace.shadow_policy_hits,
-            recipe_name: trace.recipe_name,
-            constrained_output_schemas: trace.constrained_output_schemas,
-            gateway_calls: trace.gateway_calls,
-            backend_fallback: trace.backend_fallback,
-            is_fallback_generated: trace.is_fallback_generated,
-            final_status: trace.final_status,
-            explanation: trace.explanation,
-          } : undefined}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onEscalate={handleEscalate}
-          actionLoading={actionLoading}
-        />
-      )}
+      {/* ━━ Scrollable Body ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div style={{ flex: 1, overflow: "auto", padding: "var(--space-16)" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-20)" }}>
 
-      {/* Line-Item Selector */}
-      {lineItems.length > 0 && analysis && analysis.lines.length > 0 && (
-        <div>
-          <h3
-            style={{
-              fontSize: "var(--font-size-caption)",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-              color: "var(--color-text-tertiary)",
-              margin: "0 0 var(--space-8)",
-            }}
-          >
-            Select Line Item
-          </h3>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-6)" }}>
-            {lineItems.map((item) => {
-              const lineAnalysis = analysis.lines.find((l) => l.line_id === item.line_id);
-              const isSelected = selectedLine === item.line_id;
-              return (
-                <button
-                  key={item.line_id}
-                  onClick={() => setSelectedLine(item.line_id)}
+          {/* ── Section A: Agent Analysis ──────────────────────────────── */}
+          <section>
+            <SectionLabel letter="A" title="Agent Analysis" />
+            {detail.shadow_verdict ? (
+              <AgentReasoningCard
+                verdict={detail.shadow_verdict as ShadowVerdict}
+                intent={detail.intent ?? undefined}
+                confidence={analysis?.confidence ? analysis.confidence / 100 : 0.92}
+                recipeName={detail.selected_recipe ?? undefined}
+                explanation={
+                  trace?.explanation ?? analysis?.diagnosis ?? "Deterministic execution completed successfully."
+                }
+                policyHits={trace?.shadow_policy_hits}
+                trace={
+                  trace
+                    ? {
+                        trace_id: trace.trace_id,
+                        event_id: trace.event_id,
+                        skill_name: trace.skill_name,
+                        intent_selected: trace.intent_selected,
+                        shadow_verdict: trace.shadow_verdict,
+                        shadow_policy_hits: trace.shadow_policy_hits,
+                        recipe_name: trace.recipe_name,
+                        constrained_output_schemas: trace.constrained_output_schemas,
+                        gateway_calls: trace.gateway_calls,
+                        backend_fallback: trace.backend_fallback,
+                        is_fallback_generated: trace.is_fallback_generated,
+                        final_status: trace.final_status,
+                        explanation: trace.explanation,
+                      }
+                    : undefined
+                }
+                onApprove={handleApprove}
+                onReject={handleReject}
+                onEscalate={handleEscalate}
+                actionLoading={actionLoading}
+              />
+            ) : (
+              <div
+                style={{
+                  padding: "var(--space-16)",
+                  background: "var(--color-surface-primary)",
+                  borderRadius: "var(--radius-md)",
+                  boxShadow: "var(--shadow-sm)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--space-8)",
+                  fontSize: "var(--font-size-caption)",
+                  color: "var(--color-text-tertiary)",
+                }}
+              >
+                <AlertTriangle size={14} />
+                Agent analysis pending — Compliance Shadow has not yet completed.
+              </div>
+            )}
+          </section>
+
+          {/* ── Section B: Pipeline Progress ───────────────────────────── */}
+          <section>
+            <SectionLabel letter="B" title="Pipeline Progress" />
+            <WaterfallStepper
+              nodes={nodeStates}
+              intent={detail.intent ?? undefined}
+            />
+
+            {/* Compliance Shadow verdict callout */}
+            {detail.shadow_verdict && (
+              <div
+                style={{
+                  marginTop: "var(--space-8)",
+                  padding: "var(--space-8) var(--space-12)",
+                  borderRadius: "var(--radius-sm)",
+                  background:
+                    detail.shadow_verdict === "GREEN"
+                      ? "var(--color-success-subtle)"
+                      : detail.shadow_verdict === "YELLOW"
+                        ? "var(--color-warning-subtle)"
+                        : "var(--color-error-subtle)",
+                  border: `1px solid ${
+                    detail.shadow_verdict === "GREEN"
+                      ? "var(--color-success-border)"
+                      : detail.shadow_verdict === "YELLOW"
+                        ? "var(--color-warning-border)"
+                        : "var(--color-error-border)"
+                  }`,
+                  fontSize: "var(--font-size-caption)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--space-6)",
+                }}
+              >
+                <span style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "var(--font-size-label)" }}>
+                  Compliance Shadow
+                </span>
+                <Badge
+                  variant={
+                    detail.shadow_verdict === "GREEN"
+                      ? "success"
+                      : detail.shadow_verdict === "YELLOW"
+                        ? "warning"
+                        : "error"
+                  }
+                  size="sm"
+                >
+                  {detail.shadow_verdict}
+                </Badge>
+                <span style={{ color: "var(--color-text-secondary)" }}>
+                  {detail.shadow_verdict === "GREEN" && "— Approved for execution"}
+                  {detail.shadow_verdict === "YELLOW" && "— Approved with review"}
+                  {detail.shadow_verdict === "RED" && "— Blocked by policy"}
+                </span>
+              </div>
+            )}
+          </section>
+
+          {/* ── Section C: AI Narrative & Order Details ─────────────────── */}
+          <section>
+            <SectionLabel letter="C" title="AI Narrative & Order Details" />
+
+            {/* Diagnosis callout */}
+            {analysis && (
+              <div
+                style={{
+                  borderLeft: "3px solid var(--color-brand)",
+                  paddingLeft: "var(--space-12)",
+                  fontSize: "var(--font-size-body)",
+                  color: "var(--color-text-secondary)",
+                  lineHeight: 1.6,
+                  marginBottom: "var(--space-12)",
+                }}
+              >
+                {analysis.diagnosis}
+              </div>
+            )}
+
+            {/* Order metrics mini-grid */}
+            {lineItems.length > 0 && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr 1fr",
+                  gap: "var(--space-8)",
+                  marginBottom: "var(--space-12)",
+                  padding: "var(--space-12)",
+                  background: "var(--color-surface-primary)",
+                  borderRadius: "var(--radius-md)",
+                  boxShadow: "var(--shadow-xs)",
+                }}
+              >
+                <MiniMetric label="Lines" value={String(lineItems.length)} />
+                <MiniMetric label="ERP Total" value={fmtPrice(totalErp)} />
+                <MiniMetric label="PO Total" value={fmtPrice(totalPo)} />
+                <MiniMetric
+                  label="Delta"
+                  value={fmtPrice(Math.abs(delta))}
+                  color={delta !== 0 ? "var(--color-error)" : undefined}
+                />
+              </div>
+            )}
+
+            {/* Line-Item Selector */}
+            {lineItems.length > 0 && analysis && analysis.lines.length > 0 && (
+              <div style={{ marginBottom: "var(--space-12)" }}>
+                <h4
+                  style={{
+                    fontSize: "var(--font-size-caption)",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    color: "var(--color-text-tertiary)",
+                    margin: "0 0 var(--space-6)",
+                  }}
+                >
+                  Select Line Item
+                </h4>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-4)" }}>
+                  {lineItems.map((item) => {
+                    const lineAnalysis = analysis.lines.find((l) => l.line_id === item.line_id);
+                    const isSelected = selectedLine === item.line_id;
+                    return (
+                      <button
+                        key={item.line_id}
+                        onClick={() => setSelectedLine(item.line_id)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "var(--space-4)",
+                          padding: "var(--space-4) var(--space-10)",
+                          borderRadius: "var(--radius-full)",
+                          border: isSelected
+                            ? "2px solid var(--color-brand)"
+                            : "1px solid var(--color-border-default)",
+                          background: isSelected ? "var(--color-brand-subtle)" : "var(--color-surface-primary)",
+                          cursor: "pointer",
+                          fontFamily: "var(--font-sans)",
+                          fontSize: "var(--font-size-caption)",
+                          transition: "all var(--dur-fast)",
+                        }}
+                      >
+                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+                          {item.line_id}
+                        </span>
+                        <span
+                          style={{
+                            color: "var(--color-text-tertiary)",
+                            maxWidth: 80,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {item.description}
+                        </span>
+                        {lineAnalysis && (
+                          <Badge variant={rootCauseVariant(item.root_cause)} size="sm" icon={null}>
+                            {lineAnalysis.risk}
+                          </Badge>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Pricing Waterfall */}
+            {selectedAnalysis && selectedAnalysis.waterfall.length > 0 && (
+              <div>
+                <div
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "var(--space-6)",
-                    padding: "var(--space-6) var(--space-12)",
-                    borderRadius: "var(--radius-full)",
-                    border: isSelected
-                      ? "2px solid var(--color-brand)"
-                      : "1px solid var(--color-border-default)",
-                    background: isSelected ? "var(--color-brand-subtle)" : "var(--color-surface-primary)",
-                    cursor: "pointer",
-                    fontFamily: "var(--font-sans)",
-                    fontSize: "var(--font-size-caption)",
-                    transition: "all var(--dur-fast)",
+                    justifyContent: "space-between",
+                    marginBottom: "var(--space-6)",
                   }}
                 >
-                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-                    {item.line_id}
+                  <h4
+                    style={{
+                      fontSize: "var(--font-size-subhead)",
+                      fontWeight: 600,
+                      color: "var(--color-text-primary)",
+                      margin: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "var(--space-6)",
+                    }}
+                  >
+                    <FileText size={14} color="var(--color-text-tertiary)" />
+                    ERP Pricing Waterfall
+                  </h4>
+                  <span
+                    style={{
+                      fontSize: "var(--font-size-label)",
+                      color: "var(--color-text-tertiary)",
+                      background: "var(--color-surface-secondary)",
+                      padding: "2px 8px",
+                      borderRadius: "var(--radius-full)",
+                    }}
+                  >
+                    {selectedAnalysis.waterfall.length} step{selectedAnalysis.waterfall.length !== 1 ? "s" : ""}
                   </span>
-                  <span style={{ color: "var(--color-text-tertiary)", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {item.description}
-                  </span>
-                  {lineAnalysis && (
-                    <Badge variant={rootCauseVariant(item.root_cause)} size="sm" icon={null}>
-                      {lineAnalysis.risk}
-                    </Badge>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                </div>
+                <PricingWaterfall steps={selectedAnalysis.waterfall} />
+              </div>
+            )}
 
-      {/* Pricing Waterfall */}
-      {selectedAnalysis && selectedAnalysis.waterfall.length > 0 && (
-        <div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "var(--space-8)",
-            }}
-          >
-            <h3
+            {/* Metadata grid */}
+            <div
               style={{
-                fontSize: "var(--font-size-subhead)",
-                fontWeight: 600,
-                color: "var(--color-text-primary)",
-                margin: 0,
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--space-6)",
-              }}
-            >
-              <FileText size={14} color="var(--color-text-tertiary)" />
-              ERP Pricing Waterfall
-            </h3>
-            <span
-              style={{
-                fontSize: "var(--font-size-label)",
-                color: "var(--color-text-tertiary)",
-                background: "var(--color-surface-secondary)",
-                padding: "2px 8px",
-                borderRadius: "var(--radius-full)",
-              }}
-            >
-              {selectedAnalysis.waterfall.length} step{selectedAnalysis.waterfall.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-          <PricingWaterfall steps={selectedAnalysis.waterfall} />
-        </div>
-      )}
-
-      {/* Pipeline Waterfall */}
-      <div>
-        <h3
-          style={{
-            fontSize: "var(--font-size-subhead)",
-            fontWeight: 600,
-            color: "var(--color-text-primary)",
-            margin: "0 0 var(--space-12)",
-          }}
-        >
-          Pipeline Progress
-        </h3>
-        <WaterfallStepper
-          nodes={nodeStates}
-          intent={detail.intent ?? undefined}
-        />
-      </div>
-
-      {/* Detail Tabs */}
-      <div>
-        <div
-          style={{
-            display: "flex",
-            gap: "var(--space-4)",
-            borderBottom: "1px solid var(--color-border-default)",
-            marginBottom: "var(--space-12)",
-          }}
-        >
-          {DETAIL_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setDetailTab(tab.id)}
-              style={{
-                padding: "var(--space-6) var(--space-12)",
-                background: "none",
-                border: "none",
-                borderBottom: detailTab === tab.id ? "2px solid var(--color-brand)" : "2px solid transparent",
-                cursor: "pointer",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "var(--space-8)",
                 fontSize: "var(--font-size-caption)",
-                fontWeight: detailTab === tab.id ? 600 : 400,
-                color: detailTab === tab.id ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
-                fontFamily: "var(--font-sans)",
+                marginTop: "var(--space-12)",
               }}
             >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {detailTab === "evidence" && trace && (
-          <div style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
-              <TraceField label="Trace ID" value={trace.trace_id} mono />
-              <TraceField label="Skill" value={trace.skill_name} />
-              <TraceField label="Intent" value={trace.intent_selected} />
-              <TraceField label="Shadow Verdict" value={trace.shadow_verdict} />
-              {trace.shadow_policy_hits.length > 0 && (
-                <TraceField label="Policy Hits" value={trace.shadow_policy_hits.join(", ")} />
-              )}
-              <TraceField label="Recipe" value={trace.recipe_name} />
-              {trace.gateway_calls.length > 0 && (
-                <TraceField label="Gateway Calls" value={trace.gateway_calls.join(", ")} />
-              )}
-              <TraceField label="Final Status" value={trace.final_status} />
+              <div>
+                <span style={{ color: "var(--color-text-quaternary)" }}>Created</span>
+                <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, marginTop: 2, fontFamily: "var(--font-mono)" }}>
+                  {new Date(detail.created_at).toLocaleString()}
+                </div>
+              </div>
+              <div>
+                <span style={{ color: "var(--color-text-quaternary)" }}>Updated</span>
+                <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, marginTop: 2, fontFamily: "var(--font-mono)" }}>
+                  {new Date(detail.updated_at).toLocaleString()}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          </section>
 
-        {detailTab === "sap" && (
-          <div style={{ color: "var(--color-text-quaternary)", fontSize: "var(--font-size-caption)", fontStyle: "italic" }}>
-            SAP condition records and master data — coming soon.
-          </div>
-        )}
-        {detailTab === "changes" && (
-          <div style={{ color: "var(--color-text-quaternary)", fontSize: "var(--font-size-caption)", fontStyle: "italic" }}>
-            Change analysis and audit diff — coming soon.
-          </div>
-        )}
-      </div>
+          {/* ── Section D: Evidence & Next Steps ───────────────────────── */}
+          <section>
+            <SectionLabel letter="D" title="Evidence & Next Steps" />
 
-      {/* Resolution Data */}
-      {detail.resolution_data && Object.keys(detail.resolution_data).length > 0 && (
-        <div>
-          <h3
-            style={{
-              fontSize: "var(--font-size-subhead)",
-              fontWeight: 600,
-              color: "var(--color-text-primary)",
-              margin: "0 0 var(--space-8)",
-            }}
-          >
-            Resolution Data
-          </h3>
-          <pre
-            style={{
-              background: "var(--color-surface-secondary)",
-              padding: "var(--space-12)",
-              borderRadius: "var(--radius-sm)",
-              fontSize: "var(--font-size-caption)",
-              fontFamily: "var(--font-mono)",
-              color: "var(--color-text-secondary)",
-              overflow: "auto",
-              margin: 0,
-            }}
-          >
-            {JSON.stringify(detail.resolution_data, null, 2)}
-          </pre>
+            {/* Tab bar */}
+            <div
+              style={{
+                display: "flex",
+                gap: "var(--space-4)",
+                borderBottom: "1px solid var(--color-border-default)",
+                marginBottom: "var(--space-10)",
+              }}
+            >
+              {DETAIL_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setDetailTab(tab.id)}
+                  style={{
+                    padding: "var(--space-6) var(--space-12)",
+                    background: "none",
+                    border: "none",
+                    borderBottom: detailTab === tab.id ? "2px solid var(--color-brand)" : "2px solid transparent",
+                    cursor: "pointer",
+                    fontSize: "var(--font-size-caption)",
+                    fontWeight: detailTab === tab.id ? 600 : 400,
+                    color: detailTab === tab.id ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
+                    fontFamily: "var(--font-sans)",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Evidence tab */}
+            {detailTab === "evidence" && trace && (
+              <div style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
+                  <TraceField label="Trace ID" value={trace.trace_id} mono />
+                  <TraceField label="Skill" value={trace.skill_name} />
+                  <TraceField label="Intent" value={trace.intent_selected} />
+                  <TraceField label="Shadow Verdict" value={trace.shadow_verdict} />
+                  {trace.shadow_policy_hits.length > 0 && (
+                    <TraceField label="Policy Hits" value={trace.shadow_policy_hits.join(", ")} />
+                  )}
+                  <TraceField label="Recipe" value={trace.recipe_name} />
+                  {trace.gateway_calls.length > 0 && (
+                    <TraceField label="Gateway Calls" value={trace.gateway_calls.join(", ")} />
+                  )}
+                  <TraceField label="Final Status" value={trace.final_status} />
+                </div>
+              </div>
+            )}
+
+            {detailTab === "sap" && (
+              <div style={{ color: "var(--color-text-quaternary)", fontSize: "var(--font-size-caption)", fontStyle: "italic" }}>
+                SAP condition records and master data — coming soon.
+              </div>
+            )}
+            {detailTab === "changes" && (
+              <div style={{ color: "var(--color-text-quaternary)", fontSize: "var(--font-size-caption)", fontStyle: "italic" }}>
+                Change analysis and audit diff — coming soon.
+              </div>
+            )}
+
+            {/* Next Steps */}
+            {analysis && (
+              <div style={{ marginTop: "var(--space-12)" }}>
+                <h4
+                  style={{
+                    fontSize: "var(--font-size-caption)",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    color: "var(--color-text-tertiary)",
+                    margin: "0 0 var(--space-6)",
+                  }}
+                >
+                  Recommended Next Steps
+                </h4>
+                <ol
+                  style={{
+                    margin: 0,
+                    paddingLeft: "var(--space-20)",
+                    fontSize: "var(--font-size-caption)",
+                    color: "var(--color-text-secondary)",
+                    lineHeight: 1.8,
+                  }}
+                >
+                  <li>Review the agent analysis and confidence score above</li>
+                  <li>Verify the pricing waterfall for the flagged line items</li>
+                  {canExecuteRecipe ? (
+                    <li>
+                      <strong style={{ color: "var(--color-success)" }}>Execute Recipe</strong> — Compliance Shadow has approved
+                    </li>
+                  ) : (
+                    <li>
+                      <strong style={{ color: "var(--color-warning)" }}>Await Compliance Shadow</strong> — recipe execution is blocked until approval
+                    </li>
+                  )}
+                  <li>Monitor pipeline progress for completion</li>
+                </ol>
+              </div>
+            )}
+          </section>
+
+          {/* Resolution Data */}
+          {detail.resolution_data && Object.keys(detail.resolution_data).length > 0 && (
+            <section>
+              <h3
+                style={{
+                  fontSize: "var(--font-size-subhead)",
+                  fontWeight: 600,
+                  color: "var(--color-text-primary)",
+                  margin: "0 0 var(--space-8)",
+                }}
+              >
+                Resolution Data
+              </h3>
+              <pre
+                style={{
+                  background: "var(--color-surface-secondary)",
+                  padding: "var(--space-12)",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: "var(--font-size-caption)",
+                  fontFamily: "var(--font-mono)",
+                  color: "var(--color-text-secondary)",
+                  overflow: "auto",
+                  margin: 0,
+                }}
+              >
+                {JSON.stringify(detail.resolution_data, null, 2)}
+              </pre>
+            </section>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
-/* ── Helper components ────────────────────────────────────────────── */
+/* ── Helper components ───────────────────────────────────────────────── */
+
+function SectionLabel({ letter, title }: { letter: string; title: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--space-8)",
+        marginBottom: "var(--space-10)",
+      }}
+    >
+      <span
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: "var(--radius-full)",
+          background: "var(--color-brand-subtle)",
+          color: "var(--color-brand)",
+          fontSize: "var(--font-size-label)",
+          fontWeight: 700,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        {letter}
+      </span>
+      <h3
+        style={{
+          fontSize: "var(--font-size-subhead)",
+          fontWeight: 600,
+          color: "var(--color-text-primary)",
+          margin: 0,
+        }}
+      >
+        {title}
+      </h3>
+    </div>
+  );
+}
 
 function MiniMetric({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
@@ -591,7 +844,15 @@ function TraceField({ label, value, mono }: { label: string; value?: string | nu
   if (!value) return null;
   return (
     <div>
-      <span style={{ color: "var(--color-text-quaternary)", fontSize: "var(--font-size-label)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+      <span
+        style={{
+          color: "var(--color-text-quaternary)",
+          fontSize: "var(--font-size-label)",
+          fontWeight: 600,
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+        }}
+      >
         {label}
       </span>
       <div
