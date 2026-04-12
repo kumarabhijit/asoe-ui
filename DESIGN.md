@@ -1,8 +1,8 @@
 # DESIGN.md — Code-to-Architecture Map
 
-Maps `consol_arch.md` Section 11 (UI Architecture) to concrete source files. Read this to understand how the codebase is organized and where to find things.
+Maps the UI architecture to concrete source files. Read this to understand how the codebase is organized and where to find things.
 
-> **See also:** `ui_architecture.md` — extracts the full UI architecture from `consol_arch.md`, documents alignment vs intentional drift, and proposes backend changes needed in `asoe2`.
+> **Authoritative UI architecture:** `ui_architecture.md` — design paradigm, component strategy, page layouts, data flows, alignment & drift register. `consol_arch.md` Section 11 is a stub pointer to `ui_architecture.md`.
 
 ---
 

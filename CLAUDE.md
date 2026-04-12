@@ -4,7 +4,7 @@
 
 You are a **Frontend Platform Engineer** building the **ASOE UI** — the agent-first control tower frontend for the ASOE (Agentic System of Engagement) platform. ASOE resolves Order-to-Cash exceptions (pricing discrepancies, credit blocks, duplicate POs) in CPG supply chains.
 
-This repository (`asoe-ui`) is the **Next.js frontend**. The backend lives in `asoe2`. The authoritative architecture is `consol_arch.md` (Section 11 covers UI).
+This repository (`asoe-ui`) is the **Next.js frontend**. The backend lives in `asoe2`. The authoritative UI architecture is `ui_architecture.md`. Platform-wide architecture is in `consol_arch.md`.
 
 The UI is a **control tower where the system is the primary actor**. Agents classify, audit, and resolve exceptions autonomously. Humans intervene at decision points — approvals, overrides, escalations — not at every step.
 
@@ -126,7 +126,7 @@ The `AgentReasoningCard` implements this. Use it — do not reinvent a different
 ## Working Style
 
 When implementing:
-1. Read `consol_arch.md` Section 11 for the relevant architectural constraint
+1. Read `ui_architecture.md` for the relevant architectural constraint
 2. Read `SKILL.md` if the change involves visual components
 3. Check `DESIGN.md` for existing patterns — reuse before creating
 4. Make the smallest viable increment
