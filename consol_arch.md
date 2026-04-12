@@ -1385,8 +1385,8 @@ All other elements — data, links, badges, confidence bars, selected states —
 | Page | Layout | Purpose |
 |---|---|---|
 | Login | Centered card | SSO + email/password, agent activity footer (system is alive) |
-| Exception Queue | Queue + Sidebar (Layout A) | Flagship view: metrics strip, tab bar, card-based expandable rows with line-item grids, Sidebar for detail |
-| Exception Detail | Sidebar expand | AgentReasoningCard (Layer 1/2), WaterfallStepper, side-by-side PO comparison |
+| Exception Queue | Three-pane Outlook master-detail | Flagship view: resizable list pane (compact cards, search, filters) + detail pane (polymorphic: dynamic header ribbon, entity profile, impact metrics, agent analysis with Problem/Root Cause/Recommendation, collapsible evidence grid, pipeline progress). Human acts as Review Authority (Approve/Reject/Escalate) — no execution triggers in UI. |
+| Exception Detail | Detail pane (inline) or full-page (`/exceptions/[id]`) | AgentReasoningCard (Layer 1/2), WaterfallStepper, PricingWaterfall, entity context. Shadow Verdict as read-only badge. |
 | Dashboard | 2-column grid (Layout B) | Analytics: resolution rates, agent performance, exception trends. See **Analytics Data Isolation** below. |
 | Customer Inbox | Two-pane (queue + detail) | AI-powered email triage — inbound customer communication analysis, agent recommendations, category/status tracking |
 | Settings / Admin | Standard layout | User management, SSO config, policy overrides, agent settings |

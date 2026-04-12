@@ -201,39 +201,54 @@ All other elements use neutrals. Status colors are semantic and map to shadow ve
 | Page | Spec (Section 11.5) | Route | Status |
 |---|---|---|---|
 | Login | Centered card, SSO + email/password | `/login` | ALIGNED |
-| Exception Queue | Queue + Sidebar (Layout A) | `/exceptions` | ALIGNED (enriched) |
-| Exception Detail | Sidebar expand | `/exceptions` (sidebar) | ALIGNED (enriched) |
+| Exception Queue | Three-pane Outlook master-detail | `/exceptions` | ALIGNED (evolved from Layout A — see 5.1) |
+| Exception Detail | Detail pane (inline) or full-page | `/exceptions` (right pane) / `/exceptions/[id]` | ALIGNED (polymorphic) |
 | Dashboard | 2-column grid (Layout B) | `/dashboard` | ALIGNED (enriched) |
 | Settings / Admin | Standard layout | `/settings` | PENDING (Phase 9) |
 | **Customer Inbox** | **NOT IN SPEC** | `/inbox` | **DRIFT — new page** |
 
-### 5.1 Exception Queue (`/exceptions`) — Layout A
+### 5.1 Exception Queue (`/exceptions`) — Three-Pane Outlook Master-Detail
 
-**Spec alignment:** Implements Layout A (queue + sidebar) per Section 11.5. All filter values sourced from `useHealth()` per Guardrail #2.
+**Spec evolution:** Originally specified as Layout A (queue + sidebar) in Section 11.5. Evolved to a persistent three-pane "Outlook-style" master-detail interface for high-productivity triage. `consol_arch.md` Section 11.5 updated to reflect this layout. All filter values sourced from `useHealth()` per Guardrail #2.
 
-**Enrichments beyond spec:**
-- **Expandable card rows** (from pre-merge sample screen) — collapsed row shows order summary; expand chevron reveals line-item grid with columns: Line, SKU, Product, UOM, Qty, ERP Price, PO Price, totals, Root Cause badge
-- **Breadcrumb navigation** (Home > Order Management > Exception Queue)
-- **Tab bar** below metrics (Orders | Root Cause Insights | Agent Activity)
-- **Line-item grid** fetched on demand via `exceptionsApi.lineItems(id)` — requires new backend endpoint (see Section 10)
+**Layout architecture:**
+- **Top Rail (NavBar):** 56px sticky global navigation (unchanged)
+- **Middle Pane (ExceptionListPane):** Resizable (default 35%). Compact exception cards with search bar, state/intent filter dropdowns, inline metrics (open, resolved, avg time). Each card shows: Order ID, Intent Tag, Status badges, Timestamp. Selected card highlighted with brand accent.
+- **Right Pane (ExceptionDetailPanel):** Polymorphic detail view adapting per exception intent:
+  - **Dynamic Header Ribbon** — breadcrumb-style: Reference ID > Customer > Location > Primary SKU / "N Lines Affected"
+  - **Context Strip** — Entity Profile (customer, tier, VIP, credit standing) + Impact Metrics (revenue at risk, delta, SLA priority)
+  - **Agent Analysis** — Problem / Root Cause / Recommendation narrative blocks + AgentReasoningCard (Layer 1/2)
+  - **Evidence Grid** — collapsed by default; expandable line-item table with ERP vs PO comparison + pricing waterfall
+  - **Supporting Context** — pipeline progress (WaterfallStepper), trace evidence tabs, resolution data
+
+**Governance:** Human acts as **Review Authority** only — Approve, Reject, or Escalate via AgentReasoningCard. No "Execute Recipe" or manual execution triggers. Shadow Verdict displayed as read-only badge. Execution is triggered by the backend upon approval.
+
+**Resizable panes:** `react-resizable-panels` (Group/Panel/Separator). Default 35/65 split.
 
 **Data flow:**
 ```
-exceptionsApi.list() + stats() → state → render
-Row expand → exceptionsApi.lineItems(id) → line-item grid
-Row click → Sidebar opens
+exceptionsApi.list() + stats() → list state → render
+First item auto-selected → pre-fetched detail
+Card click → on-demand fetch:
   → exceptionsApi.get(id) + trace(id) + lineItems(id) + orderAnalysis(id)
+  → orderAnalysis includes entity_profile + impact_metrics
 ```
 
-### 5.2 Exception Detail Panel (Sidebar)
+### 5.2 Exception Detail Panel (Right Pane / Full-Page)
 
-**Spec alignment:** Implements AgentReasoningCard (Layer 1/2), WaterfallStepper per Section 11.1, 11.2.
+**Spec alignment:** Implements AgentReasoningCard (Layer 1/2), WaterfallStepper per Section 11.1, 11.2. Polymorphic — adapts to any exception intent (pricing, credit, duplicate PO).
 
-**Enrichments beyond spec:**
-- **Order summary card** — icon, order ID, state badge, event type, tenant, 4-metric mini-grid (lines, ERP total, PO total, delta), agent diagnosis with left-border accent
-- **Line-item selector** — pill buttons per line item with risk badge, drives pricing waterfall
-- **PricingWaterfall** — selected line's pricing condition chain (BASE → CONTRACT → TPR → UOM → RESULT/ERROR)
-- **Tabbed detail sections** — Evidence (populated from trace), SAP Data (placeholder), Change Analysis (placeholder)
+**Structure (5 layers):**
+1. **Dynamic Header Ribbon** — breadcrumb context: Reference ID > Customer Name > Location > Primary SKU or "N Lines Affected". Lifecycle badge + Shadow Verdict (read-only) + total value.
+2. **Context Strip** (two-column) — Entity Profile (customer, BP number, tier, VIP, credit standing, location) | Impact Metrics (revenue at risk, delta amount/%, SLA priority/deadline, affected lines).
+3. **Agent Analysis** — "The Problem" (diagnosis narrative), "Root Cause" (deterministic cause), "Recommendation" (one-line action). Followed by AgentReasoningCard with Layer 1/2 and Approve/Reject/Escalate actions.
+4. **Evidence Grid** — collapsed by default to reduce cognitive load. Expandable: line-item table (Line, SKU, Description, Qty, ERP, PO, Root Cause), line selector pills, PricingWaterfall for selected line.
+5. **Supporting Context** — Pipeline progress (WaterfallStepper), Trace Evidence tabs (Evidence | SAP Data | Change Analysis), Resolution data (JSON).
+
+**New types driving polymorphism:**
+- `EntityProfile` — customer master data (name, BP, tier, VIP, credit standing, location, region)
+- `ImpactMetrics` — blast radius (revenue at risk, delta, SLA priority, affected lines)
+- `OrderAnalysis` extended with `root_cause`, `recommendation`, `entity_profile`, `impact_metrics`
 
 ### 5.3 Dashboard (`/dashboard`) — Layout B
 
@@ -475,7 +490,7 @@ Summary of all alignments and drifts between `consol_arch.md` and the actual `as
 | PricingWaterfall component (D2) | Section 11.2 | Incorporated into consol_arch.md during alignment |
 | Line-item API (D3) | Section 6.2 | Endpoint added to spec + backend implementation |
 | Order analysis API (D4) | Section 6.2 | Endpoint added to spec + backend implementation |
-| Expandable order rows (D5) | Section 11.5 | Description updated in consol_arch.md |
+| Expandable order rows → Outlook layout (D5) | Section 11.5 | Evolved: Layout A → three-pane Outlook master-detail. consol_arch.md updated. |
 | Badge variant mappers (D6) | Section 11.2 | 5 mappers documented in consol_arch.md |
 | Component count (D7) | Section 11.2 | Updated to 14 in consol_arch.md |
 | StatsResponse fields (T1-T5) | Section 6.2 | Backend renamed + UI fields added |
@@ -486,7 +501,13 @@ Summary of all alignments and drifts between `consol_arch.md` and the actual `as
 
 ### INTENTIONAL DRIFT (UI enrichment — needs spec update)
 
-_No active drift items. All D1-D7 items resolved during architecture alignment (2026-04-11)._
+_D1-D7 resolved during architecture alignment (2026-04-11)._
+
+| ID | Area | Description | Status |
+|---|---|---|---|
+| D8 | Exception Queue layout | Evolved from Layout A (queue + sidebar) to three-pane Outlook master-detail with resizable panels (`react-resizable-panels`). Sidebar component available but not used. | **RESOLVED** — consol_arch.md Section 11.5 updated (2026-04-12) |
+| D9 | Polymorphic detail view | ExceptionDetailPanel adapts per intent via EntityProfile + ImpactMetrics. Dynamic header ribbon, context strip, Problem/Root Cause/Recommendation narrative. | **RESOLVED** — consol_arch.md Section 11.5 updated (2026-04-12) |
+| D10 | Governance: Review Authority model | Removed "Execute Recipe" button. Human acts as Review Authority only (Approve/Reject/Escalate). Shadow Verdict displayed as read-only badge. Execution triggered by backend on approval. | **RESOLVED** — consol_arch.md Section 11.5 updated, AUDITOR_GUIDE updated (2026-04-12) |
 
 ### TYPE CONTRACT DRIFT (needs code or backend fix)
 

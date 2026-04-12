@@ -141,7 +141,7 @@ When designing new components:
 5. Include keyboard and screen reader support
 
 For new pages:
-1. Determine layout pattern (Layout A: queue+sidebar, Layout B: dashboard grid)
+1. Determine layout pattern (Outlook master-detail for exception pages, Layout B: dashboard grid)
 2. Source filter/enum values from `useHealth`
 3. Use existing components — do not create one-off alternatives
 4. Connect to `src/lib/api.ts` endpoints
