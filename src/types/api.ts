@@ -63,11 +63,11 @@ export type ExceptionListResponse = PaginatedResponse<ExceptionSummary>;
 
 export type ExceptionDetailResponse = ExceptionDetail;
 
-/* ── Override ──────────────────────────────────────────────────────── */
+/* ── Override (YELLOW tier — manager+) ────────────────────────────── */
 
 export interface OverrideRequest {
   action: string;
-  notes?: string;
+  notes: string;  // mandatory (SOX)
   resolved_by: string;
 }
 
@@ -79,6 +79,19 @@ export interface ApproveRequest {
 
 export interface RejectRequest {
   reason?: string;
+}
+
+/* ── Challenge (GREEN tier — analyst+) ────────────────────────────── */
+
+export interface ChallengeRequest {
+  challenge_reason: string;
+}
+
+/* ── Admin Release (RED tier — admin only) ────────────────────────── */
+
+export interface AdminReleaseRequest {
+  release_reason: string;
+  risk_acknowledgment: boolean;
 }
 
 /* ── Stats (dashboard) ─────────────────────────────────────────────── */

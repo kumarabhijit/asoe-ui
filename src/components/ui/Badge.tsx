@@ -70,6 +70,7 @@ export function lifecycleVariant(state?: string): BadgeVariant {
       return "success";
     case "PENDING_REVIEW":
     case "ESCALATED":
+    case "PENDING_ADMIN_REVIEW":
     case "AUDITING":
       return "warning";
     case "BLOCKED":

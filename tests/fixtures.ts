@@ -149,8 +149,8 @@ export const MOCK_HEALTH: HealthResponse = {
   allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO"],
   lifecycle_states: [
     "INGESTED", "CLASSIFYING", "AUDITING", "PENDING_REVIEW",
-    "ESCALATED", "EXECUTING", "RESOLVED", "FAILED",
-    "BLOCKED", "REJECTED", "CLOSED",
+    "ESCALATED", "PENDING_ADMIN_REVIEW", "EXECUTING", "RESOLVED",
+    "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
   allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py"],
 };

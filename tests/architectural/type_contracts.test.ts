@@ -57,7 +57,7 @@ describe("Exception type contracts", () => {
     expect(Array.isArray(health.lifecycle_states)).toBe(true);
     expect(Array.isArray(health.allowed_recipes)).toBe(true);
     expect(health.allowed_intents.length).toBeGreaterThan(0);
-    expect(health.lifecycle_states.length).toBe(11); // 11 lifecycle states
+    expect(health.lifecycle_states.length).toBe(12); // 12 lifecycle states
   });
 
   it("V1 intents are exactly 4", () => {

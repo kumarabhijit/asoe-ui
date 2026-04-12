@@ -36,6 +36,7 @@ export type LifecycleState =
   | "AUDITING"
   | "PENDING_REVIEW"
   | "ESCALATED"
+  | "PENDING_ADMIN_REVIEW"
   | "EXECUTING"
   | "RESOLVED"
   | "FAILED"
