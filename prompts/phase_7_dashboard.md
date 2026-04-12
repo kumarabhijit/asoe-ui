@@ -1,7 +1,7 @@
 # Phase 7: Dashboard
 
 **Prerequisite:** Phase 3 (MetricTile, Badge, Card), Phase 4 (types + API client + useHealth)
-**Architecture reference:** `consol_arch.md` Section 11.5 (Dashboard — Layout B: 2-column grid), Section 11.6 (Analytics Data Isolation)
+**Architecture reference:** `ui_architecture.md` Section 5.3 (Dashboard — Layout B: 2-column grid), `consol_arch.md` Section 11.6 (Analytics Data Isolation)
 
 ---
 
@@ -65,7 +65,7 @@ Page Content (max-width: 1280px)
 
 ## Section 11.6 KPI Coverage
 
-| KPI (from consol_arch.md) | Dashboard Implementation |
+| KPI (from consol_arch.md Section 11.6) | Dashboard Implementation |
 |---|---|
 | Resolution rate | MetricTile: "Resolution Rate" as percentage |
 | Avg time-to-resolution | MetricTile: "Avg Resolution" in minutes |

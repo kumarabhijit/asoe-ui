@@ -28,7 +28,7 @@ Master index of all implementation phases. See `tasks.md` for detailed progress 
 
 - **Phases 0-2** were implemented before phase prompts were established. The code and `tasks.md` are the record.
 - **Phases 3-8** have retroactive prompts written from the session that implemented them (accurate, not speculative).
-- **Phase 8.5** adapted pre-merge visual designs (Inbox page + Sample Screen) into the consol_arch.md-aligned codebase. Added PricingWaterfall component, expandable order rows, line-item grids, and refactored Inbox to use shared components.
+- **Phase 8.5** adapted pre-merge visual designs (Inbox page + Sample Screen) into the architecture-aligned codebase. Added PricingWaterfall component, expandable order rows, line-item grids, and refactored Inbox to use shared components.
 - **Phase prompts for 9-11** should be created when each phase begins, following the `asoe2/prompts/phase_*.md` pattern.
 - **`prompts/asoe-ui-design-system.md`** is the original Phase 0 prompt — still valid for regenerating the design system from scratch.
 - **`plan.md`** is the historical Phase 1 prompt (login screen). Superseded by `tasks.md` but preserved for reference.
