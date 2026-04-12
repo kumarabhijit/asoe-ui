@@ -16,8 +16,10 @@ src/
 │   ├── login/page.tsx            # Multi-step login (email → password → SSO redirect)
 │   ├── auth/callback/page.tsx    # SSO callback handler
 │   ├── exceptions/
-│   │   ├── page.tsx              # Exception Queue — flagship view (Layout A, expandable rows)
-│   │   └── ExceptionDetailPanel.tsx  # Sidebar: order summary, reasoning, waterfall, line selector
+│   │   ├── page.tsx              # Exception Queue — three-pane Outlook master-detail layout
+│   │   ├── ExceptionListPane.tsx # Middle pane: compact card list with search + filters
+│   │   ├── ExceptionDetailPanel.tsx  # Right pane: polymorphic detail (header ribbon, context, analysis, evidence)
+│   │   └── [id]/page.tsx         # Full-page exception detail (standalone route)
 │   ├── dashboard/page.tsx        # Analytics dashboard (Layout B) + recent activity feed
 │   ├── inbox/page.tsx            # Customer Inbox — AI email triage (two-pane layout)
 │   └── api/auth/[...nextauth]/route.ts  # NextAuth API route
@@ -69,7 +71,7 @@ src/
 | `MetricTile` | Custom | KPI: 40x40 tinted icon + monospace value | Exception Queue, Dashboard, Inbox |
 | `Badge` | Custom | Tinted bg + icon + text, 6 variant mappers | Exception Queue, Detail, Inbox, Dashboard |
 | `Toast` | Custom | 4.5s auto-dismiss, solid-fill (only one in system) | Via ToastProvider |
-| `Sidebar` | Custom | 480px panel, escape-to-close, focus trap | Exception Queue |
+| `Sidebar` | Custom | 480px panel, escape-to-close, focus trap | (Available, not used in Outlook layout) |
 | `ActivityIndicator` | Custom | Node-specific domain-aware messages | WaterfallStepper |
 | `WaterfallStepper` | Custom | 10-node pipeline with per-node states | ExceptionDetailPanel |
 | `AgentReasoningCard` | Custom | Layer 1/2, verdict-specific behavior | ExceptionDetailPanel |
@@ -86,38 +88,47 @@ src/
 
 ## 3. Page Architecture
 
-### Exception Queue (`/exceptions`) — Layout A: Queue + Sidebar
+### Exception Queue (`/exceptions`) — Three-Pane Outlook Master-Detail
 
 ```
-NavBar (sticky top)
+NavBar (sticky top, 56px)
 ├── Tabs: Customer Inbox | Exception Queue | Dashboard | Settings
 ├── Agent status badge + user avatar
-Page Content (max-width 1440px)
-├── Breadcrumb (Home > Order Management > Exception Queue)
-├── Page Header (icon + title + dynamic subtitle + refresh button)
-├── Metrics Strip (4x MetricTile: total, open, auto-resolved, avg time)
-├── Tab Bar (Orders | Root Cause Insights | Agent Activity)
-├── Filters (search + state dropdown + intent dropdown)
-│   └── Dropdowns sourced from useHealth() — Guardrail #2
-├── Expandable Exception Cards
-│   ├── Collapsed: order ID, event type, intent badge, line count, state, verdict, time
-│   ├── Expand chevron → line-item grid (fetched on demand)
-│   │   └── Columns: Line, SKU, Product, UOM, Qty, ERP, PO, Σ ERP, Σ PO, Root Cause
-│   └── Row click → opens Sidebar
-└── Sidebar (480px right panel)
-    └── ExceptionDetailPanel
-        ├── Order Summary Card (icon, order ID, state, event type, tenant)
-        │   ├── Mini-metrics (lines, ERP total, PO total, delta)
-        │   └── Agent diagnosis (left border accent)
-        ├── AgentReasoningCard (Layer 1/2)
-        ├── Line-Item Selector (pill buttons per line, risk badge)
-        ├── PricingWaterfall (selected line's condition chain)
-        ├── WaterfallStepper (10-node pipeline)
-        ├── Detail Tabs (Evidence | SAP Data | Change Analysis)
-        └── Resolution data (JSON)
+┌──────────────────────────┬─┬────────────────────────────────────────┐
+│ Middle Pane (List)       │↔│ Right Pane (Detail)                    │
+│ ExceptionListPane        │ │ ExceptionDetailPanel                   │
+│ ┌──────────────────────┐ │ │ ┌──────────────────────────────────┐   │
+│ │ Title + count + ⟳    │ │ │ │ Header Ribbon (breadcrumb-style) │   │
+│ │ Compact metrics      │ │ │ │ SO-1001 > Customer > Location >  │   │
+│ │ Search input         │ │ │ │ Primary SKU or "N Lines"         │   │
+│ │ State + Intent filter│ │ │ ├──────────────┬───────────────────┤   │
+│ ├──────────────────────┤ │ │ │ Entity       │ Impact & Risk     │   │
+│ │ Exception Card ●     │ │ │ │ Profile      │ Metrics           │   │
+│ │ Exception Card       │ │ │ ├──────────────┴───────────────────┤   │
+│ │ Exception Card       │ │ │ │ Agent Analysis                   │   │
+│ │ ...                  │ │ │ │ (Problem / Root Cause / Reco)    │   │
+│ └──────────────────────┘ │ │ │ AgentReasoningCard (Layer 1/2)   │   │
+│                          │ │ │ ▸ Evidence Detail [collapsed]     │   │
+│ 35% (resizable)          │ │ │ Pipeline Progress                 │   │
+│                          │ │ │ Trace Evidence tabs               │   │
+│                          │ │ └──────────────────────────────────┘   │
+└──────────────────────────┴─┴────────────────────────────────────────┘
 ```
 
-**Data flow:** `exceptionsApi.list()` + `exceptionsApi.stats()` → state → render. Filters trigger re-fetch. Row click fetches `exceptionsApi.get(id)` + `exceptionsApi.trace(id)` + `exceptionsApi.lineItems(id)` + `exceptionsApi.orderAnalysis(id)`. Expand chevron fetches `exceptionsApi.lineItems(id)`.
+**Resizable panes:** `react-resizable-panels` (Group/Panel/Separator). Panel sizes persisted per session. Default 35/65 split.
+
+**Lifted state:** `selectedExceptionId` in parent `page.tsx`. Selecting a card updates the right pane without page reload.
+
+**Data flow:** `exceptionsApi.list()` + `exceptionsApi.stats()` → list state → render. Filters trigger re-fetch. First item auto-selected and pre-fetched. Subsequent selections trigger on-demand fetch: `exceptionsApi.get(id)` + `exceptionsApi.trace(id)` + `exceptionsApi.lineItems(id)` + `exceptionsApi.orderAnalysis(id)`.
+
+**Polymorphic detail view:** The right pane adapts to any exception type (pricing, credit, duplicate PO) via dynamic data categories:
+- **Header ribbon:** breadcrumb-style context from event payload
+- **Context strip:** Entity Profile (customer, tier, credit standing) + Impact Metrics (revenue at risk, delta, SLA)
+- **Agent Analysis:** Problem / Root Cause / Recommendation narrative blocks
+- **Evidence Grid:** collapsed by default; expandable line-item table + pricing waterfall
+- **Supporting Context:** pipeline progress, trace evidence tabs, resolution data
+
+**Governance:** No "Execute Recipe" button. Human acts as Review Authority (Approve/Reject/Escalate via AgentReasoningCard). Shadow Verdict displayed as read-only badge.
 
 ### Customer Inbox (`/inbox`) — Two-Pane Layout
 
@@ -195,7 +206,9 @@ Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 | `PricingConditionType` | Pricing condition type enum (BASE/CONTRACT/TPR/UOM/RESULT/ERROR) | exceptions.ts |
 | `PricingWaterfallStep` | Single step in pricing waterfall visualization | exceptions.ts |
 | `LineItemAnalysis` | Per-line agent analysis with waterfall | exceptions.ts |
-| `OrderAnalysis` | Order-level agent analysis (drives detail panel) | exceptions.ts |
+| `OrderAnalysis` | Order-level agent analysis (drives detail panel). Extended with `root_cause`, `recommendation`, `entity_profile`, `impact_metrics` | exceptions.ts |
+| `EntityProfile` | Master data context for exception entity (customer name, BP number, tier, VIP, credit standing, location) | exceptions.ts |
+| `ImpactMetrics` | Quantitative "blast radius" (revenue at risk, delta, SLA priority, affected lines) | exceptions.ts |
 
 ---
 

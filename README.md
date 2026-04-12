@@ -23,6 +23,7 @@ npm run dev
 |---|---|
 | Framework | Next.js 16 (App Router, React 19, TypeScript) |
 | Styling | CSS custom properties (`design-tokens.css`) + Tailwind CSS |
+| Layout | react-resizable-panels (three-pane Outlook master-detail) |
 | Icons | Lucide React (16/20/24px — never emoji) |
 | Auth | NextAuth.js → FastAPI auth endpoints (`asoe2`) |
 | Validation | Zod |
@@ -36,7 +37,7 @@ npm run dev
 asoe-ui/
 ├── src/
 │   ├── app/                      # Pages (Next.js App Router)
-│   │   ├── exceptions/           # Exception Queue (expandable rows) + detail panel
+│   │   ├── exceptions/           # Exception Queue (three-pane Outlook layout) + polymorphic detail
 │   │   ├── dashboard/            # Analytics dashboard + recent activity feed
 │   │   ├── inbox/                # Customer Inbox (AI email triage, two-pane)
 │   │   ├── login/                # Multi-step login (email → password → SSO)
@@ -74,7 +75,7 @@ asoe-ui/
 | `DESIGN.md` | Engineers | Code-to-architecture map (components, pages, types, API client) |
 | `ui_architecture.md` | Engineers / Architects | UI architecture extraction — alignment, drift register, proposed backend changes |
 | `docs/AUDITOR_GUIDE.md` | Auditors | 10 frontend compliance controls (RBAC, session, trace, tenancy) |
-| `tasks.md` | Team | Phase-based progress (Phases 0-8.5 complete, 9-11 pending) |
+| `tasks.md` | Team | Phase-based progress (Phases 0-8.6 complete, 9-11 pending) |
 | `consol_arch.md` | All | Platform architecture — Section 11 covers UI |
 
 ---

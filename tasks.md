@@ -136,6 +136,27 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `consol_arch.
 
 ---
 
+### [x] PHASE 8.6: Three-Pane Outlook Layout & Polymorphic Detail View
+- [x] Three-pane "Outlook" master-detail layout (`src/app/exceptions/page.tsx`) — resizable panels via `react-resizable-panels`
+- [x] ExceptionListPane (`src/app/exceptions/ExceptionListPane.tsx`) — compact card list with search + filters, compact inline metrics
+- [x] Lifted `selectedExceptionId` state to parent — first item auto-selected, on-demand fetch for subsequent
+- [x] Polymorphic ExceptionDetailPanel — adapts to any exception type (pricing, credit, duplicate PO)
+- [x] Dynamic header ribbon — breadcrumb-style: Reference ID > Customer > Location > Primary SKU / "N Lines"
+- [x] Context strip — Entity Profile (customer, tier, VIP, credit standing) + Impact Metrics (revenue at risk, delta, SLA)
+- [x] Agent Analysis restructured — Problem / Root Cause / Recommendation narrative blocks
+- [x] Evidence Grid — collapsed by default, expandable line-item table + pricing waterfall
+- [x] Governance alignment — removed "Execute Recipe" button; human = Review Authority only (Approve/Reject/Escalate)
+- [x] Shadow Verdict displayed as read-only badge (not actionable)
+- [x] New types: `EntityProfile`, `ImpactMetrics`; `OrderAnalysis` extended with `root_cause`, `recommendation`, `entity_profile`, `impact_metrics`
+- [x] Mock data: all 8 exceptions enriched with intent-specific entity profiles and impact metrics
+- [x] Design tokens: pane layout tokens (`--list-pane-default`, `--pane-handle-width`, `--pane-handle-hover`)
+- [x] Guardrail #2 test updated for ExceptionListPane (filter health endpoint sourcing)
+- [x] Dependency: `react-resizable-panels` added
+
+✅ Outcome: High-productivity Outlook-style layout. Polymorphic detail view adapts per intent. Human = Review Authority. 132 tests pass. (2026-04-12)
+
+---
+
 ## Remaining Phases
 
 ### [ ] PHASE 9: Settings & Admin Page

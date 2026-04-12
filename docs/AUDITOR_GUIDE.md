@@ -20,11 +20,14 @@ Action buttons are gated by user role per Section 9.2. The backend enforces RBAC
 
 **RED Override safeguard (Section 11.1):** The Override button on RED exceptions is gated to the `admin` role via the `isAdmin` prop on `AgentReasoningCard`. Override requires a mandatory `resolution_notes` entry recorded in `policy_audit_log` for SOX compliance.
 
+**Review Authority model (Phase 8.6):** The Exception Detail view enforces that human users act as **Review Authority** only. There are no "Execute Recipe", "Run Engine", or "Process" buttons in the UI. The human may Approve, Reject, or Escalate the agent's proposed resolution — execution is triggered by the backend upon approval, not by the UI. The Compliance Shadow verdict (GREEN/YELLOW/RED) is displayed as a **read-only badge**, not as an actionable control.
+
 **How to verify:**
-- `src/components/ui/AgentReasoningCard.tsx` — verdict-specific button rendering logic
+- `src/components/ui/AgentReasoningCard.tsx` — verdict-specific button rendering logic (Approve/Reject/Escalate only)
+- `src/app/exceptions/ExceptionDetailPanel.tsx` — no execution trigger buttons; Shadow Verdict as read-only badge in header ribbon
 - `src/lib/roles.ts` — `ROLE_PERMISSIONS` mapping aligned with `asoe2/api/deps.py`
 
-**SOX relevance:** Prevents unauthorized financial exception resolution.
+**SOX relevance:** Prevents unauthorized financial exception resolution. Ensures separation of duty — agents propose, humans review, backend executes.
 
 ---
 
