@@ -18,6 +18,8 @@ import type {
   OverrideRequest,
   ApproveRequest,
   RejectRequest,
+  ChallengeRequest,
+  AdminReleaseRequest,
   StatsResponse,
   TraceResponse,
   WorkflowRequest,
@@ -165,8 +167,8 @@ const MOCK_HEALTH: HealthResponse = {
   allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO"],
   lifecycle_states: [
     "INGESTED", "CLASSIFYING", "AUDITING", "PENDING_REVIEW",
-    "ESCALATED", "EXECUTING", "RESOLVED", "FAILED",
-    "BLOCKED", "REJECTED", "CLOSED",
+    "ESCALATED", "PENDING_ADMIN_REVIEW", "EXECUTING", "RESOLVED",
+    "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
   allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py"],
 };
@@ -353,6 +355,34 @@ export const exceptionsApi = {
       },
       resolved_by: "jane.doe@acme.com",
       resolution_notes: request?.reason,
+    };
+  },
+
+  async challenge(id: string, request: ChallengeRequest): Promise<ExceptionDetailResponse> {
+    await delay(MOCK_DELAY);
+    const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
+    if (!exc) throw new Error("Exception not found");
+    return {
+      ...exc,
+      lifecycle_state: "ESCALATED",
+      resolution_data: {},
+      resolved_by: undefined,
+      resolved_action: undefined,
+      resolution_notes: `CHALLENGED: ${request.challenge_reason}`,
+    };
+  },
+
+  async adminRelease(id: string, request: AdminReleaseRequest): Promise<ExceptionDetailResponse> {
+    await delay(MOCK_DELAY);
+    const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
+    if (!exc) throw new Error("Exception not found");
+    return {
+      ...exc,
+      lifecycle_state: "PENDING_ADMIN_REVIEW",
+      resolution_data: {},
+      resolved_by: undefined,
+      resolved_action: undefined,
+      resolution_notes: `ADMIN_RELEASE: ${request.release_reason}`,
     };
   },
 
