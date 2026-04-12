@@ -121,7 +121,7 @@ export default function ExceptionQueuePage() {
       />
 
       {/* ━━ Two-pane Master-Detail Area ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{ flex: 1, overflow: "hidden" }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
         <Group orientation="horizontal" id="exception-queue-panels">
 
           {/* ── Middle Pane: Exception List ──────────────────────────── */}
