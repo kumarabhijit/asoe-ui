@@ -102,7 +102,7 @@ Shadcn/ui adopted **only for non-agent primitives**. Agent-first components are 
 
 **Rationale:** The pre-merge sample screen (`samples/asoe-sample-screen.jsx`) demonstrated this visualization as core to the exception resolution experience. CPG pricing disputes require condition-level visibility. This component requires backend endpoints for line-item and waterfall data (see Section 10).
 
-**Recommendation:** Add PricingWaterfall to `consol_arch.md` Section 11.2 component table.
+**Status:** Documented here as the authoritative UI architecture reference. `consol_arch.md` Section 11 is a stub pointer to this document.
 
 ### Intentional Drift: Badge Variant Mappers
 
