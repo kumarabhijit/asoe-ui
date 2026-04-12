@@ -226,7 +226,38 @@ export interface OrderAnalysis {
   confidence: number;
   risk: "LOW" | "MEDIUM" | "HIGH";
   resolution: string;
+  /** Underlying deterministic root cause (e.g., "Promo Expired", "Duplicate ID within 48h") */
+  root_cause: string;
+  /** One-line specific action recommendation (e.g., "Adjust price to contract") */
+  recommendation: string;
+  /** Master data context for the exception entity */
+  entity_profile: EntityProfile;
+  /** Quantitative "blast radius" of the exception */
+  impact_metrics: ImpactMetrics;
   lines: LineItemAnalysis[];
+}
+
+/** Entity profile — master data relevant to the exception context */
+export interface EntityProfile {
+  customer_name: string;
+  bp_number: string;
+  customer_tier?: string;
+  vip_status?: boolean;
+  credit_standing?: string;
+  location?: string;
+  region?: string;
+}
+
+/** Impact metrics — quantitative "blast radius" of the exception */
+export interface ImpactMetrics {
+  revenue_at_risk: number;
+  delta_amount: number;
+  delta_percentage: number;
+  fulfillment_gap_pct?: number;
+  /** SLA priority as a string — rendered dynamically, not hardcoded in UI logic */
+  sla_priority: string;
+  sla_deadline?: string;
+  affected_lines: number;
 }
 
 /* ── Health endpoint (dynamic enum source per Guardrail #2) ────────── */

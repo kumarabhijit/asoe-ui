@@ -1,28 +1,40 @@
 /**
- * ExceptionDetailPanel — Right pane of the three-pane "Outlook" layout.
+ * ExceptionDetailPanel — Unified polymorphic exception detail view.
  *
- * Structured into four sections per the master-detail specification:
- *   A — Agent Analysis  (confidence score, intent/recipe mapping)
- *   B — Pipeline Progress  (vertical stepper: Ingest → Compliance Shadow)
- *   C — AI Narrative & Order Details  (line items, pricing waterfall)
- *   D — Evidence & Next Steps  (trace tabs, resolution data)
+ * Adapts its data display based on Exception Intent (Skill) while
+ * maintaining a consistent structural layout within the Outlook pane.
  *
- * Sticky header shows: SO ID, Total Value, lifecycle badge, and the
- * compliance-gated "Execute Recipe" button (disabled until Compliance
- * Shadow returns GREEN or YELLOW verdict).
+ * Layout:
+ *   1. Dynamic Header Ribbon  (breadcrumb-style context identifiers)
+ *   2. Context Strip           (entity profile + impact metrics + shadow verdict)
+ *   3. Agent Analysis          (problem / root cause / recommendation)
+ *   4. Evidence Grid           (collapsed by default, expandable line items)
+ *   5. Supporting Context      (pipeline progress, trace evidence, resolution)
  *
- * Data fetching: receives exceptionId from parent. Fetches detail,
- * trace, line items, and order analysis in parallel on mount.
+ * Governance: The human acts as Review Authority — Approve, Reject,
+ * or Escalate only. No "Execute Recipe" or manual execution triggers.
+ * Shadow Verdict displayed as a read-only badge.
  */
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Package, Play, AlertTriangle } from "lucide-react";
+import {
+  FileText,
+  Package,
+  ChevronRight,
+  ChevronDown,
+  AlertTriangle,
+  Building2,
+  DollarSign,
+  Shield,
+  Clock,
+  User,
+  MapPin,
+} from "lucide-react";
 import { AgentReasoningCard } from "@/components/ui/AgentReasoningCard";
 import { WaterfallStepper, type NodeState } from "@/components/ui/WaterfallStepper";
 import { PricingWaterfall } from "@/components/ui/PricingWaterfall";
-import { Badge, lifecycleVariant, rootCauseVariant } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Badge, lifecycleVariant, verdictVariant, rootCauseVariant } from "@/components/ui/Badge";
 import { exceptionsApi } from "@/lib/api";
 import type {
   ExceptionDetail,
@@ -234,9 +246,8 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
   const totalErp = lineItems.reduce((s, l) => s + l.erp_price * l.quantity, 0);
   const totalPo = lineItems.reduce((s, l) => s + l.po_price * l.quantity, 0);
   const delta = totalPo - totalErp;
-
-  // Pro-tip: Execute Recipe gated by Compliance Shadow verdict
-  const canExecuteRecipe = detail.shadow_verdict === "GREEN" || detail.shadow_verdict === "YELLOW";
+  const ep = analysis?.entity_profile;
+  const im = analysis?.impact_metrics;
 
   const DETAIL_TABS = [
     { id: "evidence", label: "Evidence" },
@@ -244,394 +255,288 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
     { id: "changes", label: "Change Analysis" },
   ];
 
+  // Primary SKU or "N Lines Affected" for header ribbon
+  const primarySkuLabel =
+    lineItems.length === 1
+      ? `${lineItems[0].sku} — ${lineItems[0].description}`
+      : `${lineItems.length} Lines Affected`;
+
   /* ── Render ──────────────────────────────────────────────────────── */
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", fontFamily: "var(--font-sans)" }}>
 
-      {/* ━━ Sticky Header ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* ━━ 1. Dynamic Header Ribbon (breadcrumb-style context) ━━━━━━━ */}
       <div
         style={{
-          padding: "var(--space-12) var(--space-16)",
+          padding: "var(--space-10) var(--space-16)",
           borderBottom: "1px solid var(--color-border-default)",
           background: "var(--color-surface-primary)",
           flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "var(--space-12)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-10)", minWidth: 0 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: "var(--radius-sm)",
-              background: "var(--color-text-primary)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            <Package size={16} color="var(--color-text-inverse)" />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", flexWrap: "wrap" }}>
-              <span
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontWeight: 700,
-                  fontSize: "var(--font-size-subhead)",
-                  color: "var(--color-text-primary)",
-                }}
-              >
-                {detail.order_id}
-              </span>
-              <Badge variant={lifecycleVariant(detail.lifecycle_state)} size="sm">
-                {detail.lifecycle_state.replace(/_/g, " ")}
-              </Badge>
-            </div>
-            <div style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-tertiary)", marginTop: 2 }}>
-              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                {fmtPrice(totalPo)}
-              </span>
-              {delta !== 0 && (
-                <span
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontWeight: 600,
-                    color: "var(--color-error)",
-                    marginLeft: "var(--space-6)",
-                  }}
-                >
-                  {"\u0394"} {fmtPrice(Math.abs(delta))}
-                </span>
-              )}
-              <span style={{ marginLeft: "var(--space-6)" }}>
-                {" \u00B7 "}{detail.event_type.replace(/_/g, " ")}
-              </span>
-            </div>
-          </div>
+        {/* Breadcrumb row */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-6)",
+            fontSize: "var(--font-size-caption)",
+            color: "var(--color-text-tertiary)",
+            marginBottom: "var(--space-6)",
+            flexWrap: "wrap",
+          }}
+        >
+          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+            {detail.order_id}
+          </span>
+          <ChevronRight size={10} />
+          <span style={{ fontWeight: 500, color: "var(--color-text-secondary)" }}>
+            {ep?.customer_name ?? detail.tenant_id}
+          </span>
+          <ChevronRight size={10} />
+          <span>{ep?.location ?? "—"}</span>
+          <ChevronRight size={10} />
+          <span>{primarySkuLabel}</span>
         </div>
 
-        {/* Execute Recipe (compliance-gated) */}
-        <Button
-          variant="brand"
-          size="sm"
-          disabled={!canExecuteRecipe}
-          title={
-            canExecuteRecipe
-              ? "Execute the selected recipe"
-              : "Requires Compliance Shadow approval (GREEN or YELLOW verdict)"
-          }
-        >
-          <Play size={14} />
-          Execute Recipe
-        </Button>
+        {/* Status row: lifecycle + event type + shadow verdict read-only */}
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", flexWrap: "wrap" }}>
+          <Badge variant={lifecycleVariant(detail.lifecycle_state)} size="sm">
+            {detail.lifecycle_state.replace(/_/g, " ")}
+          </Badge>
+          <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-tertiary)" }}>
+            {detail.event_type.replace(/_/g, " ")}
+          </span>
+          {detail.shadow_verdict && (
+            <Badge variant={verdictVariant(detail.shadow_verdict)} size="sm">
+              {detail.shadow_verdict}
+            </Badge>
+          )}
+          <div style={{ flex: 1 }} />
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontWeight: 700,
+              fontSize: "var(--font-size-body)",
+              color: "var(--color-text-primary)",
+            }}
+          >
+            {fmtPrice(totalPo)}
+          </span>
+          {delta !== 0 && (
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontWeight: 600,
+                fontSize: "var(--font-size-caption)",
+                color: "var(--color-error)",
+              }}
+            >
+              {"\u0394"} {fmtPrice(Math.abs(delta))}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* ━━ Scrollable Body ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{ flex: 1, overflow: "auto", padding: "var(--space-16)" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-20)" }}>
-
-          {/* ── Section A: Agent Analysis ──────────────────────────────── */}
-          <section>
-            <SectionLabel letter="A" title="Agent Analysis" />
-            {detail.shadow_verdict ? (
-              <AgentReasoningCard
-                verdict={detail.shadow_verdict as ShadowVerdict}
-                intent={detail.intent ?? undefined}
-                confidence={analysis?.confidence ? analysis.confidence / 100 : 0.92}
-                recipeName={detail.selected_recipe ?? undefined}
-                explanation={
-                  trace?.explanation ?? analysis?.diagnosis ?? "Deterministic execution completed successfully."
-                }
-                policyHits={trace?.shadow_policy_hits}
-                trace={
-                  trace
-                    ? {
-                        trace_id: trace.trace_id,
-                        event_id: trace.event_id,
-                        skill_name: trace.skill_name,
-                        intent_selected: trace.intent_selected,
-                        shadow_verdict: trace.shadow_verdict,
-                        shadow_policy_hits: trace.shadow_policy_hits,
-                        recipe_name: trace.recipe_name,
-                        constrained_output_schemas: trace.constrained_output_schemas,
-                        gateway_calls: trace.gateway_calls,
-                        backend_fallback: trace.backend_fallback,
-                        is_fallback_generated: trace.is_fallback_generated,
-                        final_status: trace.final_status,
-                        explanation: trace.explanation,
-                      }
-                    : undefined
-                }
-                onApprove={handleApprove}
-                onReject={handleReject}
-                onEscalate={handleEscalate}
-                actionLoading={actionLoading}
-              />
-            ) : (
-              <div
-                style={{
-                  padding: "var(--space-16)",
-                  background: "var(--color-surface-primary)",
-                  borderRadius: "var(--radius-md)",
-                  boxShadow: "var(--shadow-sm)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--space-8)",
-                  fontSize: "var(--font-size-caption)",
-                  color: "var(--color-text-tertiary)",
-                }}
-              >
-                <AlertTriangle size={14} />
-                Agent analysis pending — Compliance Shadow has not yet completed.
+      {/* ━━ 2. Context Strip (Entity Profile + Impact Metrics) ━━━━━━━━ */}
+      {(ep || im) && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            borderBottom: "1px solid var(--color-border-default)",
+            flexShrink: 0,
+          }}
+        >
+          {/* Entity Profile */}
+          <div
+            style={{
+              padding: "var(--space-10) var(--space-16)",
+              borderRight: "1px solid var(--color-border-default)",
+              background: "var(--color-surface-primary)",
+            }}
+          >
+            <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-6)" }}>
+              Entity Profile
+            </div>
+            {ep && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", fontSize: "var(--font-size-caption)" }}>
+                <ContextRow icon={<User size={11} />} label="Customer" value={`${ep.customer_name} (${ep.bp_number})`} />
+                <ContextRow icon={<Building2 size={11} />} label="Tier" value={ep.customer_tier ?? "—"} badge={ep.vip_status ? "VIP" : undefined} />
+                <ContextRow icon={<Shield size={11} />} label="Credit" value={ep.credit_standing ?? "—"} />
+                <ContextRow icon={<MapPin size={11} />} label="Location" value={ep.location ?? "—"} />
               </div>
             )}
-          </section>
+          </div>
 
-          {/* ── Section B: Pipeline Progress ───────────────────────────── */}
+          {/* Impact Metrics */}
+          <div
+            style={{
+              padding: "var(--space-10) var(--space-16)",
+              background: "var(--color-surface-primary)",
+            }}
+          >
+            <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-6)" }}>
+              Impact & Risk
+            </div>
+            {im && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", fontSize: "var(--font-size-caption)" }}>
+                <ContextRow icon={<DollarSign size={11} />} label="At Risk" value={fmtPrice(im.revenue_at_risk)} highlight />
+                <ContextRow icon={<DollarSign size={11} />} label="Delta" value={`${fmtPrice(im.delta_amount)} (${im.delta_percentage.toFixed(1)}%)`} />
+                {im.fulfillment_gap_pct !== undefined && (
+                  <ContextRow icon={<Package size={11} />} label="Gap" value={`${im.fulfillment_gap_pct.toFixed(1)}%`} />
+                )}
+                <ContextRow icon={<Clock size={11} />} label="Priority" value={im.sla_priority} badge={im.sla_priority} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ━━ 3. Scrollable Body ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div style={{ flex: 1, overflow: "auto", padding: "var(--space-16)" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-16)" }}>
+
+          {/* ── Agent Analysis: Problem / Root Cause / Recommendation ──── */}
+          {analysis && (
+            <section
+              style={{
+                background: "var(--color-surface-primary)",
+                borderRadius: "var(--radius-md)",
+                boxShadow: "var(--shadow-sm)",
+                padding: "var(--space-16)",
+              }}
+            >
+              {/* The Problem */}
+              <div style={{ marginBottom: "var(--space-12)" }}>
+                <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-4)" }}>
+                  The Problem
+                </div>
+                <p style={{ fontSize: "var(--font-size-body)", color: "var(--color-text-secondary)", lineHeight: 1.6, margin: 0 }}>
+                  {analysis.diagnosis}
+                </p>
+              </div>
+
+              {/* Root Cause */}
+              <div style={{ marginBottom: "var(--space-12)" }}>
+                <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-4)" }}>
+                  Root Cause
+                </div>
+                <div
+                  style={{
+                    borderLeft: "3px solid var(--color-warning)",
+                    paddingLeft: "var(--space-10)",
+                    fontSize: "var(--font-size-body)",
+                    fontWeight: 500,
+                    color: "var(--color-text-primary)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {analysis.root_cause}
+                </div>
+              </div>
+
+              {/* Recommendation */}
+              <div>
+                <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-4)" }}>
+                  Recommendation
+                </div>
+                <div
+                  style={{
+                    borderLeft: "3px solid var(--color-brand)",
+                    paddingLeft: "var(--space-10)",
+                    fontSize: "var(--font-size-body)",
+                    fontWeight: 600,
+                    color: "var(--color-brand)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {analysis.recommendation}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* ── Agent Reasoning Card (Layer 1/2 pattern) ───────────────── */}
+          {detail.shadow_verdict ? (
+            <AgentReasoningCard
+              verdict={detail.shadow_verdict as ShadowVerdict}
+              intent={detail.intent ?? undefined}
+              confidence={analysis?.confidence ? analysis.confidence / 100 : 0.92}
+              recipeName={detail.selected_recipe ?? undefined}
+              explanation={
+                trace?.explanation ?? analysis?.diagnosis ?? "Deterministic execution completed successfully."
+              }
+              policyHits={trace?.shadow_policy_hits}
+              trace={
+                trace
+                  ? {
+                      trace_id: trace.trace_id,
+                      event_id: trace.event_id,
+                      skill_name: trace.skill_name,
+                      intent_selected: trace.intent_selected,
+                      shadow_verdict: trace.shadow_verdict,
+                      shadow_policy_hits: trace.shadow_policy_hits,
+                      recipe_name: trace.recipe_name,
+                      constrained_output_schemas: trace.constrained_output_schemas,
+                      gateway_calls: trace.gateway_calls,
+                      backend_fallback: trace.backend_fallback,
+                      is_fallback_generated: trace.is_fallback_generated,
+                      final_status: trace.final_status,
+                      explanation: trace.explanation,
+                    }
+                  : undefined
+              }
+              onApprove={handleApprove}
+              onReject={handleReject}
+              onEscalate={handleEscalate}
+              actionLoading={actionLoading}
+            />
+          ) : (
+            <div
+              style={{
+                padding: "var(--space-12)",
+                background: "var(--color-surface-primary)",
+                borderRadius: "var(--radius-md)",
+                boxShadow: "var(--shadow-sm)",
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-8)",
+                fontSize: "var(--font-size-caption)",
+                color: "var(--color-text-tertiary)",
+              }}
+            >
+              <AlertTriangle size={14} />
+              Agent analysis pending — Compliance Shadow has not yet completed.
+            </div>
+          )}
+
+          {/* ── Evidence Grid (collapsed by default) ───────────────────── */}
+          {lineItems.length > 0 && (
+            <EvidenceGrid
+              lineItems={lineItems}
+              analysis={analysis}
+              selectedLine={selectedLine}
+              onSelectLine={setSelectedLine}
+              selectedAnalysis={selectedAnalysis}
+              totalErp={totalErp}
+              totalPo={totalPo}
+            />
+          )}
+
+          {/* ── Supporting Context: Pipeline Progress ──────────────────── */}
           <section>
-            <SectionLabel letter="B" title="Pipeline Progress" />
+            <SectionHeading title="Pipeline Progress" />
             <WaterfallStepper
               nodes={nodeStates}
               intent={detail.intent ?? undefined}
             />
-
-            {/* Compliance Shadow verdict callout */}
-            {detail.shadow_verdict && (
-              <div
-                style={{
-                  marginTop: "var(--space-8)",
-                  padding: "var(--space-8) var(--space-12)",
-                  borderRadius: "var(--radius-sm)",
-                  background:
-                    detail.shadow_verdict === "GREEN"
-                      ? "var(--color-success-subtle)"
-                      : detail.shadow_verdict === "YELLOW"
-                        ? "var(--color-warning-subtle)"
-                        : "var(--color-error-subtle)",
-                  border: `1px solid ${
-                    detail.shadow_verdict === "GREEN"
-                      ? "var(--color-success-border)"
-                      : detail.shadow_verdict === "YELLOW"
-                        ? "var(--color-warning-border)"
-                        : "var(--color-error-border)"
-                  }`,
-                  fontSize: "var(--font-size-caption)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--space-6)",
-                }}
-              >
-                <span style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "var(--font-size-label)" }}>
-                  Compliance Shadow
-                </span>
-                <Badge
-                  variant={
-                    detail.shadow_verdict === "GREEN"
-                      ? "success"
-                      : detail.shadow_verdict === "YELLOW"
-                        ? "warning"
-                        : "error"
-                  }
-                  size="sm"
-                >
-                  {detail.shadow_verdict}
-                </Badge>
-                <span style={{ color: "var(--color-text-secondary)" }}>
-                  {detail.shadow_verdict === "GREEN" && "— Approved for execution"}
-                  {detail.shadow_verdict === "YELLOW" && "— Approved with review"}
-                  {detail.shadow_verdict === "RED" && "— Blocked by policy"}
-                </span>
-              </div>
-            )}
           </section>
 
-          {/* ── Section C: AI Narrative & Order Details ─────────────────── */}
+          {/* ── Supporting Context: Trace Evidence ─────────────────────── */}
           <section>
-            <SectionLabel letter="C" title="AI Narrative & Order Details" />
-
-            {/* Diagnosis callout */}
-            {analysis && (
-              <div
-                style={{
-                  borderLeft: "3px solid var(--color-brand)",
-                  paddingLeft: "var(--space-12)",
-                  fontSize: "var(--font-size-body)",
-                  color: "var(--color-text-secondary)",
-                  lineHeight: 1.6,
-                  marginBottom: "var(--space-12)",
-                }}
-              >
-                {analysis.diagnosis}
-              </div>
-            )}
-
-            {/* Order metrics mini-grid */}
-            {lineItems.length > 0 && (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr 1fr",
-                  gap: "var(--space-8)",
-                  marginBottom: "var(--space-12)",
-                  padding: "var(--space-12)",
-                  background: "var(--color-surface-primary)",
-                  borderRadius: "var(--radius-md)",
-                  boxShadow: "var(--shadow-xs)",
-                }}
-              >
-                <MiniMetric label="Lines" value={String(lineItems.length)} />
-                <MiniMetric label="ERP Total" value={fmtPrice(totalErp)} />
-                <MiniMetric label="PO Total" value={fmtPrice(totalPo)} />
-                <MiniMetric
-                  label="Delta"
-                  value={fmtPrice(Math.abs(delta))}
-                  color={delta !== 0 ? "var(--color-error)" : undefined}
-                />
-              </div>
-            )}
-
-            {/* Line-Item Selector */}
-            {lineItems.length > 0 && analysis && analysis.lines.length > 0 && (
-              <div style={{ marginBottom: "var(--space-12)" }}>
-                <h4
-                  style={{
-                    fontSize: "var(--font-size-caption)",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
-                    color: "var(--color-text-tertiary)",
-                    margin: "0 0 var(--space-6)",
-                  }}
-                >
-                  Select Line Item
-                </h4>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-4)" }}>
-                  {lineItems.map((item) => {
-                    const lineAnalysis = analysis.lines.find((l) => l.line_id === item.line_id);
-                    const isSelected = selectedLine === item.line_id;
-                    return (
-                      <button
-                        key={item.line_id}
-                        onClick={() => setSelectedLine(item.line_id)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "var(--space-4)",
-                          padding: "var(--space-4) var(--space-10)",
-                          borderRadius: "var(--radius-full)",
-                          border: isSelected
-                            ? "2px solid var(--color-brand)"
-                            : "1px solid var(--color-border-default)",
-                          background: isSelected ? "var(--color-brand-subtle)" : "var(--color-surface-primary)",
-                          cursor: "pointer",
-                          fontFamily: "var(--font-sans)",
-                          fontSize: "var(--font-size-caption)",
-                          transition: "all var(--dur-fast)",
-                        }}
-                      >
-                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-                          {item.line_id}
-                        </span>
-                        <span
-                          style={{
-                            color: "var(--color-text-tertiary)",
-                            maxWidth: 80,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {item.description}
-                        </span>
-                        {lineAnalysis && (
-                          <Badge variant={rootCauseVariant(item.root_cause)} size="sm" icon={null}>
-                            {lineAnalysis.risk}
-                          </Badge>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Pricing Waterfall */}
-            {selectedAnalysis && selectedAnalysis.waterfall.length > 0 && (
-              <div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "var(--space-6)",
-                  }}
-                >
-                  <h4
-                    style={{
-                      fontSize: "var(--font-size-subhead)",
-                      fontWeight: 600,
-                      color: "var(--color-text-primary)",
-                      margin: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "var(--space-6)",
-                    }}
-                  >
-                    <FileText size={14} color="var(--color-text-tertiary)" />
-                    ERP Pricing Waterfall
-                  </h4>
-                  <span
-                    style={{
-                      fontSize: "var(--font-size-label)",
-                      color: "var(--color-text-tertiary)",
-                      background: "var(--color-surface-secondary)",
-                      padding: "2px 8px",
-                      borderRadius: "var(--radius-full)",
-                    }}
-                  >
-                    {selectedAnalysis.waterfall.length} step{selectedAnalysis.waterfall.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-                <PricingWaterfall steps={selectedAnalysis.waterfall} />
-              </div>
-            )}
-
-            {/* Metadata grid */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "var(--space-8)",
-                fontSize: "var(--font-size-caption)",
-                marginTop: "var(--space-12)",
-              }}
-            >
-              <div>
-                <span style={{ color: "var(--color-text-quaternary)" }}>Created</span>
-                <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, marginTop: 2, fontFamily: "var(--font-mono)" }}>
-                  {new Date(detail.created_at).toLocaleString()}
-                </div>
-              </div>
-              <div>
-                <span style={{ color: "var(--color-text-quaternary)" }}>Updated</span>
-                <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, marginTop: 2, fontFamily: "var(--font-mono)" }}>
-                  {new Date(detail.updated_at).toLocaleString()}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* ── Section D: Evidence & Next Steps ───────────────────────── */}
-          <section>
-            <SectionLabel letter="D" title="Evidence & Next Steps" />
-
-            {/* Tab bar */}
+            <SectionHeading title="Trace Evidence" />
             <div
               style={{
                 display: "flex",
@@ -661,7 +566,6 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
               ))}
             </div>
 
-            {/* Evidence tab */}
             {detailTab === "evidence" && trace && (
               <div style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
@@ -680,7 +584,6 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
                 </div>
               </div>
             )}
-
             {detailTab === "sap" && (
               <div style={{ color: "var(--color-text-quaternary)", fontSize: "var(--font-size-caption)", fontStyle: "italic" }}>
                 SAP condition records and master data — coming soon.
@@ -691,61 +594,35 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
                 Change analysis and audit diff — coming soon.
               </div>
             )}
-
-            {/* Next Steps */}
-            {analysis && (
-              <div style={{ marginTop: "var(--space-12)" }}>
-                <h4
-                  style={{
-                    fontSize: "var(--font-size-caption)",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
-                    color: "var(--color-text-tertiary)",
-                    margin: "0 0 var(--space-6)",
-                  }}
-                >
-                  Recommended Next Steps
-                </h4>
-                <ol
-                  style={{
-                    margin: 0,
-                    paddingLeft: "var(--space-20)",
-                    fontSize: "var(--font-size-caption)",
-                    color: "var(--color-text-secondary)",
-                    lineHeight: 1.8,
-                  }}
-                >
-                  <li>Review the agent analysis and confidence score above</li>
-                  <li>Verify the pricing waterfall for the flagged line items</li>
-                  {canExecuteRecipe ? (
-                    <li>
-                      <strong style={{ color: "var(--color-success)" }}>Execute Recipe</strong> — Compliance Shadow has approved
-                    </li>
-                  ) : (
-                    <li>
-                      <strong style={{ color: "var(--color-warning)" }}>Await Compliance Shadow</strong> — recipe execution is blocked until approval
-                    </li>
-                  )}
-                  <li>Monitor pipeline progress for completion</li>
-                </ol>
-              </div>
-            )}
           </section>
 
-          {/* Resolution Data */}
+          {/* ── Metadata ───────────────────────────────────────────────── */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "var(--space-8)",
+              fontSize: "var(--font-size-caption)",
+            }}
+          >
+            <div>
+              <span style={{ color: "var(--color-text-quaternary)" }}>Created</span>
+              <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, marginTop: 2, fontFamily: "var(--font-mono)" }}>
+                {new Date(detail.created_at).toLocaleString()}
+              </div>
+            </div>
+            <div>
+              <span style={{ color: "var(--color-text-quaternary)" }}>Updated</span>
+              <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, marginTop: 2, fontFamily: "var(--font-mono)" }}>
+                {new Date(detail.updated_at).toLocaleString()}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Resolution Data ─────────────────────────────────────────── */}
           {detail.resolution_data && Object.keys(detail.resolution_data).length > 0 && (
             <section>
-              <h3
-                style={{
-                  fontSize: "var(--font-size-subhead)",
-                  fontWeight: 600,
-                  color: "var(--color-text-primary)",
-                  margin: "0 0 var(--space-8)",
-                }}
-              >
-                Resolution Data
-              </h3>
+              <SectionHeading title="Resolution Data" />
               <pre
                 style={{
                   background: "var(--color-surface-secondary)",
@@ -770,73 +647,246 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
 
 /* ── Helper components ───────────────────────────────────────────────── */
 
-function SectionLabel({ letter, title }: { letter: string; title: string }) {
+function SectionHeading({ title }: { title: string }) {
   return (
-    <div
+    <h3
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "var(--space-8)",
-        marginBottom: "var(--space-10)",
+        fontSize: "var(--font-size-subhead)",
+        fontWeight: 600,
+        color: "var(--color-text-primary)",
+        margin: "0 0 var(--space-8)",
       }}
     >
+      {title}
+    </h3>
+  );
+}
+
+/** Context strip row — icon + label + value + optional badge */
+function ContextRow({ icon, label, value, badge, highlight }: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  badge?: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-6)" }}>
+      <span style={{ color: "var(--color-text-quaternary)", flexShrink: 0 }}>{icon}</span>
+      <span style={{ color: "var(--color-text-tertiary)", minWidth: 52 }}>{label}</span>
       <span
         style={{
-          width: 20,
-          height: 20,
-          borderRadius: "var(--radius-full)",
-          background: "var(--color-brand-subtle)",
-          color: "var(--color-brand)",
-          fontSize: "var(--font-size-label)",
-          fontWeight: 700,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
+          color: highlight ? "var(--color-error)" : "var(--color-text-primary)",
+          fontWeight: highlight ? 700 : 500,
+          fontFamily: highlight ? "var(--font-mono)" : "var(--font-sans)",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
         }}
       >
-        {letter}
+        {value}
       </span>
-      <h3
-        style={{
-          fontSize: "var(--font-size-subhead)",
-          fontWeight: 600,
-          color: "var(--color-text-primary)",
-          margin: 0,
-        }}
-      >
-        {title}
-      </h3>
+      {badge && (
+        <span
+          style={{
+            fontSize: "var(--font-size-label)",
+            fontWeight: 700,
+            padding: "1px 6px",
+            borderRadius: "var(--radius-full)",
+            background: "var(--color-brand-subtle)",
+            color: "var(--color-brand)",
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+          }}
+        >
+          {badge}
+        </span>
+      )}
     </div>
   );
 }
 
-function MiniMetric({ label, value, color }: { label: string; value: string; color?: string }) {
+/** Collapsible evidence grid — line items + pricing waterfall */
+function EvidenceGrid({
+  lineItems,
+  analysis,
+  selectedLine,
+  onSelectLine,
+  selectedAnalysis,
+  totalErp,
+  totalPo,
+}: {
+  lineItems: LineItem[];
+  analysis: OrderAnalysis | null;
+  selectedLine: string | null;
+  onSelectLine: (id: string) => void;
+  selectedAnalysis: ReturnType<NonNullable<OrderAnalysis>["lines"]["find"]>;
+  totalErp: number;
+  totalPo: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <div style={{ textAlign: "center" }}>
-      <div
+    <section
+      style={{
+        background: "var(--color-surface-primary)",
+        borderRadius: "var(--radius-md)",
+        boxShadow: "var(--shadow-sm)",
+        overflow: "hidden",
+      }}
+    >
+      {/* Toggle header */}
+      <button
+        onClick={() => setExpanded(!expanded)}
         style={{
-          fontSize: "var(--font-size-label)",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-          color: "var(--color-text-quaternary)",
-          marginBottom: 2,
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "var(--space-10) var(--space-16)",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          fontFamily: "var(--font-sans)",
         }}
       >
-        {label}
-      </div>
-      <div
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: "var(--font-size-body)",
-          fontWeight: 700,
-          color: color ?? "var(--color-text-primary)",
-        }}
-      >
-        {value}
-      </div>
-    </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-8)" }}>
+          <ChevronDown
+            size={14}
+            style={{
+              color: "var(--color-text-tertiary)",
+              transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform var(--dur-fast)",
+            }}
+          />
+          <span style={{ fontSize: "var(--font-size-subhead)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+            Evidence Detail
+          </span>
+          <span
+            style={{
+              fontSize: "var(--font-size-label)",
+              fontWeight: 600,
+              color: "var(--color-text-tertiary)",
+              background: "var(--color-surface-secondary)",
+              padding: "2px 8px",
+              borderRadius: "var(--radius-full)",
+            }}
+          >
+            {lineItems.length} line{lineItems.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-12)", fontSize: "var(--font-size-caption)" }}>
+          <span style={{ color: "var(--color-text-tertiary)" }}>
+            ERP <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-text-primary)" }}>{fmtPrice(totalErp)}</span>
+          </span>
+          <span style={{ color: "var(--color-text-tertiary)" }}>
+            PO <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: totalPo !== totalErp ? "var(--color-error)" : "var(--color-text-primary)" }}>{fmtPrice(totalPo)}</span>
+          </span>
+        </div>
+      </button>
+
+      {/* Expanded content */}
+      {expanded && (
+        <div style={{ borderTop: "1px solid var(--color-border-default)", padding: "var(--space-12) var(--space-16)" }}>
+          {/* Line item table */}
+          <div style={{ overflowX: "auto", marginBottom: "var(--space-12)" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--font-size-caption)" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--color-border-default)" }}>
+                  {["Line", "SKU", "Description", "Qty", "ERP", "PO", "Root Cause"].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: "var(--space-6) var(--space-8)",
+                        textAlign: ["Qty", "ERP", "PO"].includes(h) ? "right" : "left",
+                        fontSize: "var(--font-size-label)",
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        color: "var(--color-text-tertiary)",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {lineItems.map((item) => (
+                  <tr
+                    key={item.line_id}
+                    onClick={() => onSelectLine(item.line_id)}
+                    style={{
+                      borderBottom: "1px solid var(--color-border-subtle)",
+                      cursor: "pointer",
+                      background: selectedLine === item.line_id ? "var(--color-surface-row-active)" : "transparent",
+                    }}
+                  >
+                    <td style={{ padding: "var(--space-6) var(--space-8)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>{item.line_id}</td>
+                    <td style={{ padding: "var(--space-6) var(--space-8)", fontFamily: "var(--font-mono)", color: "var(--color-text-tertiary)" }}>{item.sku}</td>
+                    <td style={{ padding: "var(--space-6) var(--space-8)", color: "var(--color-text-secondary)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.description}</td>
+                    <td style={{ padding: "var(--space-6) var(--space-8)", textAlign: "right", fontFamily: "var(--font-mono)" }}>{item.quantity.toLocaleString()}</td>
+                    <td style={{ padding: "var(--space-6) var(--space-8)", textAlign: "right", fontFamily: "var(--font-mono)" }}>{fmtPrice(item.erp_price)}</td>
+                    <td style={{ padding: "var(--space-6) var(--space-8)", textAlign: "right", fontFamily: "var(--font-mono)", color: item.po_price !== item.erp_price ? "var(--color-error)" : "var(--color-text-primary)", fontWeight: item.po_price !== item.erp_price ? 600 : 400 }}>{fmtPrice(item.po_price)}</td>
+                    <td style={{ padding: "var(--space-6) var(--space-8)" }}>
+                      {item.root_cause && <Badge variant={rootCauseVariant(item.root_cause)} size="sm" icon={null}>{item.root_cause.replace(/_/g, " ")}</Badge>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Line selector pills (for waterfall) */}
+          {analysis && analysis.lines.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-4)", marginBottom: "var(--space-10)" }}>
+              {lineItems.map((item) => {
+                const la = analysis.lines.find((l) => l.line_id === item.line_id);
+                const isSelected = selectedLine === item.line_id;
+                return (
+                  <button
+                    key={item.line_id}
+                    onClick={() => onSelectLine(item.line_id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "var(--space-4)",
+                      padding: "var(--space-4) var(--space-10)",
+                      borderRadius: "var(--radius-full)",
+                      border: isSelected ? "2px solid var(--color-brand)" : "1px solid var(--color-border-default)",
+                      background: isSelected ? "var(--color-brand-subtle)" : "var(--color-surface-primary)",
+                      cursor: "pointer",
+                      fontFamily: "var(--font-sans)",
+                      fontSize: "var(--font-size-caption)",
+                      transition: "all var(--dur-fast)",
+                    }}
+                  >
+                    <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--color-text-primary)" }}>{item.line_id}</span>
+                    {la && <Badge variant={rootCauseVariant(item.root_cause)} size="sm" icon={null}>{la.risk}</Badge>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Pricing Waterfall for selected line */}
+          {selectedAnalysis && selectedAnalysis.waterfall.length > 0 && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-6)" }}>
+                <h4 style={{ fontSize: "var(--font-size-subhead)", fontWeight: 600, color: "var(--color-text-primary)", margin: 0, display: "flex", alignItems: "center", gap: "var(--space-6)" }}>
+                  <FileText size={14} color="var(--color-text-tertiary)" />
+                  ERP Pricing Waterfall
+                </h4>
+                <span style={{ fontSize: "var(--font-size-label)", color: "var(--color-text-tertiary)", background: "var(--color-surface-secondary)", padding: "2px 8px", borderRadius: "var(--radius-full)" }}>
+                  {selectedAnalysis.waterfall.length} step{selectedAnalysis.waterfall.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <PricingWaterfall steps={selectedAnalysis.waterfall} />
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
