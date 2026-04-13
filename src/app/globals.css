@@ -76,3 +76,18 @@ body {
   }
 }
 
+/* ── react-resizable-panels zoom fix ───────────────────────────────────
+   The library sets touch-action: "pan-y" (horizontal) or "pan-x" (vertical)
+   via inline styles on Group, Panel, and their inner wrappers. "pan-y"
+   blocks pinch-to-zoom because the gesture isn't in the allowed set.
+   Override with !important to restore browser zoom (Ctrl +/-, trackpad
+   pinch) while keeping panel drag on the Separator (which has its own
+   touch-action: none).
+   See github.com/bvaughn/react-resizable-panels/issues/662
+   ──────────────────────────────────────────────────────────────────────── */
+.panel-group-zoomable,
+.panel-group-zoomable [data-panel],
+.panel-group-zoomable [data-panel] > [style] {
+  touch-action: pan-x pan-y pinch-zoom !important;
+}
+
