@@ -97,13 +97,19 @@ export default function ExceptionQueuePage() {
   });
 
   /*
-   * Layout strategy:
+   * Zoom strategy:
    *   At normal zoom the page fills exactly the viewport (no scroll).
    *   When zoomed in, 100vh shrinks in CSS pixels but the min-height
    *   of 576px keeps the panel area usable.  Because the combined
-   *   height (nav + panels) then exceeds 100vh, the outer container
-   *   scrolls via overflow: auto — the same behaviour as /inbox.
+   *   height (nav + panels) then exceeds 100vh, the browser shows a
+   *   native page-level scrollbar — the same behaviour as /inbox.
    *   The nav-height token keeps the calc() in sync with NavBar.
+   *
+   *   react-resizable-panels sets touch-action: pan-y on Group/Panel
+   *   elements via inline styles, which blocks trackpad pinch-to-zoom.
+   *   The .panel-group-zoomable class in globals.css overrides this
+   *   with "pan-x pan-y pinch-zoom !important" to restore zoom while
+   *   preserving Separator drag.
    */
 
   /* ── Render ──────────────────────────────────────────────────────── */
@@ -113,7 +119,6 @@ export default function ExceptionQueuePage() {
         background: "var(--color-surface-page)",
         fontFamily: "var(--font-sans)",
         minHeight: "100vh",
-        overflow: "auto",
       }}
     >
       {/* ━━ Top Rail: Global Navigation ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
@@ -131,7 +136,7 @@ export default function ExceptionQueuePage() {
 
       {/* ━━ Two-pane Master-Detail Area ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div style={{ height: "calc(100vh - var(--nav-height))", minHeight: 576 }}>
-        <Group orientation="horizontal" id="exception-queue-panels" style={{ height: "100%" }}>
+        <Group orientation="horizontal" id="exception-queue-panels" className="panel-group-zoomable" style={{ height: "100%" }}>
 
           {/* ── Middle Pane: Exception List ──────────────────────────── */}
           <Panel defaultSize="35%" minSize="22%" maxSize="50%" id="list-pane">
