@@ -100,7 +100,7 @@ export default function ExceptionQueuePage() {
   return (
     <div
       style={{
-        height: "100vh",
+        minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
         background: "var(--color-surface-page)",
@@ -121,8 +121,8 @@ export default function ExceptionQueuePage() {
       />
 
       {/* ━━ Two-pane Master-Detail Area ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-        <Group orientation="horizontal" id="exception-queue-panels">
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <Group orientation="horizontal" id="exception-queue-panels" style={{ height: "100%" }}>
 
           {/* ── Middle Pane: Exception List ──────────────────────────── */}
           <Panel defaultSize="35%" minSize="22%" maxSize="50%" id="list-pane">
