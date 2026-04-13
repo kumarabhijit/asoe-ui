@@ -264,7 +264,7 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
   /* ── Render ──────────────────────────────────────────────────────── */
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", fontFamily: "var(--font-sans)" }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", fontFamily: "var(--font-sans)", minWidth: 0 }}>
 
       {/* ━━ 1. Dynamic Header Ribbon (breadcrumb-style context) ━━━━━━━ */}
       <div
@@ -285,6 +285,7 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
             color: "var(--color-text-tertiary)",
             marginBottom: "var(--space-6)",
             flexWrap: "wrap",
+            minWidth: 0,
           }}
         >
           <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--color-text-primary)" }}>
@@ -344,7 +345,7 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
             borderBottom: "1px solid var(--color-border-default)",
             flexShrink: 0,
           }}
@@ -600,7 +601,7 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
               gap: "var(--space-8)",
               fontSize: "var(--font-size-caption)",
             }}
@@ -671,9 +672,9 @@ function ContextRow({ icon, label, value, badge, highlight }: {
   highlight?: boolean;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-6)" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", minWidth: 0 }}>
       <span style={{ color: "var(--color-text-quaternary)", flexShrink: 0 }}>{icon}</span>
-      <span style={{ color: "var(--color-text-tertiary)", minWidth: 52 }}>{label}</span>
+      <span style={{ color: "var(--color-text-tertiary)", minWidth: 52, flexShrink: 0 }}>{label}</span>
       <span
         style={{
           color: highlight ? "var(--color-error)" : "var(--color-text-primary)",
@@ -824,7 +825,7 @@ function EvidenceGrid({
                   >
                     <td style={{ padding: "var(--space-6) var(--space-8)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>{item.line_id}</td>
                     <td style={{ padding: "var(--space-6) var(--space-8)", fontFamily: "var(--font-mono)", color: "var(--color-text-tertiary)" }}>{item.sku}</td>
-                    <td style={{ padding: "var(--space-6) var(--space-8)", color: "var(--color-text-secondary)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.description}</td>
+                    <td style={{ padding: "var(--space-6) var(--space-8)", color: "var(--color-text-secondary)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.description}</td>
                     <td style={{ padding: "var(--space-6) var(--space-8)", textAlign: "right", fontFamily: "var(--font-mono)" }}>{item.quantity.toLocaleString()}</td>
                     <td style={{ padding: "var(--space-6) var(--space-8)", textAlign: "right", fontFamily: "var(--font-mono)" }}>{fmtPrice(item.erp_price)}</td>
                     <td style={{ padding: "var(--space-6) var(--space-8)", textAlign: "right", fontFamily: "var(--font-mono)", color: item.po_price !== item.erp_price ? "var(--color-error)" : "var(--color-text-primary)", fontWeight: item.po_price !== item.erp_price ? 600 : 400 }}>{fmtPrice(item.po_price)}</td>

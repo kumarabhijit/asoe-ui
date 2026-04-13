@@ -100,9 +100,10 @@ export default function ExceptionQueuePage() {
    * Layout strategy:
    *   At normal zoom the page fills exactly the viewport (no scroll).
    *   When zoomed in, 100vh shrinks in CSS pixels but the min-height
-   *   of 36rem (576px) keeps the panel area usable.  Because the
-   *   combined height (nav + panels) then exceeds 100vh the browser
-   *   shows a page-level scrollbar — the same behaviour as /inbox.
+   *   of 576px keeps the panel area usable.  Because the combined
+   *   height (nav + panels) then exceeds 100vh, the outer container
+   *   scrolls via overflow: auto — the same behaviour as /inbox.
+   *   The nav-height token keeps the calc() in sync with NavBar.
    */
 
   /* ── Render ──────────────────────────────────────────────────────── */
@@ -111,6 +112,8 @@ export default function ExceptionQueuePage() {
       style={{
         background: "var(--color-surface-page)",
         fontFamily: "var(--font-sans)",
+        minHeight: "100vh",
+        overflow: "auto",
       }}
     >
       {/* ━━ Top Rail: Global Navigation ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
@@ -127,7 +130,7 @@ export default function ExceptionQueuePage() {
       />
 
       {/* ━━ Two-pane Master-Detail Area ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{ height: "calc(100vh - 56px)", minHeight: "36rem" }}>
+      <div style={{ height: "calc(100vh - var(--nav-height))", minHeight: 576 }}>
         <Group orientation="horizontal" id="exception-queue-panels" style={{ height: "100%" }}>
 
           {/* ── Middle Pane: Exception List ──────────────────────────── */}
@@ -157,6 +160,7 @@ export default function ExceptionQueuePage() {
               cursor: "col-resize",
               transition: "background var(--dur-fast)",
               flexShrink: 0,
+              touchAction: "none",
             }}
           />
 
