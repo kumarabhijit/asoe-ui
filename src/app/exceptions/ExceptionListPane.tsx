@@ -86,6 +86,7 @@ export default function ExceptionListPane({
         display: "flex",
         flexDirection: "column",
         background: "var(--color-surface-page)",
+        minWidth: 0,
       }}
     >
       {/* ── Pane Header ──────────────────────────────────────────────── */}
@@ -321,13 +322,17 @@ function ExceptionCard({
       }}
     >
       {/* Row 1: Order ID + Timestamp */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-6)", minWidth: 0 }}>
         <span
           style={{
             fontFamily: "var(--font-mono)",
             fontSize: "var(--font-size-body)",
             fontWeight: 700,
             color: "var(--color-text-primary)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            minWidth: 0,
           }}
         >
           {exc.order_id}
@@ -337,6 +342,7 @@ function ExceptionCard({
             fontSize: "var(--font-size-label)",
             color: "var(--color-text-quaternary)",
             fontFamily: "var(--font-mono)",
+            flexShrink: 0,
           }}
         >
           {formatTime(exc.created_at)}

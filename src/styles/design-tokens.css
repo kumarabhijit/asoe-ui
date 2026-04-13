@@ -232,7 +232,7 @@
 
   /* Pane layout (three-pane "Outlook" pattern) */
   --list-pane-default: 35%;
-  --pane-handle-width: 4px;
+  --pane-handle-width: 6px;
   --pane-handle-hover: var(--color-brand-muted);
 
   /* Z-index scale */
