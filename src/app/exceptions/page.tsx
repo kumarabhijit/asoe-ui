@@ -96,13 +96,19 @@ export default function ExceptionQueuePage() {
     );
   });
 
+  /*
+   * Layout strategy:
+   *   At normal zoom the page fills exactly the viewport (no scroll).
+   *   When zoomed in, 100vh shrinks in CSS pixels but the min-height
+   *   of 36rem (576px) keeps the panel area usable.  Because the
+   *   combined height (nav + panels) then exceeds 100vh the browser
+   *   shows a page-level scrollbar — the same behaviour as /inbox.
+   */
+
   /* ── Render ──────────────────────────────────────────────────────── */
   return (
     <div
       style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
         background: "var(--color-surface-page)",
         fontFamily: "var(--font-sans)",
       }}
@@ -121,8 +127,8 @@ export default function ExceptionQueuePage() {
       />
 
       {/* ━━ Two-pane Master-Detail Area ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <Group orientation="horizontal" id="exception-queue-panels" className="panel-group-zoomable" style={{ height: "100%" }}>
+      <div style={{ height: "calc(100vh - 56px)", minHeight: "36rem" }}>
+        <Group orientation="horizontal" id="exception-queue-panels" style={{ height: "100%" }}>
 
           {/* ── Middle Pane: Exception List ──────────────────────────── */}
           <Panel defaultSize="35%" minSize="22%" maxSize="50%" id="list-pane">
