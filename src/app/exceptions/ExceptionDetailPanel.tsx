@@ -514,25 +514,6 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
                 trace?.explanation ?? analysis?.diagnosis ?? "Deterministic execution completed successfully."
               }
               policyHits={trace?.shadow_policy_hits}
-              trace={
-                trace
-                  ? {
-                      trace_id: trace.trace_id,
-                      event_id: trace.event_id,
-                      skill_name: trace.skill_name,
-                      intent_selected: trace.intent_selected,
-                      shadow_verdict: trace.shadow_verdict,
-                      shadow_policy_hits: trace.shadow_policy_hits,
-                      recipe_name: trace.recipe_name,
-                      constrained_output_schemas: trace.constrained_output_schemas,
-                      gateway_calls: trace.gateway_calls,
-                      backend_fallback: trace.backend_fallback,
-                      is_fallback_generated: trace.is_fallback_generated,
-                      final_status: trace.final_status,
-                      explanation: trace.explanation,
-                    }
-                  : undefined
-              }
               onApprove={handleApprove}
               onReject={handleReject}
               onEscalate={handleEscalate}

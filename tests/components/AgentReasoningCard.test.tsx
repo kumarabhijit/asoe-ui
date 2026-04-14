@@ -1,15 +1,17 @@
 /**
- * AgentReasoningCard tests — two-layer cognition, verdict-specific behavior.
+ * AgentReasoningCard tests — Layer 1 cognition, verdict-specific behavior.
  *
  * Tests the core agent-first component per Section 11.1:
- * - GREEN: Layer 2 collapsed, "View Details" toggles it
- * - YELLOW: Layer 2 auto-expanded, Approve/Reject/Escalate shown
- * - RED: Layer 2 auto-expanded, Override admin-gated, no primary CTA
+ * - GREEN: "Auto-resolved" badge, no action buttons
+ * - YELLOW: Approve/Reject/Escalate shown
+ * - RED: Override admin-gated, no primary CTA
+ *
+ * Layer 2 (trace evidence) is now in the Trace Evidence collapsible
+ * section of ExceptionDetailPanel — not tested here.
  */
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AgentReasoningCard } from "@/components/ui/AgentReasoningCard";
-import { MOCK_TRACE } from "../fixtures";
 
 describe("AgentReasoningCard", () => {
   describe("Layer 1 — always visible", () => {
@@ -45,27 +47,10 @@ describe("AgentReasoningCard", () => {
       expect(screen.getByText("Auto-resolved")).toBeInTheDocument();
     });
 
-    it("shows 'View Details' button (not Approve/Reject)", () => {
+    it("does not show Approve/Reject action buttons", () => {
       render(<AgentReasoningCard verdict="GREEN" />);
-      expect(screen.getByText("View Details")).toBeInTheDocument();
       expect(screen.queryByText("Approve")).not.toBeInTheDocument();
       expect(screen.queryByText("Reject")).not.toBeInTheDocument();
-    });
-
-    it("Layer 2 is collapsed by default", () => {
-      render(<AgentReasoningCard verdict="GREEN" trace={MOCK_TRACE} />);
-      expect(screen.queryByText("deterministic_fallback")).not.toBeInTheDocument();
-    });
-
-    it("'View Details' toggles Layer 2", async () => {
-      const user = userEvent.setup();
-      render(<AgentReasoningCard verdict="GREEN" trace={MOCK_TRACE} />);
-
-      await user.click(screen.getByText("View Details"));
-      expect(screen.getByText("deterministic_fallback")).toBeInTheDocument();
-
-      await user.click(screen.getByText("Hide Details"));
-      expect(screen.queryByText("deterministic_fallback")).not.toBeInTheDocument();
     });
   });
 
@@ -89,11 +74,6 @@ describe("AgentReasoningCard", () => {
       expect(screen.getByText("Escalate")).toBeInTheDocument();
     });
 
-    it("Layer 2 is auto-expanded", () => {
-      render(<AgentReasoningCard verdict="YELLOW" trace={MOCK_TRACE} />);
-      expect(screen.getByText("deterministic_fallback")).toBeInTheDocument();
-    });
-
     it("fires onApprove with comment when Approve confirmed", async () => {
       const user = userEvent.setup();
       const onApprove = vi.fn();
@@ -113,11 +93,6 @@ describe("AgentReasoningCard", () => {
     it("shows 'Blocked by Policy' badge", () => {
       render(<AgentReasoningCard verdict="RED" />);
       expect(screen.getByText("Blocked by Policy")).toBeInTheDocument();
-    });
-
-    it("Layer 2 is auto-expanded", () => {
-      render(<AgentReasoningCard verdict="RED" trace={MOCK_TRACE} />);
-      expect(screen.getByText("deterministic_fallback")).toBeInTheDocument();
     });
 
     it("shows policy hits when provided", () => {
