@@ -651,6 +651,27 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
                     Change analysis and audit diff will surface here — showing field-level before/after comparisons, change initiators, and approval chains.
                   </div>
                 )}
+                {detail.resolution_data && Object.keys(detail.resolution_data).length > 0 && (
+                  <div style={{ marginTop: "var(--space-12)" }}>
+                    <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-6)" }}>
+                      Resolution Data
+                    </div>
+                    <pre
+                      style={{
+                        background: "var(--color-surface-secondary)",
+                        padding: "var(--space-12)",
+                        borderRadius: "var(--radius-sm)",
+                        fontSize: "var(--font-size-caption)",
+                        fontFamily: "var(--font-mono)",
+                        color: "var(--color-text-secondary)",
+                        overflow: "auto",
+                        margin: 0,
+                      }}
+                    >
+                      {JSON.stringify(detail.resolution_data, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </>
             )}
           </section>
@@ -678,26 +699,6 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
             </div>
           </div>
 
-          {/* ── Resolution Data ─────────────────────────────────────────── */}
-          {detail.resolution_data && Object.keys(detail.resolution_data).length > 0 && (
-            <section>
-              <SectionHeading title="Resolution Data" />
-              <pre
-                style={{
-                  background: "var(--color-surface-secondary)",
-                  padding: "var(--space-12)",
-                  borderRadius: "var(--radius-sm)",
-                  fontSize: "var(--font-size-caption)",
-                  fontFamily: "var(--font-mono)",
-                  color: "var(--color-text-secondary)",
-                  overflow: "auto",
-                  margin: 0,
-                }}
-              >
-                {JSON.stringify(detail.resolution_data, null, 2)}
-              </pre>
-            </section>
-          )}
         </div>
       </div>
     </div>
