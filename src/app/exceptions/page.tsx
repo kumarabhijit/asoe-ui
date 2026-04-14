@@ -20,10 +20,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { Inbox } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
 import { useHealth } from "@/hooks/useHealth";
+import { useAuth } from "@/hooks/useAuth";
 import { exceptionsApi } from "@/lib/api";
 import type { ExceptionSummary } from "@/types/exceptions";
 import type { StatsResponse } from "@/types/api";
@@ -38,7 +41,14 @@ const NAV_TABS = [
 ];
 
 export default function ExceptionQueuePage() {
+  const router = useRouter();
   const { health } = useHealth();
+  const { user } = useAuth();
+
+  useEffect(() => { document.title = "Exception Queue — ASOE"; }, []);
+
+  const userName = user?.name || "User";
+  const userInitials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   /* ── List state ──────────────────────────────────────────────────── */
   const [exceptions, setExceptions] = useState<ExceptionSummary[]>([]);
@@ -127,11 +137,13 @@ export default function ExceptionQueuePage() {
         activeTab="exceptions"
         onTabChange={(id) => {
           const tab = NAV_TABS.find((t) => t.id === id);
-          if (tab?.href) window.location.href = tab.href;
+          if (tab?.href) router.push(tab.href);
         }}
-        userName="Jane Doe"
-        userInitials="JD"
-        agentCount={3}
+        userName={userName}
+        userInitials={userInitials}
+        agentCount={health?.allowed_intents?.length || 0}
+        onSignOut={() => signOut({ callbackUrl: "/login" })}
+        onSettingsClick={() => router.push("/settings")}
       />
 
       {/* ━━ Two-pane Master-Detail Area ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
@@ -175,6 +187,7 @@ export default function ExceptionQueuePage() {
               <ExceptionDetailPanel
                 key={selectedId}
                 exceptionId={selectedId}
+                onActionComplete={fetchData}
               />
             ) : (
               <EmptyDetailState />

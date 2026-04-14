@@ -7,6 +7,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import {
   BarChart3,
   TrendingUp,
@@ -24,6 +26,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge, verdictVariant, lifecycleVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useHealth } from "@/hooks/useHealth";
+import { useAuth } from "@/hooks/useAuth";
 import { exceptionsApi } from "@/lib/api";
 import type { StatsResponse } from "@/types/api";
 
@@ -44,9 +47,16 @@ const RECENT_ACTIVITY = [
 ];
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { health } = useHealth();
+  const { user } = useAuth();
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const userName = user?.name || "User";
+  const userInitials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+
+  useEffect(() => { document.title = "Dashboard — ASOE"; }, []);
 
   useEffect(() => {
     async function fetch() {
@@ -79,11 +89,13 @@ export default function DashboardPage() {
         activeTab="dashboard"
         onTabChange={(id) => {
           const tab = NAV_TABS.find((t) => t.id === id);
-          if (tab?.href) window.location.href = tab.href;
+          if (tab?.href) router.push(tab.href);
         }}
-        userName="Jane Doe"
-        userInitials="JD"
-        agentCount={3}
+        userName={userName}
+        userInitials={userInitials}
+        agentCount={health?.allowed_intents?.length || 0}
+        onSignOut={() => signOut({ callbackUrl: "/login" })}
+        onSettingsClick={() => router.push("/settings")}
       />
 
       <div style={{ maxWidth: 1440, margin: "0 auto", padding: "var(--space-24) var(--space-32)" }}>

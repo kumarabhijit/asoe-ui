@@ -24,6 +24,7 @@ interface NavBarProps {
   userInitials?: string;
   agentCount?: number;
   onSignOut?: () => void;
+  onSettingsClick?: () => void;
   style?: CSSProperties;
   rightContent?: ReactNode;
 }
@@ -36,6 +37,7 @@ export function NavBar({
   userInitials,
   agentCount = 0,
   onSignOut,
+  onSettingsClick,
   style,
   rightContent,
 }: NavBarProps) {
@@ -132,6 +134,7 @@ export function NavBar({
 
         {/* Settings icon */}
         <button
+          onClick={onSettingsClick}
           style={{
             background: "none",
             border: "none",
