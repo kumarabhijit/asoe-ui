@@ -564,6 +564,18 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
               title="Pipeline Progress"
               open={pipelineOpen}
               onToggle={() => setPipelineOpen((v) => !v)}
+              badge={
+                nodeStates.some((n) => n.status === "failed") ? "failed"
+                : nodeStates.some((n) => n.status === "started") ? "in progress"
+                : nodeStates.every((n) => n.status === "completed" || n.status === "skipped") ? "complete"
+                : "pending"
+              }
+              badgeVariant={
+                nodeStates.some((n) => n.status === "failed") ? "error"
+                : nodeStates.some((n) => n.status === "started") ? "info"
+                : nodeStates.every((n) => n.status === "completed" || n.status === "skipped") ? "success"
+                : "neutral"
+              }
             />
             {pipelineOpen && (
               <div style={{ borderTop: "1px solid var(--color-border-default)", padding: "var(--space-12) var(--space-16)" }}>
@@ -704,8 +716,16 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
 
 /* ── Helper components ───────────────────────────────────────────────── */
 
+const BADGE_VARIANT_STYLES: Record<string, { bg: string; color: string }> = {
+  success: { bg: "var(--color-success-subtle)", color: "var(--color-success)" },
+  error: { bg: "var(--color-error-subtle)", color: "var(--color-error)" },
+  info: { bg: "var(--color-info-subtle)", color: "var(--color-info)" },
+  neutral: { bg: "var(--color-surface-secondary)", color: "var(--color-text-tertiary)" },
+};
+
 /** Collapsible section header — matches Evidence Detail card pattern */
-function CollapsibleHeader({ title, open, onToggle, badge }: { title: string; open: boolean; onToggle: () => void; badge?: string }) {
+function CollapsibleHeader({ title, open, onToggle, badge, badgeVariant = "neutral" }: { title: string; open: boolean; onToggle: () => void; badge?: string; badgeVariant?: string }) {
+  const bv = BADGE_VARIANT_STYLES[badgeVariant] ?? BADGE_VARIANT_STYLES.neutral;
   return (
     <button
       onClick={onToggle}
@@ -745,8 +765,8 @@ function CollapsibleHeader({ title, open, onToggle, badge }: { title: string; op
             style={{
               fontSize: "var(--font-size-label)",
               fontWeight: 600,
-              color: "var(--color-text-tertiary)",
-              background: "var(--color-surface-secondary)",
+              color: bv.color,
+              background: bv.bg,
               padding: "2px 8px",
               borderRadius: "var(--radius-full)",
             }}
