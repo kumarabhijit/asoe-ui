@@ -170,7 +170,7 @@ export default function ExceptionListPane({
 
         {/* Search */}
         <Input
-          placeholder="Search by order ID, intent..."
+          placeholder="Search by order ID, exception..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           rightIcon={<Search size={14} />}
@@ -200,7 +200,7 @@ export default function ExceptionListPane({
             style={selectStyle}
             aria-label="Filter by intent"
           >
-            <option value="">All Intents</option>
+            <option value="">All Exceptions</option>
             {(health?.allowed_intents ?? []).map((i) => (
               <option key={i} value={i}>
                 {i.replace(/_/g, " ")}
