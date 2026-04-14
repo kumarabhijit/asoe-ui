@@ -37,9 +37,12 @@ npm run dev
 asoe-ui/
 ├── src/
 │   ├── app/                      # Pages (Next.js App Router)
+│   │   ├── layout.tsx            # Root layout (skip-to-main, Providers wrapper)
+│   │   ├── providers.tsx         # Client-side providers (SessionProvider + ToastProvider)
 │   │   ├── exceptions/           # Exception Queue (three-pane Outlook layout) + polymorphic detail
 │   │   ├── dashboard/            # Analytics dashboard + recent activity feed
 │   │   ├── inbox/                # Customer Inbox (AI email triage, two-pane)
+│   │   ├── settings/             # Settings page (Phase 9 stub — admin, SSO, agent config)
 │   │   ├── login/                # Multi-step login (email → password → SSO)
 │   │   └── auth/callback/        # SSO callback handler
 │   ├── components/ui/            # 14 reusable components (Section 11.2)
@@ -75,8 +78,24 @@ asoe-ui/
 | `DESIGN.md` | Engineers | Code-to-architecture map (components, pages, types, API client) |
 | `ui_architecture.md` | Engineers / Architects | UI architecture extraction — alignment, drift register, proposed backend changes |
 | `docs/AUDITOR_GUIDE.md` | Auditors | 10 frontend compliance controls (RBAC, session, trace, tenancy) |
-| `tasks.md` | Team | Phase-based progress (Phases 0-8.6 complete, 9-11 pending) |
+| `tasks.md` | Team | Phase-based progress (Phases 0-8.7 complete, 9-11 pending) |
 | `consol_arch.md` | All | Platform architecture — Section 11 is a stub pointer to `ui_architecture.md` |
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `NEXTAUTH_URL` | `http://localhost:3000` | NextAuth base URL |
+| `NEXTAUTH_SECRET` | — | JWT signing secret (required) |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | FastAPI backend URL |
+| `NEXT_PUBLIC_SHOW_PREVIEW_FEATURES` | `true` | Show preview/upcoming feature tabs (SAP Data, Change Analysis). Set to `"false"` for production to hide. |
+| `SSO_CLIENT_ID` | — | OIDC client ID (per IdP) |
+| `SSO_CLIENT_SECRET` | — | OIDC client secret (per IdP) |
+| `SSO_ISSUER_URL` | — | OIDC issuer URL (per IdP) |
+
+See `.env.local.example` for the full template.
 
 ---
 

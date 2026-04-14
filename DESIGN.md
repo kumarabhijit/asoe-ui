@@ -11,17 +11,19 @@ Maps the UI architecture to concrete source files. Read this to understand how t
 ```
 src/
 ├── app/                          # Next.js App Router pages
-│   ├── layout.tsx                # Root layout (imports design-tokens.css + globals.css)
+│   ├── layout.tsx                # Root layout (skip-to-main link + Providers wrapper)
+│   ├── providers.tsx             # Client-side providers (SessionProvider + ToastProvider)
 │   ├── page.tsx                  # Root redirect → /exceptions
 │   ├── login/page.tsx            # Multi-step login (email → password → SSO redirect)
 │   ├── auth/callback/page.tsx    # SSO callback handler
 │   ├── exceptions/
 │   │   ├── page.tsx              # Exception Queue — three-pane Outlook master-detail layout
-│   │   ├── ExceptionListPane.tsx # Middle pane: compact card list with search + filters
-│   │   ├── ExceptionDetailPanel.tsx  # Right pane: polymorphic detail (header ribbon, context, analysis, evidence)
+│   │   ├── ExceptionListPane.tsx # Middle pane: compact card list with search + filters + URL-synced state
+│   │   ├── ExceptionDetailPanel.tsx  # Right pane: polymorphic detail (collapsible sections)
 │   │   └── [id]/page.tsx         # Full-page exception detail (standalone route)
 │   ├── dashboard/page.tsx        # Analytics dashboard (Layout B) + recent activity feed
 │   ├── inbox/page.tsx            # Customer Inbox — AI email triage (two-pane layout)
+│   ├── settings/page.tsx         # Settings page (Phase 9 stub — admin, SSO, agent config)
 │   └── api/auth/[...nextauth]/route.ts  # NextAuth API route
 ├── components/ui/                # Reusable UI components (Section 11.2)
 │   ├── ActivityIndicator.tsx     # Domain-aware loading text per pipeline node
@@ -67,7 +69,7 @@ src/
 | `Card` | Custom | Borderless, shadow-only (Shadcn uses borders) | Login, Dashboard, Detail |
 | `Input` | Custom | ASOE label typography, brand focus ring | Login, Exception Queue |
 | `Logo` | Custom | Brand mark with tagline | NavBar, Login |
-| `NavBar` | Custom | 56px glass, agent pulse, brand purple on logo only | All pages (consistent tabs) |
+| `NavBar` | Custom | 56px glass, agent pulse, `onSignOut`, `onSettingsClick`, `aria-current` | All pages (consistent tabs) |
 | `MetricTile` | Custom | KPI: 40x40 tinted icon + monospace value | Exception Queue, Dashboard, Inbox |
 | `Badge` | Custom | Tinted bg + icon + text, 6 variant mappers | Exception Queue, Detail, Inbox, Dashboard |
 | `Toast` | Custom | 4.5s auto-dismiss, solid-fill (only one in system) | Via ToastProvider |
@@ -119,14 +121,21 @@ NavBar (sticky top, 56px)
 
 **Lifted state:** `selectedExceptionId` in parent `page.tsx`. Selecting a card updates the right pane without page reload.
 
+**Filter URL sync:** Filter state (`filterState`, `filterIntent`, `searchQuery`) synced to URL search params (`?state=X&intent=Y&q=Z`) via `useSearchParams`. Persists across page refresh and is shareable. "Filters active" indicator with "Clear all" button shown when any filter is set.
+
+**Error handling:** Fetch errors tracked via `error` state. Distinct UI for error (retry button) vs empty (filter hint) vs loading (skeletons).
+
 **Data flow:** `exceptionsApi.list()` + `exceptionsApi.stats()` → list state → render. Filters trigger re-fetch. First item auto-selected and pre-fetched. Subsequent selections trigger on-demand fetch: `exceptionsApi.get(id)` + `exceptionsApi.trace(id)` + `exceptionsApi.lineItems(id)` + `exceptionsApi.orderAnalysis(id)`.
 
 **Polymorphic detail view:** The right pane adapts to any exception type (pricing, credit, duplicate PO) via dynamic data categories:
 - **Header ribbon:** breadcrumb-style context from event payload
-- **Context strip:** Entity Profile (customer, tier, credit standing) + Impact Metrics (revenue at risk, delta, SLA)
+- **Context strip (collapsible, default expanded):** Entity Profile (customer, tier, credit standing) + Impact Metrics (revenue at risk, delta, SLA)
 - **Agent Analysis:** Problem / Root Cause / Recommendation narrative blocks
 - **Evidence Grid:** collapsed by default; expandable line-item table + pricing waterfall
-- **Supporting Context:** pipeline progress, trace evidence tabs, resolution data
+- **Pipeline Progress (collapsible, default collapsed):** 10-node WaterfallStepper
+- **Trace Evidence (collapsible, default collapsed):** trace fields + preview tabs (SAP Data, Change Analysis — controlled by `NEXT_PUBLIC_SHOW_PREVIEW_FEATURES`)
+
+**Action feedback:** Approve/Reject/Escalate actions show toast notifications (success/error) via `useToast()`. List auto-refreshes after any action via `onActionComplete` callback.
 
 **Governance:** No "Execute Recipe" button. Human acts as Review Authority (Approve/Reject/Escalate via AgentReasoningCard). Shadow Verdict displayed as read-only badge.
 
