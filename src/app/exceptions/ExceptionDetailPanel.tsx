@@ -552,29 +552,47 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
           )}
 
           {/* ── Supporting Context: Pipeline Progress ──────────────────── */}
-          <section>
+          <section
+            style={{
+              background: "var(--color-surface-primary)",
+              borderRadius: "var(--radius-md)",
+              boxShadow: "var(--shadow-sm)",
+              overflow: "hidden",
+            }}
+          >
             <CollapsibleHeader
               title="Pipeline Progress"
               open={pipelineOpen}
               onToggle={() => setPipelineOpen((v) => !v)}
+              badge={`${nodeStates.length} nodes`}
             />
             {pipelineOpen && (
-              <WaterfallStepper
-                nodes={nodeStates}
-                intent={detail.intent ?? undefined}
-              />
+              <div style={{ borderTop: "1px solid var(--color-border-default)", padding: "var(--space-12) var(--space-16)" }}>
+                <WaterfallStepper
+                  nodes={nodeStates}
+                  intent={detail.intent ?? undefined}
+                />
+              </div>
             )}
           </section>
 
           {/* ── Supporting Context: Trace Evidence ─────────────────────── */}
-          <section>
+          <section
+            style={{
+              background: "var(--color-surface-primary)",
+              borderRadius: "var(--radius-md)",
+              boxShadow: "var(--shadow-sm)",
+              overflow: "hidden",
+            }}
+          >
             <CollapsibleHeader
               title="Trace Evidence"
               open={traceOpen}
               onToggle={() => setTraceOpen((v) => !v)}
+              badge={trace ? "trace" : undefined}
             />
             {traceOpen && (
-              <>
+              <div style={{ borderTop: "1px solid var(--color-border-default)", padding: "var(--space-12) var(--space-16)" }}>
                 <div
                   style={{
                     display: "flex",
@@ -653,7 +671,7 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
                     </pre>
                   </div>
                 )}
-              </>
+              </div>
             )}
           </section>
 
@@ -688,8 +706,8 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
 
 /* ── Helper components ───────────────────────────────────────────────── */
 
-/** Collapsible section header with chevron toggle */
-function CollapsibleHeader({ title, open, onToggle }: { title: string; open: boolean; onToggle: () => void }) {
+/** Collapsible section header — matches Evidence Detail card pattern */
+function CollapsibleHeader({ title, open, onToggle, badge }: { title: string; open: boolean; onToggle: () => void; badge?: string }) {
   return (
     <button
       onClick={onToggle}
@@ -699,23 +717,46 @@ function CollapsibleHeader({ title, open, onToggle }: { title: string; open: boo
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "var(--space-8) var(--space-16)",
-        background: "var(--color-surface-secondary)",
+        padding: "var(--space-10) var(--space-16)",
+        background: "none",
         border: "none",
         cursor: "pointer",
         fontFamily: "var(--font-sans)",
       }}
     >
-      <span
-        style={{
-          fontSize: "var(--font-size-subhead)",
-          fontWeight: 600,
-          color: "var(--color-text-primary)",
-        }}
-      >
-        {title}
-      </span>
-      {open ? <ChevronDown size={14} color="var(--color-text-tertiary)" /> : <ChevronRight size={14} color="var(--color-text-tertiary)" />}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-8)" }}>
+        <ChevronDown
+          size={14}
+          style={{
+            color: "var(--color-text-tertiary)",
+            transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+            transition: "transform var(--dur-fast)",
+          }}
+        />
+        <span
+          style={{
+            fontSize: "var(--font-size-subhead)",
+            fontWeight: 600,
+            color: "var(--color-text-primary)",
+          }}
+        >
+          {title}
+        </span>
+        {badge && (
+          <span
+            style={{
+              fontSize: "var(--font-size-label)",
+              fontWeight: 600,
+              color: "var(--color-text-tertiary)",
+              background: "var(--color-surface-secondary)",
+              padding: "2px 8px",
+              borderRadius: "var(--radius-full)",
+            }}
+          >
+            {badge}
+          </span>
+        )}
+      </div>
     </button>
   );
 }
