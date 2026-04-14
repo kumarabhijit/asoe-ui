@@ -564,7 +564,6 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
               title="Pipeline Progress"
               open={pipelineOpen}
               onToggle={() => setPipelineOpen((v) => !v)}
-              badge={`${nodeStates.length} nodes`}
             />
             {pipelineOpen && (
               <div style={{ borderTop: "1px solid var(--color-border-default)", padding: "var(--space-12) var(--space-16)" }}>
@@ -589,7 +588,6 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
               title="Trace Evidence"
               open={traceOpen}
               onToggle={() => setTraceOpen((v) => !v)}
-              badge={trace ? "trace" : undefined}
             />
             {traceOpen && (
               <div style={{ borderTop: "1px solid var(--color-border-default)", padding: "var(--space-12) var(--space-16)" }}>
