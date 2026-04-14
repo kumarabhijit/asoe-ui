@@ -18,7 +18,9 @@ Master index of all implementation phases. See `tasks.md` for detailed progress 
 | 7 | Dashboard (analytics, KPI tiles, breakdowns, platform health) | ✅ Complete | `prompts/phase_7_dashboard.md` | Phase 3, 4 |
 | 8 | WebSocket Integration (useWebSocket hook, Section 8 protocol) | ✅ Complete | `prompts/phase_8_websocket.md` | Phase 4 |
 | 8.5 | UI Enrichment (expandable rows, PricingWaterfall, line items, inbox alignment) | ✅ Complete | — (plan in `.claude/plans/`) | Phase 3, 5, 6, 7 |
-| 9 | Settings & Admin Page | Pending | `prompts/phase_9_settings.md` (create when starting) | Phase 1, 3, 4 |
+| 8.6 | Three-Pane Outlook Layout & Polymorphic Detail View | ✅ Complete | — | Phase 5, 6, 8.5 |
+| 8.7 | Enterprise UX Fixes & Accessibility (27 items: SPA nav, logout, toast, diagnostics, collapsible sections, filter persistence, a11y) | ✅ Complete | — | Phase 3-8.6 |
+| 9 | Settings & Admin Page (stub created in 8.7) | Pending | `prompts/phase_9_settings.md` (create when starting) | Phase 1, 3, 4 |
 | 10 | Testing (Vitest, RTL, vitest-axe, ESLint guardrail rule) | Pending | `prompts/phase_10_testing.md` (create when starting) | Phase 2-8.5 |
 | 11 | Deployment (Dockerfile, CI/CD, pre-commit hooks) | Pending | `prompts/phase_11_deployment.md` (create when starting) | Phase 10 |
 
@@ -29,6 +31,8 @@ Master index of all implementation phases. See `tasks.md` for detailed progress 
 - **Phases 0-2** were implemented before phase prompts were established. The code and `tasks.md` are the record.
 - **Phases 3-8** have retroactive prompts written from the session that implemented them (accurate, not speculative).
 - **Phase 8.5** adapted pre-merge visual designs (Inbox page + Sample Screen) into the architecture-aligned codebase. Added PricingWaterfall component, expandable order rows, line-item grids, and refactored Inbox to use shared components.
+- **Phase 8.6** refactored Exception Queue to three-pane Outlook master-detail with polymorphic detail view, entity profiles, impact metrics, and governance alignment.
+- **Phase 8.7** resolved 27 enterprise UX issues: SPA navigation, logout, toast feedback, error states, filter URL persistence, collapsible sections, diagnostics toggle, accessibility (skip link, aria-current, semantic breadcrumbs), and feature flag for preview tabs.
 - **Phase prompts for 9-11** should be created when each phase begins, following the `asoe2/prompts/phase_*.md` pattern.
 - **`prompts/asoe-ui-design-system.md`** is the original Phase 0 prompt — still valid for regenerating the design system from scratch.
 - **`plan.md`** is the historical Phase 1 prompt (login screen). Superseded by `tasks.md` but preserved for reference.

@@ -182,8 +182,15 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 - [x] Make Pipeline Progress section collapsible (default collapsed)
 - [x] Make Trace Evidence section collapsible (default collapsed)
 - [x] Restore SAP Data and Change Analysis preview tabs behind `NEXT_PUBLIC_SHOW_PREVIEW_FEATURES` feature flag
+- [x] Remove duplicate Layer 2 from AgentReasoningCard — trace data moved to Trace Evidence section
+- [x] Unify Pipeline Progress and Trace Evidence card styling with Evidence Detail pattern
+- [x] Add pipeline status badge to Pipeline Progress header (complete/in progress/failed/pending)
+- [x] Move Resolution Data into Trace Evidence collapsible section
+- [x] Hide Pipeline Progress and Trace Evidence behind "Show Diagnostics" toggle
+- [x] Rename filter label "All Intents" → "All Exceptions", update search placeholder
+- [x] Make ASOE logo in NavBar clickable, links to Customer Inbox (/inbox)
 
-✅ Outcome: 19 Tier 1+2 UX issues resolved. SPA navigation, logout, toast feedback, error handling, filter persistence, accessibility. 230 tests pass. (2026-04-14)
+✅ Outcome: 27 UX items completed. Clean decision surface with Diagnostics toggle for technical details. SPA navigation, logout, toast feedback, error handling, filter persistence, accessibility. 226 tests pass. (2026-04-14)
 
 ---
 
