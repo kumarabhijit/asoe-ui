@@ -277,8 +277,14 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
   const ep = analysis?.entity_profile;
   const im = analysis?.impact_metrics;
 
+  const showPreview = process.env.NEXT_PUBLIC_SHOW_PREVIEW_FEATURES !== "false";
+
   const DETAIL_TABS = [
     { id: "evidence", label: "Evidence" },
+    ...(showPreview ? [
+      { id: "sap", label: "SAP Data" },
+      { id: "changes", label: "Change Analysis" },
+    ] : []),
   ];
 
   // Primary SKU or "N Lines Affected" for header ribbon
@@ -633,6 +639,16 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
                       )}
                       <TraceField label="Final Status" value={trace.final_status} />
                     </div>
+                  </div>
+                )}
+                {showPreview && detailTab === "sap" && (
+                  <div style={{ padding: "var(--space-12)", color: "var(--color-text-quaternary)", fontSize: "var(--font-size-caption)", fontStyle: "italic", background: "var(--color-surface-secondary)", borderRadius: "var(--radius-sm)" }}>
+                    SAP condition records and master data will be available here — integrating with SAP ECC/S4HANA pricing procedures, condition tables, and master data views.
+                  </div>
+                )}
+                {showPreview && detailTab === "changes" && (
+                  <div style={{ padding: "var(--space-12)", color: "var(--color-text-quaternary)", fontSize: "var(--font-size-caption)", fontStyle: "italic", background: "var(--color-surface-secondary)", borderRadius: "var(--radius-sm)" }}>
+                    Change analysis and audit diff will surface here — showing field-level before/after comparisons, change initiators, and approval chains.
                   </div>
                 )}
               </>

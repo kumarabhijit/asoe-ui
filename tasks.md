@@ -157,11 +157,41 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 
 ---
 
+### [x] PHASE 8.7: Enterprise UX Fixes & Accessibility
+- [x] Wire logout on all pages via `signOut()` from NextAuth
+- [x] Create Settings page stub (`src/app/settings/page.tsx`) — Phase 9 placeholder with 4 section cards
+- [x] Wire NavBar Settings gear icon with `onSettingsClick` prop
+- [x] Replace `window.location.href` with `router.push()` for SPA navigation (all pages)
+- [x] Source user name/initials from `useAuth()` session instead of hardcoded values
+- [x] Source agent count from health endpoint (`allowed_intents.length`) instead of hardcoded `3`
+- [x] Add toast notifications on approve/reject/escalate (success + error feedback)
+- [x] Implement escalate action via `exceptionsApi.override()` (was `console.log` stub)
+- [x] Auto-refresh exception list after approve/reject/escalate via `onActionComplete` callback
+- [x] Set per-page `document.title` on all pages
+- [x] Change login email input from `type="text"` to `type="email"`
+- [x] Add `SessionProvider` + `ToastProvider` in root layout via `providers.tsx`
+- [x] Add error state tracking + retry button for exception queue data fetching
+- [x] Add distinct empty states (no results vs. error) with filter-clearing hint
+- [x] Persist filter state to URL search params (`?state=X&intent=Y&q=Z`)
+- [x] Add "Filters active" indicator with "Clear all" button
+- [x] Convert breadcrumbs to semantic `<nav aria-label="Breadcrumb">` (dashboard, inbox, settings)
+- [x] Add skip-to-main-content link in root layout
+- [x] Add `aria-current="page"` on active NavBar tab
+- [x] Add `id="main-content"` landmarks to all page content areas
+- [x] Make Entity Profile section collapsible (default expanded)
+- [x] Make Pipeline Progress section collapsible (default collapsed)
+- [x] Make Trace Evidence section collapsible (default collapsed)
+- [x] Restore SAP Data and Change Analysis preview tabs behind `NEXT_PUBLIC_SHOW_PREVIEW_FEATURES` feature flag
+
+✅ Outcome: 19 Tier 1+2 UX issues resolved. SPA navigation, logout, toast feedback, error handling, filter persistence, accessibility. 230 tests pass. (2026-04-14)
+
+---
+
 ## Remaining Phases
 
 ### [ ] PHASE 9: Settings & Admin Page
 **Scope:** Section 11.5 — user management, SSO config, policy overrides, agent settings.
-- [ ] Settings page (`src/app/settings/page.tsx`)
+- [x] Settings page stub (`src/app/settings/page.tsx`) — created in Phase 8.7
 - [ ] User management (admin-only) — list users, assign roles
 - [ ] Policy overrides (admin-only) — `PUT /api/v1/policies/{tenant_id}`
 - [ ] Agent settings — kill switch toggle, explain mode toggle
@@ -170,7 +200,7 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 ---
 
 ### [ ] PHASE 10: Testing
-**Scope:** Expand test coverage (Vitest + React Testing Library already configured, 128 tests passing).
+**Scope:** Expand test coverage (Vitest + React Testing Library already configured, 230 tests passing).
 - [ ] Component unit tests for PricingWaterfall (new component)
 - [ ] `vitest-axe` accessibility tests on status-related components (Badge, Toast, AgentReasoningCard)
 - [ ] Guardrail #2 lint rule (`no-hardcoded-enums` ESLint custom rule)
