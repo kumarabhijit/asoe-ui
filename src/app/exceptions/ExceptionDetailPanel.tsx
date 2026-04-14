@@ -276,8 +276,6 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
 
   const DETAIL_TABS = [
     { id: "evidence", label: "Evidence" },
-    { id: "sap", label: "SAP Data" },
-    { id: "changes", label: "Change Analysis" },
   ];
 
   // Primary SKU or "N Lines Affected" for header ribbon
@@ -608,16 +606,6 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
                   )}
                   <TraceField label="Final Status" value={trace.final_status} />
                 </div>
-              </div>
-            )}
-            {detailTab === "sap" && (
-              <div style={{ color: "var(--color-text-quaternary)", fontSize: "var(--font-size-caption)", fontStyle: "italic" }}>
-                SAP condition records and master data — coming soon.
-              </div>
-            )}
-            {detailTab === "changes" && (
-              <div style={{ color: "var(--color-text-quaternary)", fontSize: "var(--font-size-caption)", fontStyle: "italic" }}>
-                Change analysis and audit diff — coming soon.
               </div>
             )}
           </section>

@@ -58,9 +58,10 @@ export default function SettingsPage() {
         onSettingsClick={() => router.push("/settings")}
       />
 
-      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "var(--space-24) var(--space-32)" }}>
+      <main id="main-content" style={{ maxWidth: 1440, margin: "0 auto", padding: "var(--space-24) var(--space-32)" }}>
         {/* Breadcrumb */}
-        <div
+        <nav
+          aria-label="Breadcrumb"
           style={{
             fontSize: "var(--font-size-caption)",
             color: "var(--color-text-tertiary)",
@@ -73,7 +74,7 @@ export default function SettingsPage() {
           <span>Home</span>
           <span style={{ color: "var(--color-text-quaternary)" }}>/</span>
           <span style={{ color: "var(--color-text-secondary)" }}>Settings</span>
-        </div>
+        </nav>
 
         {/* Page header */}
         <div
@@ -153,7 +154,7 @@ export default function SettingsPage() {
             </Card>
           ))}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

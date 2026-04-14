@@ -98,9 +98,10 @@ export default function DashboardPage() {
         onSettingsClick={() => router.push("/settings")}
       />
 
-      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "var(--space-24) var(--space-32)" }}>
+      <main id="main-content" style={{ maxWidth: 1440, margin: "0 auto", padding: "var(--space-24) var(--space-32)" }}>
         {/* Breadcrumb */}
-        <div
+        <nav
+          aria-label="Breadcrumb"
           style={{
             fontSize: "var(--font-size-caption)",
             color: "var(--color-text-tertiary)",
@@ -113,7 +114,7 @@ export default function DashboardPage() {
           <span>Home</span>
           <ChevronRight size={10} />
           <span style={{ color: "var(--color-text-secondary)" }}>Dashboard</span>
-        </div>
+        </nav>
 
         {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-16)", marginBottom: "var(--space-24)" }}>
@@ -369,7 +370,7 @@ export default function DashboardPage() {
             </div>
           </Card>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

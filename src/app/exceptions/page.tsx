@@ -19,8 +19,8 @@
  */
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { Inbox } from "lucide-react";
@@ -41,7 +41,16 @@ const NAV_TABS = [
 ];
 
 export default function ExceptionQueuePage() {
+  return (
+    <Suspense>
+      <ExceptionQueueContent />
+    </Suspense>
+  );
+}
+
+function ExceptionQueueContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { health } = useHealth();
   const { user } = useAuth();
 
@@ -54,18 +63,39 @@ export default function ExceptionQueuePage() {
   const [exceptions, setExceptions] = useState<ExceptionSummary[]>([]);
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   /* ── Lifted selection state ──────────────────────────────────────── */
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  /* ── Filters ─────────────────────────────────────────────────────── */
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterState, setFilterState] = useState("");
-  const [filterIntent, setFilterIntent] = useState("");
+  /* ── Filters (initialized from URL params) ───────────────────────── */
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
+  const [filterState, setFilterState] = useState(searchParams.get("state") || "");
+  const [filterIntent, setFilterIntent] = useState(searchParams.get("intent") || "");
+
+  /* ── Sync filters to URL ─────────────────────────────────────────── */
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filterState) params.set("state", filterState);
+    if (filterIntent) params.set("intent", filterIntent);
+    if (searchQuery) params.set("q", searchQuery);
+    const qs = params.toString();
+    const url = qs ? `/exceptions?${qs}` : "/exceptions";
+    router.replace(url, { scroll: false });
+  }, [filterState, filterIntent, searchQuery, router]);
+
+  const hasActiveFilters = !!(filterState || filterIntent || searchQuery);
+
+  function clearAllFilters() {
+    setFilterState("");
+    setFilterIntent("");
+    setSearchQuery("");
+  }
 
   /* ── Data fetching ───────────────────────────────────────────────── */
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const [excRes, statsRes] = await Promise.all([
         exceptionsApi.list({
@@ -78,6 +108,7 @@ export default function ExceptionQueuePage() {
       setStats(statsRes);
     } catch (err) {
       console.error("Failed to fetch exceptions:", err);
+      setError("Failed to load exceptions. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -147,7 +178,7 @@ export default function ExceptionQueuePage() {
       />
 
       {/* ━━ Two-pane Master-Detail Area ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{ height: "calc(100vh - var(--nav-height))", minHeight: 576 }}>
+      <main id="main-content" style={{ height: "calc(100vh - var(--nav-height))", minHeight: 576 }}>
         <Group orientation="horizontal" id="exception-queue-panels" className="panel-group-zoomable" style={{ height: "100%" }}>
 
           {/* ── Middle Pane: Exception List ──────────────────────────── */}
@@ -156,6 +187,7 @@ export default function ExceptionQueuePage() {
               exceptions={filtered}
               stats={stats}
               loading={loading}
+              error={error}
               selectedId={selectedId}
               onSelect={setSelectedId}
               searchQuery={searchQuery}
@@ -164,6 +196,8 @@ export default function ExceptionQueuePage() {
               onFilterStateChange={setFilterState}
               filterIntent={filterIntent}
               onFilterIntentChange={setFilterIntent}
+              hasActiveFilters={hasActiveFilters}
+              onClearFilters={clearAllFilters}
               health={health}
               onRefresh={fetchData}
             />
@@ -195,7 +229,7 @@ export default function ExceptionQueuePage() {
           </Panel>
 
         </Group>
-      </div>
+      </main>
     </div>
   );
 }

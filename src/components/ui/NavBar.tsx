@@ -83,6 +83,7 @@ export function NavBar({
               onClick={() => onTabChange?.(tab.id)}
               onMouseEnter={() => setHoveredTab(tab.id)}
               onMouseLeave={() => setHoveredTab(null)}
+              aria-current={isActive ? "page" : undefined}
               style={{
                 position: "relative",
                 background: "none",

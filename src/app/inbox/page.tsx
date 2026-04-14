@@ -180,11 +180,11 @@ export default function InboxPage() {
       >
         <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 var(--space-32)" }}>
           {/* Breadcrumb */}
-          <div style={{ padding: "var(--space-8) 0" }}>
+          <nav aria-label="Breadcrumb" style={{ padding: "var(--space-8) 0" }}>
             <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-tertiary)" }}>Home</span>
             <ChevronRight size={10} style={{ margin: "0 var(--space-4)", color: "var(--color-text-tertiary)", verticalAlign: "middle" }} />
             <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)" }}>Customer Inbox</span>
-          </div>
+          </nav>
           <div
             style={{
               display: "flex",
@@ -230,6 +230,7 @@ export default function InboxPage() {
         </div>
       </div>
 
+      <div id="main-content" />
       {/* ── METRICS STRIP ── */}
       <div style={{ maxWidth: 1440, margin: "0 auto", padding: "var(--space-16) var(--space-32)" }}>
         <div
