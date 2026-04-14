@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Shield,
   CheckCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { Badge, lifecycleVariant, verdictVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -26,6 +27,7 @@ interface ExceptionListPaneProps {
   exceptions: ExceptionSummary[];
   stats: StatsResponse | null;
   loading: boolean;
+  error?: string | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
   searchQuery: string;
@@ -34,6 +36,8 @@ interface ExceptionListPaneProps {
   onFilterStateChange: (s: string) => void;
   filterIntent: string;
   onFilterIntentChange: (i: string) => void;
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
   health: HealthResponse | null;
   onRefresh: () => void;
 }
@@ -68,6 +72,7 @@ export default function ExceptionListPane({
   exceptions,
   stats,
   loading,
+  error,
   selectedId,
   onSelect,
   searchQuery,
@@ -76,6 +81,8 @@ export default function ExceptionListPane({
   onFilterStateChange,
   filterIntent,
   onFilterIntentChange,
+  hasActiveFilters,
+  onClearFilters,
   health,
   onRefresh,
 }: ExceptionListPaneProps) {
@@ -201,6 +208,38 @@ export default function ExceptionListPane({
             ))}
           </select>
         </div>
+
+        {/* Active filter indicator */}
+        {hasActiveFilters && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "var(--space-4) 0",
+            }}
+          >
+            <span style={{ fontSize: "var(--font-size-label)", color: "var(--color-text-tertiary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              <Filter size={10} style={{ marginRight: "var(--space-4)", verticalAlign: "middle" }} />
+              Filters active
+            </span>
+            <button
+              onClick={onClearFilters}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "var(--font-size-label)",
+                fontWeight: 600,
+                color: "var(--color-brand)",
+                fontFamily: "var(--font-sans)",
+                padding: 0,
+              }}
+            >
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Scrollable Exception Card List ────────────────────────────── */}
@@ -223,6 +262,18 @@ export default function ExceptionListPane({
               />
             ))}
           </div>
+        ) : error ? (
+          <div
+            style={{
+              padding: "var(--space-32)",
+              textAlign: "center",
+              color: "var(--color-error)",
+            }}
+          >
+            <AlertTriangle size={24} style={{ marginBottom: "var(--space-8)" }} />
+            <div style={{ fontSize: "var(--font-size-body)", fontWeight: 500, marginBottom: "var(--space-8)" }}>{error}</div>
+            <Button variant="neutral" size="sm" onClick={onRefresh}>Retry</Button>
+          </div>
         ) : exceptions.length === 0 ? (
           <div
             style={{
@@ -233,6 +284,11 @@ export default function ExceptionListPane({
           >
             <CheckCircle size={24} style={{ marginBottom: "var(--space-8)" }} />
             <div style={{ fontSize: "var(--font-size-body)" }}>No exceptions match your filters</div>
+            {(filterState || filterIntent || searchQuery) && (
+              <div style={{ fontSize: "var(--font-size-caption)", marginTop: "var(--space-4)" }}>
+                Try clearing your filters to see all exceptions.
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>

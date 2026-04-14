@@ -164,7 +164,7 @@ function LoginForm() {
         >
           <Input
             label="Username, email address, or SSO code"
-            type="text"
+            type="email"
             placeholder="jane@acme.com"
             autoComplete="email"
             autoFocus

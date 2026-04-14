@@ -31,6 +31,27 @@ body {
   color: var(--color-text-primary);
 }
 
+/* ── Skip to main content (accessibility) ──────────────────────────── */
+.skip-to-main {
+  position: absolute;
+  top: -100%;
+  left: var(--space-16);
+  z-index: 100;
+  padding: var(--space-8) var(--space-16);
+  background: var(--color-surface-primary);
+  color: var(--color-brand);
+  font-weight: 600;
+  font-size: var(--font-size-body);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  text-decoration: none;
+  transition: top var(--dur-fast) var(--ease-out);
+}
+
+.skip-to-main:focus {
+  top: var(--space-8);
+}
+
 /* ── Focus visible ──────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid var(--color-brand);

@@ -7,7 +7,9 @@
  */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import {
   Mail, ChevronRight, Search, Zap, CheckCircle2,
   Clock, FileText, AlertTriangle, RefreshCw,
@@ -16,6 +18,8 @@ import { NavBar } from "@/components/ui/NavBar";
 import { MetricTile } from "@/components/ui/MetricTile";
 import { Badge, categoryVariant, inboxStatusVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { useHealth } from "@/hooks/useHealth";
+import { useAuth } from "@/hooks/useAuth";
 
 /* ── Display label maps (visual mapping with default fallback) ────── */
 const CATEGORY_LABELS: Record<string, string> = {
@@ -124,9 +128,17 @@ const NAV_TABS = [
 
 /* ── Main Page ────────────────────────────────────────────────────── */
 export default function InboxPage() {
+  const router = useRouter();
+  const { health } = useHealth();
+  const { user } = useAuth();
   const [selectedId, setSelectedId] = useState("1");
   const [activeTab, setActiveTab] = useState("inbox");
   const [detailTab, setDetailTab] = useState("email");
+
+  const userName = user?.name || "User";
+  const userInitials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+
+  useEffect(() => { document.title = "Customer Inbox — ASOE"; }, []);
 
   const selected = INBOX.find((i) => i.id === selectedId) || INBOX[0];
   const needsAttention = INBOX.filter((i) => i.status === "NEEDS_APPROVAL" || i.status === "ESCALATED").length;
@@ -149,11 +161,13 @@ export default function InboxPage() {
         activeTab="inbox"
         onTabChange={(id) => {
           const tab = NAV_TABS.find((t) => t.id === id);
-          if (tab?.href) window.location.href = tab.href;
+          if (tab?.href) router.push(tab.href);
         }}
-        userName="Jane Doe"
-        userInitials="JD"
-        agentCount={3}
+        userName={userName}
+        userInitials={userInitials}
+        agentCount={health?.allowed_intents?.length || 0}
+        onSignOut={() => signOut({ callbackUrl: "/login" })}
+        onSettingsClick={() => router.push("/settings")}
       />
 
       {/* ── PAGE HEADER ── */}
@@ -166,11 +180,11 @@ export default function InboxPage() {
       >
         <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 var(--space-32)" }}>
           {/* Breadcrumb */}
-          <div style={{ padding: "var(--space-8) 0" }}>
+          <nav aria-label="Breadcrumb" style={{ padding: "var(--space-8) 0" }}>
             <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-tertiary)" }}>Home</span>
             <ChevronRight size={10} style={{ margin: "0 var(--space-4)", color: "var(--color-text-tertiary)", verticalAlign: "middle" }} />
             <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)" }}>Customer Inbox</span>
-          </div>
+          </nav>
           <div
             style={{
               display: "flex",
@@ -216,6 +230,7 @@ export default function InboxPage() {
         </div>
       </div>
 
+      <div id="main-content" />
       {/* ── METRICS STRIP ── */}
       <div style={{ maxWidth: 1440, margin: "0 auto", padding: "var(--space-16) var(--space-32)" }}>
         <div

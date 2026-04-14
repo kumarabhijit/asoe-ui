@@ -35,6 +35,7 @@ import { AgentReasoningCard } from "@/components/ui/AgentReasoningCard";
 import { WaterfallStepper, type NodeState } from "@/components/ui/WaterfallStepper";
 import { PricingWaterfall } from "@/components/ui/PricingWaterfall";
 import { Badge, lifecycleVariant, verdictVariant, rootCauseVariant } from "@/components/ui/Badge";
+import { useToast } from "@/components/ui/Toast";
 import { exceptionsApi } from "@/lib/api";
 import type {
   ExceptionDetail,
@@ -49,6 +50,8 @@ interface ExceptionDetailPanelProps {
   exceptionId: string;
   /** Optional — used in full-page view for back navigation */
   onClose?: () => void;
+  /** Called after a successful approve/reject/escalate to refresh the parent list */
+  onActionComplete?: () => void;
 }
 
 /* ── Pipeline node state builder ─────────────────────────────────────── */
@@ -125,7 +128,8 @@ function fmtPrice(n: number): string {
 
 /* ── Component ───────────────────────────────────────────────────────── */
 
-export default function ExceptionDetailPanel({ exceptionId, onClose }: ExceptionDetailPanelProps) {
+export default function ExceptionDetailPanel({ exceptionId, onClose, onActionComplete }: ExceptionDetailPanelProps) {
+  const { addToast } = useToast();
   const [detail, setDetail] = useState<ExceptionDetail | null>(null);
   const [trace, setTrace] = useState<TraceResponse | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -142,8 +146,11 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
     try {
       const updated = await exceptionsApi.approve(exceptionId, { notes: comment || undefined });
       setDetail(updated);
+      addToast("success", `Exception ${exceptionId} approved`);
+      onActionComplete?.();
     } catch (err) {
       console.error("Approve failed:", err);
+      addToast("error", "Failed to approve exception. Please try again.");
     } finally {
       setActionLoading(false);
     }
@@ -154,15 +161,33 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
     try {
       const updated = await exceptionsApi.reject(exceptionId, { reason: comment || "Rejected by reviewer" });
       setDetail(updated);
+      addToast("success", `Exception ${exceptionId} rejected`);
+      onActionComplete?.();
     } catch (err) {
       console.error("Reject failed:", err);
+      addToast("error", "Failed to reject exception. Please try again.");
     } finally {
       setActionLoading(false);
     }
   }
 
-  function handleEscalate() {
-    console.log("Escalate", exceptionId);
+  async function handleEscalate() {
+    setActionLoading(true);
+    try {
+      const updated = await exceptionsApi.override(exceptionId, {
+        action: "ESCALATE",
+        notes: "Escalated by reviewer",
+        resolved_by: "current_user",
+      });
+      setDetail(updated);
+      addToast("warning", `Exception ${exceptionId} escalated for review`);
+      onActionComplete?.();
+    } catch (err) {
+      console.error("Escalate failed:", err);
+      addToast("error", "Failed to escalate exception. Please try again.");
+    } finally {
+      setActionLoading(false);
+    }
   }
 
   /* ── Data Fetching ───────────────────────────────────────────────── */
@@ -251,8 +276,6 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
 
   const DETAIL_TABS = [
     { id: "evidence", label: "Evidence" },
-    { id: "sap", label: "SAP Data" },
-    { id: "changes", label: "Change Analysis" },
   ];
 
   // Primary SKU or "N Lines Affected" for header ribbon
@@ -583,16 +606,6 @@ export default function ExceptionDetailPanel({ exceptionId, onClose }: Exception
                   )}
                   <TraceField label="Final Status" value={trace.final_status} />
                 </div>
-              </div>
-            )}
-            {detailTab === "sap" && (
-              <div style={{ color: "var(--color-text-quaternary)", fontSize: "var(--font-size-caption)", fontStyle: "italic" }}>
-                SAP condition records and master data — coming soon.
-              </div>
-            )}
-            {detailTab === "changes" && (
-              <div style={{ color: "var(--color-text-quaternary)", fontSize: "var(--font-size-caption)", fontStyle: "italic" }}>
-                Change analysis and audit diff — coming soon.
               </div>
             )}
           </section>
