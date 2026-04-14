@@ -69,14 +69,14 @@ src/
 | `Card` | Custom | Borderless, shadow-only (Shadcn uses borders) | Login, Dashboard, Detail |
 | `Input` | Custom | ASOE label typography, brand focus ring | Login, Exception Queue |
 | `Logo` | Custom | Brand mark with tagline | NavBar, Login |
-| `NavBar` | Custom | 56px glass, agent pulse, `onSignOut`, `onSettingsClick`, `aria-current` | All pages (consistent tabs) |
+| `NavBar` | Custom | 56px glass, agent pulse, `onSignOut`, `onSettingsClick`, `aria-current`, logo links to `/inbox` | All pages (consistent tabs) |
 | `MetricTile` | Custom | KPI: 40x40 tinted icon + monospace value | Exception Queue, Dashboard, Inbox |
 | `Badge` | Custom | Tinted bg + icon + text, 6 variant mappers | Exception Queue, Detail, Inbox, Dashboard |
 | `Toast` | Custom | 4.5s auto-dismiss, solid-fill (only one in system) | Via ToastProvider |
 | `Sidebar` | Custom | 480px panel, escape-to-close, focus trap | (Available, not used in Outlook layout) |
 | `ActivityIndicator` | Custom | Node-specific domain-aware messages | WaterfallStepper |
 | `WaterfallStepper` | Custom | 10-node pipeline with per-node states | ExceptionDetailPanel |
-| `AgentReasoningCard` | Custom | Layer 1/2, verdict-specific behavior | ExceptionDetailPanel |
+| `AgentReasoningCard` | Custom | Layer 1 only (recommendation + actions), verdict-specific behavior | ExceptionDetailPanel |
 | `PricingWaterfall` | Custom | Pricing condition chain timeline | ExceptionDetailPanel |
 | `GravitationalOrbs` | Custom | Canvas animated background | Login |
 
@@ -130,10 +130,12 @@ NavBar (sticky top, 56px)
 **Polymorphic detail view:** The right pane adapts to any exception type (pricing, credit, duplicate PO) via dynamic data categories:
 - **Header ribbon:** breadcrumb-style context from event payload
 - **Context strip (collapsible, default expanded):** Entity Profile (customer, tier, credit standing) + Impact Metrics (revenue at risk, delta, SLA)
-- **Agent Analysis:** Problem / Root Cause / Recommendation narrative blocks
-- **Evidence Grid:** collapsed by default; expandable line-item table + pricing waterfall
-- **Pipeline Progress (collapsible, default collapsed):** 10-node WaterfallStepper
-- **Trace Evidence (collapsible, default collapsed):** trace fields + preview tabs (SAP Data, Change Analysis — controlled by `NEXT_PUBLIC_SHOW_PREVIEW_FEATURES`)
+- **Agent Analysis:** Problem / Root Cause / Recommendation + `AgentReasoningCard` (Layer 1 only — actions, confidence, verdict)
+- **Evidence Detail:** collapsed by default; expandable line-item table + pricing waterfall
+- **Metadata:** created/updated timestamps
+- **Diagnostics (hidden by default, "Show Diagnostics" toggle):**
+  - **Pipeline Progress (collapsible):** 10-node WaterfallStepper with status badge (complete/in progress/failed/pending)
+  - **Trace Evidence (collapsible):** trace fields, Resolution Data JSON, preview tabs (SAP Data, Change Analysis — controlled by `NEXT_PUBLIC_SHOW_PREVIEW_FEATURES`)
 
 **Action feedback:** Approve/Reject/Escalate actions show toast notifications (success/error) via `useToast()`. List auto-refreshes after any action via `onActionComplete` callback.
 

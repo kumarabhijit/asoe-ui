@@ -12,10 +12,10 @@ Action buttons are gated by user role per Section 9.2. The backend enforces RBAC
 
 | Role | YELLOW Verdict Actions | RED Verdict Actions | GREEN Verdict Actions |
 |---|---|---|---|
-| `analyst` | Approve, Reject, Escalate | Acknowledge, Escalate | View Details |
-| `manager` | Approve, Reject, Escalate | Acknowledge, Escalate | View Details |
-| `admin` | Approve, Reject, Escalate | Acknowledge, **Override** (requires `resolution_notes`), Escalate | View Details |
-| `viewer` | None (view only) | None (view only) | View Details |
+| `analyst` | Approve, Reject, Escalate | Acknowledge, Escalate | (no actions — auto-resolved) |
+| `manager` | Approve, Reject, Escalate | Acknowledge, Escalate | (no actions — auto-resolved) |
+| `admin` | Approve, Reject, Escalate | Acknowledge, **Override** (requires `resolution_notes`), Escalate | (no actions — auto-resolved) |
+| `viewer` | None (view only) | None (view only) | (no actions — view only) |
 | `partner` | None (scoped view of own orders) | None | None |
 
 **RED Override safeguard (Section 11.1):** The Override button on RED exceptions is gated to the `admin` role via the `isAdmin` prop on `AgentReasoningCard`. Override requires a mandatory `resolution_notes` entry recorded in `policy_audit_log` for SOX compliance.
@@ -60,10 +60,10 @@ UI action → API request (X-Trace-ID header) → Backend → Worker → GraphSt
 UI ← WebSocket event (WSEvent.trace_id) ← Redis pub/sub ← Worker
 ```
 
-- The `trace_id` is displayed in the ExceptionDetailPanel Layer 2 (AgentReasoningCard expanded view)
-- TraceRecord fields (skill_name, intent_selected, shadow_verdict, recipe_name, gateway_calls) are rendered for audit review
+- The `trace_id` and TraceRecord fields (skill_name, intent_selected, shadow_verdict, recipe_name, gateway_calls) are displayed in the **Trace Evidence** collapsible section within ExceptionDetailPanel, accessible via the "Show Diagnostics" toggle
+- Resolution Data (JSON) is also nested within Trace Evidence for audit review
 
-**How to verify:** Check `src/app/exceptions/ExceptionDetailPanel.tsx` (trace display), `src/components/ui/AgentReasoningCard.tsx` (Layer 2 trace fields).
+**How to verify:** Check `src/app/exceptions/ExceptionDetailPanel.tsx` — Trace Evidence section (inside Diagnostics toggle) displays all trace fields and resolution data.
 
 **SOX relevance:** Every financial decision traceable from UI action to ERP effect.
 
