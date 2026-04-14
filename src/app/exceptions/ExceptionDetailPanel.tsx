@@ -30,6 +30,7 @@ import {
   Clock,
   User,
   MapPin,
+  Terminal,
 } from "lucide-react";
 import { AgentReasoningCard } from "@/components/ui/AgentReasoningCard";
 import { WaterfallStepper, type NodeState } from "@/components/ui/WaterfallStepper";
@@ -139,6 +140,7 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
   const [selectedLine, setSelectedLine] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState("evidence");
   const [entityProfileOpen, setEntityProfileOpen] = useState(true);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [pipelineOpen, setPipelineOpen] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
 
@@ -551,56 +553,90 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
             />
           )}
 
-          {/* ── Supporting Context: Pipeline Progress ──────────────────── */}
-          <section
+          {/* ── Diagnostics toggle ─────────────────────────────────────── */}
+          <button
+            onClick={() => setDiagnosticsOpen((v) => !v)}
             style={{
-              background: "var(--color-surface-primary)",
-              borderRadius: "var(--radius-md)",
-              boxShadow: "var(--shadow-sm)",
-              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "var(--space-6)",
+              width: "100%",
+              padding: "var(--space-8) 0",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--font-size-caption)",
+              fontWeight: 600,
+              color: "var(--color-text-tertiary)",
+              transition: "color var(--dur-fast)",
             }}
+            aria-expanded={diagnosticsOpen}
           >
-            <CollapsibleHeader
-              title="Pipeline Progress"
-              open={pipelineOpen}
-              onToggle={() => setPipelineOpen((v) => !v)}
-              badge={
-                nodeStates.some((n) => n.status === "failed") ? "failed"
-                : nodeStates.some((n) => n.status === "started") ? "in progress"
-                : nodeStates.every((n) => n.status === "completed" || n.status === "skipped") ? "complete"
-                : "pending"
-              }
-              badgeVariant={
-                nodeStates.some((n) => n.status === "failed") ? "error"
-                : nodeStates.some((n) => n.status === "started") ? "info"
-                : nodeStates.every((n) => n.status === "completed" || n.status === "skipped") ? "success"
-                : "neutral"
-              }
+            <Terminal size={12} />
+            {diagnosticsOpen ? "Hide Diagnostics" : "Show Diagnostics"}
+            <ChevronDown
+              size={12}
+              style={{
+                transform: diagnosticsOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                transition: "transform var(--dur-fast)",
+              }}
             />
-            {pipelineOpen && (
-              <div style={{ borderTop: "1px solid var(--color-border-default)", padding: "var(--space-12) var(--space-16)" }}>
-                <WaterfallStepper
-                  nodes={nodeStates}
-                  intent={detail.intent ?? undefined}
-                />
-              </div>
-            )}
-          </section>
+          </button>
 
-          {/* ── Supporting Context: Trace Evidence ─────────────────────── */}
-          <section
-            style={{
-              background: "var(--color-surface-primary)",
-              borderRadius: "var(--radius-md)",
-              boxShadow: "var(--shadow-sm)",
-              overflow: "hidden",
-            }}
-          >
-            <CollapsibleHeader
-              title="Trace Evidence"
-              open={traceOpen}
-              onToggle={() => setTraceOpen((v) => !v)}
-            />
+          {diagnosticsOpen && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-12)" }}>
+              {/* ── Pipeline Progress ──────────────────────────────────── */}
+              <section
+                style={{
+                  background: "var(--color-surface-primary)",
+                  borderRadius: "var(--radius-md)",
+                  boxShadow: "var(--shadow-sm)",
+                  overflow: "hidden",
+                }}
+              >
+                <CollapsibleHeader
+                  title="Pipeline Progress"
+                  open={pipelineOpen}
+                  onToggle={() => setPipelineOpen((v) => !v)}
+                  badge={
+                    nodeStates.some((n) => n.status === "failed") ? "failed"
+                    : nodeStates.some((n) => n.status === "started") ? "in progress"
+                    : nodeStates.every((n) => n.status === "completed" || n.status === "skipped") ? "complete"
+                    : "pending"
+                  }
+                  badgeVariant={
+                    nodeStates.some((n) => n.status === "failed") ? "error"
+                    : nodeStates.some((n) => n.status === "started") ? "info"
+                    : nodeStates.every((n) => n.status === "completed" || n.status === "skipped") ? "success"
+                    : "neutral"
+                  }
+                />
+                {pipelineOpen && (
+                  <div style={{ borderTop: "1px solid var(--color-border-default)", padding: "var(--space-12) var(--space-16)" }}>
+                    <WaterfallStepper
+                      nodes={nodeStates}
+                      intent={detail.intent ?? undefined}
+                    />
+                  </div>
+                )}
+              </section>
+
+              {/* ── Trace Evidence ─────────────────────────────────────── */}
+              <section
+                style={{
+                  background: "var(--color-surface-primary)",
+                  borderRadius: "var(--radius-md)",
+                  boxShadow: "var(--shadow-sm)",
+                  overflow: "hidden",
+                }}
+              >
+                <CollapsibleHeader
+                  title="Trace Evidence"
+                  open={traceOpen}
+                  onToggle={() => setTraceOpen((v) => !v)}
+                />
             {traceOpen && (
               <div style={{ borderTop: "1px solid var(--color-border-default)", padding: "var(--space-12) var(--space-16)" }}>
                 <div
@@ -683,7 +719,9 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
                 )}
               </div>
             )}
-          </section>
+              </section>
+            </div>
+          )}
 
           {/* ── Metadata ───────────────────────────────────────────────── */}
           <div
