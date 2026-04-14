@@ -5,6 +5,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Logo } from "./Logo";
 import { Badge } from "./Badge";
 import { LogOut, Settings } from "lucide-react";
@@ -61,8 +62,10 @@ export function NavBar({
         ...style,
       }}
     >
-      {/* Logo */}
-      <Logo size="sm" />
+      {/* Logo — links to home */}
+      <Link href="/inbox" style={{ textDecoration: "none", display: "flex" }}>
+        <Logo size="sm" />
+      </Link>
 
       {/* Tab Navigation */}
       <div
