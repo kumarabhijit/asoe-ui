@@ -138,6 +138,8 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
   const [actionLoading, setActionLoading] = useState(false);
   const [selectedLine, setSelectedLine] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState("evidence");
+  const [entityProfileOpen, setEntityProfileOpen] = useState(true);
+  const [pipelineOpen, setPipelineOpen] = useState(false);
 
   /* ── Actions ─────────────────────────────────────────────────────── */
 
@@ -367,54 +369,66 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
       {(ep || im) && (
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
             borderBottom: "1px solid var(--color-border-default)",
             flexShrink: 0,
           }}
         >
-          {/* Entity Profile */}
-          <div
-            style={{
-              padding: "var(--space-10) var(--space-16)",
-              borderRight: "1px solid var(--color-border-default)",
-              background: "var(--color-surface-primary)",
-            }}
-          >
-            <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-6)" }}>
-              Entity Profile
-            </div>
-            {ep && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", fontSize: "var(--font-size-caption)" }}>
-                <ContextRow icon={<User size={11} />} label="Customer" value={`${ep.customer_name} (${ep.bp_number})`} />
-                <ContextRow icon={<Building2 size={11} />} label="Tier" value={ep.customer_tier ?? "—"} badge={ep.vip_status ? "VIP" : undefined} />
-                <ContextRow icon={<Shield size={11} />} label="Credit" value={ep.credit_standing ?? "—"} />
-                <ContextRow icon={<MapPin size={11} />} label="Location" value={ep.location ?? "—"} />
-              </div>
-            )}
-          </div>
-
-          {/* Impact Metrics */}
-          <div
-            style={{
-              padding: "var(--space-10) var(--space-16)",
-              background: "var(--color-surface-primary)",
-            }}
-          >
-            <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-6)" }}>
-              Impact & Risk
-            </div>
-            {im && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", fontSize: "var(--font-size-caption)" }}>
-                <ContextRow icon={<DollarSign size={11} />} label="At Risk" value={fmtPrice(im.revenue_at_risk)} highlight />
-                <ContextRow icon={<DollarSign size={11} />} label="Delta" value={`${fmtPrice(im.delta_amount)} (${im.delta_percentage.toFixed(1)}%)`} />
-                {im.fulfillment_gap_pct !== undefined && (
-                  <ContextRow icon={<Package size={11} />} label="Gap" value={`${im.fulfillment_gap_pct.toFixed(1)}%`} />
+          <CollapsibleHeader
+            title="Entity Profile"
+            open={entityProfileOpen}
+            onToggle={() => setEntityProfileOpen((v) => !v)}
+          />
+          {entityProfileOpen && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              }}
+            >
+              {/* Entity Profile */}
+              <div
+                style={{
+                  padding: "var(--space-10) var(--space-16)",
+                  borderRight: "1px solid var(--color-border-default)",
+                  background: "var(--color-surface-primary)",
+                }}
+              >
+                <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-6)" }}>
+                  Customer
+                </div>
+                {ep && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", fontSize: "var(--font-size-caption)" }}>
+                    <ContextRow icon={<User size={11} />} label="Customer" value={`${ep.customer_name} (${ep.bp_number})`} />
+                    <ContextRow icon={<Building2 size={11} />} label="Tier" value={ep.customer_tier ?? "—"} badge={ep.vip_status ? "VIP" : undefined} />
+                    <ContextRow icon={<Shield size={11} />} label="Credit" value={ep.credit_standing ?? "—"} />
+                    <ContextRow icon={<MapPin size={11} />} label="Location" value={ep.location ?? "—"} />
+                  </div>
                 )}
-                <ContextRow icon={<Clock size={11} />} label="Priority" value={im.sla_priority} badge={im.sla_priority} />
               </div>
-            )}
-          </div>
+
+              {/* Impact Metrics */}
+              <div
+                style={{
+                  padding: "var(--space-10) var(--space-16)",
+                  background: "var(--color-surface-primary)",
+                }}
+              >
+                <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-6)" }}>
+                  Impact & Risk
+                </div>
+                {im && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", fontSize: "var(--font-size-caption)" }}>
+                    <ContextRow icon={<DollarSign size={11} />} label="At Risk" value={fmtPrice(im.revenue_at_risk)} highlight />
+                    <ContextRow icon={<DollarSign size={11} />} label="Delta" value={`${fmtPrice(im.delta_amount)} (${im.delta_percentage.toFixed(1)}%)`} />
+                    {im.fulfillment_gap_pct !== undefined && (
+                      <ContextRow icon={<Package size={11} />} label="Gap" value={`${im.fulfillment_gap_pct.toFixed(1)}%`} />
+                    )}
+                    <ContextRow icon={<Clock size={11} />} label="Priority" value={im.sla_priority} badge={im.sla_priority} />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -551,11 +565,17 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
 
           {/* ── Supporting Context: Pipeline Progress ──────────────────── */}
           <section>
-            <SectionHeading title="Pipeline Progress" />
-            <WaterfallStepper
-              nodes={nodeStates}
-              intent={detail.intent ?? undefined}
+            <CollapsibleHeader
+              title="Pipeline Progress"
+              open={pipelineOpen}
+              onToggle={() => setPipelineOpen((v) => !v)}
             />
+            {pipelineOpen && (
+              <WaterfallStepper
+                nodes={nodeStates}
+                intent={detail.intent ?? undefined}
+              />
+            )}
           </section>
 
           {/* ── Supporting Context: Trace Evidence ─────────────────────── */}
@@ -660,6 +680,38 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
 }
 
 /* ── Helper components ───────────────────────────────────────────────── */
+
+/** Collapsible section header with chevron toggle */
+function CollapsibleHeader({ title, open, onToggle }: { title: string; open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-expanded={open}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "var(--space-8) var(--space-16)",
+        background: "var(--color-surface-secondary)",
+        border: "none",
+        cursor: "pointer",
+        fontFamily: "var(--font-sans)",
+      }}
+    >
+      <span
+        style={{
+          fontSize: "var(--font-size-subhead)",
+          fontWeight: 600,
+          color: "var(--color-text-primary)",
+        }}
+      >
+        {title}
+      </span>
+      {open ? <ChevronDown size={14} color="var(--color-text-tertiary)" /> : <ChevronRight size={14} color="var(--color-text-tertiary)" />}
+    </button>
+  );
+}
 
 function SectionHeading({ title }: { title: string }) {
   return (
