@@ -140,6 +140,7 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
   const [detailTab, setDetailTab] = useState("evidence");
   const [entityProfileOpen, setEntityProfileOpen] = useState(true);
   const [pipelineOpen, setPipelineOpen] = useState(false);
+  const [traceOpen, setTraceOpen] = useState(false);
 
   /* ── Actions ─────────────────────────────────────────────────────── */
 
@@ -580,53 +581,61 @@ export default function ExceptionDetailPanel({ exceptionId, onClose, onActionCom
 
           {/* ── Supporting Context: Trace Evidence ─────────────────────── */}
           <section>
-            <SectionHeading title="Trace Evidence" />
-            <div
-              style={{
-                display: "flex",
-                gap: "var(--space-4)",
-                borderBottom: "1px solid var(--color-border-default)",
-                marginBottom: "var(--space-10)",
-              }}
-            >
-              {DETAIL_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setDetailTab(tab.id)}
+            <CollapsibleHeader
+              title="Trace Evidence"
+              open={traceOpen}
+              onToggle={() => setTraceOpen((v) => !v)}
+            />
+            {traceOpen && (
+              <>
+                <div
                   style={{
-                    padding: "var(--space-6) var(--space-12)",
-                    background: "none",
-                    border: "none",
-                    borderBottom: detailTab === tab.id ? "2px solid var(--color-brand)" : "2px solid transparent",
-                    cursor: "pointer",
-                    fontSize: "var(--font-size-caption)",
-                    fontWeight: detailTab === tab.id ? 600 : 400,
-                    color: detailTab === tab.id ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
-                    fontFamily: "var(--font-sans)",
+                    display: "flex",
+                    gap: "var(--space-4)",
+                    borderBottom: "1px solid var(--color-border-default)",
+                    marginBottom: "var(--space-10)",
                   }}
                 >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {detailTab === "evidence" && trace && (
-              <div style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
-                  <TraceField label="Trace ID" value={trace.trace_id} mono />
-                  <TraceField label="Skill" value={trace.skill_name} />
-                  <TraceField label="Intent" value={trace.intent_selected} />
-                  <TraceField label="Shadow Verdict" value={trace.shadow_verdict} />
-                  {trace.shadow_policy_hits.length > 0 && (
-                    <TraceField label="Policy Hits" value={trace.shadow_policy_hits.join(", ")} />
-                  )}
-                  <TraceField label="Recipe" value={trace.recipe_name} />
-                  {trace.gateway_calls.length > 0 && (
-                    <TraceField label="Gateway Calls" value={trace.gateway_calls.join(", ")} />
-                  )}
-                  <TraceField label="Final Status" value={trace.final_status} />
+                  {DETAIL_TABS.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setDetailTab(tab.id)}
+                      style={{
+                        padding: "var(--space-6) var(--space-12)",
+                        background: "none",
+                        border: "none",
+                        borderBottom: detailTab === tab.id ? "2px solid var(--color-brand)" : "2px solid transparent",
+                        cursor: "pointer",
+                        fontSize: "var(--font-size-caption)",
+                        fontWeight: detailTab === tab.id ? 600 : 400,
+                        color: detailTab === tab.id ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
+                        fontFamily: "var(--font-sans)",
+                      }}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
-              </div>
+
+                {detailTab === "evidence" && trace && (
+                  <div style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
+                      <TraceField label="Trace ID" value={trace.trace_id} mono />
+                      <TraceField label="Skill" value={trace.skill_name} />
+                      <TraceField label="Intent" value={trace.intent_selected} />
+                      <TraceField label="Shadow Verdict" value={trace.shadow_verdict} />
+                      {trace.shadow_policy_hits.length > 0 && (
+                        <TraceField label="Policy Hits" value={trace.shadow_policy_hits.join(", ")} />
+                      )}
+                      <TraceField label="Recipe" value={trace.recipe_name} />
+                      {trace.gateway_calls.length > 0 && (
+                        <TraceField label="Gateway Calls" value={trace.gateway_calls.join(", ")} />
+                      )}
+                      <TraceField label="Final Status" value={trace.final_status} />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </section>
 
