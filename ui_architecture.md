@@ -88,13 +88,14 @@ Shadcn/ui adopted **only for non-agent primitives**. Agent-first components are 
 | **Toast** | Custom (spec) | `src/components/ui/Toast.tsx` | ALIGNED |
 | **GravitationalOrbs** | Custom (pre-spec) | `src/components/ui/GravitationalOrbs.tsx` | Pre-existing, not in spec table |
 | **PricingWaterfall** | **DRIFT** | `src/components/ui/PricingWaterfall.tsx` | UI enrichment — not in spec (see below) |
+| **Select** | Shadcn (spec) | `src/components/ui/Select.tsx` | ALIGNED (Radix + Tailwind, Phase 8.9) |
+| **DropdownMenu** | Shadcn (spec) | `src/components/ui/DropdownMenu.tsx` | ALIGNED (Radix + Tailwind, Phase 8.9) |
+| **Dialog** | Shadcn (spec) | `src/components/ui/Dialog.tsx` | ALIGNED (Radix + Tailwind, Phase 8.9) |
 | DataTable | Shadcn (spec) | Not yet installed | PENDING |
-| Dialog/Sheet | Shadcn (spec) | Not yet installed | PENDING |
-| Select/Dropdown | Shadcn (spec) | Not yet installed | PENDING |
 | Tooltip | Shadcn (spec) | Not yet installed | PENDING |
 
 **Spec count:** 12 custom + 4 Shadcn = 16 total.
-**Actual count:** 14 custom + 0 Shadcn = 14 total (Shadcn primitives pending Phase 9+).
+**Actual count:** 14 custom + 3 Shadcn = 17 total (DataTable and Tooltip pending).
 
 ### Intentional Drift: PricingWaterfall
 
@@ -181,12 +182,16 @@ All other elements use neutrals. Status colors are semantic and map to shadow ve
 | Layer | Spec | Actual | Status |
 |---|---|---|---|
 | Framework | Next.js 16 (App Router, React 19, TypeScript) | Next.js 16.2.3 (App Router, React 19) | ALIGNED |
-| Styling | CSS custom properties + Tailwind CSS | CSS custom properties + Tailwind CSS | ALIGNED |
+| Styling | CSS custom properties + Tailwind CSS | CSS custom properties + Tailwind CSS + CVA | ALIGNED |
+| Components | Shadcn/ui for non-agent primitives | Shadcn/ui (Select, DropdownMenu, Dialog) + 14 custom | ALIGNED |
+| Dark Mode | — | System-default via `next-themes` (`prefers-color-scheme`) | NEW (Phase 8.9) |
 | Icons | Lucide React (16/20/24px — never emoji) | Lucide React | ALIGNED |
 | Fonts | SF Pro Display / Inter, SF Mono / JetBrains Mono | Inter (Google Fonts), SF Mono (system) | ALIGNED |
 | Auth | NextAuth.js → FastAPI auth endpoints | NextAuth.js with mock auth API | ALIGNED (mock) |
 | Validation | Zod | Zod (installed, limited use so far) | ALIGNED |
-| Testing | Not specified in tech stack | Vitest + React Testing Library | ALIGNED (128 tests passing) |
+| Testing | Not specified in tech stack | Vitest + React Testing Library | ALIGNED (242 tests passing) |
+
+**Styling architecture (Phase 8.9):** Tailwind CSS utility classes are the primary styling mechanism. Design tokens remain in `design-tokens.css` (light + dark mode variants). `tailwind.config.ts` maps all 137 tokens to Tailwind theme extensions. CVA (`class-variance-authority`) is used for multi-variant components (Button, Badge). `cn()` utility (`src/lib/utils.ts`) merges classes. Only 18 inline `style={{}}` remain — all data-driven dynamic values.
 
 **Alignment status:** ALIGNED.
 

@@ -213,6 +213,23 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 
 ---
 
+### [x] PHASE 8.9: Shadcn/ui + Tailwind CSS Migration
+- [x] Phase 0: Map 137 CSS custom properties to `tailwind.config.ts`, install Shadcn deps (CVA, clsx, tailwind-merge, @radix-ui/react-slot), create `cn()` utility, add `components.json`
+- [x] Phase 0: Install `next-themes`, wire `ThemeProvider` with `defaultTheme="system"`, define `.dark` token variants in `design-tokens.css`
+- [x] Phase 1: Create Shadcn-style Select (Radix), DropdownMenu (Radix), Dialog (Radix) components
+- [x] Phase 1: Replace raw `<select>` in ExceptionListPane with Shadcn Select
+- [x] Phase 1: Replace NavBar user avatar + sign-out with DropdownMenu
+- [x] Phase 2: Rewrite Button, Card, Input, Badge with CVA + Tailwind (same props API, zero consumer changes)
+- [x] Phase 3: Convert 17 files from inline `style={{}}` to Tailwind classes (exception detail sub-components + reusable UI components)
+- [x] Phase 4: Convert all page files (login, settings, dashboard, inbox, exceptions)
+- [x] Phase 4: Convert Phase 3 leftovers (AgentReasoningCard, WaterfallStepper, PricingWaterfall)
+- [x] Phase 4: Clean up design-tokens.css (remove duplicate utility classes, move to globals.css)
+- [x] Inline style reduction: 492 → 18 (96%). Remaining 18 are all data-driven dynamic values.
+
+✅ Outcome: Full Shadcn/ui + Tailwind CSS styling. System-default dark mode. 17 components restyled. 3 Shadcn Radix primitives added. 242 tests pass. (2026-04-15)
+
+---
+
 ## Remaining Phases
 
 ### [ ] PHASE 9: Settings & Admin Page
