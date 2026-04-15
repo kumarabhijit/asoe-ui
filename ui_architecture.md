@@ -250,6 +250,22 @@ Card click → on-demand fetch:
 - `ImpactMetrics` — blast radius (revenue at risk, delta, SLA priority, affected lines)
 - `OrderAnalysis` extended with `root_cause`, `recommendation`, `entity_profile`, `impact_metrics`
 
+**Intent-specific rendering: data-presence pattern (not component dispatch).**
+
+The detail panel is polymorphic via data, not via intent-string dispatch. Different intents produce different optional fields in `OrderAnalysis` and `resolution_data`. The UI renders sections based on **whether the data is present**, not on which intent string the exception carries:
+
+```tsx
+// CORRECT: data-presence-driven sections
+{analysis?.duplicate_detection && <DuplicateDetectionSection data={analysis.duplicate_detection} />}
+{analysis?.pricing_waterfall && <PricingWaterfallSection data={analysis.pricing_waterfall} />}
+```
+
+This preserves Guardrail #2: a new intent added in `asoe2` that populates `duplicate_detection` automatically gets the section rendered — zero UI code changes. A new intent with no specialized data gets the full generic 5-layer layout.
+
+**Forbidden:** Dispatching to intent-named components via switch/map on the intent string (e.g., `switch (intent) { case 'DUPLICATE_PO': ... }`). This would couple the UI to the intent vocabulary and fail the Guardrail #2 zero-change test. See `prompts/exception_queue_duplicate_po.md` for full rationale.
+
+**Decomposition axis:** The 5-layer structure (HeaderRibbon, ContextStrip, AgentAnalysis, EvidenceGrid, Diagnostics) should be extracted into reusable sub-components. Decompose along the **layer axis**, not the intent axis.
+
 ### 5.3 Dashboard (`/dashboard`) — Layout B
 
 **Spec alignment:** Implements Layout B (2-column grid) per Section 11.5. All KPIs from Section 11.6.
@@ -508,6 +524,7 @@ _D1-D7 resolved during architecture alignment (2026-04-11)._
 | D8 | Exception Queue layout | Evolved from Layout A (queue + sidebar) to three-pane Outlook master-detail with resizable panels (`react-resizable-panels`). Sidebar component available but not used. | **RESOLVED** — consol_arch.md Section 11.5 updated (2026-04-12) |
 | D9 | Polymorphic detail view | ExceptionDetailPanel adapts per intent via EntityProfile + ImpactMetrics. Dynamic header ribbon, context strip, Problem/Root Cause/Recommendation narrative. | **RESOLVED** — consol_arch.md Section 11.5 updated (2026-04-12) |
 | D10 | Governance: Review Authority model | Removed "Execute Recipe" button. Human acts as Review Authority only (Approve/Reject/Escalate). Shadow Verdict displayed as read-only badge. Execution triggered by backend on approval. | **RESOLVED** — consol_arch.md Section 11.5 updated, AUDITOR_GUIDE updated (2026-04-12) |
+| D11 | Intent-specific detail rendering | Adopted **data-presence pattern** over intent-dispatch pattern. The detail panel renders optional sections based on data fields present in `OrderAnalysis` (e.g., `duplicate_detection`, `pricing_waterfall`), not by branching on the intent string. This preserves Guardrail #2 and the polymorphic data-driven architecture. Full rationale in `prompts/exception_queue_duplicate_po.md`. | **RESOLVED** — architectural decision documented (2026-04-15) |
 
 ### TYPE CONTRACT DRIFT (needs code or backend fix)
 
