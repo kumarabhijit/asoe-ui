@@ -47,7 +47,7 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: strin
       role="status"
       aria-live="polite"
       className={cn(
-        "flex items-center gap-10 px-16 py-12 text-white rounded-md shadow-lg text-body font-medium max-w-[400px] animate-in slide-in-from-right-6 duration-normal",
+        "flex items-center gap-10 px-16 py-12 [color:white] rounded-md shadow-lg text-body font-medium max-w-[400px] animate-in slide-in-from-right-6 duration-normal",
         v.className,
       )}
     >
