@@ -287,7 +287,7 @@
   --color-text-secondary:  #A0A0B4;
   --color-text-tertiary:   #6E6E84;
   --color-text-quaternary: #464660;
-  --color-text-inverse:    #111118;
+  --color-text-inverse:    #FFFFFF;  /* Text on brand/status colored backgrounds — always white */
   --color-text-brand:      #8B7CF7;
   --color-text-brand-hover:#9D90FA;
 
