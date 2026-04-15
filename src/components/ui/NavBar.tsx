@@ -8,6 +8,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { Logo } from "./Logo";
 import { Badge } from "./Badge";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "./DropdownMenu";
 import { LogOut, Settings } from "lucide-react";
 import type { ReactNode, CSSProperties } from "react";
 
@@ -136,69 +144,45 @@ export function NavBar({
 
         {rightContent}
 
-        {/* Settings icon */}
-        <button
-          onClick={onSettingsClick}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "var(--color-text-tertiary)",
-            padding: "var(--space-6)",
-            display: "flex",
-            borderRadius: "var(--radius-sm)",
-            transition: "color var(--dur-fast)",
-          }}
-          aria-label="Settings"
-        >
-          <Settings size={18} />
-        </button>
-
-        {/* User avatar */}
+        {/* User menu (includes Settings and Sign out) */}
         {userInitials && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-8)",
-            }}
-          >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "var(--radius-full)",
-                background: "var(--color-surface-tertiary)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "var(--font-size-caption)",
-                fontWeight: 600,
-                color: "var(--color-text-secondary)",
-                cursor: "pointer",
-              }}
-              title={userName}
-            >
-              {userInitials}
-            </div>
-            {onSignOut && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <button
-                onClick={onSignOut}
                 style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--color-text-tertiary)",
-                  padding: "var(--space-4)",
+                  width: 32,
+                  height: 32,
+                  borderRadius: "var(--radius-full)",
+                  background: "var(--color-surface-tertiary)",
                   display: "flex",
-                  borderRadius: "var(--radius-sm)",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "var(--font-size-caption)",
+                  fontWeight: 600,
+                  color: "var(--color-text-secondary)",
+                  cursor: "pointer",
+                  border: "none",
                 }}
-                aria-label="Sign out"
+                aria-label="User menu"
               >
-                <LogOut size={16} />
+                {userInitials}
               </button>
-            )}
-          </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={8}>
+              <DropdownMenuLabel>{userName || "User"}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {onSettingsClick && (
+                <DropdownMenuItem onClick={onSettingsClick}>
+                  <Settings /> Settings
+                </DropdownMenuItem>
+              )}
+              {onSignOut && (
+                <DropdownMenuItem onClick={onSignOut}>
+                  <LogOut /> Sign out
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
     </nav>

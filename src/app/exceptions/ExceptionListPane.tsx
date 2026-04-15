@@ -20,6 +20,7 @@ import {
 import { Badge, lifecycleVariant, verdictVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/Select";
 import type { ExceptionSummary, HealthResponse } from "@/types/exceptions";
 import type { StatsResponse } from "@/types/api";
 
@@ -55,18 +56,6 @@ function formatTime(iso: string): string {
     return iso;
   }
 }
-
-const selectStyle: React.CSSProperties = {
-  flex: 1,
-  padding: "var(--space-4) var(--space-8)",
-  borderRadius: "var(--radius-sm)",
-  border: "1px solid var(--color-border-default)",
-  background: "var(--color-surface-primary)",
-  fontSize: "var(--font-size-label)",
-  fontFamily: "var(--font-sans)",
-  color: "var(--color-text-secondary)",
-  cursor: "pointer",
-};
 
 export default function ExceptionListPane({
   exceptions,
@@ -180,33 +169,33 @@ export default function ExceptionListPane({
         <div style={{ display: "flex", gap: "var(--space-6)", marginTop: "var(--space-8)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", flex: 1 }}>
             <Filter size={12} color="var(--color-text-tertiary)" />
-            <select
-              value={filterState}
-              onChange={(e) => onFilterStateChange(e.target.value)}
-              style={selectStyle}
-              aria-label="Filter by lifecycle state"
-            >
-              <option value="">All States</option>
-              {(health?.lifecycle_states ?? []).map((s) => (
-                <option key={s} value={s}>
-                  {s.replace(/_/g, " ")}
-                </option>
-              ))}
-            </select>
+            <Select value={filterState} onValueChange={(v) => onFilterStateChange(v === "__all__" ? "" : v)}>
+              <SelectTrigger aria-label="Filter by lifecycle state" className="flex-1">
+                <SelectValue placeholder="All States" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All States</SelectItem>
+                {(health?.lifecycle_states ?? []).map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s.replace(/_/g, " ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <select
-            value={filterIntent}
-            onChange={(e) => onFilterIntentChange(e.target.value)}
-            style={selectStyle}
-            aria-label="Filter by intent"
-          >
-            <option value="">All Exceptions</option>
-            {(health?.allowed_intents ?? []).map((i) => (
-              <option key={i} value={i}>
-                {i.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
+          <Select value={filterIntent} onValueChange={(v) => onFilterIntentChange(v === "__all__" ? "" : v)}>
+            <SelectTrigger aria-label="Filter by intent" className="flex-1">
+              <SelectValue placeholder="All Exceptions" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Exceptions</SelectItem>
+              {(health?.allowed_intents ?? []).map((i) => (
+                <SelectItem key={i} value={i}>
+                  {i.replace(/_/g, " ")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Active filter indicator */}
