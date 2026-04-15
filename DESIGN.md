@@ -17,9 +17,17 @@ src/
 │   ├── login/page.tsx            # Multi-step login (email → password → SSO redirect)
 │   ├── auth/callback/page.tsx    # SSO callback handler
 │   ├── exceptions/
-│   │   ├── page.tsx              # Exception Queue — three-pane Outlook master-detail layout
-│   │   ├── ExceptionListPane.tsx # Middle pane: compact card list with search + filters + URL-synced state
-│   │   ├── ExceptionDetailPanel.tsx  # Right pane: polymorphic detail (collapsible sections)
+│   │   ├── page.tsx              # Exception Queue — three-pane Outlook master-detail layout + WebSocket wiring
+│   │   ├── ExceptionListPane.tsx # Middle pane: compact card list with search + filters + left border indicators
+│   │   ├── ExceptionDetailPanel.tsx  # Right pane: orchestrator (~357 lines) composing 5 layer sub-components
+│   │   ├── HeaderRibbon.tsx      # Layer 1: breadcrumb context, lifecycle/verdict badges, total value
+│   │   ├── ContextStrip.tsx      # Layer 2: Entity Profile + Impact Metrics (collapsible)
+│   │   ├── AgentAnalysisSection.tsx  # Layer 3: Problem / Root Cause / Recommendation narratives
+│   │   ├── EvidenceGrid.tsx      # Layer 4: collapsible line-item table + pricing waterfall
+│   │   ├── DiagnosticsSection.tsx    # Layer 5: pipeline progress + trace evidence (behind toggle)
+│   │   ├── DuplicateDetectionSection.tsx  # Data-presence enrichment: original vs duplicate order
+│   │   ├── OrderComparisonSection.tsx     # Data-presence enrichment: side-by-side order comparison
+│   │   ├── shared.tsx            # CollapsibleHeader, fmtPrice helpers
 │   │   └── [id]/page.tsx         # Full-page exception detail (standalone route)
 │   ├── dashboard/page.tsx        # Analytics dashboard (Layout B) + recent activity feed
 │   ├── inbox/page.tsx            # Customer Inbox — AI email triage (two-pane layout)
@@ -127,17 +135,32 @@ NavBar (sticky top, 56px)
 
 **Data flow:** `exceptionsApi.list()` + `exceptionsApi.stats()` → list state → render. Filters trigger re-fetch. First item auto-selected and pre-fetched. Subsequent selections trigger on-demand fetch: `exceptionsApi.get(id)` + `exceptionsApi.trace(id)` + `exceptionsApi.lineItems(id)` + `exceptionsApi.orderAnalysis(id)`.
 
-**Polymorphic detail view:** The right pane adapts to any exception type (pricing, credit, duplicate PO) via dynamic data categories:
-- **Header ribbon:** breadcrumb-style context from event payload
-- **Context strip (collapsible, default expanded):** Entity Profile (customer, tier, credit standing) + Impact Metrics (revenue at risk, delta, SLA)
-- **Agent Analysis:** Problem / Root Cause / Recommendation + `AgentReasoningCard` (Layer 1 only — actions, confidence, verdict)
-- **Evidence Detail:** collapsed by default; expandable line-item table + pricing waterfall
-- **Metadata:** created/updated timestamps
-- **Diagnostics (hidden by default, "Show Diagnostics" toggle):**
-  - **Pipeline Progress (collapsible):** 10-node WaterfallStepper with status badge (complete/in progress/failed/pending)
-  - **Trace Evidence (collapsible):** trace fields, Resolution Data JSON, preview tabs (SAP Data, Change Analysis — controlled by `NEXT_PUBLIC_SHOW_PREVIEW_FEATURES`)
+**Polymorphic detail view:** The right pane (`ExceptionDetailPanel.tsx`) orchestrates 8 sub-components decomposed along the **5-layer axis** (not the intent axis). Each sub-component is intent-agnostic — driven by data presence, not intent strings:
+
+| Layer | Sub-Component | File | Purpose |
+|---|---|---|---|
+| 1 | `HeaderRibbon` | `HeaderRibbon.tsx` | Breadcrumb context, lifecycle/verdict badges, total value |
+| 2 | `ContextStrip` | `ContextStrip.tsx` | Entity Profile + Impact Metrics (collapsible, default expanded) |
+| 3 | `AgentAnalysisSection` | `AgentAnalysisSection.tsx` | Problem / Root Cause / Recommendation narratives |
+| 3+ | `DuplicateDetectionSection` | `DuplicateDetectionSection.tsx` | Data-presence enrichment: original vs duplicate order, detection method, confidence, autonomy |
+| 3+ | `OrderComparisonSection` | `OrderComparisonSection.tsx` | Data-presence enrichment: side-by-side order comparison with matching/differing field badges |
+| 4 | `EvidenceGrid` | `EvidenceGrid.tsx` | Collapsed by default; line-item table + pricing waterfall |
+| 5 | `DiagnosticsSection` | `DiagnosticsSection.tsx` | Hidden behind "Show Diagnostics" toggle: Pipeline Progress (WaterfallStepper) + Trace Evidence tabs |
+
+**Data-presence enrichment sections** render only when their optional data is present in `OrderAnalysis`:
+```tsx
+{analysis?.duplicate_detection && <DuplicateDetectionSection data={analysis.duplicate_detection} />}
+{analysis?.order_comparison && <OrderComparisonSection data={analysis.order_comparison} />}
+```
+Adding a new enrichment section requires only: (1) add the type to `OrderAnalysis`, (2) create the section component, (3) add the conditional render — zero dispatch logic.
+
+**Shared helpers** (`shared.tsx`): `CollapsibleHeader` (used by ContextStrip, DiagnosticsSection) and `fmtPrice` (used by HeaderRibbon, ContextStrip, EvidenceGrid, enrichment sections).
 
 **Action feedback:** Approve/Reject/Escalate actions show toast notifications (success/error) via `useToast()`. List auto-refreshes after any action via `onActionComplete` callback.
+
+**WebSocket wiring:** The page orchestrator connects via `useWebSocket` and routes events to the detail panel via `onRefreshRef`. `pipeline_progress` events update the WaterfallStepper in real-time. `exception_update` and `task_complete` events refresh both the list and the currently viewed exception.
+
+**List indicators:** Exception cards show left border color: blue=selected, green=auto-resolved (GREEN verdict + terminal state), transparent otherwise. Terminal lifecycle state cards with GREEN verdict show a "Resolved" badge.
 
 **Governance:** No "Execute Recipe" button. Human acts as Review Authority (Approve/Reject/Escalate via AgentReasoningCard). Shadow Verdict displayed as read-only badge.
 
@@ -217,9 +240,14 @@ Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 | `PricingConditionType` | Pricing condition type enum (BASE/CONTRACT/TPR/UOM/RESULT/ERROR) | exceptions.ts |
 | `PricingWaterfallStep` | Single step in pricing waterfall visualization | exceptions.ts |
 | `LineItemAnalysis` | Per-line agent analysis with waterfall | exceptions.ts |
-| `OrderAnalysis` | Order-level agent analysis (drives detail panel). Extended with `root_cause`, `recommendation`, `entity_profile`, `impact_metrics` | exceptions.ts |
+| `OrderAnalysis` | Order-level agent analysis (drives detail panel). Extended with `root_cause`, `recommendation`, `entity_profile`, `impact_metrics`, `duplicate_detection?`, `order_comparison?` | exceptions.ts |
 | `EntityProfile` | Master data context for exception entity (customer name, BP number, tier, VIP, credit standing, location) | exceptions.ts |
 | `ImpactMetrics` | Quantitative "blast radius" (revenue at risk, delta, SLA priority, affected lines) | exceptions.ts |
+| `DuplicateDetectionData` | Duplicate detection summary: original/duplicate order snapshots, detection method, confidence, recommended action, autonomy level | exceptions.ts |
+| `OrderSnapshot` | Compact order snapshot for detection comparison (SO#, PO#, date, value, line count, status) | exceptions.ts |
+| `OrderComparisonData` | Side-by-side order comparison: orders array, matching fields, differing fields | exceptions.ts |
+| `ComparisonOrder` | Full order for comparison: SO#, PO#, date, customer, line items, total, status | exceptions.ts |
+| `ComparisonLineItem` | Single line item in comparison (SKU, description, qty, unit price) | exceptions.ts |
 
 ---
 
@@ -284,6 +312,8 @@ Implements Section 8:
 3. Receive `WSEvent` messages (`pipeline_progress`, `exception_update`, `task_complete`, `error`)
 4. Reconnect with exponential backoff (1s, 2s, 4s, 8s, max 30s)
 5. Send `last_seen_timestamp` on reconnect for event replay (60-second buffer)
+
+**Exception Queue wiring:** The page orchestrator (`/exceptions/page.tsx`) subscribes to WebSocket events and routes them to the detail panel via `onRefreshRef`. `pipeline_progress` events for the currently viewed exception update the WaterfallStepper in real-time. `exception_update` and `task_complete` events refresh both the exception list and the detail panel.
 
 ---
 

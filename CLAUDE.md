@@ -148,6 +148,16 @@ For new pages:
 
 ---
 
+## Deferred Capabilities
+
+The following capabilities are **not in scope** for current sessions. Do not implement, scaffold, or generate code for them unless explicitly requested:
+
+- **Figma integration** — Figma MCP tools, `get_design_context`, `use_figma`, screenshot-to-code, Code Connect mappings, and any Figma-driven implementation are deferred. The design system is defined in `skills/asoe-ui-design/SKILL.md` and `src/styles/design-tokens.css`. Do not use Figma URLs, Figma API calls, or Figma-derived code generation in any session.
+- **Dark mode** — Light mode only. No dark mode theming or toggle.
+- **Shadcn/ui installation** — Shadcn primitives (DataTable, Dialog, Select, Tooltip) are planned but not yet installed. Use custom components from `src/components/ui/` only.
+
+---
+
 ## Definition of Done
 
 A task is done only if:

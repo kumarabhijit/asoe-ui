@@ -283,8 +283,6 @@ This preserves Guardrail #2: a new intent added in `asoe2` that populates `dupli
 
 **WebSocket integration:** The page orchestrator connects via `useWebSocket` and routes events to the detail panel. `pipeline_progress`, `exception_update`, and `task_complete` events trigger data refresh for the currently viewed exception.
 
-**Decomposition axis:** The 5-layer structure (HeaderRibbon, ContextStrip, AgentAnalysis, EvidenceGrid, Diagnostics) should be extracted into reusable sub-components. Decompose along the **layer axis**, not the intent axis.
-
 ### 5.3 Dashboard (`/dashboard`) — Layout B
 
 **Spec alignment:** Implements Layout B (2-column grid) per Section 11.5. All KPIs from Section 11.6.
