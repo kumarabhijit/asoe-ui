@@ -21,18 +21,11 @@ interface DuplicateDetectionSectionProps {
 
 export function DuplicateDetectionSection({ data }: DuplicateDetectionSectionProps) {
   return (
-    <section
-      style={{
-        background: "var(--color-surface-primary)",
-        borderRadius: "var(--radius-md)",
-        boxShadow: "var(--shadow-sm)",
-        padding: "var(--space-16)",
-      }}
-    >
+    <section className="bg-surface-primary rounded-md shadow-sm p-16">
       {/* Section header */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-8)", marginBottom: "var(--space-12)" }}>
-        <Copy size={14} style={{ color: "var(--color-text-tertiary)" }} />
-        <span style={{ fontSize: "var(--font-size-subhead)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+      <div className="flex items-center gap-8 mb-12">
+        <Copy size={14} className="text-text-tertiary" />
+        <span className="text-subhead font-semibold text-text-primary">
           Duplicate Detection
         </span>
         <Badge variant="warning" size="sm">
@@ -41,28 +34,11 @@ export function DuplicateDetectionSection({ data }: DuplicateDetectionSectionPro
       </div>
 
       {/* Original vs Duplicate side-by-side */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr auto 1fr",
-          gap: "var(--space-12)",
-          marginBottom: "var(--space-16)",
-          alignItems: "start",
-        }}
-      >
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-12 mb-16 items-start">
         <OrderCard label="Original Order" order={data.original_order} />
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            paddingTop: "var(--space-24)",
-            color: "var(--color-text-quaternary)",
-          }}
-        >
+        <div className="flex flex-col items-center justify-center pt-24 text-text-quaternary">
           <ArrowRight size={20} />
-          <span style={{ fontSize: "var(--font-size-label)", marginTop: "var(--space-4)" }}>
+          <span className="text-label mt-4">
             {data.days_between}d apart
           </span>
         </div>
@@ -70,76 +46,35 @@ export function DuplicateDetectionSection({ data }: DuplicateDetectionSectionPro
       </div>
 
       {/* Detection method */}
-      <div style={{ marginBottom: "var(--space-12)" }}>
-        <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-4)" }}>
+      <div className="mb-12">
+        <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
           Detection Method
         </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-8)",
-            fontSize: "var(--font-size-body)",
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          <Shield size={14} style={{ color: "var(--color-text-tertiary)", flexShrink: 0 }} />
+        <div className="flex items-center gap-8 text-body text-text-secondary">
+          <Shield size={14} className="text-text-tertiary shrink-0" />
           {data.detection_method}
         </div>
       </div>
 
       {/* Recommended action */}
-      <div style={{ marginBottom: "var(--space-12)" }}>
-        <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-4)" }}>
+      <div className="mb-12">
+        <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
           Recommended Action
         </div>
-        <div
-          style={{
-            borderLeft: "3px solid var(--color-brand)",
-            paddingLeft: "var(--space-10)",
-            fontSize: "var(--font-size-body)",
-            fontWeight: 600,
-            color: "var(--color-brand)",
-            lineHeight: 1.5,
-          }}
-        >
+        <div className="border-l-[3px] border-brand pl-10 text-body font-semibold text-brand leading-normal">
           {data.recommended_action}
         </div>
-        <div
-          style={{
-            marginTop: "var(--space-4)",
-            paddingLeft: "var(--space-10)",
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-6)",
-            fontSize: "var(--font-size-caption)",
-            color: "var(--color-text-tertiary)",
-          }}
-        >
-          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>
-            Cancel target:
-          </span>
-          <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-error)", fontWeight: 600 }}>
-            {data.cancellation_target}
-          </span>
+        <div className="mt-4 pl-10 flex items-center gap-6 text-caption text-text-tertiary">
+          <span className="font-mono font-semibold">Cancel target:</span>
+          <span className="font-mono text-error font-semibold">{data.cancellation_target}</span>
         </div>
       </div>
 
       {/* Autonomy level */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-8)",
-          padding: "var(--space-8) var(--space-12)",
-          background: "var(--color-surface-secondary)",
-          borderRadius: "var(--radius-sm)",
-          fontSize: "var(--font-size-caption)",
-        }}
-      >
-        <Clock size={12} style={{ color: "var(--color-text-tertiary)" }} />
-        <span style={{ color: "var(--color-text-tertiary)", fontWeight: 600 }}>Autonomy:</span>
-        <span style={{ color: "var(--color-text-secondary)" }}>{data.autonomy_applied}</span>
+      <div className="flex items-center gap-8 px-12 py-8 bg-surface-secondary rounded-sm text-caption">
+        <Clock size={12} className="text-text-tertiary" />
+        <span className="text-text-tertiary font-semibold">Autonomy:</span>
+        <span className="text-text-secondary">{data.autonomy_applied}</span>
       </div>
     </section>
   );
@@ -149,39 +84,38 @@ export function DuplicateDetectionSection({ data }: DuplicateDetectionSectionPro
 function OrderCard({ label, order, highlight }: { label: string; order: OrderSnapshot; highlight?: boolean }) {
   return (
     <div
-      style={{
-        padding: "var(--space-12)",
-        borderRadius: "var(--radius-sm)",
-        border: `1px solid ${highlight ? "var(--color-warning)" : "var(--color-border-default)"}`,
-        background: highlight ? "var(--color-warning-subtle)" : "var(--color-surface-primary)",
-      }}
+      className={
+        highlight
+          ? "p-12 rounded-sm border border-warning bg-warning-subtle"
+          : "p-12 rounded-sm border border-border bg-surface-primary"
+      }
     >
-      <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-8)" }}>
+      <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-8">
         {label}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", fontSize: "var(--font-size-caption)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "var(--color-text-tertiary)" }}>SO #</span>
-          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-text-primary)" }}>{order.so_number}</span>
+      <div className="flex flex-col gap-4 text-caption">
+        <div className="flex justify-between">
+          <span className="text-text-tertiary">SO #</span>
+          <span className="font-mono font-semibold text-text-primary">{order.so_number}</span>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "var(--color-text-tertiary)" }}>PO #</span>
-          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-text-primary)" }}>{order.po_number}</span>
+        <div className="flex justify-between">
+          <span className="text-text-tertiary">PO #</span>
+          <span className="font-mono font-semibold text-text-primary">{order.po_number}</span>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "var(--color-text-tertiary)" }}>Created</span>
-          <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{new Date(order.created_date).toLocaleDateString()}</span>
+        <div className="flex justify-between">
+          <span className="text-text-tertiary">Created</span>
+          <span className="font-mono text-text-secondary">{new Date(order.created_date).toLocaleDateString()}</span>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "var(--color-text-tertiary)" }}>Value</span>
-          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-text-primary)" }}>{fmtPrice(order.total_value)}</span>
+        <div className="flex justify-between">
+          <span className="text-text-tertiary">Value</span>
+          <span className="font-mono font-semibold text-text-primary">{fmtPrice(order.total_value)}</span>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "var(--color-text-tertiary)" }}>Lines</span>
-          <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{order.line_count}</span>
+        <div className="flex justify-between">
+          <span className="text-text-tertiary">Lines</span>
+          <span className="font-mono text-text-secondary">{order.line_count}</span>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "var(--color-text-tertiary)" }}>Status</span>
+        <div className="flex justify-between">
+          <span className="text-text-tertiary">Status</span>
           <Badge variant="neutral" size="sm">{order.status}</Badge>
         </div>
       </div>

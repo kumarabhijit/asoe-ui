@@ -1,4 +1,5 @@
 import { Layers } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface LogoProps {
   size?: "sm" | "md" | "lg";
@@ -6,50 +7,26 @@ interface LogoProps {
 }
 
 const sizes = {
-  sm: { box: 32, icon: 16, title: 15, gap: 8 },
-  md: { box: 40, icon: 20, title: 20, gap: 10 },
-  lg: { box: 48, icon: 24, title: 24, gap: 12 },
+  sm: { box: "w-8 h-8", icon: 16, title: "text-[15px]", gap: "gap-2" },
+  md: { box: "w-10 h-10", icon: 20, title: "text-[20px]", gap: "gap-2.5" },
+  lg: { box: "w-12 h-12", icon: 24, title: "text-[24px]", gap: "gap-3" },
 };
 
 export function Logo({ size = "md", showTagline = false }: LogoProps) {
   const s = sizes[size];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--space-8)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: s.gap }}>
-        <div
-          style={{
-            width: s.box,
-            height: s.box,
-            borderRadius: "var(--radius-md)",
-            background: "var(--color-brand)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <Layers size={s.icon} color="var(--color-text-inverse)" strokeWidth={2.5} />
+    <div className="flex flex-col items-center gap-8">
+      <div className={cn("flex items-center", s.gap)}>
+        <div className={cn(s.box, "rounded-md bg-brand flex items-center justify-center shrink-0")}>
+          <Layers size={s.icon} className="text-text-inverse" strokeWidth={2.5} />
         </div>
-        <span
-          style={{
-            fontWeight: 700,
-            fontSize: s.title,
-            color: "var(--color-text-primary)",
-            letterSpacing: "-0.01em",
-          }}
-        >
+        <span className={cn(s.title, "font-bold text-text-primary tracking-tight")}>
           ASOE
         </span>
       </div>
       {showTagline && (
-        <span
-          style={{
-            fontSize: "var(--font-size-body)",
-            color: "var(--color-text-tertiary)",
-            fontWeight: 400,
-          }}
-        >
+        <span className="text-body text-text-tertiary font-normal">
           Agentic System of Engagement
         </span>
       )}

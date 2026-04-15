@@ -8,6 +8,7 @@
 
 import { ChevronRight } from "lucide-react";
 import { Badge, lifecycleVariant, verdictVariant } from "@/components/ui/Badge";
+import { fmtPrice } from "./shared";
 import type { ExceptionDetail, EntityProfile } from "@/types/exceptions";
 
 interface HeaderRibbonProps {
@@ -18,38 +19,16 @@ interface HeaderRibbonProps {
   delta: number;
 }
 
-function fmtPrice(n: number): string {
-  return `$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, totalPo, delta }: HeaderRibbonProps) {
   return (
-    <div
-      style={{
-        padding: "var(--space-10) var(--space-16)",
-        borderBottom: "1px solid var(--color-border-default)",
-        background: "var(--color-surface-primary)",
-        flexShrink: 0,
-      }}
-    >
+    <div className="px-16 py-10 border-b border-border bg-surface-primary shrink-0">
       {/* Breadcrumb row */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-6)",
-          fontSize: "var(--font-size-caption)",
-          color: "var(--color-text-tertiary)",
-          marginBottom: "var(--space-6)",
-          flexWrap: "wrap",
-          minWidth: 0,
-        }}
-      >
-        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <div className="flex items-center gap-6 text-caption text-text-tertiary mb-6 flex-wrap min-w-0">
+        <span className="font-mono font-bold text-text-primary">
           {detail.order_id}
         </span>
         <ChevronRight size={10} />
-        <span style={{ fontWeight: 500, color: "var(--color-text-secondary)" }}>
+        <span className="font-medium text-text-secondary">
           {ep?.customer_name ?? detail.tenant_id}
         </span>
         <ChevronRight size={10} />
@@ -58,12 +37,12 @@ export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, total
         <span>{primarySkuLabel}</span>
       </div>
 
-      {/* Status row: lifecycle + event type + shadow verdict read-only */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", flexWrap: "wrap" }}>
+      {/* Status row */}
+      <div className="flex items-center gap-6 flex-wrap">
         <Badge variant={lifecycleVariant(detail.lifecycle_state)} size="sm">
           {detail.lifecycle_state.replace(/_/g, " ")}
         </Badge>
-        <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-tertiary)" }}>
+        <span className="text-caption text-text-tertiary">
           {detail.event_type.replace(/_/g, " ")}
         </span>
         {detail.shadow_verdict && (
@@ -71,26 +50,12 @@ export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, total
             {detail.shadow_verdict}
           </Badge>
         )}
-        <div style={{ flex: 1 }} />
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontWeight: 700,
-            fontSize: "var(--font-size-body)",
-            color: "var(--color-text-primary)",
-          }}
-        >
+        <div className="flex-1" />
+        <span className="font-mono font-bold text-body text-text-primary">
           {fmtPrice(totalPo)}
         </span>
         {delta !== 0 && (
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontWeight: 600,
-              fontSize: "var(--font-size-caption)",
-              color: "var(--color-error)",
-            }}
-          >
+          <span className="font-mono font-semibold text-caption text-error">
             {"\u0394"} {fmtPrice(Math.abs(delta))}
           </span>
         )}

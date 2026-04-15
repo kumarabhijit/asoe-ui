@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from "react";
 import { X, Check, AlertTriangle, ShieldX, Info } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type ToastVariant = "success" | "warning" | "error" | "info";
 
@@ -26,15 +27,15 @@ export function useToast() {
   return useContext(ToastContext);
 }
 
-const VARIANT_STYLES: Record<ToastVariant, { bg: string; icon: ReactNode }> = {
-  success: { bg: "var(--color-success)", icon: <Check size={16} /> },
-  warning: { bg: "var(--color-warning)", icon: <AlertTriangle size={16} /> },
-  error: { bg: "var(--color-error)", icon: <ShieldX size={16} /> },
-  info: { bg: "var(--color-info)", icon: <Info size={16} /> },
+const VARIANT_CONFIG: Record<ToastVariant, { className: string; icon: ReactNode }> = {
+  success: { className: "bg-success", icon: <Check size={16} /> },
+  warning: { className: "bg-warning", icon: <AlertTriangle size={16} /> },
+  error: { className: "bg-error", icon: <ShieldX size={16} /> },
+  info: { className: "bg-info", icon: <Info size={16} /> },
 };
 
 function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: string) => void }) {
-  const v = VARIANT_STYLES[item.variant];
+  const v = VARIANT_CONFIG[item.variant];
 
   useEffect(() => {
     const timer = setTimeout(() => onDismiss(item.id), item.duration || 4500);
@@ -45,35 +46,17 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: strin
     <div
       role="status"
       aria-live="polite"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "var(--space-10)",
-        padding: "var(--space-12) var(--space-16)",
-        background: v.bg,
-        color: "#fff",
-        borderRadius: "var(--radius-md)",
-        boxShadow: "var(--shadow-lg)",
-        fontSize: "var(--font-size-body)",
-        fontWeight: 500,
-        animation: "toastSlideIn var(--dur-normal) var(--ease-out)",
-        maxWidth: 400,
-      }}
+      className={cn(
+        "flex items-center gap-10 px-16 py-12 text-white rounded-md shadow-lg text-body font-medium max-w-[400px] animate-in slide-in-from-right-6 duration-normal",
+        v.className,
+      )}
     >
-      <span style={{ flexShrink: 0, display: "flex" }}>{v.icon}</span>
-      <span style={{ flex: 1 }}>{item.message}</span>
+      <span className="shrink-0 flex">{v.icon}</span>
+      <span className="flex-1">{item.message}</span>
       <button
         onClick={() => onDismiss(item.id)}
         aria-label="Dismiss"
-        style={{
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          color: "rgba(255,255,255,0.8)",
-          padding: 2,
-          display: "flex",
-          flexShrink: 0,
-        }}
+        className="bg-transparent border-none cursor-pointer text-white/80 p-px flex shrink-0 hover:text-white"
       >
         <X size={14} />
       </button>
@@ -96,30 +79,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
-      {/* Toast container — fixed bottom-right */}
       {toasts.length > 0 && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: "var(--space-24)",
-            right: "var(--space-24)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--space-8)",
-            zIndex: "var(--z-toast)",
-          }}
-        >
+        <div className="fixed bottom-24 right-24 flex flex-col gap-8 z-toast">
           {toasts.map((t) => (
             <ToastItem key={t.id} item={t} onDismiss={dismiss} />
           ))}
         </div>
       )}
-      <style>{`
-        @keyframes toastSlideIn {
-          from { opacity: 0; transform: translateX(24px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-      `}</style>
     </ToastContext.Provider>
   );
 }

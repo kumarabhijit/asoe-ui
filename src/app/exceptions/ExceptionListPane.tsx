@@ -21,6 +21,7 @@ import { Badge, lifecycleVariant, verdictVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/Select";
+import { cn } from "@/lib/utils";
 import type { ExceptionSummary, HealthResponse } from "@/types/exceptions";
 import type { StatsResponse } from "@/types/api";
 
@@ -76,55 +77,17 @@ export default function ExceptionListPane({
   onRefresh,
 }: ExceptionListPaneProps) {
   return (
-    <div
-      style={{
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        background: "var(--color-surface-page)",
-        minWidth: 0,
-      }}
-    >
+    <div className="h-full flex flex-col bg-surface-page min-w-0">
       {/* ── Pane Header ──────────────────────────────────────────────── */}
-      <div
-        style={{
-          padding: "var(--space-12) var(--space-16)",
-          borderBottom: "1px solid var(--color-border-default)",
-          background: "var(--color-surface-primary)",
-          flexShrink: 0,
-        }}
-      >
+      <div className="px-16 py-12 border-b border-border bg-surface-primary shrink-0">
         {/* Title row */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: "var(--space-10)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-8)" }}>
-            <Shield size={16} color="var(--color-text-primary)" />
-            <h2
-              style={{
-                fontSize: "var(--font-size-heading)",
-                fontWeight: 700,
-                color: "var(--color-text-primary)",
-                margin: 0,
-              }}
-            >
+        <div className="flex items-center justify-between mb-10">
+          <div className="flex items-center gap-8">
+            <Shield size={16} className="text-text-primary" />
+            <h2 className="text-heading font-bold text-text-primary m-0">
               Exceptions
             </h2>
-            <span
-              style={{
-                fontSize: "var(--font-size-label)",
-                fontWeight: 600,
-                color: "var(--color-text-tertiary)",
-                background: "var(--color-surface-secondary)",
-                padding: "2px 8px",
-                borderRadius: "var(--radius-full)",
-              }}
-            >
+            <span className="text-label font-semibold text-text-tertiary bg-surface-secondary px-2 py-px rounded-full">
               {exceptions.length}
             </span>
           </div>
@@ -135,14 +98,7 @@ export default function ExceptionListPane({
 
         {/* Compact inline metrics */}
         {stats && (
-          <div
-            style={{
-              display: "flex",
-              gap: "var(--space-12)",
-              marginBottom: "var(--space-10)",
-              fontSize: "var(--font-size-caption)",
-            }}
-          >
+          <div className="flex gap-12 mb-10 text-caption">
             <CompactMetric label="Open" value={stats.open_exceptions} color="var(--color-warning)" />
             <CompactMetric label="Resolved" value={stats.auto_resolved} color="var(--color-success)" />
             <CompactMetric
@@ -166,9 +122,9 @@ export default function ExceptionListPane({
         />
 
         {/* Filter row */}
-        <div style={{ display: "flex", gap: "var(--space-6)", marginTop: "var(--space-8)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", flex: 1 }}>
-            <Filter size={12} color="var(--color-text-tertiary)" />
+        <div className="flex gap-6 mt-8">
+          <div className="flex items-center gap-4 flex-1">
+            <Filter size={12} className="text-text-tertiary" />
             <Select value={filterState} onValueChange={(v) => onFilterStateChange(v === "__all__" ? "" : v)}>
               <SelectTrigger aria-label="Filter by lifecycle state" className="flex-1">
                 <SelectValue placeholder="All States" />
@@ -200,30 +156,14 @@ export default function ExceptionListPane({
 
         {/* Active filter indicator */}
         {hasActiveFilters && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "var(--space-4) 0",
-            }}
-          >
-            <span style={{ fontSize: "var(--font-size-label)", color: "var(--color-text-tertiary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              <Filter size={10} style={{ marginRight: "var(--space-4)", verticalAlign: "middle" }} />
+          <div className="flex items-center justify-between py-4">
+            <span className="text-label text-text-tertiary font-semibold uppercase tracking-wider">
+              <Filter size={10} className="mr-4 inline align-middle" />
               Filters active
             </span>
             <button
               onClick={onClearFilters}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "var(--font-size-label)",
-                fontWeight: 600,
-                color: "var(--color-brand)",
-                fontFamily: "var(--font-sans)",
-                padding: 0,
-              }}
+              className="bg-transparent border-none cursor-pointer text-label font-semibold text-brand font-sans p-0"
             >
               Clear all
             </button>
@@ -232,55 +172,31 @@ export default function ExceptionListPane({
       </div>
 
       {/* ── Scrollable Exception Card List ────────────────────────────── */}
-      <div
-        role="listbox"
-        aria-label="Exception list"
-        style={{
-          flex: 1,
-          overflow: "auto",
-          padding: "var(--space-6)",
-        }}
-      >
+      <div role="listbox" aria-label="Exception list" className="flex-1 overflow-auto p-6">
         {loading ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)", padding: "var(--space-4)" }}>
+          <div className="flex flex-col gap-6 p-4">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="skeleton"
-                style={{ height: 68, borderRadius: "var(--radius-md)" }}
-              />
+              <div key={i} className="skeleton h-[68px] rounded-md" />
             ))}
           </div>
         ) : error ? (
-          <div
-            style={{
-              padding: "var(--space-32)",
-              textAlign: "center",
-              color: "var(--color-error)",
-            }}
-          >
-            <AlertTriangle size={24} style={{ marginBottom: "var(--space-8)" }} />
-            <div style={{ fontSize: "var(--font-size-body)", fontWeight: 500, marginBottom: "var(--space-8)" }}>{error}</div>
+          <div className="p-32 text-center text-error">
+            <AlertTriangle size={24} className="mb-8" />
+            <div className="text-body font-medium mb-8">{error}</div>
             <Button variant="neutral" size="sm" onClick={onRefresh}>Retry</Button>
           </div>
         ) : exceptions.length === 0 ? (
-          <div
-            style={{
-              padding: "var(--space-32)",
-              textAlign: "center",
-              color: "var(--color-text-quaternary)",
-            }}
-          >
-            <CheckCircle size={24} style={{ marginBottom: "var(--space-8)" }} />
-            <div style={{ fontSize: "var(--font-size-body)" }}>No exceptions match your filters</div>
+          <div className="p-32 text-center text-text-quaternary">
+            <CheckCircle size={24} className="mb-8" />
+            <div className="text-body">No exceptions match your filters</div>
             {(filterState || filterIntent || searchQuery) && (
-              <div style={{ fontSize: "var(--font-size-caption)", marginTop: "var(--space-4)" }}>
+              <div className="text-caption mt-4">
                 Try clearing your filters to see all exceptions.
               </div>
             )}
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          <div className="flex flex-col gap-4">
             {exceptions.map((exc) => (
               <ExceptionCard
                 key={exc.id}
@@ -300,26 +216,10 @@ export default function ExceptionListPane({
 
 function CompactMetric({ label, value, color }: { label: string; value: string | number; color: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
-      <div
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: "var(--radius-full)",
-          background: color,
-          flexShrink: 0,
-        }}
-      />
-      <span style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>{label}</span>
-      <span
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontWeight: 700,
-          color: "var(--color-text-primary)",
-        }}
-      >
-        {value}
-      </span>
+    <div className="flex items-center gap-4">
+      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+      <span className="text-text-tertiary font-medium">{label}</span>
+      <span className="font-mono font-bold text-text-primary">{value}</span>
     </div>
   );
 }
@@ -357,53 +257,24 @@ function ExceptionCard({
           onSelect();
         }
       }}
-      style={{
-        width: "100%",
-        textAlign: "left",
-        padding: "var(--space-10) var(--space-12)",
-        borderRadius: "var(--radius-md)",
-        borderLeft: `3px solid ${getLeftBorderColor(exc, isSelected)}`,
-        background: isSelected
-          ? "var(--color-surface-row-active)"
-          : "var(--color-surface-primary)",
-        cursor: "pointer",
-        fontFamily: "var(--font-sans)",
-        transition: "all var(--dur-fast)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--space-4)",
-      }}
+      className={cn(
+        "w-full text-left px-12 py-10 rounded-md border-l-[3px] cursor-pointer font-sans transition-all duration-fast flex flex-col gap-4",
+        isSelected ? "bg-surface-row-active" : "bg-surface-primary",
+      )}
+      style={{ borderLeftColor: getLeftBorderColor(exc, isSelected) }}
     >
       {/* Row 1: Order ID + Timestamp */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-6)", minWidth: 0 }}>
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: "var(--font-size-body)",
-            fontWeight: 700,
-            color: "var(--color-text-primary)",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            minWidth: 0,
-          }}
-        >
+      <div className="flex items-center justify-between gap-6 min-w-0">
+        <span className="font-mono text-body font-bold text-text-primary overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
           {exc.order_id}
         </span>
-        <span
-          style={{
-            fontSize: "var(--font-size-label)",
-            color: "var(--color-text-quaternary)",
-            fontFamily: "var(--font-mono)",
-            flexShrink: 0,
-          }}
-        >
+        <span className="text-label text-text-quaternary font-mono shrink-0">
           {formatTime(exc.created_at)}
         </span>
       </div>
 
       {/* Row 2: Intent tag + lifecycle badge + verdict */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", flexWrap: "wrap" }}>
+      <div className="flex items-center gap-4 flex-wrap">
         {exc.intent && (
           <Badge variant="brand" size="sm" icon={null}>
             {exc.intent.replace(/_/g, " ")}

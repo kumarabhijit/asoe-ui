@@ -21,43 +21,27 @@ interface OrderComparisonSectionProps {
 
 export function OrderComparisonSection({ data }: OrderComparisonSectionProps) {
   return (
-    <section
-      style={{
-        background: "var(--color-surface-primary)",
-        borderRadius: "var(--radius-md)",
-        boxShadow: "var(--shadow-sm)",
-        padding: "var(--space-16)",
-      }}
-    >
+    <section className="bg-surface-primary rounded-md shadow-sm p-16">
       {/* Section header */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-8)", marginBottom: "var(--space-12)" }}>
-        <GitCompare size={14} style={{ color: "var(--color-text-tertiary)" }} />
-        <span style={{ fontSize: "var(--font-size-subhead)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+      <div className="flex items-center gap-8 mb-12">
+        <GitCompare size={14} className="text-text-tertiary" />
+        <span className="text-subhead font-semibold text-text-primary">
           Order Comparison
         </span>
-        <span
-          style={{
-            fontSize: "var(--font-size-label)",
-            fontWeight: 600,
-            color: "var(--color-text-tertiary)",
-            background: "var(--color-surface-secondary)",
-            padding: "2px 8px",
-            borderRadius: "var(--radius-full)",
-          }}
-        >
+        <span className="text-label font-semibold text-text-tertiary bg-surface-secondary px-2 py-px rounded-full">
           {data.orders.length} orders
         </span>
       </div>
 
       {/* Matching / Differing field badges */}
-      <div style={{ display: "flex", gap: "var(--space-16)", marginBottom: "var(--space-12)", flexWrap: "wrap" }}>
+      <div className="flex gap-16 mb-12 flex-wrap">
         {data.matching_fields.length > 0 && (
           <div>
-            <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-4)", display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
-              <Check size={10} style={{ color: "var(--color-success)" }} />
+            <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4 flex items-center gap-4">
+              <Check size={10} className="text-success" />
               Matching Fields
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-4)" }}>
+            <div className="flex flex-wrap gap-4">
               {data.matching_fields.map((f) => (
                 <Badge key={f} variant="success" size="sm">{f.replace(/_/g, " ")}</Badge>
               ))}
@@ -66,11 +50,11 @@ export function OrderComparisonSection({ data }: OrderComparisonSectionProps) {
         )}
         {data.differing_fields.length > 0 && (
           <div>
-            <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-4)", display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
-              <X size={10} style={{ color: "var(--color-error)" }} />
+            <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4 flex items-center gap-4">
+              <X size={10} className="text-error" />
               Differing Fields
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-4)" }}>
+            <div className="flex flex-wrap gap-4">
               {data.differing_fields.map((f) => (
                 <Badge key={f} variant="error" size="sm">{f.replace(/_/g, " ")}</Badge>
               ))}
@@ -81,11 +65,8 @@ export function OrderComparisonSection({ data }: OrderComparisonSectionProps) {
 
       {/* Orders side-by-side */}
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${data.orders.length}, 1fr)`,
-          gap: "var(--space-12)",
-        }}
+        className="grid gap-12"
+        style={{ gridTemplateColumns: `repeat(${data.orders.length}, 1fr)` }}
       >
         {data.orders.map((order, i) => (
           <OrderComparisonCard key={order.so_number} order={order} index={i} />
@@ -96,27 +77,27 @@ export function OrderComparisonSection({ data }: OrderComparisonSectionProps) {
 }
 
 function OrderComparisonCard({ order, index }: { order: ComparisonOrder; index: number }) {
+  const isDuplicate = index > 0;
   return (
     <div
-      style={{
-        padding: "var(--space-12)",
-        borderRadius: "var(--radius-sm)",
-        border: `1px solid ${index === 0 ? "var(--color-border-default)" : "var(--color-warning)"}`,
-        background: index === 0 ? "var(--color-surface-primary)" : "var(--color-warning-subtle)",
-      }}
+      className={
+        isDuplicate
+          ? "p-12 rounded-sm border border-warning bg-warning-subtle"
+          : "p-12 rounded-sm border border-border bg-surface-primary"
+      }
     >
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-8)" }}>
-        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: "var(--font-size-body)", color: "var(--color-text-primary)" }}>
+      <div className="flex items-center justify-between mb-8">
+        <span className="font-mono font-bold text-body text-text-primary">
           {order.so_number}
         </span>
-        <Badge variant={index === 0 ? "success" : "warning"} size="sm">
-          {index === 0 ? "Original" : "Duplicate"}
+        <Badge variant={isDuplicate ? "warning" : "success"} size="sm">
+          {isDuplicate ? "Duplicate" : "Original"}
         </Badge>
       </div>
 
       {/* Order metadata */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", fontSize: "var(--font-size-caption)", marginBottom: "var(--space-10)" }}>
+      <div className="flex flex-col gap-4 text-caption mb-10">
         <MetaRow label="PO #" value={order.po_number} mono />
         <MetaRow label="Customer" value={order.customer} />
         <MetaRow label="Created" value={new Date(order.created_date).toLocaleDateString()} mono />
@@ -127,23 +108,17 @@ function OrderComparisonCard({ order, index }: { order: ComparisonOrder; index: 
       {/* Line items */}
       {order.lines.length > 0 && (
         <>
-          <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-4)" }}>
+          <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
             Line Items
           </div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--font-size-caption)" }}>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-caption">
               <thead>
-                <tr style={{ borderBottom: "1px solid var(--color-border-default)" }}>
+                <tr className="border-b border-border">
                   {["SKU", "Qty", "Price"].map((h) => (
                     <th
                       key={h}
-                      style={{
-                        padding: "var(--space-4) var(--space-6)",
-                        textAlign: h === "SKU" ? "left" : "right",
-                        fontSize: "var(--font-size-label)",
-                        fontWeight: 700,
-                        color: "var(--color-text-tertiary)",
-                      }}
+                      className={`px-6 py-4 text-label font-bold text-text-tertiary ${h !== "SKU" ? "text-right" : "text-left"}`}
                     >
                       {h}
                     </th>
@@ -152,10 +127,10 @@ function OrderComparisonCard({ order, index }: { order: ComparisonOrder; index: 
               </thead>
               <tbody>
                 {order.lines.map((line) => (
-                  <tr key={line.sku} style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                    <td style={{ padding: "var(--space-4) var(--space-6)", fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{line.sku}</td>
-                    <td style={{ padding: "var(--space-4) var(--space-6)", textAlign: "right", fontFamily: "var(--font-mono)" }}>{line.qty.toLocaleString()}</td>
-                    <td style={{ padding: "var(--space-4) var(--space-6)", textAlign: "right", fontFamily: "var(--font-mono)" }}>{fmtPrice(line.unit_price)}</td>
+                  <tr key={line.sku} className="border-b border-border-subtle">
+                    <td className="px-6 py-4 font-mono text-text-secondary">{line.sku}</td>
+                    <td className="px-6 py-4 text-right font-mono">{line.qty.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right font-mono">{fmtPrice(line.unit_price)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -169,14 +144,10 @@ function OrderComparisonCard({ order, index }: { order: ComparisonOrder; index: 
 
 function MetaRow({ label, value, mono, highlight }: { label: string; value: string; mono?: boolean; highlight?: boolean }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <span style={{ color: "var(--color-text-tertiary)" }}>{label}</span>
+    <div className="flex justify-between items-center">
+      <span className="text-text-tertiary">{label}</span>
       <span
-        style={{
-          fontFamily: mono ? "var(--font-mono)" : "var(--font-sans)",
-          fontWeight: highlight ? 700 : 500,
-          color: highlight ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-        }}
+        className={`${mono ? "font-mono" : ""} ${highlight ? "font-bold text-text-primary" : "font-medium text-text-secondary"}`}
       >
         {value}
       </span>
