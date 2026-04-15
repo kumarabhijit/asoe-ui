@@ -42,6 +42,7 @@ import { PriceAnalysisSection } from "./PriceAnalysisSection";
 import { BackOrderSection } from "./BackOrderSection";
 import { OverMaxSection } from "./OverMaxSection";
 import { MOQSection } from "./MOQSection";
+import { PalletConfigSection } from "./PalletConfigSection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -310,6 +311,9 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
           )}
           {analysis?.moq_analysis && (
             <MOQSection data={analysis.moq_analysis} />
+          )}
+          {analysis?.pallet_analysis && (
+            <PalletConfigSection data={analysis.pallet_analysis} />
           )}
 
           {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
