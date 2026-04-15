@@ -194,6 +194,25 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 
 ---
 
+### [x] PHASE 8.8: Duplicate PO Detail Rendering & Panel Decomposition
+- [x] Decompose `ExceptionDetailPanel` (1091 lines → 357-line orchestrator + 8 sub-components) along the 5-layer axis
+- [x] Extract `HeaderRibbon`, `ContextStrip`, `AgentAnalysisSection`, `EvidenceGrid`, `DiagnosticsSection`, `shared` helpers
+- [x] Add `DuplicateDetectionData` and `OrderComparisonData` types to `src/types/exceptions.ts`
+- [x] Add optional `duplicate_detection` and `order_comparison` fields to `OrderAnalysis`
+- [x] Create `DuplicateDetectionSection` — original vs duplicate order, detection method, confidence, recommended action, autonomy
+- [x] Create `OrderComparisonSection` — side-by-side order comparison with matching/differing field badges
+- [x] All new sections use data-presence pattern (`{data?.field && <Section />}`) — zero intent-string branching (Guardrail #2)
+- [x] Add GREEN verdict Duplicate PO mock (exc-009: $504 auto-blocked, L1 autonomy)
+- [x] Enrich YELLOW verdict mocks (exc-002, exc-006) with `duplicate_detection` and `order_comparison` data
+- [x] Wire WebSocket to exception detail panel via `onRefreshRef` callback for real-time pipeline updates
+- [x] Add left border color indicators to exception list cards (green=auto-resolved GREEN, blue=selected)
+- [x] Add "Resolved" badge on terminal lifecycle state cards with GREEN verdict
+- [x] Update `ui_architecture.md` Section 5.2 with decomposition table and new types
+
+✅ Outcome: Duplicate PO exceptions render rich detection + comparison data. Detail panel decomposed for maintainability. WebSocket wired for real-time updates. 9 mock exceptions, 242 tests pass. (2026-04-15)
+
+---
+
 ## Remaining Phases
 
 ### [ ] PHASE 9: Settings & Admin Page
