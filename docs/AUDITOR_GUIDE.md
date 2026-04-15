@@ -133,11 +133,13 @@ The UI renders compliance-critical data faithfully from the backend:
 | Policy hits | `GET /exceptions/{id}/trace` | AgentReasoningCard Layer 2 |
 | Gateway calls | Trace response | AgentReasoningCard Layer 2 |
 | Backend fallback tier | Trace response | AgentReasoningCard Layer 2 |
-| Resolution data | Exception detail | ExceptionDetailPanel JSON view |
-| Pipeline progress | WebSocket events | WaterfallStepper |
-| resolved_by / resolved_action / resolution_notes | Exception detail | ExceptionDetailPanel |
+| Resolution data | Exception detail | DiagnosticsSection JSON view |
+| Pipeline progress | WebSocket events (wired to detail panel via `onRefreshRef`) | WaterfallStepper (in DiagnosticsSection) |
+| resolved_by / resolved_action / resolution_notes | Exception detail | DiagnosticsSection |
+| Duplicate detection (original vs duplicate order, confidence, autonomy) | `GET /exceptions/{id}/analysis` | DuplicateDetectionSection (data-presence) |
+| Order comparison (matching/differing fields, line-item diff) | `GET /exceptions/{id}/analysis` | OrderComparisonSection (data-presence) |
 
-**How to verify:** Check `src/app/exceptions/ExceptionDetailPanel.tsx`, `src/components/ui/AgentReasoningCard.tsx`.
+**How to verify:** Check `src/app/exceptions/ExceptionDetailPanel.tsx` (orchestrator) and sub-components: `HeaderRibbon.tsx`, `ContextStrip.tsx`, `AgentAnalysisSection.tsx`, `EvidenceGrid.tsx`, `DiagnosticsSection.tsx`, `DuplicateDetectionSection.tsx`, `OrderComparisonSection.tsx`. Also check `src/components/ui/AgentReasoningCard.tsx`.
 
 **SOX relevance:** Audit trail accessible to compliance reviewers through the UI.
 

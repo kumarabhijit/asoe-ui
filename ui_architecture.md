@@ -238,17 +238,34 @@ Card click → on-demand fetch:
 
 **Spec alignment:** Implements AgentReasoningCard (Layer 1/2), WaterfallStepper per Section 11.1, 11.2. Polymorphic — adapts to any exception intent (pricing, credit, duplicate PO).
 
-**Structure (5 layers):**
+**Decomposition (Phase 8.8):** The detail panel is decomposed along the **5-layer axis** into focused sub-components:
+
+| Sub-Component | File | Purpose |
+|---|---|---|
+| `HeaderRibbon` | `src/app/exceptions/HeaderRibbon.tsx` | Breadcrumb context, lifecycle/verdict badges, total value |
+| `ContextStrip` | `src/app/exceptions/ContextStrip.tsx` | Entity Profile + Impact Metrics two-column grid (collapsible) |
+| `AgentAnalysisSection` | `src/app/exceptions/AgentAnalysisSection.tsx` | Problem / Root Cause / Recommendation narratives |
+| `EvidenceGrid` | `src/app/exceptions/EvidenceGrid.tsx` | Collapsible line-item table + pricing waterfall |
+| `DiagnosticsSection` | `src/app/exceptions/DiagnosticsSection.tsx` | Pipeline progress + trace evidence tabs (behind toggle) |
+| `DuplicateDetectionSection` | `src/app/exceptions/DuplicateDetectionSection.tsx` | Data-presence enrichment: original vs duplicate order comparison |
+| `OrderComparisonSection` | `src/app/exceptions/OrderComparisonSection.tsx` | Data-presence enrichment: side-by-side order line-item comparison |
+| `shared` | `src/app/exceptions/shared.tsx` | CollapsibleHeader, fmtPrice helpers |
+
+The orchestrator (`ExceptionDetailPanel.tsx`, ~357 lines) composes these sub-components. Each sub-component is **intent-agnostic** — driven by data, not intent strings.
+
+**Structure (5 layers + enrichment):**
 1. **Dynamic Header Ribbon** — breadcrumb context: Reference ID > Customer Name > Location > Primary SKU or "N Lines Affected". Lifecycle badge + Shadow Verdict (read-only) + total value.
 2. **Context Strip** (two-column) — Entity Profile (customer, BP number, tier, VIP, credit standing, location) | Impact Metrics (revenue at risk, delta amount/%, SLA priority/deadline, affected lines).
-3. **Agent Analysis** — "The Problem" (diagnosis narrative), "Root Cause" (deterministic cause), "Recommendation" (one-line action). Followed by AgentReasoningCard with Layer 1/2 and Approve/Reject/Escalate actions.
+3. **Agent Analysis** — "The Problem" (diagnosis narrative), "Root Cause" (deterministic cause), "Recommendation" (one-line action). Followed by AgentReasoningCard with Layer 1/2 and Approve/Reject/Escalate actions. **Plus** data-presence-driven enrichment sections (DuplicateDetection, OrderComparison).
 4. **Evidence Grid** — collapsed by default to reduce cognitive load. Expandable: line-item table (Line, SKU, Description, Qty, ERP, PO, Root Cause), line selector pills, PricingWaterfall for selected line.
 5. **Supporting Context** — Pipeline progress (WaterfallStepper), Trace Evidence tabs (Evidence | SAP Data | Change Analysis), Resolution data (JSON).
 
-**New types driving polymorphism:**
+**Types driving polymorphism:**
 - `EntityProfile` — customer master data (name, BP, tier, VIP, credit standing, location, region)
 - `ImpactMetrics` — blast radius (revenue at risk, delta, SLA priority, affected lines)
 - `OrderAnalysis` extended with `root_cause`, `recommendation`, `entity_profile`, `impact_metrics`
+- `DuplicateDetectionData` — original/duplicate order snapshots, detection method, confidence, recommended action, autonomy level
+- `OrderComparisonData` — side-by-side orders with matching/differing field indicators and line-item comparison
 
 **Intent-specific rendering: data-presence pattern (not component dispatch).**
 
@@ -257,14 +274,14 @@ The detail panel is polymorphic via data, not via intent-string dispatch. Differ
 ```tsx
 // CORRECT: data-presence-driven sections
 {analysis?.duplicate_detection && <DuplicateDetectionSection data={analysis.duplicate_detection} />}
-{analysis?.pricing_waterfall && <PricingWaterfallSection data={analysis.pricing_waterfall} />}
+{analysis?.order_comparison && <OrderComparisonSection data={analysis.order_comparison} />}
 ```
 
 This preserves Guardrail #2: a new intent added in `asoe2` that populates `duplicate_detection` automatically gets the section rendered — zero UI code changes. A new intent with no specialized data gets the full generic 5-layer layout.
 
 **Forbidden:** Dispatching to intent-named components via switch/map on the intent string (e.g., `switch (intent) { case 'DUPLICATE_PO': ... }`). This would couple the UI to the intent vocabulary and fail the Guardrail #2 zero-change test. See `prompts/exception_queue_duplicate_po.md` for full rationale.
 
-**Decomposition axis:** The 5-layer structure (HeaderRibbon, ContextStrip, AgentAnalysis, EvidenceGrid, Diagnostics) should be extracted into reusable sub-components. Decompose along the **layer axis**, not the intent axis.
+**WebSocket integration:** The page orchestrator connects via `useWebSocket` and routes events to the detail panel. `pipeline_progress`, `exception_update`, and `task_complete` events trigger data refresh for the currently viewed exception.
 
 ### 5.3 Dashboard (`/dashboard`) — Layout B
 

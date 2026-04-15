@@ -19,7 +19,7 @@
  */
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
@@ -27,9 +27,11 @@ import { Inbox } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { exceptionsApi } from "@/lib/api";
 import type { ExceptionSummary } from "@/types/exceptions";
 import type { StatsResponse } from "@/types/api";
+import type { WSEvent } from "@/types/websocket";
 import ExceptionListPane from "./ExceptionListPane";
 import ExceptionDetailPanel from "./ExceptionDetailPanel";
 
@@ -124,6 +126,36 @@ function ExceptionQueueContent() {
       setSelectedId(exceptions[0].id);
     }
   }, [exceptions, selectedId]);
+
+  /* ── WebSocket — real-time pipeline updates ──────────────────────── */
+  const detailRefreshRef = useRef<(() => void) | null>(null);
+
+  const handleWsEvent = useCallback((event: WSEvent) => {
+    if (event.type === "pipeline_progress") {
+      // Pipeline progress for currently viewed exception — notify detail panel
+      if (event.exception_id === selectedId) {
+        detailRefreshRef.current?.();
+      }
+    } else if (event.type === "exception_update") {
+      // Exception state changed — refresh list + detail if viewing this exception
+      fetchData();
+      if (event.exception_id === selectedId) {
+        detailRefreshRef.current?.();
+      }
+    } else if (event.type === "task_complete") {
+      // Task finished — refresh everything
+      fetchData();
+      if (event.exception_id === selectedId) {
+        detailRefreshRef.current?.();
+      }
+    }
+  }, [selectedId, fetchData]);
+
+  useWebSocket({
+    token: user?.id ? "mock-ws-token" : undefined,
+    enabled: !!user,
+    onEvent: handleWsEvent,
+  });
 
   /* ── Client-side search filter ───────────────────────────────────── */
   const filtered = exceptions.filter((exc) => {
@@ -222,6 +254,7 @@ function ExceptionQueueContent() {
                 key={selectedId}
                 exceptionId={selectedId}
                 onActionComplete={fetchData}
+                onRefreshRef={detailRefreshRef}
               />
             ) : (
               <EmptyDetailState />

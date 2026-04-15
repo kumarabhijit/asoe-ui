@@ -157,6 +157,19 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     created_at: "2026-04-08T11:00:00Z",
     updated_at: "2026-04-08T12:30:00Z",
   },
+  {
+    id: "exc-009",
+    tenant_id: "acme-corp",
+    order_id: "SO-8100",
+    event_type: "EDI_850_DUPLICATE_PO",
+    intent: "DUPLICATE_PO",
+    lifecycle_state: "RESOLVED",
+    shadow_verdict: "GREEN",
+    selected_recipe: "DuplicatePORecipe.py",
+    final_status: "COMPLETE",
+    created_at: "2026-04-11T06:20:00Z",
+    updated_at: "2026-04-11T06:22:00Z",
+  },
 ];
 
 const MOCK_HEALTH: HealthResponse = {
@@ -429,12 +442,12 @@ export const exceptionsApi = {
       avg_resolution_time_seconds: 480,
       by_intent: {
         CONTRACTUAL_CORRECTION: 3,
-        DUPLICATE_PO: 2,
+        DUPLICATE_PO: 3,
         CREDIT_BLOCK: 2,
         MASS_PRICING_ERROR: 1,
       },
       by_lifecycle_state: {
-        RESOLVED: 2,
+        RESOLVED: 3,
         PENDING_REVIEW: 2,
         BLOCKED: 1,
         EXECUTING: 1,
@@ -442,7 +455,7 @@ export const exceptionsApi = {
         CLOSED: 1,
       },
       by_shadow_verdict: {
-        GREEN: 4,
+        GREEN: 5,
         YELLOW: 3,
         RED: 1,
       },
@@ -532,6 +545,9 @@ const MOCK_LINE_ITEMS: Record<string, LineItem[]> = {
     { line_id: "L1", sku: "SKU-8801", description: "Organic Tea 6pk", uom: "CS", quantity: 150, erp_price: 22.50, po_price: 20.00, root_cause: "PROMO_EXPIRED" },
     { line_id: "L2", sku: "SKU-8805", description: "Green Tea 12pk", uom: "CS", quantity: 200, erp_price: 18.00, po_price: 18.00 },
   ],
+  "exc-009": [
+    { line_id: "L1", sku: "SKU-4410", description: "Sports Water 24pk", uom: "CS", quantity: 60, erp_price: 8.40, po_price: 8.40 },
+  ],
 };
 
 const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
@@ -590,7 +606,7 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       },
     ],
   },
-  /* ── DUPLICATE_PO exception ──────────────────────────────────────── */
+  /* ── DUPLICATE_PO exception (YELLOW — needs approval) ────────────── */
   "exc-002": {
     diagnosis: "PO #PO-88421 matches existing PO #PO-88419 received 36 hours prior. Identical line items, quantities, and ship-to address. Likely EDI retransmission or buyer system retry.",
     confidence: 88,
@@ -632,6 +648,60 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
         waterfall: [],
       },
     ],
+    duplicate_detection: {
+      original_order: {
+        so_number: "SO-1040",
+        po_number: "PO-88419",
+        created_date: "2026-04-09T21:00:00Z",
+        total_value: 6720.00,
+        line_count: 2,
+        status: "In Fulfillment",
+      },
+      duplicate_order: {
+        so_number: "SO-1042",
+        po_number: "PO-88421",
+        created_date: "2026-04-11T09:00:00Z",
+        total_value: 6720.00,
+        line_count: 2,
+        status: "Pending",
+      },
+      detection_method: "Same customer + identical SKUs + identical quantities within 48-hour window",
+      days_between: 1.5,
+      confidence: 88,
+      recommended_action: "Block duplicate SO-1042 and notify buyer QuickMart for confirmation",
+      cancellation_target: "SO-1042",
+      autonomy_applied: "L2 — Review required, value $6,720 exceeds auto-block threshold ($1,000)",
+    },
+    order_comparison: {
+      orders: [
+        {
+          so_number: "SO-1040",
+          po_number: "PO-88419",
+          created_date: "2026-04-09T21:00:00Z",
+          customer: "QuickMart Distribution",
+          lines: [
+            { sku: "SKU-1180", description: "24-pk Water", qty: 500, unit_price: 9.60 },
+            { sku: "SKU-1181", description: "12-pk Sparkling", qty: 200, unit_price: 11.40 },
+          ],
+          total_value: 7080.00,
+          status: "In Fulfillment",
+        },
+        {
+          so_number: "SO-1042",
+          po_number: "PO-88421",
+          created_date: "2026-04-11T09:00:00Z",
+          customer: "QuickMart Distribution",
+          lines: [
+            { sku: "SKU-1180", description: "24-pk Water", qty: 500, unit_price: 9.62 },
+            { sku: "SKU-1181", description: "12-pk Sparkling", qty: 200, unit_price: 10.00 },
+          ],
+          total_value: 6810.00,
+          status: "Pending",
+        },
+      ],
+      matching_fields: ["customer_id", "ship_to_address", "sku_list", "quantities"],
+      differing_fields: ["po_number", "unit_prices"],
+    },
   },
   /* ── CREDIT_BLOCK exception (RED) ────────────────────────────────── */
   "exc-003": {
@@ -770,7 +840,7 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       },
     ],
   },
-  /* ── DUPLICATE_PO: Escalated ─────────────────────────────────────── */
+  /* ── DUPLICATE_PO: Escalated (ambiguous duplicate) ────────────────── */
   "exc-006": {
     diagnosis: "PO flagged as potential duplicate. Similar line items but different quantities — may be a legitimate reorder vs. duplicate transmission.",
     confidence: 72,
@@ -811,6 +881,60 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
         waterfall: [],
       },
     ],
+    duplicate_detection: {
+      original_order: {
+        so_number: "SO-5008",
+        po_number: "PO-91203",
+        created_date: "2026-04-07T14:30:00Z",
+        total_value: 7876.80,
+        line_count: 2,
+        status: "Shipped",
+      },
+      duplicate_order: {
+        so_number: "SO-5010",
+        po_number: "PO-91210",
+        created_date: "2026-04-09T16:45:00Z",
+        total_value: 8092.80,
+        line_count: 2,
+        status: "Pending Review",
+      },
+      detection_method: "Same customer + overlapping SKUs within 72-hour window. Quantities differ by 15%.",
+      days_between: 2.1,
+      confidence: 72,
+      recommended_action: "Request buyer confirmation — quantities differ, may be legitimate reorder",
+      cancellation_target: "SO-5010",
+      autonomy_applied: "L3 — Buyer confirmation required, ambiguous duplicate with 72% confidence",
+    },
+    order_comparison: {
+      orders: [
+        {
+          so_number: "SO-5008",
+          po_number: "PO-91203",
+          created_date: "2026-04-07T14:30:00Z",
+          customer: "PowerDrink Distributors",
+          lines: [
+            { sku: "SKU-7701", description: "Energy Drink 4pk", qty: 410, unit_price: 8.96 },
+            { sku: "SKU-7705", description: "Energy Drink 8pk", qty: 200, unit_price: 17.50 },
+          ],
+          total_value: 7173.60,
+          status: "Shipped",
+        },
+        {
+          so_number: "SO-5010",
+          po_number: "PO-91210",
+          created_date: "2026-04-09T16:45:00Z",
+          customer: "PowerDrink Distributors",
+          lines: [
+            { sku: "SKU-7701", description: "Energy Drink 4pk", qty: 480, unit_price: 8.50 },
+            { sku: "SKU-7705", description: "Energy Drink 8pk", qty: 240, unit_price: 16.00 },
+          ],
+          total_value: 7920.00,
+          status: "Pending Review",
+        },
+      ],
+      matching_fields: ["customer_id", "sku_list", "ship_to_address"],
+      differing_fields: ["quantities", "unit_prices", "po_number", "total_value"],
+    },
   },
   /* ── CREDIT_BLOCK: Pending Review ────────────────────────────────── */
   "exc-007": {
@@ -887,5 +1011,91 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
         waterfall: [],
       },
     ],
+  },
+  /* ── DUPLICATE_PO: Auto-resolved (GREEN) ────────────────────────── */
+  "exc-009": {
+    diagnosis: "PO #PO-55102 is an exact retransmission of PO #PO-55100 received 4 hours prior. Identical customer, SKU, quantity, and ship-to. Low-value order ($504) auto-blocked per L1 autonomy policy.",
+    confidence: 98,
+    risk: "LOW",
+    resolution: "BLOCK_AND_NOTIFY",
+    root_cause: "EDI retransmission — identical PO received within 4 hours. Single line item, exact match on all fields.",
+    recommendation: "No action required — auto-resolved. Duplicate blocked and buyer notification sent.",
+    entity_profile: {
+      customer_name: "CornerShop Express",
+      bp_number: "BP-330210",
+      customer_tier: "Standard",
+      vip_status: false,
+      credit_standing: "Good",
+      location: "Plant 2500 — Houston DC",
+      region: "South",
+    },
+    impact_metrics: {
+      revenue_at_risk: 504.00,
+      delta_amount: 0,
+      delta_percentage: 0,
+      sla_priority: "LOW",
+      affected_lines: 1,
+    },
+    lines: [
+      {
+        line_id: "L1",
+        diagnosis: "Exact duplicate of PO-55100/L1. Same SKU, qty, price, ship-to.",
+        resolution: "BLOCK_AND_NOTIFY",
+        risk: "LOW",
+        waterfall: [],
+      },
+    ],
+    duplicate_detection: {
+      original_order: {
+        so_number: "SO-8098",
+        po_number: "PO-55100",
+        created_date: "2026-04-11T02:15:00Z",
+        total_value: 504.00,
+        line_count: 1,
+        status: "In Fulfillment",
+      },
+      duplicate_order: {
+        so_number: "SO-8100",
+        po_number: "PO-55102",
+        created_date: "2026-04-11T06:20:00Z",
+        total_value: 504.00,
+        line_count: 1,
+        status: "Blocked",
+      },
+      detection_method: "Exact match — same customer, SKU, quantity, price, and ship-to within 24-hour window",
+      days_between: 0.17,
+      confidence: 98,
+      recommended_action: "Auto-blocked duplicate SO-8100. Buyer notification sent.",
+      cancellation_target: "SO-8100",
+      autonomy_applied: "L1 — Auto-block, value $504 below auto-block threshold ($1,000)",
+    },
+    order_comparison: {
+      orders: [
+        {
+          so_number: "SO-8098",
+          po_number: "PO-55100",
+          created_date: "2026-04-11T02:15:00Z",
+          customer: "CornerShop Express",
+          lines: [
+            { sku: "SKU-4410", description: "Sports Water 24pk", qty: 60, unit_price: 8.40 },
+          ],
+          total_value: 504.00,
+          status: "In Fulfillment",
+        },
+        {
+          so_number: "SO-8100",
+          po_number: "PO-55102",
+          created_date: "2026-04-11T06:20:00Z",
+          customer: "CornerShop Express",
+          lines: [
+            { sku: "SKU-4410", description: "Sports Water 24pk", qty: 60, unit_price: 8.40 },
+          ],
+          total_value: 504.00,
+          status: "Blocked",
+        },
+      ],
+      matching_fields: ["customer_id", "sku_list", "quantities", "unit_prices", "ship_to_address"],
+      differing_fields: ["po_number"],
+    },
   },
 };

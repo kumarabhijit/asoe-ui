@@ -39,7 +39,7 @@ asoe-ui/
 │   ├── app/                      # Pages (Next.js App Router)
 │   │   ├── layout.tsx            # Root layout (skip-to-main, Providers wrapper)
 │   │   ├── providers.tsx         # Client-side providers (SessionProvider + ToastProvider)
-│   │   ├── exceptions/           # Exception Queue (three-pane Outlook layout) + polymorphic detail
+│   │   ├── exceptions/           # Exception Queue (three-pane Outlook) + 8 decomposed detail sub-components
 │   │   ├── dashboard/            # Analytics dashboard + recent activity feed
 │   │   ├── inbox/                # Customer Inbox (AI email triage, two-pane)
 │   │   ├── settings/             # Settings page (Phase 9 stub — admin, SSO, agent config)
