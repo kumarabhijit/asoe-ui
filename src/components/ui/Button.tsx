@@ -11,11 +11,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        brand: "bg-brand text-white hover:bg-brand-hover active:bg-brand-active",
+        brand: "bg-brand [color:white] hover:bg-brand-hover active:bg-brand-active",
         neutral: "bg-surface-primary text-text-secondary border border-border hover:bg-surface-secondary active:bg-surface-tertiary",
-        success: "bg-success text-white hover:bg-success-hover",
+        success: "bg-success [color:white] hover:bg-success-hover",
         ghost: "bg-transparent text-text-tertiary hover:bg-surface-secondary hover:text-text-secondary",
-        destructive: "bg-error text-white hover:bg-error-hover",
+        destructive: "bg-error [color:white] hover:bg-error-hover",
       },
       size: {
         sm: "h-[32px] px-12 py-6 text-caption",
