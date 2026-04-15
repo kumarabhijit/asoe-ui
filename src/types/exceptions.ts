@@ -257,6 +257,8 @@ export interface OrderAnalysis {
   overmax_analysis?: OverMaxAnalysisData;
   /** Present when a min-order-qty exception produces a round-up plan */
   moq_analysis?: MOQAnalysisData;
+  /** Present when a pallet config exception produces alignment analysis */
+  pallet_analysis?: PalletAnalysisData;
 }
 
 /* ── Duplicate PO enrichment types (UI-only, not backend contract) ──── */
@@ -538,6 +540,55 @@ export interface SAPStep {
   table: string;
   field: string;
   description: string;
+}
+
+/* ── Pallet Config enrichment types ─────────────────────────────────── */
+
+/** Pallet analysis — present when the Pallet Config skill/recipe produces it */
+export interface PalletAnalysisData {
+  /** Total cases ordered across all lines */
+  total_ordered_cases: number;
+  /** Total loose (non-full-layer) cases */
+  loose_cases_total: number;
+  /** Total at-risk value */
+  at_risk_total: number;
+  /** Estimated extra labor hours for manual handling */
+  extra_labor_est_hrs: number;
+  /** Freight waste percentage from partial pallets */
+  freight_waste_pct: number;
+  /** Number of order lines */
+  order_line_count: number;
+  /** Per-line pallet alignment details */
+  lines: PalletLine[];
+  /** AI-suggested plan for pallet alignment */
+  suggested_plan: PalletSuggestion[];
+}
+
+/** Per-line pallet alignment detail */
+export interface PalletLine {
+  sku: string;
+  description: string;
+  uom: string;
+  layer_qty: number;
+  pallet_qty: number;
+  ordered_qty: number;
+  complete_layers: number;
+  loose_qty: number;
+  full_pallets: number;
+  pallet_fill_pct: number;
+  violation_type: string;
+}
+
+/** AI pallet alignment suggestion */
+export interface PalletSuggestion {
+  sku: string;
+  description: string;
+  current: number;
+  suggested: number;
+  delta: number;
+  layers: number;
+  full_pallets: number;
+  reason: string;
 }
 
 /** Entity profile — master data relevant to the exception context */
