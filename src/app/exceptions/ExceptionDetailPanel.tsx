@@ -39,6 +39,7 @@ import { AgentAnalysisSection } from "./AgentAnalysisSection";
 import { DuplicateDetectionSection } from "./DuplicateDetectionSection";
 import { OrderComparisonSection } from "./OrderComparisonSection";
 import { PriceAnalysisSection } from "./PriceAnalysisSection";
+import { BackOrderSection } from "./BackOrderSection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -298,6 +299,9 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
           )}
           {analysis?.order_comparison && (
             <OrderComparisonSection data={analysis.order_comparison} />
+          )}
+          {analysis?.backorder_analysis && (
+            <BackOrderSection data={analysis.backorder_analysis} />
           )}
 
           {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
