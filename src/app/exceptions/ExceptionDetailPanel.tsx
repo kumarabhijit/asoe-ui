@@ -202,13 +202,13 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
 
   if (loading) {
     return (
-      <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "var(--space-16)", borderBottom: "1px solid var(--color-border-default)", background: "var(--color-surface-primary)" }}>
-          <div className="skeleton" style={{ height: 20, width: 200, borderRadius: "var(--radius-sm)" }} />
+      <div className="h-full flex flex-col">
+        <div className="p-16 border-b border-border bg-surface-primary">
+          <div className="skeleton h-5 w-[200px] rounded-sm" />
         </div>
-        <div style={{ flex: 1, padding: "var(--space-16)", display: "flex", flexDirection: "column", gap: "var(--space-12)" }}>
+        <div className="flex-1 p-16 flex flex-col gap-12">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="skeleton" style={{ height: 80, borderRadius: "var(--radius-sm)" }} />
+            <div key={i} className="skeleton h-20 rounded-sm" />
           ))}
         </div>
       </div>
@@ -217,7 +217,7 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
 
   if (!detail) {
     return (
-      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-quaternary)", fontSize: "var(--font-size-body)" }}>
+      <div className="h-full flex items-center justify-center text-text-quaternary text-body">
         Exception not found.
       </div>
     );
@@ -240,7 +240,7 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
   /* ── Render ──────────────────────────────────────────────────────── */
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", fontFamily: "var(--font-sans)", minWidth: 0 }}>
+    <div className="h-full flex flex-col font-sans min-w-0">
 
       {/* ━━ 1. Dynamic Header Ribbon ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <HeaderRibbon
@@ -258,8 +258,8 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
       />
 
       {/* ━━ 3. Scrollable Body ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{ flex: 1, overflow: "auto", padding: "var(--space-16)" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-16)" }}>
+      <div className="flex-1 overflow-auto p-16">
+        <div className="flex flex-col gap-16">
 
           {/* Agent Analysis: Problem / Root Cause / Recommendation */}
           {analysis && <AgentAnalysisSection analysis={analysis} />}
@@ -279,19 +279,7 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
               actionLoading={actionLoading}
             />
           ) : (
-            <div
-              style={{
-                padding: "var(--space-12)",
-                background: "var(--color-surface-primary)",
-                borderRadius: "var(--radius-md)",
-                boxShadow: "var(--shadow-sm)",
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--space-8)",
-                fontSize: "var(--font-size-caption)",
-                color: "var(--color-text-tertiary)",
-              }}
-            >
+            <div className="p-12 bg-surface-primary rounded-md shadow-sm flex items-center gap-8 text-caption text-text-tertiary">
               <AlertTriangle size={14} />
               Agent analysis pending — Compliance Shadow has not yet completed.
             </div>
@@ -328,23 +316,16 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
           />
 
           {/* ── Metadata ──────────────────────────────────────────────── */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "var(--space-8)",
-              fontSize: "var(--font-size-caption)",
-            }}
-          >
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-8 text-caption">
             <div>
-              <span style={{ color: "var(--color-text-quaternary)" }}>Created</span>
-              <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, marginTop: 2, fontFamily: "var(--font-mono)" }}>
+              <span className="text-text-quaternary">Created</span>
+              <div className="text-text-secondary font-medium mt-px font-mono">
                 {new Date(detail.created_at).toLocaleString()}
               </div>
             </div>
             <div>
-              <span style={{ color: "var(--color-text-quaternary)" }}>Updated</span>
-              <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, marginTop: 2, fontFamily: "var(--font-mono)" }}>
+              <span className="text-text-quaternary">Updated</span>
+              <div className="text-text-secondary font-medium mt-px font-mono">
                 {new Date(detail.updated_at).toLocaleString()}
               </div>
             </div>

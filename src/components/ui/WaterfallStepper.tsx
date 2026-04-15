@@ -219,7 +219,7 @@ export function WaterfallStepper({ nodes, intent, style }: WaterfallStepperProps
                 <ActivityIndicator
                   node={n.node}
                   intent={intent}
-                  style={{ marginTop: "var(--space-4)" }}
+                  className="mt-4"
                 />
               )}
 

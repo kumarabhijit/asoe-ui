@@ -1,25 +1,18 @@
 /**
  * ActivityIndicator — dynamic text replacing static labels.
  * Section 11.2: Node-specific, domain-aware messages — not generic "Loading..."
- *
- * Messages are defined in a node_activity_messages map selected based
- * on the current pipeline node + available GraphState data.
  */
 "use client";
 
+import { cn } from "@/lib/utils";
 import type { PipelineNode } from "@/types/exceptions";
-import type { CSSProperties } from "react";
 
 interface ActivityIndicatorProps {
   node: PipelineNode;
   intent?: string;
-  style?: CSSProperties;
+  className?: string;
 }
 
-/**
- * Node-specific activity messages — domain-aware, not generic.
- * Intent-aware variants are selected when intent is known.
- */
 const NODE_MESSAGES: Record<PipelineNode, string | Record<string, string>> = {
   ingest: "Validating order event fields...",
   classify: "Classifying exception intent...",
@@ -58,26 +51,12 @@ function getMessage(node: PipelineNode, intent?: string): string {
   return entry._default;
 }
 
-export function ActivityIndicator({ node, intent, style }: ActivityIndicatorProps) {
+export function ActivityIndicator({ node, intent, className }: ActivityIndicatorProps) {
   const message = getMessage(node, intent);
 
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "var(--space-6)",
-        fontSize: "var(--font-size-caption)",
-        color: "var(--color-text-tertiary)",
-        fontWeight: 500,
-        fontStyle: "italic",
-        ...style,
-      }}
-    >
-      <span
-        className="agent-active-dot"
-        style={{ width: 6, height: 6, flexShrink: 0 }}
-      />
+    <span className={cn("inline-flex items-center gap-6 text-caption text-text-tertiary font-medium italic", className)}>
+      <span className="agent-active-dot w-1.5 h-1.5 shrink-0" />
       {message}
     </span>
   );

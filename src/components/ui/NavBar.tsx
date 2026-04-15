@@ -4,7 +4,6 @@
  */
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { Logo } from "./Logo";
 import { Badge } from "./Badge";
@@ -17,7 +16,8 @@ import {
   DropdownMenuLabel,
 } from "./DropdownMenu";
 import { LogOut, Settings } from "lucide-react";
-import type { ReactNode, CSSProperties } from "react";
+import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 
 interface NavTab {
   id: string;
@@ -34,7 +34,7 @@ interface NavBarProps {
   agentCount?: number;
   onSignOut?: () => void;
   onSettingsClick?: () => void;
-  style?: CSSProperties;
+  className?: string;
   rightContent?: ReactNode;
 }
 
@@ -47,86 +47,40 @@ export function NavBar({
   agentCount = 0,
   onSignOut,
   onSettingsClick,
-  style,
+  className,
   rightContent,
 }: NavBarProps) {
-  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
-
   return (
     <nav
-      style={{
-        height: "var(--nav-height)",
-        display: "flex",
-        alignItems: "center",
-        padding: "0 var(--space-24)",
-        background: "rgba(255, 255, 255, 0.85)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
-        borderBottom: "1px solid var(--color-border-default)",
-        position: "sticky",
-        top: 0,
-        zIndex: "var(--z-nav)",
-        gap: "var(--space-24)",
-        ...style,
-      }}
+      className={cn(
+        "h-[var(--nav-height)] flex items-center px-24 bg-surface-glass backdrop-blur-glass border-b border-border sticky top-0 z-sticky gap-24",
+        className,
+      )}
     >
       {/* Logo — links to home */}
-      <Link href="/inbox" style={{ textDecoration: "none", display: "flex" }}>
+      <Link href="/inbox" className="no-underline flex">
         <Logo size="sm" />
       </Link>
 
       {/* Tab Navigation */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-4)",
-          flex: 1,
-          marginLeft: "var(--space-16)",
-        }}
-      >
+      <div className="flex items-center gap-4 flex-1 ml-16">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
-          const isHovered = hoveredTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => onTabChange?.(tab.id)}
-              onMouseEnter={() => setHoveredTab(tab.id)}
-              onMouseLeave={() => setHoveredTab(null)}
               aria-current={isActive ? "page" : undefined}
-              style={{
-                position: "relative",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: "var(--space-8) var(--space-12)",
-                fontSize: "var(--font-size-body)",
-                fontWeight: isActive ? 600 : 500,
-                fontFamily: "var(--font-sans)",
-                color: isActive
-                  ? "var(--color-text-primary)"
-                  : isHovered
-                  ? "var(--color-text-secondary)"
-                  : "var(--color-text-tertiary)",
-                transition: "color var(--dur-fast)",
-                whiteSpace: "nowrap",
-              }}
+              className={cn(
+                "relative bg-transparent border-none cursor-pointer px-12 py-8 text-body font-sans whitespace-nowrap transition-colors duration-fast",
+                isActive
+                  ? "font-semibold text-text-primary"
+                  : "font-medium text-text-tertiary hover:text-text-secondary",
+              )}
             >
               {tab.label}
-              {/* Active underline — brand purple per Section 11.3 */}
               {isActive && (
-                <span
-                  style={{
-                    position: "absolute",
-                    bottom: -1,
-                    left: "var(--space-12)",
-                    right: "var(--space-12)",
-                    height: 2,
-                    background: "var(--color-brand)",
-                    borderRadius: 1,
-                  }}
-                />
+                <span className="absolute -bottom-px left-12 right-12 h-0.5 bg-brand rounded-full" />
               )}
             </button>
           );
@@ -134,8 +88,7 @@ export function NavBar({
       </div>
 
       {/* Right section */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-16)" }}>
-        {/* Agent status */}
+      <div className="flex items-center gap-16">
         {agentCount > 0 && (
           <Badge variant="brand" icon={<span className="agent-active-dot" />}>
             {agentCount} Agent{agentCount !== 1 ? "s" : ""} Live
@@ -144,25 +97,12 @@ export function NavBar({
 
         {rightContent}
 
-        {/* User menu (includes Settings and Sign out) */}
+        {/* User menu */}
         {userInitials && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "var(--radius-full)",
-                  background: "var(--color-surface-tertiary)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "var(--font-size-caption)",
-                  fontWeight: 600,
-                  color: "var(--color-text-secondary)",
-                  cursor: "pointer",
-                  border: "none",
-                }}
+                className="w-8 h-8 rounded-full bg-surface-tertiary flex items-center justify-center text-caption font-semibold text-text-secondary cursor-pointer border-none"
                 aria-label="User menu"
               >
                 {userInitials}

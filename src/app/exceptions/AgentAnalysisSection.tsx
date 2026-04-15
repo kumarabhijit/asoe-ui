@@ -14,58 +14,33 @@ interface AgentAnalysisSectionProps {
 
 export function AgentAnalysisSection({ analysis }: AgentAnalysisSectionProps) {
   return (
-    <section
-      style={{
-        background: "var(--color-surface-primary)",
-        borderRadius: "var(--radius-md)",
-        boxShadow: "var(--shadow-sm)",
-        padding: "var(--space-16)",
-      }}
-    >
+    <section className="bg-surface-primary rounded-md shadow-sm p-16">
       {/* The Problem */}
-      <div style={{ marginBottom: "var(--space-12)" }}>
-        <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-4)" }}>
+      <div className="mb-12">
+        <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
           The Problem
         </div>
-        <p style={{ fontSize: "var(--font-size-body)", color: "var(--color-text-secondary)", lineHeight: 1.6, margin: 0 }}>
+        <p className="text-body text-text-secondary leading-relaxed m-0">
           {analysis.diagnosis}
         </p>
       </div>
 
       {/* Root Cause */}
-      <div style={{ marginBottom: "var(--space-12)" }}>
-        <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-4)" }}>
+      <div className="mb-12">
+        <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
           Root Cause
         </div>
-        <div
-          style={{
-            borderLeft: "3px solid var(--color-warning)",
-            paddingLeft: "var(--space-10)",
-            fontSize: "var(--font-size-body)",
-            fontWeight: 500,
-            color: "var(--color-text-primary)",
-            lineHeight: 1.5,
-          }}
-        >
+        <div className="border-l-[3px] border-warning pl-10 text-body font-medium text-text-primary leading-normal">
           {analysis.root_cause}
         </div>
       </div>
 
       {/* Recommendation */}
       <div>
-        <div style={{ fontSize: "var(--font-size-label)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-quaternary)", marginBottom: "var(--space-4)" }}>
+        <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
           Recommendation
         </div>
-        <div
-          style={{
-            borderLeft: "3px solid var(--color-brand)",
-            paddingLeft: "var(--space-10)",
-            fontSize: "var(--font-size-body)",
-            fontWeight: 600,
-            color: "var(--color-brand)",
-            lineHeight: 1.5,
-          }}
-        >
+        <div className="border-l-[3px] border-brand pl-10 text-body font-semibold text-brand leading-normal">
           {analysis.recommendation}
         </div>
       </div>
