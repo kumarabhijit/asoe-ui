@@ -255,6 +255,8 @@ export interface OrderAnalysis {
   backorder_analysis?: BackOrderAnalysisData;
   /** Present when an over-max exception produces a trim plan */
   overmax_analysis?: OverMaxAnalysisData;
+  /** Present when a min-order-qty exception produces a round-up plan */
+  moq_analysis?: MOQAnalysisData;
 }
 
 /* ── Duplicate PO enrichment types (UI-only, not backend contract) ──── */
@@ -478,6 +480,64 @@ export interface TrimPlanLine {
   trimmed_to: number;
   delta: number;
   action: "TRIM" | "SKIP" | "OK";
+}
+
+/* ── Min Order Qty (MOQ) enrichment types ───────────────────────────── */
+/* ── Min Order Qty (MOQ) enrichment types ───────────────────────────── */
+
+/** MOQ analysis — present when the MOQ skill/recipe produces it */
+export interface MOQAnalysisData {
+  /** Quantity ordered */
+  ordered_qty: number;
+  /** Minimum order quantity required */
+  moq_qty: number;
+  /** Shortfall (MOQ - ordered) */
+  shortfall_qty: number;
+  /** Shortfall as percentage of MOQ */
+  shortfall_pct: number;
+  /** Primary SKU */
+  sku: string;
+  /** Material description */
+  description: string;
+  /** Unit cost */
+  unit_cost: number;
+  /** Unit of measure */
+  uom: string;
+  /** Revenue at risk */
+  at_risk: number;
+  /** MOQ source (e.g., "KNMT-MINBM" or "MARC-MINBE") */
+  moq_source: string;
+  /** Distribution channel */
+  channel: string;
+  /** SAP V4082 block message */
+  block_message: string;
+  /** Contract reference */
+  contract_ref: string;
+  /** Block status */
+  block_status: string;
+  /** AI round-up plan */
+  round_up_plan: RoundUpPlanLine[];
+  /** SAP execution steps */
+  sap_steps: SAPStep[];
+}
+
+/** Round-up plan line */
+export interface RoundUpPlanLine {
+  sku: string;
+  description: string;
+  ordered: number;
+  round_up_to: number;
+  delta: number;
+  action: "ROUND_UP" | "ACCEPT_BELOW" | "ESCALATE";
+}
+
+/** SAP execution step */
+export interface SAPStep {
+  step: number;
+  transaction: string;
+  table: string;
+  field: string;
+  description: string;
 }
 
 /** Entity profile — master data relevant to the exception context */
