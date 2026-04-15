@@ -40,6 +40,7 @@ import { DuplicateDetectionSection } from "./DuplicateDetectionSection";
 import { OrderComparisonSection } from "./OrderComparisonSection";
 import { PriceAnalysisSection } from "./PriceAnalysisSection";
 import { BackOrderSection } from "./BackOrderSection";
+import { OverMaxSection } from "./OverMaxSection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -302,6 +303,9 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
           )}
           {analysis?.backorder_analysis && (
             <BackOrderSection data={analysis.backorder_analysis} />
+          )}
+          {analysis?.overmax_analysis && (
+            <OverMaxSection data={analysis.overmax_analysis} />
           )}
 
           {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}

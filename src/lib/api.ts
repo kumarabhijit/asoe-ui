@@ -196,6 +196,19 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     created_at: "2026-04-12T08:00:00Z",
     updated_at: "2026-04-12T08:05:00Z",
   },
+  {
+    id: "exc-012",
+    tenant_id: "acme-corp",
+    order_id: "SO-10100",
+    event_type: "OVER_MAX_QTY",
+    intent: "OVER_MAX",
+    lifecycle_state: "PENDING_REVIEW",
+    shadow_verdict: "YELLOW",
+    selected_recipe: "OverMaxTrimRecipe.py",
+    final_status: "MANUAL_REVIEW_REQUIRED",
+    created_at: "2026-04-13T09:30:00Z",
+    updated_at: "2026-04-13T09:38:00Z",
+  },
 ];
 
 const MOCK_HEALTH: HealthResponse = {
@@ -203,13 +216,13 @@ const MOCK_HEALTH: HealthResponse = {
   version: "0.3.2",
   kill_switch: false,
   explain_mode: false,
-  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER"],
+  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX"],
   lifecycle_states: [
     "INGESTED", "CLASSIFYING", "AUDITING", "PENDING_REVIEW",
     "ESCALATED", "PENDING_ADMIN_REVIEW", "EXECUTING", "RESOLVED",
     "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
-  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py"],
+  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py"],
 };
 
 /* ── Auth API (/api/auth/*) ─────��──────────────────────────────────── */
@@ -580,6 +593,11 @@ const MOCK_LINE_ITEMS: Record<string, LineItem[]> = {
   ],
   "exc-011": [
     { line_id: "L1", sku: "SKU-6200", description: "Craft IPA 6pk", uom: "CS", quantity: 200, erp_price: 22.00, po_price: 22.00 },
+  ],
+  "exc-012": [
+    { line_id: "L1", sku: "SKU-9010", description: "Sparkling Mineral 12pk", uom: "CS", quantity: 1200, erp_price: 11.50, po_price: 11.50 },
+    { line_id: "L2", sku: "SKU-9015", description: "Still Mineral 12pk", uom: "CS", quantity: 800, erp_price: 9.80, po_price: 9.80 },
+    { line_id: "L3", sku: "SKU-9020", description: "Flavored Water 24pk", uom: "CS", quantity: 600, erp_price: 14.20, po_price: 14.20 },
   ],
 };
 
@@ -1343,6 +1361,58 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
           sap_steps: ["VA02 (split delivery)", "VL01N (create 2nd delivery)"],
           recommended: true,
         },
+      ],
+    },
+  },
+  /* ── OVER_MAX: Pending Review (YELLOW) ─────────────────────────────── */
+  "exc-012": {
+    diagnosis: "Total order quantity (2,600 CS) exceeds contract maximum (2,000 CS) by 600 CS (30%). Three line items, two exceeding per-line maximums. SAP block V4080 applied.",
+    confidence: 91,
+    risk: "MEDIUM",
+    resolution: "TRIM",
+    root_cause: "Customer placed order 30% above contract max. SKU-9010 and SKU-9020 individually exceed line-level maximums.",
+    recommendation: "Apply AI trim plan to reduce order to contract maximum. Two lines need trimming; one is within limit.",
+    entity_profile: {
+      customer_name: "AquaPure Distribution",
+      bp_number: "BP-880460",
+      customer_tier: "Gold",
+      vip_status: false,
+      credit_standing: "Good",
+      location: "Plant 4100 — Atlanta DC",
+      region: "Southeast",
+    },
+    impact_metrics: {
+      revenue_at_risk: 30020.00,
+      delta_amount: 8660.00,
+      delta_percentage: 28.8,
+      sla_priority: "HIGH",
+      sla_deadline: "2026-04-14T12:00:00Z",
+      affected_lines: 3,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "1,200 CS ordered, max 900 CS. Excess 300 CS. Trim recommended.", resolution: "TRIM", risk: "MEDIUM", waterfall: [] },
+      { line_id: "L2", diagnosis: "800 CS ordered, within max 800 CS. No action needed.", resolution: "OK", risk: "LOW", waterfall: [] },
+      { line_id: "L3", diagnosis: "600 CS ordered, max 300 CS. Excess 300 CS. Even-layer item — trim to 288 CS (full layers).", resolution: "TRIM", risk: "MEDIUM", waterfall: [] },
+    ],
+    overmax_analysis: {
+      total_ordered: 2600,
+      max_qty: 2000,
+      excess_qty: 600,
+      exceedance_pct: 30.0,
+      uom: "CS",
+      at_risk: 8660.00,
+      contract_ref: "CTR-4600018820",
+      block_status: "V4080",
+      block_reason: "Order quantity exceeds contract maximum — automatic block per SD-OM-001",
+      order_lines: [
+        { sku: "SKU-9010", description: "Sparkling Mineral 12pk", qty: 1200, max_line_qty: 900, excess: 300, is_even_layer_item: false },
+        { sku: "SKU-9015", description: "Still Mineral 12pk", qty: 800, max_line_qty: 800, excess: 0, is_even_layer_item: false },
+        { sku: "SKU-9020", description: "Flavored Water 24pk", qty: 600, max_line_qty: 300, excess: 300, is_even_layer_item: true },
+      ],
+      trim_plan: [
+        { sku: "SKU-9010", description: "Sparkling Mineral 12pk", ordered: 1200, trimmed_to: 900, delta: 300, action: "TRIM" },
+        { sku: "SKU-9015", description: "Still Mineral 12pk", ordered: 800, trimmed_to: 800, delta: 0, action: "OK" },
+        { sku: "SKU-9020", description: "Flavored Water 24pk", ordered: 600, trimmed_to: 288, delta: 312, action: "TRIM" },
       ],
     },
   },
