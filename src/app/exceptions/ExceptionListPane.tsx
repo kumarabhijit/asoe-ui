@@ -337,6 +337,16 @@ function CompactMetric({ label, value, color }: { label: string; value: string |
 
 /* ── Exception Card (compact for pane density) ─────────────────────── */
 
+const TERMINAL_STATES = ["RESOLVED", "CLOSED", "REJECTED"];
+
+function getLeftBorderColor(exc: ExceptionSummary, isSelected: boolean): string {
+  if (isSelected) return "var(--color-brand)";
+  if (exc.shadow_verdict === "GREEN" && TERMINAL_STATES.includes(exc.lifecycle_state)) {
+    return "var(--color-success)";
+  }
+  return "transparent";
+}
+
 function ExceptionCard({
   exception: exc,
   isSelected,
@@ -346,6 +356,8 @@ function ExceptionCard({
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const isTerminal = TERMINAL_STATES.includes(exc.lifecycle_state);
+
   return (
     <div
       role="option"
@@ -363,9 +375,7 @@ function ExceptionCard({
         textAlign: "left",
         padding: "var(--space-10) var(--space-12)",
         borderRadius: "var(--radius-md)",
-        borderLeft: isSelected
-          ? "3px solid var(--color-brand)"
-          : "3px solid transparent",
+        borderLeft: `3px solid ${getLeftBorderColor(exc, isSelected)}`,
         background: isSelected
           ? "var(--color-surface-row-active)"
           : "var(--color-surface-primary)",
@@ -405,7 +415,7 @@ function ExceptionCard({
         </span>
       </div>
 
-      {/* Row 2: Intent tag + lifecycle badge + verdict */}
+      {/* Row 2: Intent tag + lifecycle badge + verdict + resolved indicator */}
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", flexWrap: "wrap" }}>
         {exc.intent && (
           <Badge variant="brand" size="sm" icon={null}>
@@ -418,6 +428,11 @@ function ExceptionCard({
         {exc.shadow_verdict && (
           <Badge variant={verdictVariant(exc.shadow_verdict)} size="sm">
             {exc.shadow_verdict}
+          </Badge>
+        )}
+        {isTerminal && exc.shadow_verdict === "GREEN" && (
+          <Badge variant="success" size="sm" icon={<CheckCircle size={10} />}>
+            Resolved
           </Badge>
         )}
       </div>

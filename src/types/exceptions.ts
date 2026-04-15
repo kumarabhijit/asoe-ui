@@ -236,6 +236,75 @@ export interface OrderAnalysis {
   /** Quantitative "blast radius" of the exception */
   impact_metrics: ImpactMetrics;
   lines: LineItemAnalysis[];
+
+  /* ── Data-presence-driven enrichment fields ───────────────────────
+     These optional fields are populated by the backend only when
+     relevant. The UI renders sections based on whether the data
+     is present, not on which intent string the exception carries.
+     Adding a new field here + its section component is all that's
+     needed to support a new enrichment — zero dispatch logic.
+     ──────────────────────────────────���───────────────────────────── */
+
+  /** Present when the DuplicatePO recipe has detected a duplicate */
+  duplicate_detection?: DuplicateDetectionData;
+  /** Present when two orders need side-by-side comparison */
+  order_comparison?: OrderComparisonData;
+}
+
+/* ── Duplicate PO enrichment types (UI-only, not backend contract) ──── */
+
+/** Duplicate detection summary — present when DuplicatePO Skill/Recipe produces it */
+export interface DuplicateDetectionData {
+  original_order: OrderSnapshot;
+  duplicate_order: OrderSnapshot;
+  /** How the duplicate was detected (e.g., "Same customer + SKU + qty within 7 days") */
+  detection_method: string;
+  /** Calendar days between the two submissions */
+  days_between: number;
+  /** Detection confidence 0-100 */
+  confidence: number;
+  /** Agent-recommended action (e.g., "Cancel duplicate SO-002") */
+  recommended_action: string;
+  /** SO number the agent recommends cancelling */
+  cancellation_target: string;
+  /** Autonomy level applied with rationale (e.g., "L1 — Auto-block, value < $1,000") */
+  autonomy_applied: string;
+}
+
+/** Snapshot of an order for comparison */
+export interface OrderSnapshot {
+  so_number: string;
+  po_number: string;
+  created_date: string;
+  total_value: number;
+  line_count: number;
+  status: string;
+}
+
+/** Side-by-side order comparison — present when two orders need comparison */
+export interface OrderComparisonData {
+  orders: ComparisonOrder[];
+  /** Fields that matched to trigger duplicate detection */
+  matching_fields: string[];
+  /** Fields that differ between the orders */
+  differing_fields: string[];
+}
+
+export interface ComparisonOrder {
+  so_number: string;
+  po_number: string;
+  created_date: string;
+  customer: string;
+  lines: ComparisonLineItem[];
+  total_value: number;
+  status: string;
+}
+
+export interface ComparisonLineItem {
+  sku: string;
+  description: string;
+  qty: number;
+  unit_price: number;
 }
 
 /** Entity profile — master data relevant to the exception context */
