@@ -187,13 +187,7 @@ function ExceptionQueueContent() {
 
   /* ── Render ──────────────────────────────────────────────────────── */
   return (
-    <div
-      style={{
-        background: "var(--color-surface-page)",
-        fontFamily: "var(--font-sans)",
-        minHeight: "100vh",
-      }}
-    >
+    <div className="bg-surface-page font-sans min-h-screen">
       {/* ━━ Top Rail: Global Navigation ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <NavBar
         tabs={NAV_TABS}
@@ -210,8 +204,8 @@ function ExceptionQueueContent() {
       />
 
       {/* ━━ Two-pane Master-Detail Area ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <main id="main-content" style={{ height: "calc(100vh - var(--nav-height))", minHeight: 576 }}>
-        <Group orientation="horizontal" id="exception-queue-panels" className="panel-group-zoomable" style={{ height: "100%" }}>
+      <main id="main-content" className="h-[calc(100vh-var(--nav-height))] min-h-[576px]">
+        <Group orientation="horizontal" id="exception-queue-panels" className="panel-group-zoomable h-full">
 
           {/* ── Middle Pane: Exception List ──────────────────────────── */}
           <Panel defaultSize="35%" minSize="22%" maxSize="50%" id="list-pane">
@@ -236,16 +230,7 @@ function ExceptionQueueContent() {
           </Panel>
 
           {/* ── Resize Handle ────────────────────────────────────────── */}
-          <Separator
-            style={{
-              width: "var(--pane-handle-width)",
-              background: "var(--color-border-default)",
-              cursor: "col-resize",
-              transition: "background var(--dur-fast)",
-              flexShrink: 0,
-              touchAction: "none",
-            }}
-          />
+          <Separator className="w-[var(--pane-handle-width)] bg-border cursor-col-resize transition-colors duration-fast shrink-0 touch-none" />
 
           {/* ── Right Pane: Exception Detail ─────────────────────────── */}
           <Panel minSize="45%" id="detail-pane">
@@ -271,23 +256,12 @@ function ExceptionQueueContent() {
 
 function EmptyDetailState() {
   return (
-    <div
-      style={{
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "var(--color-text-quaternary)",
-        gap: "var(--space-8)",
-        background: "var(--color-surface-page)",
-      }}
-    >
+    <div className="h-full flex flex-col items-center justify-center text-text-quaternary gap-8 bg-surface-page">
       <Inbox size={32} />
-      <div style={{ fontSize: "var(--font-size-body)", fontWeight: 500 }}>
+      <div className="text-body font-medium">
         Select an exception to view details
       </div>
-      <div style={{ fontSize: "var(--font-size-caption)" }}>
+      <div className="text-caption">
         Click any item in the list to see the full analysis
       </div>
     </div>

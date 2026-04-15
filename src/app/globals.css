@@ -112,3 +112,48 @@ body {
   touch-action: pan-x pan-y pinch-zoom !important;
 }
 
+/* ── Scrollbar styling ─────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-default);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}
+
+/* ── Skeleton loader animation ─────────────────────────────────────── */
+@keyframes asoe-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.skeleton {
+  background: var(--color-surface-secondary);
+  border-radius: var(--radius-sm);
+  animation: asoe-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* ── Agent active pulse ────────────────────────────────────────────── */
+@keyframes asoe-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.agent-active-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+  animation: asoe-pulse 1.4s ease-in-out infinite;
+}
+

@@ -20,6 +20,7 @@ import { Badge, categoryVariant, inboxStatusVariant } from "@/components/ui/Badg
 import { Button } from "@/components/ui/Button";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
 /* ── Display label maps (visual mapping with default fallback) ────── */
 const CATEGORY_LABELS: Record<string, string> = {
@@ -145,16 +146,7 @@ export default function InboxPage() {
   const autoResolved = INBOX.filter((i) => i.status === "AUTO_RESOLVED").length;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-surface-page)",
-        fontFamily: "var(--font-sans)",
-        fontSize: "var(--font-size-body)",
-        color: "var(--color-text-primary)",
-        lineHeight: 1.5,
-      }}
-    >
+    <div className="min-h-screen bg-surface-page font-sans text-body text-text-primary leading-normal">
       {/* ── NAV BAR (shared component) ── */}
       <NavBar
         tabs={NAV_TABS}
@@ -171,52 +163,29 @@ export default function InboxPage() {
       />
 
       {/* ── PAGE HEADER ── */}
-      <div
-        style={{
-          background: "var(--color-surface-primary)",
-          borderBottom: "1px solid var(--color-border-default)",
-          boxShadow: "var(--shadow-xs)",
-        }}
-      >
-        <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 var(--space-32)" }}>
+      <div className="bg-surface-primary border-b border-border shadow-xs">
+        <div className="max-w-[1440px] mx-auto px-32">
           {/* Breadcrumb */}
-          <nav aria-label="Breadcrumb" style={{ padding: "var(--space-8) 0" }}>
-            <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-tertiary)" }}>Home</span>
-            <ChevronRight size={10} style={{ margin: "0 var(--space-4)", color: "var(--color-text-tertiary)", verticalAlign: "middle" }} />
-            <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)" }}>Customer Inbox</span>
+          <nav aria-label="Breadcrumb" className="py-8">
+            <span className="text-caption text-text-tertiary">Home</span>
+            <ChevronRight size={10} className="mx-4 text-text-tertiary align-middle inline" />
+            <span className="text-caption text-text-secondary">Customer Inbox</span>
           </nav>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "var(--space-8) 0 var(--space-16)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-12)" }}>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "var(--radius-md)",
-                  background: "var(--color-text-primary)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Mail size={20} color="var(--color-text-inverse)" />
+          <div className="flex items-center justify-between py-8 pb-16">
+            <div className="flex items-center gap-12">
+              <div className="w-10 h-10 rounded-md bg-text-primary flex items-center justify-center">
+                <Mail size={20} className="text-text-inverse" />
               </div>
               <div>
-                <h1 style={{ fontSize: "var(--font-size-display)", fontWeight: 700, lineHeight: 1.15, margin: 0 }}>
+                <h1 className="text-display font-bold leading-tight m-0">
                   Customer Inbox
                 </h1>
-                <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-tertiary)" }}>
+                <span className="text-caption text-text-tertiary">
                   AI-powered email triage and classification
                 </span>
               </div>
             </div>
-            <div style={{ display: "flex", gap: "var(--space-8)" }}>
+            <div className="flex gap-8">
               <Button variant="neutral" size="md">
                 <RefreshCw size={14} />
                 Refresh
@@ -232,14 +201,8 @@ export default function InboxPage() {
 
       <div id="main-content" />
       {/* ── METRICS STRIP ── */}
-      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "var(--space-16) var(--space-32)" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "var(--space-16)",
-          }}
-        >
+      <div className="max-w-[1440px] mx-auto px-32 py-16">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-16">
           <MetricTile icon={<Mail size={20} />} label="Total Inbound" value={String(INBOX.length)} subtitle="Last 24 hours" tint="var(--color-cat-blue)" />
           <MetricTile icon={<AlertTriangle size={20} />} label="Need Attention" value={String(needsAttention)} subtitle="Approval or escalation" tint="var(--color-warning)" />
           <MetricTile icon={<CheckCircle2 size={20} />} label="Auto-Resolved" value={String(autoResolved)} subtitle="No human action needed" tint="var(--color-success)" />
@@ -248,8 +211,8 @@ export default function InboxPage() {
       </div>
 
       {/* ── TAB BAR ── */}
-      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 var(--space-32)" }}>
-        <div style={{ borderBottom: "1px solid var(--color-border-default)", display: "flex", gap: 0 }}>
+      <div className="max-w-[1440px] mx-auto px-32">
+        <div className="border-b border-border flex">
           {[
             { id: "inbox", label: "Inbox", count: INBOX.length },
             { id: "ai-flow", label: "AI Intake Flow", count: undefined },
@@ -257,35 +220,16 @@ export default function InboxPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: "var(--space-10) var(--space-16)",
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                fontFamily: "var(--font-sans)",
-                fontSize: "var(--font-size-body)",
-                fontWeight: activeTab === tab.id ? 700 : 600,
-                color: activeTab === tab.id ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
-                borderBottom: activeTab === tab.id ? "2px solid var(--color-brand)" : "2px solid transparent",
-                marginBottom: -1,
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--space-6)",
-                transition: "all var(--dur-fast)",
-              }}
+              className={cn(
+                "px-16 py-10 border-none bg-transparent cursor-pointer font-sans text-body -mb-px flex items-center gap-6 transition-all duration-fast",
+                activeTab === tab.id
+                  ? "font-bold text-text-primary border-b-2 border-brand"
+                  : "font-semibold text-text-tertiary border-b-2 border-transparent",
+              )}
             >
               {tab.label}
               {tab.count != null && (
-                <span
-                  style={{
-                    fontSize: "var(--font-size-caption)",
-                    fontWeight: 600,
-                    color: "var(--color-text-tertiary)",
-                    background: "var(--color-surface-secondary)",
-                    padding: "1px 6px",
-                    borderRadius: "var(--radius-full)",
-                  }}
-                >
+                <span className="text-caption font-semibold text-text-tertiary bg-surface-secondary px-1.5 py-px rounded-full">
                   {tab.count}
                 </span>
               )}
@@ -295,56 +239,23 @@ export default function InboxPage() {
       </div>
 
       {/* ── CONTENT: QUEUE + DETAIL PANEL ── */}
-      <div
-        style={{
-          maxWidth: 1440,
-          margin: "0 auto",
-          padding: "var(--space-16) var(--space-32)",
-          display: "flex",
-          gap: "var(--space-16)",
-        }}
-      >
+      <div className="max-w-[1440px] mx-auto px-32 py-16 flex gap-16">
         {/* ── LEFT: Inbox Queue ── */}
-        <div
-          style={{
-            width: 380,
-            flexShrink: 0,
-            background: "var(--color-surface-primary)",
-            borderRadius: "var(--radius-md)",
-            boxShadow: "var(--shadow-sm)",
-            overflow: "hidden",
-          }}
-        >
+        <div className="w-[380px] shrink-0 bg-surface-primary rounded-md shadow-sm overflow-hidden">
           {/* Search */}
-          <div
-            style={{
-              padding: "var(--space-12) var(--space-16)",
-              borderBottom: "1px solid var(--color-border-subtle)",
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-8)",
-            }}
-          >
-            <Search size={16} style={{ color: "var(--color-text-tertiary)", flexShrink: 0 }} />
-            <span style={{ fontSize: "var(--font-size-body)", color: "var(--color-text-tertiary)" }}>
+          <div className="px-16 py-12 border-b border-border-subtle flex items-center gap-8">
+            <Search size={16} className="text-text-tertiary shrink-0" />
+            <span className="text-body text-text-tertiary">
               Search inbox...
             </span>
-            <div style={{ flex: 1 }} />
-            <span
-              style={{
-                fontSize: "var(--font-size-label)",
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                color: "var(--color-text-tertiary)",
-                textTransform: "uppercase",
-              }}
-            >
+            <div className="flex-1" />
+            <span className="text-label font-bold tracking-widest text-text-tertiary uppercase">
               All Inboxes
             </span>
           </div>
 
           {/* Inbox items */}
-          <div style={{ maxHeight: "calc(100vh - 370px)", overflowY: "auto" }}>
+          <div className="max-h-[calc(100vh-370px)] overflow-y-auto">
             {INBOX.map((item) => {
               const isSelected = item.id === selectedId;
               return (
@@ -354,84 +265,31 @@ export default function InboxPage() {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => { if (e.key === "Enter") setSelectedId(item.id); }}
-                  style={{
-                    padding: "var(--space-12) var(--space-16)",
-                    cursor: "pointer",
-                    borderBottom: "1px solid var(--color-border-subtle)",
-                    background: isSelected ? "var(--color-surface-secondary)" : "var(--color-surface-primary)",
-                    borderLeft: isSelected ? "3px solid var(--color-brand)" : "3px solid transparent",
-                    transition: "background var(--dur-fast)",
-                  }}
+                  className={cn(
+                    "px-16 py-12 cursor-pointer border-b border-border-subtle border-l-[3px] transition-colors duration-fast",
+                    isSelected ? "bg-surface-secondary border-l-brand" : "bg-surface-primary border-l-transparent",
+                  )}
                 >
-                  <div style={{ display: "flex", gap: "var(--space-10)" }}>
-                    {/* Avatar */}
+                  <div className="flex gap-10">
+                    {/* Avatar — dynamic color from data, inline style is correct */}
                     <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: "var(--radius-full)",
-                        flexShrink: 0,
-                        background: `color-mix(in srgb, ${item.initialsColor} 15%, white)`,
-                        color: item.initialsColor,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "var(--font-size-caption)",
-                        fontWeight: 700,
-                      }}
+                      className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center text-caption font-bold"
+                      style={{ background: `color-mix(in srgb, ${item.initialsColor} 15%, white)`, color: item.initialsColor }}
                     >
                       {item.initials}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "baseline",
-                          marginBottom: 2,
-                        }}
-                      >
-                        <span style={{ fontWeight: 600, fontSize: "var(--font-size-body)", color: "var(--color-text-primary)" }}>
-                          {item.sender}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "var(--font-size-caption)",
-                            color: "var(--color-text-tertiary)",
-                            fontFamily: "var(--font-mono)",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {item.time}
-                        </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-baseline mb-px">
+                        <span className="font-semibold text-body text-text-primary">{item.sender}</span>
+                        <span className="text-caption text-text-tertiary font-mono shrink-0">{item.time}</span>
                       </div>
-                      <div
-                        style={{
-                          fontSize: "var(--font-size-body)",
-                          fontWeight: 500,
-                          color: "var(--color-text-primary)",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          marginBottom: "var(--space-4)",
-                        }}
-                      >
+                      <div className="text-body font-medium text-text-primary whitespace-nowrap overflow-hidden text-ellipsis mb-4">
                         {item.subject}
                       </div>
-                      <div
-                        style={{
-                          fontSize: "var(--font-size-caption)",
-                          color: "var(--color-text-tertiary)",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          marginBottom: "var(--space-8)",
-                        }}
-                      >
+                      <div className="text-caption text-text-tertiary whitespace-nowrap overflow-hidden text-ellipsis mb-8">
                         {item.preview}
                       </div>
-                      {/* Badges */}
-                      <div style={{ display: "flex", gap: "var(--space-4)", flexWrap: "wrap", alignItems: "center" }}>
+                      <div className="flex gap-4 flex-wrap items-center">
                         <Badge variant={categoryVariant(item.category)} size="sm" icon={null}>
                           {CATEGORY_LABELS[item.category] ?? item.category}
                         </Badge>
@@ -439,15 +297,7 @@ export default function InboxPage() {
                           {STATUS_LABELS[item.status] ?? item.status}
                         </Badge>
                         {item.lineCount && (
-                          <span
-                            style={{
-                              fontSize: "var(--font-size-label)",
-                              color: "var(--color-text-tertiary)",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 3,
-                            }}
-                          >
+                          <span className="text-label text-text-tertiary flex items-center gap-[3px]">
                             <FileText size={10} />
                             {item.lineCount}
                           </span>
@@ -462,50 +312,29 @@ export default function InboxPage() {
         </div>
 
         {/* ── RIGHT: Detail Panel ── */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--space-16)" }}>
+        <div className="flex-1 flex flex-col gap-16">
           {/* Email Header Card */}
-          <div
-            style={{
-              background: "var(--color-surface-primary)",
-              borderRadius: "var(--radius-md)",
-              boxShadow: "var(--shadow-sm)",
-              padding: "var(--space-20)",
-            }}
-          >
-            <div style={{ display: "flex", gap: "var(--space-12)", marginBottom: "var(--space-16)" }}>
+          <div className="bg-surface-primary rounded-md shadow-sm p-20">
+            <div className="flex gap-12 mb-16">
               <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: "var(--radius-full)",
-                  flexShrink: 0,
-                  background: `color-mix(in srgb, ${selected.initialsColor} 15%, white)`,
-                  color: selected.initialsColor,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "var(--font-size-subhead)",
-                  fontWeight: 700,
-                }}
+                className="w-11 h-11 rounded-full shrink-0 flex items-center justify-center text-subhead font-bold"
+                style={{ background: `color-mix(in srgb, ${selected.initialsColor} 15%, white)`, color: selected.initialsColor }}
               >
                 {selected.initials}
               </div>
-              <div style={{ flex: 1 }}>
-                <h2 style={{ fontSize: "var(--font-size-heading)", fontWeight: 700, margin: 0, lineHeight: 1.3 }}>
-                  {selected.subject}
-                </h2>
-                <div style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)", marginTop: 2 }}>
+              <div className="flex-1">
+                <h2 className="text-heading font-bold m-0 leading-snug">{selected.subject}</h2>
+                <div className="text-caption text-text-secondary mt-px">
                   {selected.sender}{" "}
                   {selected.email && (
-                    <span style={{ color: "var(--color-text-tertiary)" }}>
+                    <span className="text-text-tertiary">
                       &lt;{selected.email.from}&gt; · {selected.email.org} · {selected.email.received}
                     </span>
                   )}
                 </div>
               </div>
             </div>
-            {/* Metadata badges */}
-            <div style={{ display: "flex", gap: "var(--space-6)", flexWrap: "wrap", alignItems: "center" }}>
+            <div className="flex gap-6 flex-wrap items-center">
               <Badge variant={categoryVariant(selected.category)} size="sm" icon={null}>
                 {CATEGORY_LABELS[selected.category] ?? selected.category}
               </Badge>
@@ -513,123 +342,57 @@ export default function InboxPage() {
                 {STATUS_LABELS[selected.status] ?? selected.status}
               </Badge>
               {selected.amount && (
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--font-size-body)", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                  {selected.amount}
-                </span>
+                <span className="font-mono text-body font-semibold text-text-primary">{selected.amount}</span>
               )}
             </div>
-            {/* Source metadata row */}
             {selected.email && (
-              <div
-                style={{
-                  display: "flex",
-                  gap: "var(--space-32)",
-                  marginTop: "var(--space-16)",
-                  padding: "var(--space-12) var(--space-16)",
-                  background: "var(--color-surface-secondary)",
-                  borderRadius: "var(--radius-sm)",
-                }}
-              >
+              <div className="flex gap-32 mt-16 px-16 py-12 bg-surface-secondary rounded-sm">
                 <MetaField label="Source Mailbox">
-                  <span style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--color-success)", flexShrink: 0 }} />
+                  <span className="flex items-center gap-4">
+                    <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />
                     {selected.email.mailbox}
                   </span>
                 </MetaField>
                 <MetaField label="Received">
-                  <span style={{ fontFamily: "var(--font-mono)" }}>{selected.email.received}</span>
+                  <span className="font-mono">{selected.email.received}</span>
                 </MetaField>
                 <MetaField label="Attachments">
-                  <span style={{ color: "var(--color-text-tertiary)" }}>None</span>
+                  <span className="text-text-tertiary">None</span>
                 </MetaField>
               </div>
             )}
           </div>
 
           {/* ── AGENT REASONING CARD (Layer 1 — always visible) ── */}
-          <div
-            style={{
-              background: "var(--color-surface-primary)",
-              borderRadius: "var(--radius-md)",
-              boxShadow: "var(--shadow-md)",
-              padding: "var(--space-20)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-8)", marginBottom: "var(--space-12)" }}>
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: "var(--radius-sm)",
-                  background: "var(--color-surface-secondary)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Zap size={14} style={{ color: "var(--color-text-secondary)" }} />
+          <div className="bg-surface-primary rounded-md shadow-md p-20">
+            <div className="flex items-center gap-8 mb-12">
+              <div className="w-7 h-7 rounded-sm bg-surface-secondary flex items-center justify-center">
+                <Zap size={14} className="text-text-secondary" />
               </div>
-              <span style={{ fontWeight: 600, fontSize: "var(--font-size-subhead)", color: "var(--color-text-primary)" }}>
-                Agent Analysis
-              </span>
-              <div style={{ flex: 1 }} />
+              <span className="font-semibold text-subhead text-text-primary">Agent Analysis</span>
+              <div className="flex-1" />
               {selected.agentConfidence && (
-                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-8)" }}>
-                  <div
-                    style={{
-                      width: 80,
-                      height: 4,
-                      borderRadius: "var(--radius-full)",
-                      background: "var(--color-surface-secondary)",
-                      overflow: "hidden",
-                    }}
-                  >
+                <div className="flex items-center gap-8">
+                  <div className="w-20 h-1 rounded-full bg-surface-secondary overflow-hidden">
                     <div
-                      style={{
-                        width: `${selected.agentConfidence}%`,
-                        height: "100%",
-                        borderRadius: "var(--radius-full)",
-                        background: "var(--color-text-secondary)",
-                      }}
+                      className="h-full rounded-full bg-text-secondary"
+                      style={{ width: `${selected.agentConfidence}%` }}
                     />
                   </div>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "var(--font-size-caption)",
-                      fontWeight: 600,
-                      color: "var(--color-text-primary)",
-                    }}
-                  >
+                  <span className="font-mono text-caption font-semibold text-text-primary">
                     {selected.agentConfidence}%
                   </span>
                 </div>
               )}
             </div>
-            <p
-              style={{
-                fontSize: "var(--font-size-body)",
-                color: "var(--color-text-secondary)",
-                lineHeight: 1.6,
-                margin: "0 0 var(--space-12)",
-              }}
-            >
+            <p className="text-body text-text-secondary leading-relaxed m-0 mb-12">
               {selected.agentSummary}
             </p>
-            <div style={{ display: "flex", gap: "var(--space-8)", alignItems: "center" }}>
-              <div
-                style={{
-                  padding: "var(--space-4) var(--space-10)",
-                  borderRadius: "var(--radius-sm)",
-                  background: "var(--color-surface-secondary)",
-                  fontSize: "var(--font-size-caption)",
-                  fontWeight: 600,
-                  color: "var(--color-text-secondary)",
-                }}
-              >
+            <div className="flex gap-8 items-center">
+              <div className="px-10 py-4 rounded-sm bg-surface-secondary text-caption font-semibold text-text-secondary">
                 {selected.agentRecommendation}
               </div>
-              <div style={{ flex: 1 }} />
+              <div className="flex-1" />
               {selected.status === "NEEDS_APPROVAL" && (
                 <>
                   <Button variant="brand" size="sm">
@@ -642,41 +405,15 @@ export default function InboxPage() {
               )}
             </div>
             {/* Layer 2 trigger */}
-            <button
-              style={{
-                marginTop: "var(--space-12)",
-                width: "100%",
-                padding: "var(--space-8) 0",
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                fontSize: "var(--font-size-caption)",
-                color: "var(--color-text-tertiary)",
-                fontFamily: "var(--font-sans)",
-                fontWeight: 500,
-                borderTop: "1px solid var(--color-border-subtle)",
-                paddingTop: "var(--space-12)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "var(--space-4)",
-              }}
-            >
+            <button className="mt-12 w-full py-8 border-none bg-transparent cursor-pointer text-caption text-text-tertiary font-sans font-medium border-t border-border-subtle pt-12 flex items-center justify-center gap-4">
               <ChevronRight size={12} />
               View Evidence & Reasoning
             </button>
           </div>
 
           {/* ── DETAIL TABS ── */}
-          <div
-            style={{
-              background: "var(--color-surface-primary)",
-              borderRadius: "var(--radius-md)",
-              boxShadow: "var(--shadow-sm)",
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ borderBottom: "1px solid var(--color-border-subtle)", display: "flex", padding: "0 var(--space-16)" }}>
+          <div className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
+            <div className="border-b border-border-subtle flex px-16">
               {[
                 { id: "email", label: "Email" },
                 { id: "entities", label: "Entities" },
@@ -687,35 +424,18 @@ export default function InboxPage() {
                 <button
                   key={tab.id}
                   onClick={() => setDetailTab(tab.id)}
-                  style={{
-                    padding: "var(--space-10) var(--space-12)",
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontFamily: "var(--font-sans)",
-                    fontSize: "var(--font-size-caption)",
-                    fontWeight: detailTab === tab.id ? 700 : 500,
-                    color: detailTab === tab.id ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
-                    borderBottom: detailTab === tab.id ? "2px solid var(--color-brand)" : "2px solid transparent",
-                    marginBottom: -1,
-                  }}
+                  className={cn(
+                    "px-12 py-10 border-none bg-transparent cursor-pointer font-sans text-caption -mb-px",
+                    detailTab === tab.id
+                      ? "font-bold text-text-primary border-b-2 border-brand"
+                      : "font-medium text-text-tertiary border-b-2 border-transparent",
+                  )}
                 >
                   {tab.label}
                 </button>
               ))}
             </div>
-            {/* Content */}
-            <div
-              style={{
-                padding: "var(--space-20)",
-                fontSize: "var(--font-size-body)",
-                color: "var(--color-text-secondary)",
-                lineHeight: 1.7,
-                whiteSpace: "pre-wrap",
-                maxHeight: 300,
-                overflowY: "auto",
-              }}
-            >
+            <div className="p-20 text-body text-text-secondary leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto">
               {detailTab === "email"
                 ? (selected.email?.body || "Email content not available. Agent processed this item automatically.")
                 : `${
@@ -735,19 +455,10 @@ export default function InboxPage() {
 function MetaField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div
-        style={{
-          fontSize: "var(--font-size-label)",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          color: "var(--color-text-tertiary)",
-          marginBottom: 2,
-        }}
-      >
+      <div className="text-label font-bold uppercase tracking-widest text-text-tertiary mb-px">
         {label}
       </div>
-      <div style={{ fontSize: "var(--font-size-caption)", fontWeight: 500, color: "var(--color-text-secondary)" }}>
+      <div className="text-caption font-medium text-text-secondary">
         {children}
       </div>
     </div>

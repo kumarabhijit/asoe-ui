@@ -24,65 +24,23 @@ export default function ExceptionFullPage() {
   const exceptionId = params.id as string;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-surface-page)",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <div className="min-h-screen bg-surface-page flex flex-col">
       <NavBar tabs={NAV_TABS} activeTab="exceptions" agentCount={3} />
 
       {/* Breadcrumb + back button */}
-      <div
-        style={{
-          padding: "var(--space-12) var(--space-32)",
-          borderBottom: "1px solid var(--color-border-default)",
-          background: "var(--color-surface-primary)",
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-12)",
-        }}
-      >
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push("/exceptions")}
-        >
+      <div className="px-32 py-12 border-b border-border bg-surface-primary flex items-center gap-12">
+        <Button variant="ghost" size="sm" onClick={() => router.push("/exceptions")}>
           <ArrowLeft size={16} />
           Back to Queue
         </Button>
-        <span
-          style={{
-            color: "var(--color-text-quaternary)",
-            fontSize: "var(--font-size-caption)",
-          }}
-        >
-          /
-        </span>
-        <span
-          style={{
-            fontSize: "var(--font-size-caption)",
-            fontWeight: 600,
-            color: "var(--color-text-secondary)",
-            fontFamily: "var(--font-mono)",
-          }}
-        >
+        <span className="text-text-quaternary text-caption">/</span>
+        <span className="text-caption font-semibold text-text-secondary font-mono">
           {exceptionId}
         </span>
       </div>
 
       {/* Full-width detail content */}
-      <div
-        style={{
-          flex: 1,
-          maxWidth: 960,
-          width: "100%",
-          margin: "0 auto",
-          padding: "var(--space-24) var(--space-32)",
-        }}
-      >
+      <div className="flex-1 max-w-[960px] w-full mx-auto px-32 py-24">
         <ExceptionDetailPanel
           exceptionId={exceptionId}
           onClose={() => router.push("/exceptions")}
