@@ -356,8 +356,6 @@ function ExceptionCard({
   isSelected: boolean;
   onSelect: () => void;
 }) {
-  const isTerminal = TERMINAL_STATES.includes(exc.lifecycle_state);
-
   return (
     <div
       role="option"
@@ -415,7 +413,7 @@ function ExceptionCard({
         </span>
       </div>
 
-      {/* Row 2: Intent tag + lifecycle badge + verdict + resolved indicator */}
+      {/* Row 2: Intent tag + lifecycle badge + verdict */}
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", flexWrap: "wrap" }}>
         {exc.intent && (
           <Badge variant="brand" size="sm" icon={null}>
@@ -428,11 +426,6 @@ function ExceptionCard({
         {exc.shadow_verdict && (
           <Badge variant={verdictVariant(exc.shadow_verdict)} size="sm">
             {exc.shadow_verdict}
-          </Badge>
-        )}
-        {isTerminal && exc.shadow_verdict === "GREEN" && (
-          <Badge variant="success" size="sm" icon={<CheckCircle size={10} />}>
-            Resolved
           </Badge>
         )}
       </div>
