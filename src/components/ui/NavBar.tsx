@@ -102,7 +102,7 @@ export function NavBar({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                className="w-8 h-8 rounded-full bg-surface-tertiary flex items-center justify-center text-caption font-semibold text-text-secondary cursor-pointer border-none"
+                className="w-[32px] h-[32px] rounded-full bg-surface-tertiary flex items-center justify-center text-caption font-semibold text-text-secondary cursor-pointer border-none"
                 aria-label="User menu"
               >
                 {userInitials}

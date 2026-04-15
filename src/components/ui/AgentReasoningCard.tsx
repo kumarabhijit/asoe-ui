@@ -54,7 +54,7 @@ function ConfidenceBar({ value }: { value: number }) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-label font-mono text-text-tertiary font-semibold min-w-8 text-right">
+      <span className="text-label font-mono text-text-tertiary font-semibold min-w-[32px] text-right">
         {pct}%
       </span>
     </div>

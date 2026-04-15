@@ -304,7 +304,7 @@ export default function DashboardPage() {
 function BarSegment({ value, max, color }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div className="flex-1 h-8 bg-surface-tertiary rounded-full overflow-hidden">
+    <div className="flex-1 h-[8px] bg-surface-tertiary rounded-full overflow-hidden">
       <div
         className="h-full rounded-full transition-[width] duration-normal ease-out"
         style={{ width: `${pct}%`, background: color || "var(--color-brand)" }}

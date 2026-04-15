@@ -38,7 +38,7 @@ const NODE_LABELS: Record<PipelineNode, string> = {
   apply_effects: "Apply Effects",
 };
 
-const indicatorBase = "w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all duration-fast ease-out";
+const indicatorBase = "w-[20px] h-[20px] rounded-full flex items-center justify-center shrink-0 transition-all duration-fast ease-out";
 
 function NodeIndicator({ status }: { status: NodeState["status"] }) {
   switch (status) {
@@ -115,7 +115,7 @@ export function WaterfallStepper({ nodes, intent, className }: WaterfallStepperP
 
             {/* Content */}
             <div className={cn("flex-1", !isLast && "pb-8")}>
-              <div className="flex items-center gap-8 min-h-5">
+              <div className="flex items-center gap-8 min-h-[20px]">
                 <span
                   className={cn(
                     "text-body transition-colors duration-fast",

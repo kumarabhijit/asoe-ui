@@ -173,7 +173,7 @@ export default function InboxPage() {
           </nav>
           <div className="flex items-center justify-between py-8 pb-16">
             <div className="flex items-center gap-12">
-              <div className="w-10 h-10 rounded-md bg-text-primary flex items-center justify-center">
+              <div className="w-[40px] h-[40px] rounded-md bg-text-primary flex items-center justify-center">
                 <Mail size={20} className="text-text-inverse" />
               </div>
               <div>
@@ -273,7 +273,7 @@ export default function InboxPage() {
                   <div className="flex gap-10">
                     {/* Avatar — dynamic color from data, inline style is correct */}
                     <div
-                      className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center text-caption font-bold"
+                      className="w-[36px] h-[36px] rounded-full shrink-0 flex items-center justify-center text-caption font-bold"
                       style={{ background: `color-mix(in srgb, ${item.initialsColor} 15%, white)`, color: item.initialsColor }}
                     >
                       {item.initials}
@@ -317,7 +317,7 @@ export default function InboxPage() {
           <div className="bg-surface-primary rounded-md shadow-sm p-20">
             <div className="flex gap-12 mb-16">
               <div
-                className="w-11 h-11 rounded-full shrink-0 flex items-center justify-center text-subhead font-bold"
+                className="w-[44px] h-[44px] rounded-full shrink-0 flex items-center justify-center text-subhead font-bold"
                 style={{ background: `color-mix(in srgb, ${selected.initialsColor} 15%, white)`, color: selected.initialsColor }}
               >
                 {selected.initials}
@@ -366,14 +366,14 @@ export default function InboxPage() {
           {/* ── AGENT REASONING CARD (Layer 1 — always visible) ── */}
           <div className="bg-surface-primary rounded-md shadow-md p-20">
             <div className="flex items-center gap-8 mb-12">
-              <div className="w-7 h-7 rounded-sm bg-surface-secondary flex items-center justify-center">
+              <div className="w-[28px] h-[28px] rounded-sm bg-surface-secondary flex items-center justify-center">
                 <Zap size={14} className="text-text-secondary" />
               </div>
               <span className="font-semibold text-subhead text-text-primary">Agent Analysis</span>
               <div className="flex-1" />
               {selected.agentConfidence && (
                 <div className="flex items-center gap-8">
-                  <div className="w-20 h-1 rounded-full bg-surface-secondary overflow-hidden">
+                  <div className="w-[80px] h-[4px] rounded-full bg-surface-secondary overflow-hidden">
                     <div
                       className="h-full rounded-full bg-text-secondary"
                       style={{ width: `${selected.agentConfidence}%` }}

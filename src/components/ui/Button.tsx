@@ -18,9 +18,9 @@ const buttonVariants = cva(
         destructive: "bg-error text-text-inverse hover:bg-error-hover",
       },
       size: {
-        sm: "h-8 px-12 py-6 text-caption",
-        md: "h-9 px-16 py-8 text-body",
-        lg: "h-10 px-20 py-10 text-subhead",
+        sm: "h-[32px] px-12 py-6 text-caption",
+        md: "h-[36px] px-16 py-8 text-body",
+        lg: "h-[40px] px-20 py-10 text-subhead",
       },
     },
     defaultVariants: {

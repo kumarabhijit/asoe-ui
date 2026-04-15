@@ -32,7 +32,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             aria-describedby={error ? errorId : undefined}
             aria-invalid={!!error}
             className={cn(
-              "flex h-10 w-full rounded-md border bg-surface-primary px-12 font-sans text-body text-text-primary outline-none",
+              "flex h-[40px] w-full rounded-md border bg-surface-primary px-12 font-sans text-body text-text-primary outline-none",
               "transition-[border-color,box-shadow] duration-instant ease-out",
               "placeholder:text-text-quaternary",
               "focus:border-border-brand focus:ring-2 focus:ring-brand-ring",
@@ -44,7 +44,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
           {rightIcon && (
-            <div className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center text-text-tertiary">
+            <div className="absolute right-0 top-0 flex h-[40px] w-[40px] items-center justify-center text-text-tertiary">
               {rightIcon}
             </div>
           )}
