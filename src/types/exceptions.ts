@@ -249,6 +249,8 @@ export interface OrderAnalysis {
   duplicate_detection?: DuplicateDetectionData;
   /** Present when two orders need side-by-side comparison */
   order_comparison?: OrderComparisonData;
+  /** Present when a pricing exception produces price delta analysis */
+  price_analysis?: PriceAnalysisData;
 }
 
 /* ── Duplicate PO enrichment types (UI-only, not backend contract) ──── */
@@ -305,6 +307,44 @@ export interface ComparisonLineItem {
   description: string;
   qty: number;
   unit_price: number;
+}
+
+/* ── Price analysis enrichment types ─────────────────────────────────── */
+
+/** Price analysis summary — present when a pricing skill/recipe produces it */
+export interface PriceAnalysisData {
+  /** ERP (SAP) base price per unit after condition chain */
+  erp_unit_price: number;
+  /** PO (customer) price per unit */
+  po_unit_price: number;
+  /** Absolute variance per unit */
+  variance_amount: number;
+  /** Variance percentage (positive = PO below ERP) */
+  variance_pct: number;
+  /** Total revenue at risk (delta × quantity) */
+  total_at_risk: number;
+  /** Total quantity across affected lines */
+  total_quantity: number;
+  /** Unit of measure */
+  uom: string;
+  /** SAP document type (e.g., "Sales Order", "Delivery") */
+  doc_type: string;
+  /** SAP document number */
+  doc_number: string;
+  /** Primary SKU number */
+  sku: string;
+  /** Material description */
+  material_desc: string;
+  /** Order date */
+  order_date: string;
+  /** Rule that triggered the exception (e.g., "SO-PRICE-001") */
+  rule_id: string;
+  /** Deterministic root cause category */
+  root_cause_category: string;
+  /** Active contract reference (if any) */
+  contract_ref?: string;
+  /** Active promotion reference (if any) */
+  promotion_ref?: string;
 }
 
 /** Entity profile — master data relevant to the exception context */

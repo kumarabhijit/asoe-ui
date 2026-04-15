@@ -38,6 +38,7 @@ import { ContextStrip } from "./ContextStrip";
 import { AgentAnalysisSection } from "./AgentAnalysisSection";
 import { DuplicateDetectionSection } from "./DuplicateDetectionSection";
 import { OrderComparisonSection } from "./OrderComparisonSection";
+import { PriceAnalysisSection } from "./PriceAnalysisSection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -287,8 +288,11 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
 
           {/* ── Data-presence-driven enrichment sections ─────────────── */}
           {/* These render ONLY when their data is present in the analysis.
-              A new intent that populates duplicate_detection or order_comparison
-              automatically gets these sections — zero UI code changes. */}
+              A new intent that populates these fields automatically gets
+              their sections rendered — zero UI code changes needed. */}
+          {analysis?.price_analysis && (
+            <PriceAnalysisSection data={analysis.price_analysis} />
+          )}
           {analysis?.duplicate_detection && (
             <DuplicateDetectionSection data={analysis.duplicate_detection} />
           )}
