@@ -22,7 +22,9 @@ npm run dev
 | Layer | Technology |
 |---|---|
 | Framework | Next.js 16 (App Router, React 19, TypeScript) |
-| Styling | CSS custom properties (`design-tokens.css`) + Tailwind CSS |
+| Styling | Tailwind CSS + CSS custom properties (`design-tokens.css`) + CVA (class-variance-authority) |
+| Components | Shadcn/ui (Select, DropdownMenu, Dialog) + 14 custom agent-first components |
+| Dark Mode | System-default via `next-themes` (`prefers-color-scheme`) |
 | Layout | react-resizable-panels (three-pane Outlook master-detail) |
 | Icons | Lucide React (16/20/24px — never emoji) |
 | Auth | NextAuth.js → FastAPI auth endpoints (`asoe2`) |
@@ -120,7 +122,7 @@ The visual design system is defined in `skills/asoe-ui-design/`:
 
 The UI implements the architecture defined in `ui_architecture.md`. Key patterns:
 
-- **14 custom components** — agent-first components (NavBar, WaterfallStepper, AgentReasoningCard, PricingWaterfall) are custom; Shadcn adopted only for non-agent primitives (Section 11.2)
+- **17 components** (14 custom + 3 Shadcn) — agent-first components are custom; Shadcn/ui for interactive primitives (Select, DropdownMenu, Dialog). All styled with Tailwind CSS via design token mapping.
 - **Health-driven enums** — filter dropdowns source values from `GET /api/v1/health` at runtime (Guardrail #2 — no hardcoded intents or lifecycle states)
 - **WebSocket real-time** — pipeline progress via `useWebSocket` hook (Section 8 protocol with reconnection backoff)
 - **Types mirror backend** — `src/types/` matches `asoe2` Pydantic models field-for-field

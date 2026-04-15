@@ -55,7 +55,8 @@ src/
 ├── lib/
 │   ├── api.ts                    # API client: auth + health + exceptions + line items
 │   ├── auth.ts                   # NextAuth options (credentials provider, JWT callbacks)
-│   └── roles.ts                  # RBAC permissions aligned with asoe2/api/deps.py
+│   ├── roles.ts                  # RBAC permissions aligned with asoe2/api/deps.py
+│   └── utils.ts                  # cn() — Tailwind class merge utility (clsx + tailwind-merge)
 ├── types/
 │   ├── auth.ts                   # AuthUser, LoginResponse, Role (← asoe2 schemas)
 │   ├── exceptions.ts             # Intent, LifecycleState, ShadowVerdict, ExceptionSummary,
@@ -63,7 +64,8 @@ src/
 │   ├── api.ts                    # ResolveRequest/Response, StatsResponse, PaginatedResponse
 │   └── websocket.ts              # WSEvent, PipelineProgressPayload, WSAuthMessage
 ├── styles/
-│   └── design-tokens.css         # 45+ CSS custom properties — single source of truth
+│   └── design-tokens.css         # CSS custom properties (light + dark mode tokens)
+├── components.json               # Shadcn/ui configuration (aliases, paths, options)
 └── middleware.ts                  # Route protection via NextAuth JWT check
 ```
 
@@ -73,26 +75,31 @@ src/
 
 | Component | Source | Section 11.2 | Used By |
 |---|---|---|---|
-| `Button` | Custom | 5 ASOE variants with brand restraint | All pages |
-| `Card` | Custom | Borderless, shadow-only (Shadcn uses borders) | Login, Dashboard, Detail |
-| `Input` | Custom | ASOE label typography, brand focus ring | Login, Exception Queue |
-| `Logo` | Custom | Brand mark with tagline | NavBar, Login |
-| `NavBar` | Custom | 56px glass, agent pulse, `onSignOut`, `onSettingsClick`, `aria-current`, logo links to `/inbox` | All pages (consistent tabs) |
-| `MetricTile` | Custom | KPI: 40x40 tinted icon + monospace value | Exception Queue, Dashboard, Inbox |
-| `Badge` | Custom | Tinted bg + icon + text, 6 variant mappers | Exception Queue, Detail, Inbox, Dashboard |
-| `Toast` | Custom | 4.5s auto-dismiss, solid-fill (only one in system) | Via ToastProvider |
-| `Sidebar` | Custom | 480px panel, escape-to-close, focus trap | (Available, not used in Outlook layout) |
-| `ActivityIndicator` | Custom | Node-specific domain-aware messages | WaterfallStepper |
-| `WaterfallStepper` | Custom | 10-node pipeline with per-node states | ExceptionDetailPanel |
-| `AgentReasoningCard` | Custom | Layer 1 only (recommendation + actions), verdict-specific behavior | ExceptionDetailPanel |
-| `PricingWaterfall` | Custom | Pricing condition chain timeline | ExceptionDetailPanel |
-| `GravitationalOrbs` | Custom | Canvas animated background | Login |
+| `Button` | CVA + Tailwind | 5 variants (brand/neutral/success/ghost/destructive), 3 sizes, `asChild` via Radix Slot | All pages |
+| `Card` | Tailwind | Borderless shadow-elevated container + compound components (CardHeader/Title/Description/Content/Footer) | Login, Dashboard, Detail |
+| `Input` | Tailwind | Label + error + rightIcon, `forwardRef`, focus via Tailwind pseudo-classes | Login, Exception Queue |
+| `Badge` | CVA + Tailwind | Tinted bg + icon + text, 5 variant mappers, WCAG icon+text | Exception Queue, Detail, Inbox, Dashboard |
+| `Select` | Radix + Tailwind | Keyboard nav, typeahead, scroll buttons, check indicators | Exception Queue filters |
+| `DropdownMenu` | Radix + Tailwind | Sub-menus, checkbox/radio items, labels, separators | NavBar user menu |
+| `Dialog` | Radix + Tailwind | Overlay, focus trap, close button, header/footer composition | (Available for future use) |
+| `Logo` | Tailwind | Brand mark with tagline, 3 sizes | NavBar, Login |
+| `NavBar` | Tailwind | 56px glass, agent pulse, DropdownMenu user menu, tab nav | All pages (consistent tabs) |
+| `MetricTile` | Tailwind | KPI: 40x40 tinted icon + monospace value | Exception Queue, Dashboard, Inbox |
+| `Toast` | Tailwind | 4.5s auto-dismiss, status-colored, slide-in animation | Via ToastProvider |
+| `Sidebar` | Tailwind | 480px panel, escape-to-close, focus trap | (Available, not used in Outlook layout) |
+| `ActivityIndicator` | Tailwind | Node-specific domain-aware messages | WaterfallStepper |
+| `WaterfallStepper` | Tailwind | 10-node pipeline with per-node states | ExceptionDetailPanel |
+| `AgentReasoningCard` | Tailwind | Layer 1 only (recommendation + actions), verdict-specific behavior | ExceptionDetailPanel |
+| `PricingWaterfall` | Tailwind | Pricing condition chain timeline | ExceptionDetailPanel |
+| `GravitationalOrbs` | Custom (canvas) | Canvas animated background | Login |
+
+**Styling approach (Phase 8.9):** All components use Tailwind utility classes via the design token mapping in `tailwind.config.ts`. CVA (`class-variance-authority`) is used for multi-variant components (Button, Badge). `cn()` utility (`src/lib/utils.ts`) merges Tailwind classes with conflict resolution. Only 18 inline `style={{}}` objects remain across the entire codebase — all are data-driven dynamic values (avatar colors, bar widths, chart colors).
 
 **Badge variant mappers** (`Badge.tsx`): `verdictVariant()`, `lifecycleVariant()`, `rootCauseVariant()`, `categoryVariant()`, `inboxStatusVariant()` — all follow the same pattern: map API-provided strings to CSS variants with a `default` fallback.
 
 **PricingWaterfall vs WaterfallStepper:** WaterfallStepper visualizes the 10-node pipeline execution (WebSocket-driven). PricingWaterfall visualizes pricing condition chains for line items (API data-driven). They share a timeline visual metaphor but differ in data model and purpose.
 
-**Shadcn adopted (not yet installed):** DataTable (Tanstack Table), Dialog/Sheet, Select/Dropdown, Tooltip. Re-themed with ASOE tokens per Section 11.2.
+**Shadcn components installed:** Select, DropdownMenu, Dialog (Radix primitives + Tailwind styling). **Pending:** DataTable (Tanstack Table), Tooltip.
 
 ---
 
