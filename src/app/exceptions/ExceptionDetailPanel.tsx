@@ -41,6 +41,7 @@ import { OrderComparisonSection } from "./OrderComparisonSection";
 import { PriceAnalysisSection } from "./PriceAnalysisSection";
 import { BackOrderSection } from "./BackOrderSection";
 import { OverMaxSection } from "./OverMaxSection";
+import { MOQSection } from "./MOQSection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -306,6 +307,9 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
           )}
           {analysis?.overmax_analysis && (
             <OverMaxSection data={analysis.overmax_analysis} />
+          )}
+          {analysis?.moq_analysis && (
+            <MOQSection data={analysis.moq_analysis} />
           )}
 
           {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}

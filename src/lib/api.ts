@@ -209,6 +209,19 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     created_at: "2026-04-13T09:30:00Z",
     updated_at: "2026-04-13T09:38:00Z",
   },
+  {
+    id: "exc-013",
+    tenant_id: "acme-corp",
+    order_id: "SO-11200",
+    event_type: "MIN_ORDER_QTY",
+    intent: "MIN_ORDER_QTY",
+    lifecycle_state: "PENDING_REVIEW",
+    shadow_verdict: "YELLOW",
+    selected_recipe: "MOQRoundUpRecipe.py",
+    final_status: "MANUAL_REVIEW_REQUIRED",
+    created_at: "2026-04-14T07:45:00Z",
+    updated_at: "2026-04-14T07:52:00Z",
+  },
 ];
 
 const MOCK_HEALTH: HealthResponse = {
@@ -216,13 +229,13 @@ const MOCK_HEALTH: HealthResponse = {
   version: "0.3.2",
   kill_switch: false,
   explain_mode: false,
-  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX"],
+  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY"],
   lifecycle_states: [
     "INGESTED", "CLASSIFYING", "AUDITING", "PENDING_REVIEW",
     "ESCALATED", "PENDING_ADMIN_REVIEW", "EXECUTING", "RESOLVED",
     "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
-  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py"],
+  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py"],
 };
 
 /* ── Auth API (/api/auth/*) ─────��──────────────────────────────────── */
@@ -598,6 +611,10 @@ const MOCK_LINE_ITEMS: Record<string, LineItem[]> = {
     { line_id: "L1", sku: "SKU-9010", description: "Sparkling Mineral 12pk", uom: "CS", quantity: 1200, erp_price: 11.50, po_price: 11.50 },
     { line_id: "L2", sku: "SKU-9015", description: "Still Mineral 12pk", uom: "CS", quantity: 800, erp_price: 9.80, po_price: 9.80 },
     { line_id: "L3", sku: "SKU-9020", description: "Flavored Water 24pk", uom: "CS", quantity: 600, erp_price: 14.20, po_price: 14.20 },
+  ],
+  "exc-013": [
+    { line_id: "L1", sku: "SKU-7800", description: "Organic Kombucha 6pk", uom: "CS", quantity: 40, erp_price: 28.50, po_price: 28.50 },
+    { line_id: "L2", sku: "SKU-7810", description: "Ginger Kombucha 6pk", uom: "CS", quantity: 25, erp_price: 26.00, po_price: 26.00 },
   ],
 };
 
@@ -1413,6 +1430,62 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
         { sku: "SKU-9010", description: "Sparkling Mineral 12pk", ordered: 1200, trimmed_to: 900, delta: 300, action: "TRIM" },
         { sku: "SKU-9015", description: "Still Mineral 12pk", ordered: 800, trimmed_to: 800, delta: 0, action: "OK" },
         { sku: "SKU-9020", description: "Flavored Water 24pk", ordered: 600, trimmed_to: 288, delta: 312, action: "TRIM" },
+      ],
+    },
+  },
+  /* ── MIN_ORDER_QTY: Pending Review (YELLOW) ────────────────────────── */
+  "exc-013": {
+    diagnosis: "Order for 65 CS total (2 SKUs) is below the minimum order quantity of 100 CS for this distribution channel. SAP V4082 block applied. Two lines: one can be rounded up to MOQ, one needs escalation due to KNMT waiver requirement.",
+    confidence: 89,
+    risk: "MEDIUM",
+    resolution: "ROUND_UP",
+    root_cause: "Order quantity 35% below channel MOQ. MOQ set via KNMT-MINBM for Direct Store Delivery channel.",
+    recommendation: "Round up SKU-7800 from 40 to 72 CS (full pallet layer). Escalate SKU-7810 for KNMT waiver — below individual MOQ of 48 CS.",
+    entity_profile: {
+      customer_name: "Fermented Foods Co",
+      bp_number: "BP-990215",
+      customer_tier: "Silver",
+      vip_status: false,
+      credit_standing: "Good",
+      location: "Plant 2100 — Miami DC",
+      region: "Southeast",
+    },
+    impact_metrics: {
+      revenue_at_risk: 1790.00,
+      delta_amount: 625.00,
+      delta_percentage: 34.9,
+      sla_priority: "MEDIUM",
+      sla_deadline: "2026-04-15T12:00:00Z",
+      affected_lines: 2,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "40 CS ordered, MOQ 48 CS. Shortfall 8 CS. Round up to 72 CS (full layer = 24 CS/layer × 3).", resolution: "ROUND_UP", risk: "LOW", waterfall: [] },
+      { line_id: "L2", diagnosis: "25 CS ordered, MOQ 48 CS. Shortfall 23 CS. Below 50% of MOQ — requires KNMT waiver.", resolution: "ESCALATE", risk: "MEDIUM", waterfall: [] },
+    ],
+    moq_analysis: {
+      ordered_qty: 65,
+      moq_qty: 100,
+      shortfall_qty: 35,
+      shortfall_pct: 35.0,
+      sku: "SKU-7800",
+      description: "Organic Kombucha 6pk",
+      unit_cost: 28.50,
+      uom: "CS",
+      at_risk: 1790.00,
+      moq_source: "KNMT-MINBM",
+      channel: "Direct Store Delivery",
+      block_message: "Order quantity 65 CS is below minimum order quantity 100 CS for DSD channel. Block V4082 applied per SD-MOQ-001.",
+      contract_ref: "CTR-4600022150",
+      block_status: "V4082",
+      round_up_plan: [
+        { sku: "SKU-7800", description: "Organic Kombucha 6pk", ordered: 40, round_up_to: 72, delta: 32, action: "ROUND_UP" },
+        { sku: "SKU-7810", description: "Ginger Kombucha 6pk", ordered: 25, round_up_to: 25, delta: 0, action: "ESCALATE" },
+      ],
+      sap_steps: [
+        { step: 1, transaction: "VA02", table: "VBAP", field: "KWMENG", description: "Update order quantity for SKU-7800 from 40 to 72 CS" },
+        { step: 2, transaction: "VK11", table: "KONV", field: "KBETR", description: "Apply MOQ round-up pricing adjustment (volume discount tier)" },
+        { step: 3, transaction: "V.23", table: "VBAK", field: "LIFSK", description: "Release V4082 delivery block after quantity adjustment" },
+        { step: 4, transaction: "VA02", table: "VBAP", field: "ABGRU", description: "Set rejection reason on SKU-7810 pending KNMT waiver approval" },
       ],
     },
   },
