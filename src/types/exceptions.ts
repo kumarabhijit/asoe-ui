@@ -253,6 +253,8 @@ export interface OrderAnalysis {
   price_analysis?: PriceAnalysisData;
   /** Present when a back-order/OOS exception produces inventory gap analysis */
   backorder_analysis?: BackOrderAnalysisData;
+  /** Present when an over-max exception produces a trim plan */
+  overmax_analysis?: OverMaxAnalysisData;
 }
 
 /* ── Duplicate PO enrichment types (UI-only, not backend contract) ──── */
@@ -428,6 +430,54 @@ export interface ResolutionOption {
   sap_steps: string[];
   /** Whether this is the recommended ("top pick") option */
   recommended: boolean;
+}
+
+/* ── Over Max enrichment types ───────────────────────────────────────── */
+
+/** Over Max analysis — present when the Over Max skill/recipe produces it */
+export interface OverMaxAnalysisData {
+  /** Total quantity ordered across all lines */
+  total_ordered: number;
+  /** Maximum allowed quantity (contract or policy) */
+  max_qty: number;
+  /** Excess quantity (ordered - max) */
+  excess_qty: number;
+  /** Exceedance percentage */
+  exceedance_pct: number;
+  /** Unit of measure */
+  uom: string;
+  /** Revenue at risk from excess */
+  at_risk: number;
+  /** Contract reference */
+  contract_ref: string;
+  /** SAP block status */
+  block_status: string;
+  /** Block reason */
+  block_reason: string;
+  /** Per-line details */
+  order_lines: OverMaxLine[];
+  /** AI-generated trim plan */
+  trim_plan: TrimPlanLine[];
+}
+
+/** Over Max per-line detail */
+export interface OverMaxLine {
+  sku: string;
+  description: string;
+  qty: number;
+  max_line_qty: number;
+  excess: number;
+  is_even_layer_item: boolean;
+}
+
+/** AI trim plan line */
+export interface TrimPlanLine {
+  sku: string;
+  description: string;
+  ordered: number;
+  trimmed_to: number;
+  delta: number;
+  action: "TRIM" | "SKIP" | "OK";
 }
 
 /** Entity profile — master data relevant to the exception context */
