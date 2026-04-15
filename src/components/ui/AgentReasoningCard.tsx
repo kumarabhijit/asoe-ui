@@ -12,10 +12,11 @@
  */
 "use client";
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Zap, Check, AlertTriangle, ShieldX, MessageSquare } from "lucide-react";
 import { Badge, verdictVariant } from "./Badge";
 import { Button } from "./Button";
+import { cn } from "@/lib/utils";
 import type { ShadowVerdict } from "@/types/exceptions";
 
 interface AgentReasoningCardProps {
@@ -25,71 +26,35 @@ interface AgentReasoningCardProps {
   recipeName?: string;
   explanation?: string;
   policyHits?: string[];
-  /** Called with reviewer comment when Approve is confirmed */
   onApprove?: (comment: string) => void;
-  /** Called with reviewer comment when Reject is confirmed */
   onReject?: (comment: string) => void;
   onEscalate?: () => void;
   onOverride?: () => void;
-  /** Whether an action is in progress (disables buttons) */
   actionLoading?: boolean;
-  /** Whether user has admin role (enables Override on RED) */
   isAdmin?: boolean;
-  style?: CSSProperties;
+  className?: string;
 }
 
-const VERDICT_CONFIG: Record<ShadowVerdict, {
-  label: string;
-  icon: ReactNode;
-}> = {
-  GREEN: {
-    label: "Auto-resolved",
-    icon: <Check size={14} />,
-  },
-  YELLOW: {
-    label: "Review Required",
-    icon: <AlertTriangle size={14} />,
-  },
-  RED: {
-    label: "Blocked by Policy",
-    icon: <ShieldX size={14} />,
-  },
+const VERDICT_CONFIG: Record<ShadowVerdict, { label: string; icon: ReactNode }> = {
+  GREEN: { label: "Auto-resolved", icon: <Check size={14} /> },
+  YELLOW: { label: "Review Required", icon: <AlertTriangle size={14} /> },
+  RED: { label: "Blocked by Policy", icon: <ShieldX size={14} /> },
 };
 
 function ConfidenceBar({ value }: { value: number }) {
   const pct = Math.round(value * 100);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-8)", flex: 1 }}>
-      <div
-        style={{
-          flex: 1,
-          height: 6,
-          background: "var(--color-surface-tertiary)",
-          borderRadius: "var(--radius-full)",
-          overflow: "hidden",
-        }}
-      >
+    <div className="flex items-center gap-8 flex-1">
+      <div className="flex-1 h-1.5 bg-surface-tertiary rounded-full overflow-hidden">
         <div
-          style={{
-            width: `${pct}%`,
-            height: "100%",
-            background: pct >= 80 ? "var(--color-success)" : pct >= 50 ? "var(--color-warning)" : "var(--color-error)",
-            borderRadius: "var(--radius-full)",
-            transition: "width var(--dur-normal) var(--ease-out)",
-          }}
+          className={cn(
+            "h-full rounded-full transition-[width] duration-normal ease-out",
+            pct >= 80 ? "bg-success" : pct >= 50 ? "bg-warning" : "bg-error",
+          )}
+          style={{ width: `${pct}%` }}
         />
       </div>
-      <span
-        className="mono-sm"
-        style={{
-          fontSize: "var(--font-size-label)",
-          fontFamily: "var(--font-mono)",
-          color: "var(--color-text-tertiary)",
-          fontWeight: 600,
-          minWidth: 32,
-          textAlign: "right",
-        }}
-      >
+      <span className="text-label font-mono text-text-tertiary font-semibold min-w-8 text-right">
         {pct}%
       </span>
     </div>
@@ -109,18 +74,15 @@ export function AgentReasoningCard({
   onOverride,
   actionLoading = false,
   isAdmin = false,
-  style,
+  className,
 }: AgentReasoningCardProps) {
   const config = VERDICT_CONFIG[verdict];
   const [pendingAction, setPendingAction] = useState<"approve" | "reject" | null>(null);
   const [comment, setComment] = useState("");
 
   function confirmAction() {
-    if (pendingAction === "approve" && onApprove) {
-      onApprove(comment);
-    } else if (pendingAction === "reject" && onReject) {
-      onReject(comment);
-    }
+    if (pendingAction === "approve" && onApprove) onApprove(comment);
+    else if (pendingAction === "reject" && onReject) onReject(comment);
     setPendingAction(null);
     setComment("");
   }
@@ -131,37 +93,14 @@ export function AgentReasoningCard({
   }
 
   return (
-    <div
-      style={{
-        background: "var(--color-surface-primary)",
-        borderRadius: "var(--radius-md)",
-        boxShadow: "var(--shadow-sm)",
-        overflow: "hidden",
-        ...style,
-      }}
-    >
+    <div className={cn("bg-surface-primary rounded-md shadow-sm overflow-hidden", className)}>
       {/* ── Layer 1: Always visible ─────────────────────────────────── */}
-      <div style={{ padding: "var(--space-16) var(--space-20)" }}>
+      <div className="px-20 py-16">
         {/* Header row */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: "var(--space-12)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-8)" }}>
-            <Zap size={16} color="var(--color-brand)" />
-            <span
-              style={{
-                fontSize: "var(--font-size-subhead)",
-                fontWeight: 600,
-                color: "var(--color-text-primary)",
-              }}
-            >
-              Agent Analysis
-            </span>
+        <div className="flex items-center justify-between mb-12">
+          <div className="flex items-center gap-8">
+            <Zap size={16} className="text-brand" />
+            <span className="text-subhead font-semibold text-text-primary">Agent Analysis</span>
           </div>
           <Badge variant={verdictVariant(verdict)} icon={config.icon}>
             {config.label}
@@ -170,85 +109,42 @@ export function AgentReasoningCard({
 
         {/* Confidence bar */}
         {confidence !== undefined && (
-          <div style={{ marginBottom: "var(--space-12)" }}>
-            <span
-              className="label"
-              style={{
-                display: "block",
-                fontSize: "var(--font-size-label)",
-                color: "var(--color-text-tertiary)",
-                fontWeight: 600,
-                letterSpacing: "0.04em",
-                textTransform: "uppercase",
-                marginBottom: "var(--space-4)",
-              }}
-            >
+          <div className="mb-12">
+            <span className="block text-label text-text-tertiary font-semibold tracking-wider uppercase mb-4">
               Confidence
             </span>
             <ConfidenceBar value={confidence} />
           </div>
         )}
 
-        {/* Key data points (2-3 max per Section 11.1) */}
-        <div
-          style={{
-            display: "flex",
-            gap: "var(--space-16)",
-            marginBottom: "var(--space-12)",
-            flexWrap: "wrap",
-          }}
-        >
+        {/* Key data points */}
+        <div className="flex gap-16 mb-12 flex-wrap">
           {intent && (
             <div>
-              <span className="label" style={{ fontSize: "var(--font-size-label)", color: "var(--color-text-quaternary)", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>
-                Intent
-              </span>
-              <div style={{ fontSize: "var(--font-size-body)", fontWeight: 600, color: "var(--color-text-primary)", marginTop: 2 }}>
-                {intent.replace(/_/g, " ")}
-              </div>
+              <span className="text-label text-text-quaternary uppercase tracking-wider font-semibold">Intent</span>
+              <div className="text-body font-semibold text-text-primary mt-px">{intent.replace(/_/g, " ")}</div>
             </div>
           )}
           {recipeName && (
             <div>
-              <span className="label" style={{ fontSize: "var(--font-size-label)", color: "var(--color-text-quaternary)", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>
-                Recipe
-              </span>
-              <div style={{ fontSize: "var(--font-size-body)", fontWeight: 500, color: "var(--color-text-primary)", marginTop: 2 }}>
-                {recipeName.replace(".py", "")}
-              </div>
+              <span className="text-label text-text-quaternary uppercase tracking-wider font-semibold">Recipe</span>
+              <div className="text-body font-medium text-text-primary mt-px">{recipeName.replace(".py", "")}</div>
             </div>
           )}
         </div>
 
-        {/* Explanation / recommendation */}
+        {/* Explanation */}
         {explanation && (
-          <p
-            style={{
-              fontSize: "var(--font-size-body)",
-              color: "var(--color-text-secondary)",
-              lineHeight: 1.5,
-              margin: 0,
-              marginBottom: "var(--space-12)",
-            }}
-          >
+          <p className="text-body text-text-secondary leading-normal m-0 mb-12">
             {explanation}
           </p>
         )}
 
         {/* Policy hits for RED */}
         {verdict === "RED" && policyHits && policyHits.length > 0 && (
-          <div
-            style={{
-              padding: "var(--space-8) var(--space-12)",
-              background: "var(--color-error-subtle)",
-              borderRadius: "var(--radius-sm)",
-              marginBottom: "var(--space-12)",
-            }}
-          >
-            <span className="label" style={{ fontSize: "var(--font-size-label)", color: "var(--color-error)", fontWeight: 600 }}>
-              Blocking Policy Rules
-            </span>
-            <ul style={{ margin: "var(--space-4) 0 0", paddingLeft: "var(--space-16)", fontSize: "var(--font-size-caption)", color: "var(--color-error)" }}>
+          <div className="px-12 py-8 bg-error-subtle rounded-sm mb-12">
+            <span className="text-label text-error font-semibold">Blocking Policy Rules</span>
+            <ul className="mt-4 mb-0 pl-16 text-caption text-error">
               {policyHits.map((hit) => (
                 <li key={hit}>{hit}</li>
               ))}
@@ -256,9 +152,9 @@ export function AgentReasoningCard({
           </div>
         )}
 
-        {/* Action buttons — verdict-specific per Section 11.1 */}
+        {/* Action buttons */}
         {!pendingAction && (
-          <div style={{ display: "flex", gap: "var(--space-8)", flexWrap: "wrap" }}>
+          <div className="flex gap-8 flex-wrap">
             {verdict === "YELLOW" && (
               <>
                 {onApprove && <Button variant="brand" size="sm" disabled={actionLoading} onClick={() => setPendingAction("approve")}>Approve</Button>}
@@ -269,77 +165,38 @@ export function AgentReasoningCard({
             {verdict === "RED" && (
               <>
                 <Button variant="neutral" size="sm" disabled={actionLoading} onClick={() => setPendingAction("approve")}>Acknowledge</Button>
-                {isAdmin && onOverride && (
-                  <Button variant="destructive" size="sm" disabled={actionLoading} onClick={onOverride}>Override</Button>
-                )}
+                {isAdmin && onOverride && <Button variant="destructive" size="sm" disabled={actionLoading} onClick={onOverride}>Override</Button>}
                 {onEscalate && <Button variant="ghost" size="sm" disabled={actionLoading} onClick={onEscalate}>Escalate</Button>}
               </>
             )}
           </div>
         )}
 
-        {/* Comment input — shown when Approve or Reject is clicked */}
+        {/* Comment input */}
         {pendingAction && (
-          <div style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--space-8)",
-            padding: "var(--space-12)",
-            background: "var(--color-surface-secondary)",
-            borderRadius: "var(--radius-sm)",
-          }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-6)",
-              fontSize: "var(--font-size-caption)",
-              fontWeight: 600,
-              color: "var(--color-text-secondary)",
-            }}>
+          <div className="flex flex-col gap-8 p-12 bg-surface-secondary rounded-sm">
+            <div className="flex items-center gap-6 text-caption font-semibold text-text-secondary">
               <MessageSquare size={14} />
               {pendingAction === "approve" ? "Approval" : "Rejection"} Comment
             </div>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder={pendingAction === "approve"
-                ? "Add approval notes (optional)..."
-                : "Provide rejection reason..."
-              }
+              placeholder={pendingAction === "approve" ? "Add approval notes (optional)..." : "Provide rejection reason..."}
               autoFocus
               rows={3}
-              style={{
-                width: "100%",
-                padding: "var(--space-8) var(--space-12)",
-                border: "1px solid var(--color-border-default)",
-                borderRadius: "var(--radius-sm)",
-                fontSize: "var(--font-size-caption)",
-                fontFamily: "var(--font-sans)",
-                color: "var(--color-text-primary)",
-                background: "var(--color-surface-primary)",
-                resize: "vertical",
-                outline: "none",
-              }}
-              onFocus={(e) => { e.target.style.borderColor = "var(--color-brand)"; }}
-              onBlur={(e) => { e.target.style.borderColor = "var(--color-border-default)"; }}
+              className="w-full px-12 py-8 border border-border rounded-sm text-caption font-sans text-text-primary bg-surface-primary resize-y outline-none focus:border-brand"
               onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) confirmAction(); }}
             />
-            <div style={{ display: "flex", gap: "var(--space-8)", justifyContent: "flex-end" }}>
+            <div className="flex gap-8 justify-end">
               <Button variant="ghost" size="sm" onClick={cancelAction}>Cancel</Button>
-              <Button
-                variant={pendingAction === "approve" ? "brand" : "neutral"}
-                size="sm"
-                disabled={actionLoading}
-                onClick={confirmAction}
-              >
+              <Button variant={pendingAction === "approve" ? "brand" : "neutral"} size="sm" disabled={actionLoading} onClick={confirmAction}>
                 {actionLoading ? "Processing..." : pendingAction === "approve" ? "Confirm Approval" : "Confirm Rejection"}
               </Button>
             </div>
           </div>
         )}
       </div>
-
     </div>
   );
 }
-

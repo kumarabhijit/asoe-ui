@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Logo } from "@/components/ui/Logo";
+import { cn } from "@/lib/utils";
 
 type Step = "email" | "password" | "sso-redirect";
 
@@ -85,45 +86,19 @@ function LoginForm() {
   }
 
   return (
-    <div style={{ padding: "44px 36px 36px" }}>
+    <div className="pt-[44px] px-[36px] pb-[36px]">
       {/* Logo */}
-      <div style={{ marginBottom: "var(--space-32)", textAlign: "center" }}>
+      <div className="mb-32 text-center">
         <Logo size="lg" showTagline />
       </div>
 
       {/* Step Title */}
-      <h1
-        style={{
-          fontSize: "var(--font-size-title)",
-          fontWeight: 700,
-          color: "var(--color-text-primary)",
-          marginBottom: "var(--space-24)",
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-8)",
-        }}
-      >
+      <h1 className="text-title font-bold text-text-primary mb-24 flex items-center gap-8">
         {step === "password" && (
           <button
             type="button"
             onClick={handleBack}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "var(--color-text-tertiary)",
-              padding: "var(--space-4)",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "var(--radius-sm)",
-              transition: "color var(--dur-instant)",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.color = "var(--color-text-primary)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.color = "var(--color-text-tertiary)")
-            }
+            className="bg-transparent border-none cursor-pointer text-text-tertiary p-4 flex items-center rounded-sm transition-colors duration-instant hover:text-text-primary"
             aria-label="Go back to email"
           >
             <ArrowLeft size={20} />
@@ -137,21 +112,9 @@ function LoginForm() {
         <div
           role="alert"
           aria-live="polite"
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: "var(--space-8)",
-            padding: "var(--space-10) var(--space-12)",
-            background: "var(--color-error-subtle)",
-            border: "1px solid var(--color-error-border)",
-            borderRadius: "var(--radius-sm)",
-            marginBottom: "var(--space-20)",
-            fontSize: "var(--font-size-caption)",
-            color: "var(--color-error)",
-            lineHeight: 1.5,
-          }}
+          className="flex items-start gap-8 px-12 py-10 bg-error-subtle border border-error-border rounded-sm mb-20 text-caption text-error leading-[1.5]"
         >
-          <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+          <AlertCircle size={14} className="shrink-0 mt-[2px]" />
           <span>{error}</span>
         </div>
       )}
@@ -160,7 +123,7 @@ function LoginForm() {
       {step === "email" && (
         <form
           onSubmit={handleNext}
-          style={{ display: "flex", flexDirection: "column", gap: "var(--space-20)" }}
+          className="flex flex-col gap-20"
         >
           <Input
             label="Username, email address, or SSO code"
@@ -184,89 +147,36 @@ function LoginForm() {
           </Button>
 
           {/* Remember me toggle */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-10)",
-              marginTop: "var(--space-4)",
-            }}
-          >
+          <div className="flex items-center gap-10 mt-4">
             <button
               type="button"
               role="switch"
               aria-checked={rememberMe}
               onClick={() => setRememberMe(!rememberMe)}
-              style={{
-                width: 40,
-                height: 22,
-                borderRadius: "var(--radius-full)",
-                background: rememberMe
-                  ? "var(--color-brand)"
-                  : "var(--color-border-strong)",
-                border: "none",
-                cursor: "pointer",
-                position: "relative",
-                transition: "background var(--dur-fast) var(--ease-out)",
-                flexShrink: 0,
-              }}
+              className={cn(
+                "w-[40px] h-[22px] rounded-full border-none cursor-pointer relative shrink-0 transition-colors duration-fast ease-out",
+                rememberMe ? "bg-brand" : "bg-border-strong"
+              )}
             >
               <span
-                style={{
-                  position: "absolute",
-                  top: 2,
-                  left: rememberMe ? 20 : 2,
-                  width: 18,
-                  height: 18,
-                  borderRadius: "var(--radius-full)",
-                  background: "var(--color-surface-primary)",
-                  boxShadow: "var(--shadow-sm)",
-                  transition: "left var(--dur-fast) var(--ease-out)",
-                }}
+                className={cn(
+                  "absolute top-[2px] w-[18px] h-[18px] rounded-full bg-surface-primary shadow-sm transition-[left] duration-fast ease-out",
+                  rememberMe ? "left-[20px]" : "left-[2px]"
+                )}
               />
             </button>
-            <span
-              style={{
-                fontSize: "var(--font-size-body)",
-                color: "var(--color-text-secondary)",
-                fontWeight: 500,
-              }}
-            >
+            <span className="text-body text-text-secondary font-medium">
               Remember me
             </span>
           </div>
 
           {/* Help links */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-              gap: "var(--space-6)",
-              marginTop: "var(--space-4)",
-            }}
-          >
+          <div className="flex flex-col items-start gap-6 mt-4">
             {["Forgot username?", "Need help signing in?"].map((text) => (
               <button
                 key={text}
                 type="button"
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "var(--font-size-caption)",
-                  color: "var(--color-text-tertiary)",
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 500,
-                  padding: 0,
-                  transition: "color var(--dur-instant)",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.color = "var(--color-text-secondary)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.color = "var(--color-text-tertiary)")
-                }
+                className="bg-transparent border-none cursor-pointer text-caption text-text-tertiary font-sans font-medium p-0 transition-colors duration-instant hover:text-text-secondary"
               >
                 {text}
               </button>
@@ -279,18 +189,9 @@ function LoginForm() {
       {step === "password" && (
         <form
           onSubmit={handleSignIn}
-          style={{ display: "flex", flexDirection: "column", gap: "var(--space-20)" }}
+          className="flex flex-col gap-20"
         >
-          <div
-            style={{
-              padding: "var(--space-10) var(--space-12)",
-              background: "rgba(0,0,0,0.03)",
-              borderRadius: "var(--radius-sm)",
-              fontSize: "var(--font-size-body)",
-              color: "var(--color-text-secondary)",
-              fontWeight: 500,
-            }}
-          >
+          <div className="px-12 py-10 bg-black/[0.03] rounded-sm text-body text-text-secondary font-medium">
             {email}
           </div>
 
@@ -307,14 +208,7 @@ function LoginForm() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "inherit",
-                  padding: 0,
-                  display: "flex",
-                }}
+                className="bg-transparent border-none cursor-pointer text-[inherit] p-0 flex"
                 tabIndex={-1}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
@@ -335,24 +229,7 @@ function LoginForm() {
 
           <button
             type="button"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "var(--font-size-caption)",
-              color: "var(--color-text-tertiary)",
-              fontFamily: "var(--font-sans)",
-              fontWeight: 500,
-              padding: 0,
-              textAlign: "left",
-              transition: "color var(--dur-instant)",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.color = "var(--color-text-secondary)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.color = "var(--color-text-tertiary)")
-            }
+            className="bg-transparent border-none cursor-pointer text-caption text-text-tertiary font-sans font-medium p-0 text-left transition-colors duration-instant hover:text-text-secondary"
           >
             Forgot password?
           </button>
@@ -361,31 +238,12 @@ function LoginForm() {
 
       {/* ── SSO Redirect State ── */}
       {step === "sso-redirect" && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "var(--space-16)",
-            padding: "var(--space-24) 0",
-          }}
-        >
-          <div className="agent-active-dot" style={{ width: 12, height: 12 }} />
-          <span
-            style={{
-              fontSize: "var(--font-size-body)",
-              color: "var(--color-text-secondary)",
-              textAlign: "center",
-            }}
-          >
+        <div className="flex flex-col items-center gap-16 py-24">
+          <div className="agent-active-dot w-[12px] h-[12px]" />
+          <span className="text-body text-text-secondary text-center">
             Redirecting to your identity provider...
           </span>
-          <span
-            style={{
-              fontSize: "var(--font-size-caption)",
-              color: "var(--color-text-tertiary)",
-            }}
-          >
+          <span className="text-caption text-text-tertiary">
             {email}
           </span>
         </div>
@@ -396,23 +254,12 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-surface-page)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "var(--space-24)",
-        fontFamily: "var(--font-sans)",
-      }}
-    >
+    <div className="min-h-screen bg-surface-page flex flex-col items-center justify-center p-24 font-sans">
       {/* Login Card */}
-      <Card elevated style={{ width: "100%", maxWidth: 420 }}>
+      <Card elevated className="w-full max-w-[420px]">
         <Suspense
           fallback={
-            <div style={{ padding: 40, textAlign: "center" }}>Loading...</div>
+            <div className="p-40 text-center">Loading...</div>
           }
         >
           <LoginForm />
@@ -420,39 +267,15 @@ export default function LoginPage() {
       </Card>
 
       {/* Agent Activity Footer */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-8)",
-          marginTop: "var(--space-32)",
-        }}
-      >
+      <div className="flex items-center gap-8 mt-32">
         <span className="agent-active-dot" />
-        <span
-          style={{
-            fontSize: "var(--font-size-caption)",
-            color: "var(--color-text-tertiary)",
-            fontWeight: 500,
-          }}
-        >
+        <span className="text-caption text-text-tertiary font-medium">
           12 agents active
         </span>
-        <span
-          style={{
-            fontSize: "var(--font-size-caption)",
-            color: "var(--color-text-quaternary)",
-          }}
-        >
+        <span className="text-caption text-text-quaternary">
           &middot;
         </span>
-        <span
-          style={{
-            fontSize: "var(--font-size-caption)",
-            color: "var(--color-text-tertiary)",
-            fontWeight: 500,
-          }}
-        >
+        <span className="text-caption text-text-tertiary font-medium">
           847 exceptions resolved today
         </span>
       </div>

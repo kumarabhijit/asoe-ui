@@ -8,9 +8,9 @@
 "use client";
 
 import { Check, X, Minus } from "lucide-react";
-import type { PipelineNode, NodeStatus } from "@/types/exceptions";
+import type { PipelineNode } from "@/types/exceptions";
 import { ActivityIndicator } from "./ActivityIndicator";
-import type { CSSProperties } from "react";
+import { cn } from "@/lib/utils";
 
 export interface NodeState {
   node: PipelineNode;
@@ -22,10 +22,9 @@ export interface NodeState {
 interface WaterfallStepperProps {
   nodes: NodeState[];
   intent?: string;
-  style?: CSSProperties;
+  className?: string;
 }
 
-/** Human-readable node labels */
 const NODE_LABELS: Record<PipelineNode, string> = {
   ingest: "Ingest Event",
   classify: "Classify Intent",
@@ -39,70 +38,28 @@ const NODE_LABELS: Record<PipelineNode, string> = {
   apply_effects: "Apply Effects",
 };
 
-function NodeIndicator({ status }: { status: NodeState["status"] }) {
-  const size = 20;
-  const shared: CSSProperties = {
-    width: size,
-    height: size,
-    borderRadius: "var(--radius-full)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    transition: "all var(--dur-fast) var(--ease-out)",
-  };
+const indicatorBase = "w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all duration-fast ease-out";
 
+function NodeIndicator({ status }: { status: NodeState["status"] }) {
   switch (status) {
     case "completed":
-      return (
-        <span style={{ ...shared, background: "var(--color-success)", color: "#fff" }}>
-          <Check size={12} />
-        </span>
-      );
+      return <span className={cn(indicatorBase, "bg-success text-white")}><Check size={12} /></span>;
     case "failed":
-      return (
-        <span style={{ ...shared, background: "var(--color-error)", color: "#fff" }}>
-          <X size={12} />
-        </span>
-      );
+      return <span className={cn(indicatorBase, "bg-error text-white")}><X size={12} /></span>;
     case "started":
       return (
-        <span
-          style={{
-            ...shared,
-            background: "transparent",
-            border: "2px solid var(--color-brand)",
-            position: "relative",
-          }}
-        >
-          <span
-            className="agent-active-dot"
-            style={{ width: 8, height: 8, position: "absolute" }}
-          />
+        <span className={cn(indicatorBase, "bg-transparent border-2 border-brand relative")}>
+          <span className="agent-active-dot w-2 h-2 absolute" />
         </span>
       );
     case "skipped":
       return (
-        <span
-          style={{
-            ...shared,
-            background: "transparent",
-            border: "2px dashed var(--color-border-strong)",
-          }}
-        >
-          <Minus size={10} color="var(--color-text-quaternary)" />
+        <span className={cn(indicatorBase, "bg-transparent border-2 border-dashed border-border-strong")}>
+          <Minus size={10} className="text-text-quaternary" />
         </span>
       );
-    default: // pending
-      return (
-        <span
-          style={{
-            ...shared,
-            background: "transparent",
-            border: "2px solid var(--color-border-default)",
-          }}
-        />
-      );
+    default:
+      return <span className={cn(indicatorBase, "bg-transparent border-2 border-border")} />;
   }
 }
 
@@ -112,7 +69,6 @@ function formatDuration(ms?: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-/** Format data summary for completed nodes */
 function dataSummary(node: PipelineNode, data?: Record<string, unknown>): string | null {
   if (!data) return null;
   switch (node) {
@@ -133,122 +89,62 @@ function dataSummary(node: PipelineNode, data?: Record<string, unknown>): string
   }
 }
 
-export function WaterfallStepper({ nodes, intent, style }: WaterfallStepperProps) {
+export function WaterfallStepper({ nodes, intent, className }: WaterfallStepperProps) {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 0,
-        ...style,
-      }}
-    >
+    <div className={cn("flex flex-col", className)}>
       {nodes.map((n, i) => {
         const isLast = i === nodes.length - 1;
         const summary = n.status === "completed" ? dataSummary(n.node, n.data) : null;
 
         return (
-          <div key={n.node} style={{ display: "flex", gap: "var(--space-12)" }}>
+          <div key={n.node} className="flex gap-12">
             {/* Indicator + connector line */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 0,
-              }}
-            >
+            <div className="flex flex-col items-center">
               <NodeIndicator status={n.status} />
               {!isLast && (
                 <div
-                  style={{
-                    width: 2,
-                    flex: 1,
-                    minHeight: 16,
-                    background:
-                      n.status === "completed"
-                        ? "var(--color-success)"
-                        : n.status === "failed"
-                        ? "var(--color-error)"
-                        : "var(--color-border-default)",
-                    transition: "background var(--dur-fast)",
-                  }}
+                  className={cn(
+                    "w-0.5 flex-1 min-h-4 transition-colors duration-fast",
+                    n.status === "completed" ? "bg-success"
+                    : n.status === "failed" ? "bg-error"
+                    : "bg-border",
+                  )}
                 />
               )}
             </div>
 
             {/* Content */}
-            <div style={{ flex: 1, paddingBottom: isLast ? 0 : "var(--space-8)" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--space-8)",
-                  minHeight: 20,
-                }}
-              >
+            <div className={cn("flex-1", !isLast && "pb-8")}>
+              <div className="flex items-center gap-8 min-h-5">
                 <span
-                  style={{
-                    fontSize: "var(--font-size-body)",
-                    fontWeight: n.status === "started" ? 600 : 500,
-                    color:
-                      n.status === "pending" || n.status === "skipped"
-                        ? "var(--color-text-quaternary)"
-                        : "var(--color-text-primary)",
-                    transition: "color var(--dur-fast)",
-                  }}
+                  className={cn(
+                    "text-body transition-colors duration-fast",
+                    n.status === "started" ? "font-semibold text-text-primary"
+                    : n.status === "pending" || n.status === "skipped" ? "font-medium text-text-quaternary"
+                    : "font-medium text-text-primary",
+                  )}
                 >
                   {NODE_LABELS[n.node]}
                 </span>
                 {n.duration_ms !== undefined && n.status === "completed" && (
-                  <span
-                    className="mono-sm"
-                    style={{
-                      fontSize: "var(--font-size-label)",
-                      color: "var(--color-text-quaternary)",
-                      fontFamily: "var(--font-mono)",
-                    }}
-                  >
+                  <span className="text-label text-text-quaternary font-mono">
                     {formatDuration(n.duration_ms)}
                   </span>
                 )}
               </div>
 
-              {/* Activity indicator for in-progress nodes */}
               {n.status === "started" && (
-                <ActivityIndicator
-                  node={n.node}
-                  intent={intent}
-                  className="mt-4"
-                />
+                <ActivityIndicator node={n.node} intent={intent} className="mt-4" />
               )}
 
-              {/* Data summary for completed nodes */}
               {summary && (
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: "var(--font-size-caption)",
-                    color: "var(--color-text-tertiary)",
-                    fontWeight: 500,
-                    marginTop: 2,
-                  }}
-                >
+                <span className="block text-caption text-text-tertiary font-medium mt-px">
                   {summary}
                 </span>
               )}
 
-              {/* Error for failed nodes */}
               {n.status === "failed" && (
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: "var(--font-size-caption)",
-                    color: "var(--color-error)",
-                    fontWeight: 500,
-                    marginTop: 2,
-                  }}
-                >
+                <span className="block text-caption text-error font-medium mt-px">
                   Node failed — subsequent nodes skipped
                 </span>
               )}

@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/Button";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
 import { exceptionsApi } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type { StatsResponse } from "@/types/api";
 
 const NAV_TABS = [
@@ -77,13 +78,7 @@ export default function DashboardPage() {
     : 0;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-surface-page)",
-        fontFamily: "var(--font-sans)",
-      }}
-    >
+    <div className="min-h-screen bg-surface-page font-sans">
       <NavBar
         tabs={NAV_TABS}
         activeTab="dashboard"
@@ -98,58 +93,27 @@ export default function DashboardPage() {
         onSettingsClick={() => router.push("/settings")}
       />
 
-      <main id="main-content" style={{ maxWidth: 1440, margin: "0 auto", padding: "var(--space-24) var(--space-32)" }}>
+      <main id="main-content" className="mx-auto max-w-[1440px] px-32 py-24">
         {/* Breadcrumb */}
         <nav
           aria-label="Breadcrumb"
-          style={{
-            fontSize: "var(--font-size-caption)",
-            color: "var(--color-text-tertiary)",
-            marginBottom: "var(--space-12)",
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-6)",
-          }}
+          className="mb-12 flex items-center gap-6 text-caption text-text-tertiary"
         >
           <span>Home</span>
           <ChevronRight size={10} />
-          <span style={{ color: "var(--color-text-secondary)" }}>Dashboard</span>
+          <span className="text-text-secondary">Dashboard</span>
         </nav>
 
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-16)", marginBottom: "var(--space-24)" }}>
-          <div
-            style={{
-              width: 42,
-              height: 42,
-              borderRadius: "var(--radius-md)",
-              background: "var(--color-text-primary)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
+        <div className="mb-24 flex items-start gap-16">
+          <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-md bg-text-primary">
             <BarChart3 size={22} color="var(--color-text-inverse)" />
           </div>
           <div>
-            <h1
-              style={{
-                fontSize: "var(--font-size-title)",
-                fontWeight: 700,
-                color: "var(--color-text-primary)",
-                margin: 0,
-              }}
-            >
+            <h1 className="m-0 text-title font-bold text-text-primary">
               Dashboard
             </h1>
-            <p
-              style={{
-                fontSize: "var(--font-size-body)",
-                color: "var(--color-text-tertiary)",
-                margin: "var(--space-4) 0 0",
-              }}
-            >
+            <p className="mt-4 mb-0 text-body text-text-tertiary">
               Resolution analytics and agent performance metrics
             </p>
           </div>
@@ -157,14 +121,7 @@ export default function DashboardPage() {
 
         {/* Top KPI Tiles */}
         {stats && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: "var(--space-16)",
-              marginBottom: "var(--space-24)",
-            }}
-          >
+          <div className="mb-24 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-16">
             <MetricTile
               icon={<TrendingUp size={20} />}
               label="Resolution Rate"
@@ -200,71 +157,65 @@ export default function DashboardPage() {
         )}
 
         {/* 2-column grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "var(--space-20)",
-          }}
-        >
+        <div className="grid grid-cols-2 gap-20">
           {/* By Intent breakdown */}
-          <Card elevated style={{ padding: "var(--space-20)" }}>
-            <h3 style={{ fontSize: "var(--font-size-subhead)", fontWeight: 600, color: "var(--color-text-primary)", margin: "0 0 var(--space-16)" }}>
+          <Card elevated className="p-20">
+            <h3 className="m-0 mb-16 text-subhead font-semibold text-text-primary">
               Exceptions by Intent
             </h3>
             {stats?.by_intent ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-10)" }}>
+              <div className="flex flex-col gap-10">
                 {Object.entries(stats.by_intent).map(([intent, count]) => (
-                  <div key={intent} style={{ display: "flex", alignItems: "center", gap: "var(--space-12)" }}>
-                    <span style={{ flex: 1, fontSize: "var(--font-size-body)", color: "var(--color-text-secondary)" }}>
+                  <div key={intent} className="flex items-center gap-12">
+                    <span className="flex-1 text-body text-text-secondary">
                       {intent.replace(/_/g, " ")}
                     </span>
                     <BarSegment value={count} max={stats.total_exceptions} />
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--font-size-caption)", fontWeight: 600, color: "var(--color-text-primary)", minWidth: 24, textAlign: "right" }}>
+                    <span className="min-w-[24px] text-right font-mono text-caption font-semibold text-text-primary">
                       {count}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="skeleton" style={{ height: 100, borderRadius: "var(--radius-sm)" }} />
+              <div className="skeleton h-[100px] rounded-sm" />
             )}
           </Card>
 
           {/* By Lifecycle State */}
-          <Card elevated style={{ padding: "var(--space-20)" }}>
-            <h3 style={{ fontSize: "var(--font-size-subhead)", fontWeight: 600, color: "var(--color-text-primary)", margin: "0 0 var(--space-16)" }}>
+          <Card elevated className="p-20">
+            <h3 className="m-0 mb-16 text-subhead font-semibold text-text-primary">
               Exceptions by State
             </h3>
             {stats?.by_lifecycle_state ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-10)" }}>
+              <div className="flex flex-col gap-10">
                 {Object.entries(stats.by_lifecycle_state).map(([state, count]) => (
-                  <div key={state} style={{ display: "flex", alignItems: "center", gap: "var(--space-12)" }}>
-                    <Badge variant={lifecycleVariant(state)} size="sm" style={{ minWidth: 110 }}>
+                  <div key={state} className="flex items-center gap-12">
+                    <Badge variant={lifecycleVariant(state)} size="sm" className="min-w-[110px]">
                       {state.replace(/_/g, " ")}
                     </Badge>
                     <BarSegment value={count} max={stats.total_exceptions} />
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--font-size-caption)", fontWeight: 600, color: "var(--color-text-primary)", minWidth: 24, textAlign: "right" }}>
+                    <span className="min-w-[24px] text-right font-mono text-caption font-semibold text-text-primary">
                       {count}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="skeleton" style={{ height: 100, borderRadius: "var(--radius-sm)" }} />
+              <div className="skeleton h-[100px] rounded-sm" />
             )}
           </Card>
 
           {/* By Shadow Verdict */}
-          <Card elevated style={{ padding: "var(--space-20)" }}>
-            <h3 style={{ fontSize: "var(--font-size-subhead)", fontWeight: 600, color: "var(--color-text-primary)", margin: "0 0 var(--space-16)" }}>
+          <Card elevated className="p-20">
+            <h3 className="m-0 mb-16 text-subhead font-semibold text-text-primary">
               Shadow Verdict Distribution
             </h3>
             {stats?.by_shadow_verdict ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-10)" }}>
+              <div className="flex flex-col gap-10">
                 {Object.entries(stats.by_shadow_verdict).map(([verdict, count]) => (
-                  <div key={verdict} style={{ display: "flex", alignItems: "center", gap: "var(--space-12)" }}>
-                    <Badge variant={verdictVariant(verdict)} size="sm" style={{ minWidth: 80 }}>
+                  <div key={verdict} className="flex items-center gap-12">
+                    <Badge variant={verdictVariant(verdict)} size="sm" className="min-w-[80px]">
                       {verdict}
                     </Badge>
                     <BarSegment value={count} max={stats.total_exceptions} color={
@@ -272,24 +223,24 @@ export default function DashboardPage() {
                       verdict === "YELLOW" ? "var(--color-warning)" :
                       "var(--color-error)"
                     } />
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--font-size-caption)", fontWeight: 600, color: "var(--color-text-primary)", minWidth: 24, textAlign: "right" }}>
+                    <span className="min-w-[24px] text-right font-mono text-caption font-semibold text-text-primary">
                       {count}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="skeleton" style={{ height: 80, borderRadius: "var(--radius-sm)" }} />
+              <div className="skeleton h-[80px] rounded-sm" />
             )}
           </Card>
 
           {/* Platform Health */}
-          <Card elevated style={{ padding: "var(--space-20)" }}>
-            <h3 style={{ fontSize: "var(--font-size-subhead)", fontWeight: 600, color: "var(--color-text-primary)", margin: "0 0 var(--space-16)" }}>
+          <Card elevated className="p-20">
+            <h3 className="m-0 mb-16 text-subhead font-semibold text-text-primary">
               Platform Health
             </h3>
             {health ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-12)" }}>
+              <div className="flex flex-col gap-12">
                 <InfoRow label="Status" value={health.status} />
                 <InfoRow label="Version" value={health.version} mono />
                 <InfoRow
@@ -306,60 +257,35 @@ export default function DashboardPage() {
                 <InfoRow label="Active Recipes" value={String(health.allowed_recipes.length)} />
               </div>
             ) : (
-              <div className="skeleton" style={{ height: 80, borderRadius: "var(--radius-sm)" }} />
+              <div className="skeleton h-[80px] rounded-sm" />
             )}
           </Card>
 
           {/* Recent Activity */}
-          <Card elevated style={{ padding: "var(--space-20)", gridColumn: "span 2" }}>
-            <h3 style={{ fontSize: "var(--font-size-subhead)", fontWeight: 600, color: "var(--color-text-primary)", margin: "0 0 var(--space-16)" }}>
+          <Card elevated className="col-span-2 p-20">
+            <h3 className="m-0 mb-16 text-subhead font-semibold text-text-primary">
               Recent Activity
             </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            <div className="flex flex-col">
               {RECENT_ACTIVITY.map((item, idx) => (
                 <div
                   key={idx}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "var(--space-12)",
-                    padding: "var(--space-10) 0",
-                    borderBottom: idx < RECENT_ACTIVITY.length - 1 ? "1px solid var(--color-border-subtle)" : "none",
-                  }}
+                  className={cn(
+                    "flex items-center gap-12 py-10",
+                    idx < RECENT_ACTIVITY.length - 1 && "border-b border-border-subtle"
+                  )}
                 >
                   <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: item.color,
-                      flexShrink: 0,
-                    }}
+                    className="h-[8px] w-[8px] shrink-0 rounded-full"
+                    style={{ background: item.color }}
                   />
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "var(--font-size-label)",
-                      color: "var(--color-text-quaternary)",
-                      minWidth: 50,
-                      flexShrink: 0,
-                    }}
-                  >
+                  <span className="min-w-[50px] shrink-0 font-mono text-label text-text-quaternary">
                     {item.time}
                   </span>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "var(--font-size-caption)",
-                      fontWeight: 600,
-                      color: "var(--color-text-secondary)",
-                      minWidth: 70,
-                      flexShrink: 0,
-                    }}
-                  >
+                  <span className="min-w-[70px] shrink-0 font-mono text-caption font-semibold text-text-secondary">
                     {item.orderId}
                   </span>
-                  <span style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-secondary)", flex: 1 }}>
+                  <span className="flex-1 text-caption text-text-secondary">
                     {item.action}
                   </span>
                   <Badge variant={item.badge as "success" | "warning" | "error" | "info" | "neutral"} size="sm">
@@ -378,17 +304,25 @@ export default function DashboardPage() {
 function BarSegment({ value, max, color }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div style={{ flex: 1, height: 8, background: "var(--color-surface-tertiary)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
-      <div style={{ width: `${pct}%`, height: "100%", background: color || "var(--color-brand)", borderRadius: "var(--radius-full)", transition: "width var(--dur-normal) var(--ease-out)" }} />
+    <div className="flex-1 h-8 bg-surface-tertiary rounded-full overflow-hidden">
+      <div
+        className="h-full rounded-full transition-[width] duration-normal ease-out"
+        style={{ width: `${pct}%`, background: color || "var(--color-brand)" }}
+      />
     </div>
   );
 }
 
 function InfoRow({ label, value, mono, valueColor }: { label: string; value: string; mono?: boolean; valueColor?: string }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <span style={{ fontSize: "var(--font-size-body)", color: "var(--color-text-tertiary)" }}>{label}</span>
-      <span style={{ fontSize: "var(--font-size-body)", fontWeight: 600, fontFamily: mono ? "var(--font-mono)" : "var(--font-sans)", color: valueColor || "var(--color-text-primary)" }}>{value}</span>
+    <div className="flex items-center justify-between">
+      <span className="text-body text-text-tertiary">{label}</span>
+      <span
+        className={cn("text-body font-semibold", mono ? "font-mono" : "font-sans")}
+        style={{ color: valueColor || "var(--color-text-primary)" }}
+      >
+        {value}
+      </span>
     </div>
   );
 }

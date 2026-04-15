@@ -37,13 +37,7 @@ export default function SettingsPage() {
   const userInitials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-surface-page)",
-        fontFamily: "var(--font-sans)",
-      }}
-    >
+    <div className="min-h-screen bg-surface-page font-sans">
       <NavBar
         tabs={NAV_TABS}
         activeTab="settings"
@@ -58,95 +52,48 @@ export default function SettingsPage() {
         onSettingsClick={() => router.push("/settings")}
       />
 
-      <main id="main-content" style={{ maxWidth: 1440, margin: "0 auto", padding: "var(--space-24) var(--space-32)" }}>
+      <main id="main-content" className="max-w-[1440px] mx-auto py-24 px-32">
         {/* Breadcrumb */}
         <nav
           aria-label="Breadcrumb"
-          style={{
-            fontSize: "var(--font-size-caption)",
-            color: "var(--color-text-tertiary)",
-            marginBottom: "var(--space-12)",
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-6)",
-          }}
+          className="text-caption text-text-tertiary mb-12 flex items-center gap-6"
         >
           <span>Home</span>
-          <span style={{ color: "var(--color-text-quaternary)" }}>/</span>
-          <span style={{ color: "var(--color-text-secondary)" }}>Settings</span>
+          <span className="text-text-quaternary">/</span>
+          <span className="text-text-secondary">Settings</span>
         </nav>
 
         {/* Page header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-12)",
-            marginBottom: "var(--space-24)",
-          }}
-        >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: "var(--radius-md)",
-              background: "var(--color-surface-tertiary)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--color-text-secondary)",
-            }}
-          >
+        <div className="flex items-center gap-12 mb-24">
+          <div className="w-40 h-40 rounded-md bg-surface-tertiary flex items-center justify-center text-text-secondary">
             <Settings size={20} />
           </div>
           <div>
-            <h1 style={{ fontSize: "var(--font-size-display)", fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
+            <h1 className="text-display text-text-primary m-0">
               Settings
             </h1>
-            <p style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-tertiary)", margin: 0, marginTop: 2 }}>
+            <p className="text-caption text-text-tertiary m-0 mt-[2px]">
               Platform configuration and administration
             </p>
           </div>
         </div>
 
         {/* Settings cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-16)" }}>
+        <div className="grid grid-cols-2 gap-16">
           {SETTING_SECTIONS.map((section) => (
             <Card key={section.label}>
-              <div style={{ padding: "var(--space-20)", display: "flex", alignItems: "flex-start", gap: "var(--space-16)" }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: "var(--radius-sm)",
-                    background: "var(--color-surface-secondary)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "var(--color-text-secondary)",
-                    flexShrink: 0,
-                  }}
-                >
+              <div className="p-20 flex items-start gap-16">
+                <div className="w-40 h-40 rounded-sm bg-surface-secondary flex items-center justify-center text-text-secondary shrink-0">
                   <section.icon size={20} />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: "var(--font-size-subhead)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                <div className="flex-1">
+                  <div className="text-subhead text-text-primary">
                     {section.label}
                   </div>
-                  <div style={{ fontSize: "var(--font-size-caption)", color: "var(--color-text-tertiary)", marginTop: "var(--space-4)" }}>
+                  <div className="text-caption text-text-tertiary mt-4">
                     {section.description}
                   </div>
-                  <div
-                    style={{
-                      display: "inline-block",
-                      marginTop: "var(--space-10)",
-                      fontSize: "var(--font-size-label)",
-                      fontWeight: 600,
-                      color: "var(--color-text-quaternary)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                    }}
-                  >
+                  <div className="inline-block mt-10 text-label text-text-quaternary uppercase tracking-[0.04em]">
                     {section.status}
                   </div>
                 </div>
