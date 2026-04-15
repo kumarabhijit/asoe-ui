@@ -27,7 +27,7 @@ body {
 
 /* ── Selection ──────────────────────────────────────────────────────── */
 ::selection {
-  background: rgba(90, 75, 214, 0.3);
+  background: var(--color-brand-ring);
   color: var(--color-text-primary);
 }
 

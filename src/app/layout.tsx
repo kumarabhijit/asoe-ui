@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
         <a href="#main-content" className="skip-to-main">Skip to main content</a>
         <Providers>{children}</Providers>
