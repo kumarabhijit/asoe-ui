@@ -6,51 +6,47 @@
  */
 "use client";
 
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 import { Check, AlertTriangle, ShieldX, Clock, Zap, Info } from "lucide-react";
-import type { ReactNode, CSSProperties } from "react";
+import { cn } from "@/lib/utils";
+
+const badgeVariants = cva(
+  "inline-flex items-center whitespace-nowrap rounded-full font-semibold leading-snug tracking-wide",
+  {
+    variants: {
+      variant: {
+        success: "bg-success-subtle text-success",
+        warning: "bg-warning-subtle text-warning",
+        error: "bg-error-subtle text-error",
+        info: "bg-info-subtle text-info",
+        neutral: "bg-surface-secondary text-text-secondary border border-border",
+        brand: "bg-brand-subtle text-brand",
+      },
+      size: {
+        sm: "gap-1 px-2 py-px text-label",
+        md: "gap-1.5 px-2.5 py-0.5 text-caption",
+      },
+    },
+    defaultVariants: {
+      variant: "neutral",
+      size: "sm",
+    },
+  },
+);
 
 type BadgeVariant = "success" | "warning" | "error" | "info" | "neutral" | "brand";
 
-interface BadgeProps {
+interface BadgeProps
+  extends React.HTMLAttributes<HTMLSpanElement>,
+    VariantProps<typeof badgeVariants> {
   variant?: BadgeVariant;
-  children: ReactNode;
-  icon?: ReactNode;
+  children: React.ReactNode;
+  icon?: React.ReactNode;
   size?: "sm" | "md";
-  style?: CSSProperties;
 }
 
-const VARIANT_STYLES: Record<BadgeVariant, { bg: string; color: string; border: string }> = {
-  success: {
-    bg: "var(--color-success-subtle)",
-    color: "var(--color-success)",
-    border: "transparent",
-  },
-  warning: {
-    bg: "var(--color-warning-subtle)",
-    color: "var(--color-warning)",
-    border: "transparent",
-  },
-  error: {
-    bg: "var(--color-error-subtle)",
-    color: "var(--color-error)",
-    border: "transparent",
-  },
-  info: {
-    bg: "var(--color-info-subtle)",
-    color: "var(--color-info)",
-    border: "transparent",
-  },
-  neutral: {
-    bg: "var(--color-surface-secondary)",
-    color: "var(--color-text-secondary)",
-    border: "var(--color-border-default)",
-  },
-  brand: {
-    bg: "rgba(90, 75, 214, 0.08)",
-    color: "var(--color-brand)",
-    border: "transparent",
-  },
-};
+/* ── Variant mappers (visual mapping with default fallback) ────────── */
 
 /** Map shadow verdict strings to badge variants */
 export function verdictVariant(verdict?: string): BadgeVariant {
@@ -123,7 +119,7 @@ export function inboxStatusVariant(status?: string): BadgeVariant {
 }
 
 /** Default icon per variant (WCAG: status not conveyed by color alone) */
-const DEFAULT_ICONS: Record<BadgeVariant, ReactNode> = {
+const DEFAULT_ICONS: Record<BadgeVariant, React.ReactNode> = {
   success: <Check size={12} />,
   warning: <AlertTriangle size={12} />,
   error: <ShieldX size={12} />,
@@ -132,31 +128,19 @@ const DEFAULT_ICONS: Record<BadgeVariant, ReactNode> = {
   brand: <Zap size={12} />,
 };
 
-export function Badge({ variant = "neutral", children, icon, size = "sm", style }: BadgeProps) {
-  const v = VARIANT_STYLES[variant];
+function Badge({ className, variant = "neutral", size = "sm", children, icon, ...props }: BadgeProps) {
   const displayIcon = icon !== undefined ? icon : DEFAULT_ICONS[variant];
 
   return (
     <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: size === "sm" ? 4 : 6,
-        padding: size === "sm" ? "2px 8px" : "4px 10px",
-        borderRadius: "var(--radius-full)",
-        background: v.bg,
-        color: v.color,
-        border: v.border !== "transparent" ? `1px solid ${v.border}` : "none",
-        fontSize: size === "sm" ? "var(--font-size-label)" : "var(--font-size-caption)",
-        fontWeight: 600,
-        lineHeight: 1.4,
-        letterSpacing: "0.01em",
-        whiteSpace: "nowrap",
-        ...style,
-      }}
+      className={cn(badgeVariants({ variant, size }), className)}
+      {...props}
     >
       {displayIcon}
       {children}
     </span>
   );
 }
+
+export { Badge, badgeVariants };
+export type { BadgeProps, BadgeVariant };

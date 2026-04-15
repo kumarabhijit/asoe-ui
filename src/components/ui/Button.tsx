@@ -1,100 +1,76 @@
 "use client";
 
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
 import { Loader2 } from "lucide-react";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { cn } from "@/lib/utils";
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-6 whitespace-nowrap rounded-md font-sans font-semibold leading-tight transition-all duration-instant ease-out disabled:pointer-events-none disabled:opacity-40",
+  {
+    variants: {
+      variant: {
+        brand: "bg-brand text-text-inverse hover:bg-brand-hover active:bg-brand-active",
+        neutral: "bg-surface-primary text-text-secondary border border-border hover:bg-surface-secondary active:bg-surface-tertiary",
+        success: "bg-success text-text-inverse hover:bg-success-hover",
+        ghost: "bg-transparent text-text-tertiary hover:bg-surface-secondary hover:text-text-secondary",
+        destructive: "bg-error text-text-inverse hover:bg-error-hover",
+      },
+      size: {
+        sm: "h-8 px-12 py-6 text-caption",
+        md: "h-9 px-16 py-8 text-body",
+        lg: "h-10 px-20 py-10 text-subhead",
+      },
+    },
+    defaultVariants: {
+      variant: "neutral",
+      size: "md",
+    },
+  },
+);
 
 type Variant = "brand" | "neutral" | "success" | "ghost" | "destructive";
 type Size = "sm" | "md" | "lg";
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
   variant?: Variant;
   size?: Size;
   loading?: boolean;
   fullWidth?: boolean;
-  children: ReactNode;
+  asChild?: boolean;
+  children: React.ReactNode;
 }
 
-const variantStyles: Record<Variant, React.CSSProperties> = {
-  brand: {
-    background: "var(--color-brand)",
-    color: "var(--color-text-inverse)",
-    border: "none",
-  },
-  neutral: {
-    background: "var(--color-surface-primary)",
-    color: "var(--color-text-secondary)",
-    border: "1px solid var(--color-border-default)",
-  },
-  success: {
-    background: "var(--color-success)",
-    color: "var(--color-text-inverse)",
-    border: "none",
-  },
-  ghost: {
-    background: "transparent",
-    color: "var(--color-text-tertiary)",
-    border: "none",
-  },
-  destructive: {
-    background: "var(--color-error)",
-    color: "var(--color-text-inverse)",
-    border: "none",
-  },
-};
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, loading = false, fullWidth = false, asChild = false, disabled, children, ...props }, ref) => {
+    const isDisabled = disabled || loading;
+    const Comp = asChild ? Slot : "button";
 
-const sizeStyles: Record<Size, React.CSSProperties & { fontSize: number }> = {
-  sm: { height: 32, padding: "6px 12px", fontSize: 12 },
-  md: { height: 36, padding: "8px 16px", fontSize: 13 },
-  lg: { height: 40, padding: "10px 20px", fontSize: 14 },
-};
+    return (
+      <Comp
+        className={cn(
+          buttonVariants({ variant, size }),
+          fullWidth && "w-full",
+          loading && "opacity-100",
+          className,
+        )}
+        ref={ref}
+        disabled={isDisabled}
+        {...props}
+      >
+        {loading ? (
+          <Loader2 size={16} className="animate-spin" />
+        ) : (
+          children
+        )}
+      </Comp>
+    );
+  },
+);
+Button.displayName = "Button";
 
-export function Button({
-  variant = "neutral",
-  size = "md",
-  loading = false,
-  fullWidth = false,
-  disabled,
-  children,
-  style,
-  ...props
-}: ButtonProps) {
-  const isDisabled = disabled || loading;
-  const v = variantStyles[variant];
-  const s = sizeStyles[size];
-
-  return (
-    <button
-      disabled={isDisabled}
-      style={{
-        ...v,
-        ...s,
-        width: fullWidth ? "100%" : undefined,
-        borderRadius: "var(--radius-md)",
-        fontFamily: "var(--font-sans)",
-        fontWeight: 600,
-        cursor: isDisabled ? "not-allowed" : "pointer",
-        opacity: isDisabled && !loading ? 0.4 : 1,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "var(--space-6)",
-        transition: "all var(--dur-instant) var(--ease-out)",
-        lineHeight: 1.3,
-        whiteSpace: "nowrap",
-        ...style,
-      }}
-      {...props}
-    >
-      {loading ? (
-        <Loader2
-          size={16}
-          style={{
-            animation: "spin 1s linear infinite",
-          }}
-        />
-      ) : (
-        children
-      )}
-    </button>
-  );
-}
+export { Button, buttonVariants };
+export type { ButtonProps };
