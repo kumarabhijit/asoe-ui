@@ -7,9 +7,9 @@ interface LogoProps {
 }
 
 const sizes = {
-  sm: { box: "w-8 h-8", icon: 16, title: "text-[15px]", gap: "gap-2" },
-  md: { box: "w-10 h-10", icon: 20, title: "text-[20px]", gap: "gap-2.5" },
-  lg: { box: "w-12 h-12", icon: 24, title: "text-[24px]", gap: "gap-3" },
+  sm: { box: "w-[32px] h-[32px]", icon: 16, title: "text-[15px]", gap: "gap-8" },
+  md: { box: "w-[40px] h-[40px]", icon: 20, title: "text-[20px]", gap: "gap-10" },
+  lg: { box: "w-[48px] h-[48px]", icon: 24, title: "text-[24px]", gap: "gap-12" },
 };
 
 export function Logo({ size = "md", showTagline = false }: LogoProps) {

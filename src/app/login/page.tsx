@@ -127,9 +127,9 @@ function LoginForm() {
         >
           <Input
             label="Username, email address, or SSO code"
-            type="email"
+            type="text"
             placeholder="jane@acme.com"
-            autoComplete="email"
+            autoComplete="username"
             autoFocus
             value={email}
             onChange={(e) => setEmail(e.target.value)}

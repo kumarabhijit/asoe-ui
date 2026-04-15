@@ -21,7 +21,7 @@ export function MetricTile({ icon, label, value, subtitle, tint, className }: Me
     <div className={cn("flex items-center gap-12 p-16 bg-surface-primary rounded-md shadow-sm min-w-[180px]", className)}>
       {/* Icon container — 40x40 with tinted background */}
       <div
-        className="w-10 h-10 rounded-sm flex items-center justify-center shrink-0"
+        className="w-[40px] h-[40px] rounded-sm flex items-center justify-center shrink-0"
         style={{
           background: tint || "var(--color-surface-secondary)",
           color: tint ? "var(--color-surface-primary)" : "var(--color-text-secondary)",

@@ -61,10 +61,10 @@ export function PricingWaterfall({ steps, className }: PricingWaterfallProps) {
         return (
           <div key={idx} className="flex relative z-[1]">
             {/* Timeline node + connector */}
-            <div className="flex flex-col items-center mr-12 shrink-0 w-8">
+            <div className="flex flex-col items-center mr-12 shrink-0 w-[32px]">
               <div
                 className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center relative z-[2] border-2",
+                  "w-[32px] h-[32px] rounded-full flex items-center justify-center relative z-[2] border-2",
                   isError ? "bg-error-subtle" : isResult ? "bg-success-subtle" : "bg-surface-primary",
                 )}
                 style={{ borderColor: clr, color: clr }}

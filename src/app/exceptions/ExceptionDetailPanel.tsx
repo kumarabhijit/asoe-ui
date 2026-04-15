@@ -204,11 +204,11 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
     return (
       <div className="h-full flex flex-col">
         <div className="p-16 border-b border-border bg-surface-primary">
-          <div className="skeleton h-5 w-[200px] rounded-sm" />
+          <div className="skeleton h-[20px] w-[200px] rounded-sm" />
         </div>
         <div className="flex-1 p-16 flex flex-col gap-12">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="skeleton h-20 rounded-sm" />
+            <div key={i} className="skeleton h-[80px] rounded-sm" />
           ))}
         </div>
       </div>

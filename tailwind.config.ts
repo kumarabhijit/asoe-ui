@@ -98,7 +98,12 @@ const config: Config = {
         },
       },
 
-      /* ── Spacing ──────────────────────────────────────────────────── */
+      /* ── Spacing (4px-base pixel scale from design tokens) ─────────
+         These override Tailwind's default rem-based spacing scale.
+         p-4 = 4px, p-16 = 16px, gap-12 = 12px, etc.
+         For element heights/widths that need specific sizes, use
+         arbitrary values: h-[40px], w-[32px], etc.
+         ────────────────────────────────────────────────────────────── */
       spacing: {
         "0": "var(--space-0)",
         "1": "var(--space-1)",
