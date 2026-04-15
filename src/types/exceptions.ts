@@ -251,6 +251,8 @@ export interface OrderAnalysis {
   order_comparison?: OrderComparisonData;
   /** Present when a pricing exception produces price delta analysis */
   price_analysis?: PriceAnalysisData;
+  /** Present when a back-order/OOS exception produces inventory gap analysis */
+  backorder_analysis?: BackOrderAnalysisData;
 }
 
 /* ── Duplicate PO enrichment types (UI-only, not backend contract) ──── */
@@ -345,6 +347,87 @@ export interface PriceAnalysisData {
   contract_ref?: string;
   /** Active promotion reference (if any) */
   promotion_ref?: string;
+}
+
+/* ── Back-Order / OOS enrichment types ───────────────────────────────── */
+
+/** Back-order analysis — present when the OOS skill/recipe produces it */
+export interface BackOrderAnalysisData {
+  /** Quantity ordered by the customer */
+  ordered_qty: number;
+  /** Quantity currently available (ATP) */
+  available_qty: number;
+  /** Gap quantity (ordered - available) */
+  gap_qty: number;
+  /** Gap as percentage of ordered */
+  gap_pct: number;
+  /** Unit price for at-risk calculation */
+  unit_price: number;
+  /** Unit of measure */
+  uom: string;
+  /** Revenue at risk from the gap */
+  at_risk: number;
+  /** ATP (Available-to-Promise) date */
+  atp_date: string;
+  /** Primary distribution center */
+  primary_dc: WarehouseInfo;
+  /** Alternate warehouses with available stock */
+  alternate_warehouses: AlternateWarehouse[];
+  /** Substitute SKU options */
+  substitutes: SubstituteSKU[];
+  /** Inbound production order (if any) */
+  production?: { qty: number; date: string };
+  /** Inbound purchase order (if any) */
+  inbound_po?: { qty: number; eta: string; po_num: string } | null;
+  /** Ranked resolution options with multi-dimensional scoring */
+  resolution_options: ResolutionOption[];
+}
+
+/** Warehouse inventory snapshot */
+export interface WarehouseInfo {
+  plant: string;
+  name: string;
+  region: string;
+  qty: number;
+}
+
+/** Alternate warehouse with shipping details */
+export interface AlternateWarehouse extends WarehouseInfo {
+  eta_days: number;
+  freight_delta_per_unit: number;
+  freight_delta_total: number;
+}
+
+/** Substitute SKU for OOS resolution */
+export interface SubstituteSKU {
+  sku: string;
+  description: string;
+  available_qty: number;
+  price_delta_pct: number;
+  acceptance_rate: number;
+  source: string;
+  priority: number;
+}
+
+/** Resolution option with multi-dimensional scoring */
+export interface ResolutionOption {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  /** Composite score (0-1) */
+  composite_score: number;
+  /** Sub-scores by dimension */
+  scores: {
+    service: number;
+    revenue: number;
+    logistics: number;
+    preference: number;
+  };
+  /** SAP transaction steps to execute */
+  sap_steps: string[];
+  /** Whether this is the recommended ("top pick") option */
+  recommended: boolean;
 }
 
 /** Entity profile — master data relevant to the exception context */
