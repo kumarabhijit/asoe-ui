@@ -148,13 +148,16 @@ For new pages:
 
 ---
 
+## Styling & Component Strategy
+
+- **Shadcn/ui + Tailwind CSS** — Use the best of both worlds. Shadcn/ui provides accessible, composable primitives (DataTable, Dialog, Select, Tooltip, etc.). Tailwind CSS provides utility-first styling. Combine them: Shadcn for structure and behavior, Tailwind for layout and responsive utilities, CSS custom properties (`design-tokens.css`) for brand colors, spacing, and semantic tokens. When a Shadcn primitive exists for the need, prefer it over a custom component.
+- **Light + Dark mode** — Support both light and dark themes, following the user's system preference (`prefers-color-scheme`). Design tokens in `design-tokens.css` should define both light and dark variants. Default to system preference with no manual toggle required (system-default behavior).
+
 ## Deferred Capabilities
 
 The following capabilities are **not in scope** for current sessions. Do not implement, scaffold, or generate code for them unless explicitly requested:
 
 - **Figma integration** — Figma MCP tools, `get_design_context`, `use_figma`, screenshot-to-code, Code Connect mappings, and any Figma-driven implementation are deferred. The design system is defined in `skills/asoe-ui-design/SKILL.md` and `src/styles/design-tokens.css`. Do not use Figma URLs, Figma API calls, or Figma-derived code generation in any session.
-- **Dark mode** — Light mode only. No dark mode theming or toggle.
-- **Shadcn/ui installation** — Shadcn primitives (DataTable, Dialog, Select, Tooltip) are planned but not yet installed. Use custom components from `src/components/ui/` only.
 
 ---
 
