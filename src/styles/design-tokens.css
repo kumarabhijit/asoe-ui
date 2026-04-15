@@ -253,6 +253,109 @@
 }
 
 
+/* ============================================================================
+   DARK MODE — system-preference-driven via .dark class (applied by next-themes)
+   Only color tokens are redefined; spacing, radius, motion, layout stay the same.
+   ============================================================================ */
+
+.dark {
+
+  /* ── BRAND COLORS (slightly brighter for dark backgrounds) ────────── */
+  --color-brand:           #8B7CF7;
+  --color-brand-hover:     #9D90FA;
+  --color-brand-active:    #A79CFC;
+  --color-brand-subtle:    rgba(139, 124, 247, 0.12);
+  --color-brand-muted:     rgba(139, 124, 247, 0.25);
+  --color-brand-ring:      rgba(139, 124, 247, 0.30);
+
+  /* ── SURFACE COLORS ──────────────────────────────────────────────── */
+  --color-surface-page:       #0B0D14;
+  --color-surface-primary:    #12141D;
+  --color-surface-secondary:  #1A1D28;
+  --color-surface-tertiary:   #242735;
+  --color-surface-elevated:   #1A1D28;
+  --color-surface-glass:      rgba(18, 20, 29, 0.80);
+  --color-surface-glass-hover: rgba(26, 29, 40, 0.90);
+
+  /* Row states */
+  --color-surface-row-hover:  rgba(139, 124, 247, 0.06);
+  --color-surface-row-active: rgba(139, 124, 247, 0.10);
+  --color-surface-row-stripe: #0F1119;
+
+  /* ── TEXT COLORS ──────────────────────────────────────────────────── */
+  --color-text-primary:    #E8E8EE;
+  --color-text-secondary:  #A0A0B4;
+  --color-text-tertiary:   #6E6E84;
+  --color-text-quaternary: #464660;
+  --color-text-inverse:    #111118;
+  --color-text-brand:      #8B7CF7;
+  --color-text-brand-hover:#9D90FA;
+
+  /* ── BORDER COLORS ───────────────────────────────────────────────── */
+  --color-border-default:  #2A2D3A;
+  --color-border-subtle:   #1E2130;
+  --color-border-strong:   #3A3D4E;
+  --color-border-brand:    #8B7CF7;
+  --color-border-brand-subtle: rgba(139, 124, 247, 0.18);
+
+  /* ── STATUS COLORS ───────────────────────────────────────────────── */
+  --color-success:         #22C97A;
+  --color-success-hover:   #2EDB8A;
+  --color-success-subtle:  rgba(34, 201, 122, 0.10);
+  --color-success-muted:   rgba(34, 201, 122, 0.20);
+  --color-success-border:  rgba(34, 201, 122, 0.25);
+
+  --color-warning:         #F0D000;
+  --color-warning-hover:   #FFDF33;
+  --color-warning-subtle:  rgba(240, 208, 0, 0.10);
+  --color-warning-muted:   rgba(240, 208, 0, 0.20);
+  --color-warning-border:  rgba(240, 208, 0, 0.25);
+
+  --color-error:           #F06060;
+  --color-error-hover:     #F47878;
+  --color-error-subtle:    rgba(240, 96, 96, 0.10);
+  --color-error-muted:     rgba(240, 96, 96, 0.20);
+  --color-error-border:    rgba(240, 96, 96, 0.25);
+
+  --color-info:            #8B7CF7;
+  --color-info-subtle:     rgba(139, 124, 247, 0.10);
+  --color-info-muted:      rgba(139, 124, 247, 0.20);
+  --color-info-border:     rgba(139, 124, 247, 0.25);
+
+  /* ── CATEGORY COLORS ─────────────────────────────────────────────── */
+  --color-cat-blue:        #60A5FA;
+  --color-cat-blue-subtle: rgba(96, 165, 250, 0.10);
+
+  --color-cat-purple:      #A78BFA;
+  --color-cat-purple-subtle: rgba(167, 139, 250, 0.10);
+
+  --color-cat-teal:        #2DD4BF;
+  --color-cat-teal-subtle: rgba(45, 212, 191, 0.10);
+
+  --color-cat-amber:       #FBBF24;
+  --color-cat-amber-subtle: rgba(251, 191, 36, 0.10);
+
+  --color-cat-rose:        #FB7185;
+  --color-cat-rose-subtle: rgba(251, 113, 133, 0.10);
+
+  --color-cat-slate:       #94A3B8;
+  --color-cat-slate-subtle: rgba(148, 163, 184, 0.10);
+
+  /* ── SHADOWS (darkened for dark mode) ────────────────────────────── */
+  --shadow-xs:  0 1px 2px rgba(0, 0, 0, 0.20);
+  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.30), 0 1px 2px rgba(0, 0, 0, 0.20);
+  --shadow-md:  0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.40), 0 2px 8px rgba(0, 0, 0, 0.20);
+  --shadow-xl:  0 16px 48px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25);
+
+  --shadow-brand:   0 4px 16px rgba(139, 124, 247, 0.20);
+  --shadow-success: 0 4px 16px rgba(34, 201, 122, 0.20);
+  --shadow-warning: 0 4px 16px rgba(240, 208, 0, 0.20);
+  --shadow-error:   0 4px 16px rgba(240, 96, 96, 0.20);
+
+}
+
+
 /* ── UTILITY CLASSES ───────────────────────────────────────────────────── */
 
 /* Mono data register */
