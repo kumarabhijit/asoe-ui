@@ -46,8 +46,8 @@ The React application (Next.js 16 App Router) currently implements:
 - **Exception Queue**: Three-pane Outlook layout with generic detail panel
 - **Dashboard**: 4 KPI tiles, intent/state/verdict charts
 - **Customer Inbox**: Basic AI email triage with two-pane layout
-- **14 reusable UI components** + 45+ CSS design tokens
-- **226 passing tests** (unit, architectural, accessibility, e2e)
+- **15 reusable UI components** (14 custom + GapBar) + 45+ CSS design tokens
+- **252 passing tests** (unit, architectural, accessibility, e2e)
 - **WebSocket hook** for real-time pipeline updates
 
 ### Gap Summary
@@ -56,7 +56,7 @@ The React application (Next.js 16 App Router) currently implements:
 |----------|-------------------|-------------|-----|
 | Main Tabs | 5 | 3 operational + 1 stub | **2 missing tabs** (Quota, Performance) |
 | Admin Sections | 8 | 1 stub | **8 sections to build** |
-| Exception Types | 8 with dedicated renderers | 5 types, generic renderer | **5 dedicated renderers missing** |
+| Exception Types | 8 with dedicated renderers | 8 types, 6 with dedicated renderers (Price, Duplicate, BackOrder, OverMax, MOQ, Pallet) | **1 dedicated renderer missing** (Delivery Delay) |
 | AI Agents | 5 specialized + chat | Generic mock only | **5 specialized agents** |
 | Cross-cutting | Chat, Upload, Personas, Dark Mode, KG | None | **All missing** |
 | Testing | N/A (prototype) | 226 tests | Ahead of prototype |
@@ -190,7 +190,7 @@ asoe-ui currently uses a single generic `ExceptionDetailPanel` for all types.
 - Options are selectable with "top pick" highlight on the highest-scored option
 - Customer email draft
 
-**asoe-ui gap**: **Entirely missing**. No OOS exception type, no resolution option scoring UI.
+**asoe-ui status**: Has dedicated `BackOrderSection` with `GapBar` (ordered vs available), DC inventory snapshot (primary DC + alternates with ETA/freight delta), substitute SKUs, production/inbound PO cards, and ranked resolution options with multi-dimensional scoring (service/revenue/logistics/preference sub-scores + composite). Mock exceptions exc-010 (YELLOW) and exc-011 (GREEN auto-resolved). Missing: the idle/running/complete AI agent state machine, customer email draft, and inline Knowledge Graph.
 
 #### 3.3.3 Pallet Config Detail (`renderPalletDetail`)
 
@@ -203,7 +203,7 @@ asoe-ui currently uses a single generic `ExceptionDetailPanel` for all types.
 
 **AI-suggested plan**: Table with columns: SKU, Current Qty, Suggested Qty, Delta, Layers, Full Pallets, Reason
 
-**asoe-ui gap**: **Entirely missing**. Has `palletLineCalc` equivalent logic? No.
+**asoe-ui status**: Has dedicated `PalletConfigSection` with KPI strip (Total Cases, Loose Cases, Extra Labor, Freight Waste), per-line pallet fill bars with violation badges (Broken Layer / Partial Pallet), and AI Suggested Plan table (SKU, Current, Suggested, Delta, Layers, Full Pallets, Reason). Mock exception exc-014 (PALLET_CONFIG, YELLOW). Missing: the inline Knowledge Graph.
 
 #### 3.3.4 Over Max Detail (`renderOverMaxDetail`)
 
@@ -214,7 +214,7 @@ asoe-ui currently uses a single generic `ExceptionDetailPanel` for all types.
 - "Apply All" button + completion banner
 - Human-in-loop callout explaining escalation rules
 
-**asoe-ui gap**: **Entirely missing**.
+**asoe-ui status**: Has dedicated `OverMaxSection` with exceedance bar (ordered vs max with excess highlighted), collapsible order lines table (per-line qty/max/excess/even-layer), AI Trim Plan table (TRIM/SKIP/OK actions with totals), and human-in-loop callout. Mock exception exc-012 (OVER_MAX, YELLOW). Missing: per-line "Apply VA02" buttons and "Apply All" with completion banner (SAP execution simulation).
 
 #### 3.3.5 Min Order Qty Detail (`renderMOQDetail`)
 
@@ -225,7 +225,7 @@ asoe-ui currently uses a single generic `ExceptionDetailPanel` for all types.
 - Per-line "Apply VA02" buttons with applied state tracking
 - Human-in-loop callout (24h timeout, KNMT waivers need Sales Manager)
 
-**asoe-ui gap**: **Entirely missing**.
+**asoe-ui status**: Has dedicated `MOQSection` with shortfall bar (ordered vs MOQ), SAP V4082 block detail card (block message, MOQ source, channel, contract ref), AI Round-Up Plan table (ROUND_UP/ACCEPT_BELOW/ESCALATE actions with totals), collapsible SAP Execution Steps (step number, transaction code, table, field), and human-in-loop callout. Mock exception exc-013 (MIN_ORDER_QTY, YELLOW). Missing: per-line "Apply VA02" buttons with applied state tracking.
 
 #### 3.3.6 Generic Detail (Delivery Delay, Duplicate Order, Stale Open Order)
 
@@ -243,7 +243,7 @@ asoe-ui currently uses a single generic `ExceptionDetailPanel` for all types.
 |---------|-----------|---------|-----|
 | Filter chips | 10 chips: All, Price, Delay, Dup, Stale, OOS, Pallet, OverMax, MinQty, Done | Search + filter dropdowns from useHealth | Different approach — asoe-ui is more flexible |
 | Row content | Type icon, sev badge, AI Done badge, customer, doc, type-specific metric line | Compact card with search, badges | Similar |
-| Left border color | Blue=selected, Green=AI done, type-color otherwise | Not present | **Missing visual indicator** |
+| Left border color | Blue=selected, Green=AI done, type-color otherwise | Blue=selected, Green=auto-resolved (GREEN verdict + terminal state) | **Built** (Phase 8.8) |
 | Hover popout button | ⤢ icon to open in new tab | Not present | **Missing** |
 | Right-click context menu | 5 actions (Open Tab, Open Window, Run Agent, Copy ID, Copy Doc) | Not present | **Missing** |
 | Persona scoping | Badge showing "Walmart, Kroger only" when restricted | Not implemented | **Missing** |
@@ -728,7 +728,7 @@ Apple HIG-style toast container (top-right):
 - Missing: `type-specific d` fields, `aut` autonomy level, `rule` reference
 
 **Key type gaps:**
-- No `Back-Order`, `Pallet Config`, `Over Max`, `Min Order Qty` type-specific detail interfaces
+- ~~No `Back-Order`, `Pallet Config`, `Over Max`, `Min Order Qty` type-specific detail interfaces~~ — **Closed**: `BackOrderAnalysisData`, `PalletAnalysisData`, `OverMaxAnalysisData`, `MOQAnalysisData` and their sub-types added in `src/types/exceptions.ts`
 - No `QuotaEvent` type at all
 - No `MailboxEmail` type with `changeRequest`, `constraints`, `entities`
 - No `AutonomyRule` type for the autonomy matrix
@@ -808,7 +808,7 @@ The prototype has **5 specialized AI agents** plus a generic agent and CSR chat:
 - L3 (Approve): > $10K or VIP/Enterprise account
 - L4 (Human): > $100K or legal/contractual issues
 
-**asoe-ui status**: Has mock API client in `src/lib/api.ts` with generic responses. No specialized agent prompts or type-specific AI result schemas.
+**asoe-ui status**: Has mock API client in `src/lib/api.ts` with type-specific mock responses for all 8 exception types. Has type-specific AI result schemas (`PriceAnalysisData`, `BackOrderAnalysisData` with `ResolutionOption`, `OverMaxAnalysisData` with `TrimPlanLine`, `MOQAnalysisData` with `RoundUpPlanLine`/`SAPStep`, `PalletAnalysisData` with `PalletSuggestion`). No specialized agent prompts (prompts live in `asoe2`). No idle/running/complete state machine for AI agent execution.
 
 ### 7.4 SAP Data Tables (Seed Data)
 
@@ -930,7 +930,7 @@ Based on the gap analysis, these new reusable components should be created in `s
 | `ChatPanel` | Floating chat assistant panel | Global (all views) |
 | `PersonaSwitcher` | Dropdown persona selector | NavBar |
 | `ContextMenu` | Right-click contextual menu | Exception list, Mailbox list |
-| `GapBar` | Visual bar showing ordered/available/gap | OOS, Over Max, MOQ details |
+| ~~`GapBar`~~ | ~~Visual bar showing ordered/available/gap~~ | ~~OOS, Over Max, MOQ details~~ **Built** (`src/components/ui/GapBar.tsx`) |
 | `PalletFillBar` | Pallet fill percentage visualization | Pallet Config detail |
 | `SparkChart` | SVG mini line chart | Billing dashboard |
 | `ScoreBar` | Multi-dimensional score visualization | OOS options, Quota options |
@@ -969,7 +969,7 @@ The prototype uses these animations:
 
 | Priority | Feature | Effort | New Components | New Types | New Routes |
 |----------|---------|--------|----------------|-----------|------------|
-| **P0** | Type-specific exception detail panels (Price, OOS, Pallet, OverMax, MOQ) | XL | 5+ renderers, GapBar, PalletFillBar, ResolutionOptionCard, DataTable | 5 detail interfaces | None (enhance `/exceptions`) |
+| **P0** ✅ | Type-specific exception detail panels (Price, OOS, Pallet, OverMax, MOQ) | XL | **Done** — 5 renderers + GapBar built | 5 detail interfaces (PriceAnalysisData, BackOrderAnalysisData, OverMaxAnalysisData, MOQAnalysisData, PalletAnalysisData) | None (enhanced `/exceptions`) |
 | **P0** | Dark mode / Theme system | M | ThemeToggle | None | None |
 | **P0** | NavBar enhancements (persona pill, theme toggle, databar) | M | PersonaSwitcher, ThemeToggle, Databar | Persona type | None |
 | **P1** | Quota Management tab | XL | Full page + list + detail + insights + AI result | QuotaEvent, QuotaAIResult | `/quota` |
@@ -997,17 +997,17 @@ The prototype uses these animations:
 
 ### 9.2 Recommended Implementation Phases
 
-#### Phase A — Core Exception Enhancement (P0)
+#### Phase A — Core Exception Enhancement (P0) — ✅ MOSTLY COMPLETE
 
 **Goal**: Make the flagship Exception Queue match the prototype's depth.
 
-1. Add missing exception types to TypeScript types (`Back-Order`, `Pallet Config`, `Over Max`, `Min Order Qty`)
-2. Build type-specific detail interfaces for each exception type's `d` field
-3. Create shared components: `GapBar`, `AutonomyBadge`, `FilterChip`, `ContextRow`, `ProgressBar`, `DataTable`
-4. Build 5 dedicated detail renderers dispatched by exception type
-5. Implement AI agent state machine (Idle → Running → Error → Result) per exception type
-6. Add Audit Trail Drawer to the exception queue view
-7. Implement dark mode with full token overrides and `ThemeToggle`
+1. ✅ Add missing exception types to TypeScript types (`Back-Order`, `Pallet Config`, `Over Max`, `Min Order Qty`) — Done
+2. ✅ Build type-specific detail interfaces for each exception type's `d` field — Done (`PriceAnalysisData`, `BackOrderAnalysisData`, `OverMaxAnalysisData`, `MOQAnalysisData`, `PalletAnalysisData`)
+3. ✅ Create shared components: `GapBar` — Done. Remaining: `AutonomyBadge`, `FilterChip`, `ContextRow`, `ProgressBar`, `DataTable`
+4. ✅ Build 5 dedicated detail renderers dispatched by exception type — Done (data-presence pattern, not type dispatch)
+5. Implement AI agent state machine (Idle → Running → Error → Result) per exception type — **Remaining**
+6. Add Audit Trail Drawer to the exception queue view — **Remaining**
+7. Implement dark mode with full token overrides and `ThemeToggle` — **Remaining**
 
 #### Phase B — New Operational Tabs (P1)
 

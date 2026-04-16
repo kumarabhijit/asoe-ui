@@ -23,7 +23,7 @@ npm run dev
 |---|---|
 | Framework | Next.js 16 (App Router, React 19, TypeScript) |
 | Styling | Tailwind CSS + CSS custom properties (`design-tokens.css`) + CVA (class-variance-authority) |
-| Components | Shadcn/ui (Select, DropdownMenu, Dialog) + 14 custom agent-first components |
+| Components | Shadcn/ui (Select, DropdownMenu, Dialog) + 15 custom agent-first components |
 | Dark Mode | System-default via `next-themes` (`prefers-color-scheme`) |
 | Layout | react-resizable-panels (three-pane Outlook master-detail) |
 | Icons | Lucide React (16/20/24px — never emoji) |
@@ -41,13 +41,13 @@ asoe-ui/
 │   ├── app/                      # Pages (Next.js App Router)
 │   │   ├── layout.tsx            # Root layout (skip-to-main, Providers wrapper)
 │   │   ├── providers.tsx         # Client-side providers (SessionProvider + ToastProvider)
-│   │   ├── exceptions/           # Exception Queue (three-pane Outlook) + 8 decomposed detail sub-components
+│   │   ├── exceptions/           # Exception Queue (three-pane Outlook) + 13 decomposed detail sub-components
 │   │   ├── dashboard/            # Analytics dashboard + recent activity feed
 │   │   ├── inbox/                # Customer Inbox (AI email triage, two-pane)
 │   │   ├── settings/             # Settings page (Phase 9 stub — admin, SSO, agent config)
 │   │   ├── login/                # Multi-step login (email → password → SSO)
 │   │   └── auth/callback/        # SSO callback handler
-│   ├── components/ui/            # 14 reusable components (Section 11.2)
+│   ├── components/ui/            # 15 reusable components (Section 11.2)
 │   ├── hooks/                    # useAuth, useHealth, useWebSocket
 │   ├── lib/                      # API client, auth config, RBAC
 │   ├── types/                    # TypeScript types (mirrors asoe2 + UI display types)
@@ -80,7 +80,7 @@ asoe-ui/
 | `DESIGN.md` | Engineers | Code-to-architecture map (components, pages, types, API client) |
 | `ui_architecture.md` | Engineers / Architects | UI architecture extraction — alignment, drift register, proposed backend changes |
 | `docs/AUDITOR_GUIDE.md` | Auditors | 10 frontend compliance controls (RBAC, session, trace, tenancy) |
-| `tasks.md` | Team | Phase-based progress (Phases 0-8.7 complete, 9-11 pending) |
+| `tasks.md` | Team | Phase-based progress (Phases 0-8.10 complete, 9-11 pending) |
 | `consol_arch.md` | All | Platform architecture — Section 11 is a stub pointer to `ui_architecture.md` |
 
 ---
@@ -122,7 +122,7 @@ The visual design system is defined in `skills/asoe-ui-design/`:
 
 The UI implements the architecture defined in `ui_architecture.md`. Key patterns:
 
-- **17 components** (14 custom + 3 Shadcn) — agent-first components are custom; Shadcn/ui for interactive primitives (Select, DropdownMenu, Dialog). All styled with Tailwind CSS via design token mapping.
+- **18 components** (15 custom + 3 Shadcn) — agent-first components are custom; Shadcn/ui for interactive primitives (Select, DropdownMenu, Dialog). All styled with Tailwind CSS via design token mapping.
 - **Health-driven enums** — filter dropdowns source values from `GET /api/v1/health` at runtime (Guardrail #2 — no hardcoded intents or lifecycle states)
 - **WebSocket real-time** — pipeline progress via `useWebSocket` hook (Section 8 protocol with reconnection backoff)
 - **Types mirror backend** — `src/types/` matches `asoe2` Pydantic models field-for-field
