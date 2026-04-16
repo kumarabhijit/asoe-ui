@@ -8,7 +8,7 @@
  * from the health endpoint per Guardrail #2.
  */
 
-import type { AuthUser, LoginCredentials, LoginResponse, MFAVerifyRequest, SSOInitResponse, UserListResponse } from "@/types/auth";
+import type { AuthUser, LoginCredentials, LoginResponse, MFAVerifyRequest, SSOInitResponse } from "@/types/auth";
 import type {
   ResolveRequest,
   ResolveResponse,
@@ -314,26 +314,6 @@ export const authApi = {
     await delay(200);
     if (refreshToken) return { access_token: "mock-refreshed-token" };
     throw new Error("Invalid refresh token");
-  },
-
-  /** List all available users — sandbox only, for user switcher. */
-  async listUsers(): Promise<UserListResponse> {
-    await delay(200);
-    return { data: Object.values(MOCK_USERS) };
-  },
-
-  /** Switch user — sandbox only. Issues new tokens for the target user. */
-  async switchUser(email: string): Promise<LoginResponse> {
-    await delay(MOCK_DELAY);
-    const user = MOCK_USERS[email];
-    if (!user) throw new Error(`User '${email}' not found`);
-    return {
-      access_token: `mock-access-token-${user.id}`,
-      refresh_token: `mock-refresh-token-${user.id}`,
-      token_type: "bearer",
-      user,
-      mfa_required: false,
-    };
   },
 };
 

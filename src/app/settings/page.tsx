@@ -10,7 +10,6 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Settings, Users, Shield, Zap, Bell } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
-import { UserSwitcher } from "@/components/ui/UserSwitcher";
 import { Card } from "@/components/ui/Card";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,6 +35,7 @@ export default function SettingsPage() {
 
   const userName = user?.name || "User";
   const userInitials = (user as { avatar_initials?: string })?.avatar_initials || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const userTitle = (user as { title?: string })?.title || "";
   const filteredTabs = visibleTabs.length > 0 ? NAV_TABS.filter((t) => visibleTabs.includes(t.id)) : NAV_TABS;
 
   return (
@@ -49,10 +49,10 @@ export default function SettingsPage() {
         }}
         userName={userName}
         userInitials={userInitials}
+        userTitle={userTitle}
         agentCount={health?.allowed_intents?.length || 0}
         onSignOut={() => signOut({ callbackUrl: "/login" })}
-        onSettingsClick={() => router.push("/settings")}
-        rightContent={<UserSwitcher />}
+
       />
 
       <main id="main-content" className="max-w-[1440px] mx-auto py-24 px-32">

@@ -23,11 +23,6 @@ export interface AuthUser {
   retailer_id?: string; // partner-role scoping
 }
 
-/** Response from GET /api/auth/users — available users for sandbox switcher */
-export interface UserListResponse {
-  data: AuthUser[];
-}
-
 export interface LoginCredentials {
   email: string;
   password: string;
