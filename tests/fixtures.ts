@@ -19,6 +19,8 @@ export const ANALYST_USER: AuthUser = {
   roles: ["analyst"],
   org: "acme-corp",
   permissions: ["exceptions:read", "exceptions:approve", "dashboard:read"],
+  assigned_accounts: [],
+  visible_tabs: ["inbox", "exceptions", "dashboard"],
   env: "sandbox",
 };
 
@@ -30,6 +32,8 @@ export const MANAGER_USER: AuthUser = {
   roles: ["manager"],
   org: "acme-corp",
   permissions: ["exceptions:read", "exceptions:approve", "exceptions:override", "rules:write", "dashboard:read"],
+  assigned_accounts: [],
+  visible_tabs: ["inbox", "exceptions", "dashboard", "settings"],
   env: "sandbox",
 };
 
@@ -41,6 +45,8 @@ export const ADMIN_USER: AuthUser = {
   roles: ["admin"],
   org: "acme-corp",
   permissions: ["exceptions:read", "exceptions:approve", "exceptions:override", "rules:write", "users:manage", "policy:write", "audit:read", "dashboard:read"],
+  assigned_accounts: [],
+  visible_tabs: ["inbox", "exceptions", "dashboard", "settings"],
   env: "sandbox",
 };
 
@@ -52,6 +58,8 @@ export const VIEWER_USER: AuthUser = {
   roles: ["viewer"],
   org: "acme-corp",
   permissions: ["exceptions:read", "dashboard:read"],
+  assigned_accounts: [],
+  visible_tabs: ["inbox", "exceptions", "dashboard"],
   env: "sandbox",
 };
 
@@ -63,6 +71,8 @@ export const PARTNER_USER: AuthUser = {
   roles: ["partner"],
   org: "acme-corp",
   permissions: ["exceptions:read"],
+  assigned_accounts: ["acct-walmart"],
+  visible_tabs: ["inbox", "exceptions"],
   env: "sandbox",
   retailer_id: "retailer-001",
 };

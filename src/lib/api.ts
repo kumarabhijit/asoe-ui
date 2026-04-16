@@ -8,7 +8,7 @@
  * from the health endpoint per Guardrail #2.
  */
 
-import type { AuthUser, LoginCredentials, LoginResponse, MFAVerifyRequest, SSOInitResponse } from "@/types/auth";
+import type { AuthUser, LoginCredentials, LoginResponse, MFAVerifyRequest, SSOInitResponse, UserListResponse } from "@/types/auth";
 import type {
   ResolveRequest,
   ResolveResponse,
@@ -38,19 +38,68 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/* ── Mock data ─────────────────────────────────────────────────────── */
+/* ── Mock data — 5 seed users matching asoe2/api/users.py ─────────── */
 
-const MOCK_USER: AuthUser = {
-  id: "usr_001",
-  sub: "usr_001",
-  email: "jane.doe@acme.com",
-  name: "Jane Doe",
-  roles: ["analyst", "manager"],
-  org: "acme-corp",
-  permissions: ROLE_PERMISSIONS.manager,
-  env: "sandbox",
-  auth_method: "sso",
+/** Tab visibility computed from permissions — mirrors api/users.py compute_visible_tabs */
+function computeVisibleTabs(permissions: string[]): string[] {
+  const ps = new Set(permissions);
+  const tabs: string[] = [];
+  if (ps.has("exceptions:read")) { tabs.push("inbox", "exceptions"); }
+  if (ps.has("dashboard:read")) { tabs.push("dashboard"); }
+  if (ps.has("rules:write") || ps.has("policy:write") || ps.has("users:manage")) { tabs.push("settings"); }
+  return tabs;
+}
+
+const MOCK_USERS: Record<string, AuthUser> = {
+  "marcus.webb@acme-corp.com": {
+    id: "usr_marcus_webb", sub: "usr_marcus_webb",
+    email: "marcus.webb@acme-corp.com", name: "Marcus Webb",
+    title: "Admin", avatar_initials: "MW",
+    roles: ["admin"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.admin,
+    assigned_accounts: [],
+    visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.admin),
+  },
+  "sarah.chen@acme-corp.com": {
+    id: "usr_sarah_chen_mgr", sub: "usr_sarah_chen_mgr",
+    email: "sarah.chen@acme-corp.com", name: "Sarah Chen",
+    title: "CS Manager", avatar_initials: "SC",
+    roles: ["manager"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.manager,
+    assigned_accounts: [],
+    visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.manager),
+  },
+  "sarah.chen.sr@acme-corp.com": {
+    id: "usr_sarah_chen_sr", sub: "usr_sarah_chen_sr",
+    email: "sarah.chen.sr@acme-corp.com", name: "Sarah Chen",
+    title: "Sr. CS Analyst", avatar_initials: "SC",
+    roles: ["analyst"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.analyst,
+    assigned_accounts: [],
+    visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.analyst),
+  },
+  "james.ortiz@acme-corp.com": {
+    id: "usr_james_ortiz", sub: "usr_james_ortiz",
+    email: "james.ortiz@acme-corp.com", name: "James Ortiz",
+    title: "CS Analyst", avatar_initials: "JO",
+    roles: ["analyst"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.analyst,
+    assigned_accounts: ["acct-walmart", "acct-kroger"],
+    visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.analyst),
+  },
+  "priya.nair@acme-corp.com": {
+    id: "usr_priya_nair", sub: "usr_priya_nair",
+    email: "priya.nair@acme-corp.com", name: "Priya Nair",
+    title: "Trade Analyst", avatar_initials: "PN",
+    roles: ["analyst"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.analyst,
+    assigned_accounts: ["acct-target", "acct-costco"],
+    visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.analyst),
+  },
 };
+
+/** Default user for backward compatibility */
+const MOCK_USER = MOCK_USERS["marcus.webb@acme-corp.com"];
 
 const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
@@ -65,6 +114,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "COMPLETE",
     created_at: "2026-04-11T08:12:00Z",
     updated_at: "2026-04-11T08:20:00Z",
+    account_id: "acct-walmart", account_name: "Walmart",
   },
   {
     id: "exc-002",
@@ -78,6 +128,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "MANUAL_REVIEW_REQUIRED",
     created_at: "2026-04-11T09:05:00Z",
     updated_at: "2026-04-11T09:13:00Z",
+    account_id: "acct-kroger", account_name: "Kroger",
   },
   {
     id: "exc-003",
@@ -91,6 +142,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "BLOCKED",
     created_at: "2026-04-11T10:30:00Z",
     updated_at: "2026-04-11T10:31:00Z",
+    account_id: "acct-target", account_name: "Target",
   },
   {
     id: "exc-004",
@@ -104,6 +156,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: undefined,
     created_at: "2026-04-11T11:00:00Z",
     updated_at: "2026-04-11T11:02:00Z",
+    account_id: "acct-costco", account_name: "Costco",
   },
   {
     id: "exc-005",
@@ -117,6 +170,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "COMPLETE",
     created_at: "2026-04-10T14:22:00Z",
     updated_at: "2026-04-10T14:30:00Z",
+    account_id: "acct-walmart", account_name: "Walmart",
   },
   {
     id: "exc-006",
@@ -130,6 +184,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "MANUAL_REVIEW_REQUIRED",
     created_at: "2026-04-09T16:45:00Z",
     updated_at: "2026-04-11T08:45:00Z",
+    account_id: "acct-kroger", account_name: "Kroger",
   },
   {
     id: "exc-007",
@@ -143,6 +198,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "MANUAL_REVIEW_REQUIRED",
     created_at: "2026-04-11T07:15:00Z",
     updated_at: "2026-04-11T07:22:00Z",
+    account_id: "acct-target", account_name: "Target",
   },
   {
     id: "exc-008",
@@ -156,6 +212,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "COMPLETE",
     created_at: "2026-04-08T11:00:00Z",
     updated_at: "2026-04-08T12:30:00Z",
+    account_id: "acct-costco", account_name: "Costco",
   },
   {
     id: "exc-009",
@@ -169,21 +226,22 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "COMPLETE",
     created_at: "2026-04-11T06:20:00Z",
     updated_at: "2026-04-11T06:22:00Z",
+    account_id: "acct-walmart", account_name: "Walmart",
   },
   {
-    id: "exc-010", tenant_id: "acme-corp", order_id: "SO-9200", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-12T10:15:00Z", updated_at: "2026-04-12T10:22:00Z",
+    id: "exc-010", tenant_id: "acme-corp", order_id: "SO-9200", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-12T10:15:00Z", updated_at: "2026-04-12T10:22:00Z", account_id: "acct-kroger", account_name: "Kroger",
   },
   {
-    id: "exc-011", tenant_id: "acme-corp", order_id: "SO-9450", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "COMPLETE", created_at: "2026-04-12T08:00:00Z", updated_at: "2026-04-12T08:05:00Z",
+    id: "exc-011", tenant_id: "acme-corp", order_id: "SO-9450", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "COMPLETE", created_at: "2026-04-12T08:00:00Z", updated_at: "2026-04-12T08:05:00Z", account_id: "acct-target", account_name: "Target",
   },
   {
-    id: "exc-012", tenant_id: "acme-corp", order_id: "SO-10100", event_type: "OVER_MAX_QTY", intent: "OVER_MAX", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "OverMaxTrimRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-13T09:30:00Z", updated_at: "2026-04-13T09:38:00Z",
+    id: "exc-012", tenant_id: "acme-corp", order_id: "SO-10100", event_type: "OVER_MAX_QTY", intent: "OVER_MAX", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "OverMaxTrimRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-13T09:30:00Z", updated_at: "2026-04-13T09:38:00Z", account_id: "acct-costco", account_name: "Costco",
   },
   {
-    id: "exc-013", tenant_id: "acme-corp", order_id: "SO-11200", event_type: "MIN_ORDER_QTY", intent: "MIN_ORDER_QTY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "MOQRoundUpRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T07:45:00Z", updated_at: "2026-04-14T07:52:00Z",
+    id: "exc-013", tenant_id: "acme-corp", order_id: "SO-11200", event_type: "MIN_ORDER_QTY", intent: "MIN_ORDER_QTY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "MOQRoundUpRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T07:45:00Z", updated_at: "2026-04-14T07:52:00Z", account_id: "acct-walmart", account_name: "Walmart",
   },
   {
-    id: "exc-014", tenant_id: "acme-corp", order_id: "SO-12300", event_type: "PALLET_CONFIG_VIOLATION", intent: "PALLET_CONFIG", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "PalletAlignmentRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T11:20:00Z", updated_at: "2026-04-14T11:28:00Z",
+    id: "exc-014", tenant_id: "acme-corp", order_id: "SO-12300", event_type: "PALLET_CONFIG_VIOLATION", intent: "PALLET_CONFIG", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "PalletAlignmentRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T11:20:00Z", updated_at: "2026-04-14T11:28:00Z", account_id: "acct-kroger", account_name: "Kroger",
   },
 ];
 
@@ -206,12 +264,13 @@ const MOCK_HEALTH: HealthResponse = {
 export const authApi = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     await delay(MOCK_DELAY);
-    if (credentials.email === "jane@acme.com" && credentials.password === "password") {
+    const user = MOCK_USERS[credentials.email];
+    if (user && credentials.password) {
       return {
-        access_token: "mock-access-token",
-        refresh_token: "mock-refresh-token",
+        access_token: `mock-access-token-${user.id}`,
+        refresh_token: `mock-refresh-token-${user.id}`,
         token_type: "bearer",
-        user: MOCK_USER,
+        user,
         mfa_required: false,
       };
     }
@@ -246,6 +305,26 @@ export const authApi = {
     await delay(200);
     if (refreshToken) return { access_token: "mock-refreshed-token" };
     throw new Error("Invalid refresh token");
+  },
+
+  /** List all available users — sandbox only, for user switcher. */
+  async listUsers(): Promise<UserListResponse> {
+    await delay(200);
+    return { data: Object.values(MOCK_USERS) };
+  },
+
+  /** Switch user — sandbox only. Issues new tokens for the target user. */
+  async switchUser(email: string): Promise<LoginResponse> {
+    await delay(MOCK_DELAY);
+    const user = MOCK_USERS[email];
+    if (!user) throw new Error(`User '${email}' not found`);
+    return {
+      access_token: `mock-access-token-${user.id}`,
+      refresh_token: `mock-refresh-token-${user.id}`,
+      token_type: "bearer",
+      user,
+      mfa_required: false,
+    };
   },
 };
 

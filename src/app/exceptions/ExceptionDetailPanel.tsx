@@ -24,6 +24,7 @@ import { AlertTriangle } from "lucide-react";
 import { AgentReasoningCard } from "@/components/ui/AgentReasoningCard";
 import type { NodeState } from "@/components/ui/WaterfallStepper";
 import { useToast } from "@/components/ui/Toast";
+import { useAuth } from "@/hooks/useAuth";
 import { exceptionsApi } from "@/lib/api";
 import type {
   ExceptionDetail,
@@ -98,6 +99,7 @@ function buildNodeData(node: PipelineNode, exc: ExceptionDetail): Record<string,
 
 export default function ExceptionDetailPanel({ exceptionId, onActionComplete, onRefreshRef }: ExceptionDetailPanelProps) {
   const { addToast } = useToast();
+  const { hasPermission } = useAuth();
   const [detail, setDetail] = useState<ExceptionDetail | null>(null);
   const [trace, setTrace] = useState<TraceResponse | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -106,9 +108,13 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
   const [actionLoading, setActionLoading] = useState(false);
   const [selectedLine, setSelectedLine] = useState<string | null>(null);
 
-  /* ── Actions ─────────────────────────────────────────────────────── */
+  /* ── Actions (RBAC-gated via hasPermission) ─────────────────────── */
 
   async function handleApprove(comment: string) {
+    if (!hasPermission("exceptions:approve")) {
+      addToast("warning", "Permission denied: your role cannot approve exceptions.");
+      return;
+    }
     setActionLoading(true);
     try {
       const updated = await exceptionsApi.approve(exceptionId, { notes: comment || undefined });
@@ -122,6 +128,10 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
   }
 
   async function handleReject(comment: string) {
+    if (!hasPermission("exceptions:approve")) {
+      addToast("warning", "Permission denied: your role cannot reject exceptions.");
+      return;
+    }
     setActionLoading(true);
     try {
       const updated = await exceptionsApi.reject(exceptionId, { reason: comment || "Rejected by reviewer" });
@@ -135,6 +145,10 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
   }
 
   async function handleEscalate() {
+    if (!hasPermission("exceptions:override")) {
+      addToast("warning", "Permission denied: your role cannot escalate exceptions.");
+      return;
+    }
     setActionLoading(true);
     try {
       const updated = await exceptionsApi.override(exceptionId, { action: "ESCALATE", notes: "Escalated by reviewer", resolved_by: "current_user" });

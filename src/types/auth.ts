@@ -10,13 +10,22 @@ export interface AuthUser {
   sub: string; // JWT subject claim — backend UserProfile.sub
   email: string;
   name: string;
+  title?: string; // Job title (e.g., "CS Manager")
+  avatar_initials?: string; // For avatar display (e.g., "SC")
   avatarUrl?: string;
   roles: Role[];
   org: string; // tenant_id from JWT org claim
   permissions: string[];
+  assigned_accounts: string[]; // Customer scope — empty = all customers
+  visible_tabs: string[]; // Computed from permissions by backend
   env?: "sandbox" | "production";
-  auth_method?: "password+mfa" | "sso";
+  auth_method?: "password+mfa" | "sso" | "switch";
   retailer_id?: string; // partner-role scoping
+}
+
+/** Response from GET /api/auth/users — available users for sandbox switcher */
+export interface UserListResponse {
+  data: AuthUser[];
 }
 
 export interface LoginCredentials {

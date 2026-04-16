@@ -25,6 +25,7 @@ import { signOut } from "next-auth/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { Inbox } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
+import { UserSwitcher } from "@/components/ui/UserSwitcher";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -54,12 +55,15 @@ function ExceptionQueueContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { health } = useHealth();
-  const { user } = useAuth();
+  const { user, visibleTabs } = useAuth();
 
   useEffect(() => { document.title = "Exception Queue — ASOE"; }, []);
 
   const userName = user?.name || "User";
-  const userInitials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const userInitials = (user as { avatar_initials?: string })?.avatar_initials || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const filteredTabs = visibleTabs.length > 0
+    ? NAV_TABS.filter((t) => visibleTabs.includes(t.id))
+    : NAV_TABS;
 
   /* ── List state ──────────────────────────────────────────────────── */
   const [exceptions, setExceptions] = useState<ExceptionSummary[]>([]);
@@ -157,7 +161,7 @@ function ExceptionQueueContent() {
     onEvent: handleWsEvent,
   });
 
-  /* ── Client-side search filter ───────────────────────────────────── */
+  /* ── Client-side search filter (account scoping is server-side) ──── */
   const filtered = exceptions.filter((exc) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -190,7 +194,7 @@ function ExceptionQueueContent() {
     <div className="bg-surface-page font-sans min-h-screen">
       {/* ━━ Top Rail: Global Navigation ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <NavBar
-        tabs={NAV_TABS}
+        tabs={filteredTabs}
         activeTab="exceptions"
         onTabChange={(id) => {
           const tab = NAV_TABS.find((t) => t.id === id);
@@ -201,6 +205,7 @@ function ExceptionQueueContent() {
         agentCount={health?.allowed_intents?.length || 0}
         onSignOut={() => signOut({ callbackUrl: "/login" })}
         onSettingsClick={() => router.push("/settings")}
+        rightContent={<UserSwitcher />}
       />
 
       {/* ━━ Two-pane Master-Detail Area ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
