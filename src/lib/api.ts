@@ -52,6 +52,35 @@ const MOCK_USER: AuthUser = {
   auth_method: "sso",
 };
 
+/** Per-persona mock users for login testing. Password is "password" for all. */
+const PERSONA_USERS: Record<string, AuthUser> = {
+  "marcus.webb@acme-corp.com": {
+    id: "usr_mw", sub: "usr_mw", email: "marcus.webb@acme-corp.com",
+    name: "Marcus Webb", roles: ["admin"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.admin, env: "sandbox", auth_method: "password+mfa",
+  },
+  "sarah.chen@acme-corp.com": {
+    id: "usr_sc_mgr", sub: "usr_sc_mgr", email: "sarah.chen@acme-corp.com",
+    name: "Sarah Chen", roles: ["manager"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.manager, env: "sandbox", auth_method: "password+mfa",
+  },
+  "sarah.chen.sr@acme-corp.com": {
+    id: "usr_sc_sr", sub: "usr_sc_sr", email: "sarah.chen.sr@acme-corp.com",
+    name: "Sarah Chen", roles: ["analyst"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.analyst, env: "sandbox", auth_method: "password+mfa",
+  },
+  "james.ortiz@acme-corp.com": {
+    id: "usr_jo", sub: "usr_jo", email: "james.ortiz@acme-corp.com",
+    name: "James Ortiz", roles: ["analyst"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.analyst, env: "sandbox", auth_method: "password+mfa",
+  },
+  "priya.nair@acme-corp.com": {
+    id: "usr_pn", sub: "usr_pn", email: "priya.nair@acme-corp.com",
+    name: "Priya Nair", roles: ["analyst"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.analyst, env: "sandbox", auth_method: "password+mfa",
+  },
+};
+
 const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-001",
@@ -215,12 +244,27 @@ const MOCK_HEALTH: HealthResponse = {
 export const authApi = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     await delay(MOCK_DELAY);
-    if (credentials.email === "jane@acme.com" && credentials.password === "password") {
+    if (credentials.password !== "password") {
+      throw new Error("Invalid email or password");
+    }
+    // Original default user
+    if (credentials.email === "jane@acme.com") {
       return {
         access_token: "mock-access-token",
         refresh_token: "mock-refresh-token",
         token_type: "bearer",
         user: MOCK_USER,
+        mfa_required: false,
+      };
+    }
+    // Per-persona login
+    const personaUser = PERSONA_USERS[credentials.email];
+    if (personaUser) {
+      return {
+        access_token: `mock-access-token-${personaUser.id}`,
+        refresh_token: `mock-refresh-token-${personaUser.id}`,
+        token_type: "bearer",
+        user: personaUser,
         mfa_required: false,
       };
     }
