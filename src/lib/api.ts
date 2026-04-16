@@ -8,7 +8,7 @@
  * from the health endpoint per Guardrail #2.
  */
 
-import type { AuthUser, LoginCredentials, LoginResponse, MFAVerifyRequest, SSOInitResponse } from "@/types/auth";
+import type { AuthUser, LoginCredentials, LoginResponse, MFAVerifyRequest, SSOInitResponse, Persona, PersonaListResponse } from "@/types/auth";
 import type {
   ResolveRequest,
   ResolveResponse,
@@ -65,6 +65,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "COMPLETE",
     created_at: "2026-04-11T08:12:00Z",
     updated_at: "2026-04-11T08:20:00Z",
+    customer_name: "Walmart",
   },
   {
     id: "exc-002",
@@ -78,6 +79,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "MANUAL_REVIEW_REQUIRED",
     created_at: "2026-04-11T09:05:00Z",
     updated_at: "2026-04-11T09:13:00Z",
+    customer_name: "Kroger",
   },
   {
     id: "exc-003",
@@ -91,6 +93,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "BLOCKED",
     created_at: "2026-04-11T10:30:00Z",
     updated_at: "2026-04-11T10:31:00Z",
+    customer_name: "Target",
   },
   {
     id: "exc-004",
@@ -104,6 +107,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: undefined,
     created_at: "2026-04-11T11:00:00Z",
     updated_at: "2026-04-11T11:02:00Z",
+    customer_name: "Costco",
   },
   {
     id: "exc-005",
@@ -117,6 +121,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "COMPLETE",
     created_at: "2026-04-10T14:22:00Z",
     updated_at: "2026-04-10T14:30:00Z",
+    customer_name: "Walmart",
   },
   {
     id: "exc-006",
@@ -130,6 +135,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "MANUAL_REVIEW_REQUIRED",
     created_at: "2026-04-09T16:45:00Z",
     updated_at: "2026-04-11T08:45:00Z",
+    customer_name: "Kroger",
   },
   {
     id: "exc-007",
@@ -143,6 +149,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "MANUAL_REVIEW_REQUIRED",
     created_at: "2026-04-11T07:15:00Z",
     updated_at: "2026-04-11T07:22:00Z",
+    customer_name: "Target",
   },
   {
     id: "exc-008",
@@ -156,6 +163,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "COMPLETE",
     created_at: "2026-04-08T11:00:00Z",
     updated_at: "2026-04-08T12:30:00Z",
+    customer_name: "Costco",
   },
   {
     id: "exc-009",
@@ -169,21 +177,22 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "COMPLETE",
     created_at: "2026-04-11T06:20:00Z",
     updated_at: "2026-04-11T06:22:00Z",
+    customer_name: "Walmart",
   },
   {
-    id: "exc-010", tenant_id: "acme-corp", order_id: "SO-9200", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-12T10:15:00Z", updated_at: "2026-04-12T10:22:00Z",
+    id: "exc-010", tenant_id: "acme-corp", order_id: "SO-9200", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-12T10:15:00Z", updated_at: "2026-04-12T10:22:00Z", customer_name: "Kroger",
   },
   {
-    id: "exc-011", tenant_id: "acme-corp", order_id: "SO-9450", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "COMPLETE", created_at: "2026-04-12T08:00:00Z", updated_at: "2026-04-12T08:05:00Z",
+    id: "exc-011", tenant_id: "acme-corp", order_id: "SO-9450", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "COMPLETE", created_at: "2026-04-12T08:00:00Z", updated_at: "2026-04-12T08:05:00Z", customer_name: "Target",
   },
   {
-    id: "exc-012", tenant_id: "acme-corp", order_id: "SO-10100", event_type: "OVER_MAX_QTY", intent: "OVER_MAX", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "OverMaxTrimRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-13T09:30:00Z", updated_at: "2026-04-13T09:38:00Z",
+    id: "exc-012", tenant_id: "acme-corp", order_id: "SO-10100", event_type: "OVER_MAX_QTY", intent: "OVER_MAX", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "OverMaxTrimRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-13T09:30:00Z", updated_at: "2026-04-13T09:38:00Z", customer_name: "Costco",
   },
   {
-    id: "exc-013", tenant_id: "acme-corp", order_id: "SO-11200", event_type: "MIN_ORDER_QTY", intent: "MIN_ORDER_QTY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "MOQRoundUpRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T07:45:00Z", updated_at: "2026-04-14T07:52:00Z",
+    id: "exc-013", tenant_id: "acme-corp", order_id: "SO-11200", event_type: "MIN_ORDER_QTY", intent: "MIN_ORDER_QTY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "MOQRoundUpRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T07:45:00Z", updated_at: "2026-04-14T07:52:00Z", customer_name: "Walmart",
   },
   {
-    id: "exc-014", tenant_id: "acme-corp", order_id: "SO-12300", event_type: "PALLET_CONFIG_VIOLATION", intent: "PALLET_CONFIG", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "PalletAlignmentRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T11:20:00Z", updated_at: "2026-04-14T11:28:00Z",
+    id: "exc-014", tenant_id: "acme-corp", order_id: "SO-12300", event_type: "PALLET_CONFIG_VIOLATION", intent: "PALLET_CONFIG", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "PalletAlignmentRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T11:20:00Z", updated_at: "2026-04-14T11:28:00Z", customer_name: "Kroger",
   },
 ];
 
@@ -521,6 +530,93 @@ export const policyApi = {
       effective_from: new Date().toISOString(),
       created_by: MOCK_USER.sub,
     };
+  },
+};
+
+/* ── Personas API ─────────────────────────────────────────────────── */
+
+const MOCK_PERSONAS: Persona[] = [
+  {
+    id: "marcus-webb",
+    name: "Marcus Webb",
+    title: "Admin",
+    email: "marcus.webb@acme-corp.com",
+    role: "admin",
+    avatar_initials: "MW",
+    permissions: {
+      can_run_agents: true, can_run_all: true, can_edit_rules: true, can_edit_autonomy: true,
+      can_view_billing: true, can_configure_personas: true, can_upload_data: true, can_export_audit: true,
+    },
+    tabs: ["inbox", "exceptions", "quota", "dashboard", "performance", "settings"],
+    customer_scope: "all",
+    assigned_customers: [],
+  },
+  {
+    id: "sarah-chen-manager",
+    name: "Sarah Chen",
+    title: "CS Manager",
+    email: "sarah.chen@acme-corp.com",
+    role: "manager",
+    avatar_initials: "SC",
+    permissions: {
+      can_run_agents: true, can_run_all: true, can_edit_rules: true, can_edit_autonomy: true,
+      can_view_billing: false, can_configure_personas: false, can_upload_data: false, can_export_audit: true,
+    },
+    tabs: ["inbox", "exceptions", "quota", "dashboard", "performance", "settings"],
+    customer_scope: "all",
+    assigned_customers: [],
+  },
+  {
+    id: "sarah-chen-analyst",
+    name: "Sarah Chen",
+    title: "Sr. CS Analyst",
+    email: "sarah.chen.sr@acme-corp.com",
+    role: "analyst",
+    avatar_initials: "SC",
+    permissions: {
+      can_run_agents: true, can_run_all: true, can_edit_rules: false, can_edit_autonomy: false,
+      can_view_billing: false, can_configure_personas: false, can_upload_data: false, can_export_audit: true,
+    },
+    tabs: ["inbox", "exceptions", "quota", "dashboard"],
+    customer_scope: "all",
+    assigned_customers: [],
+  },
+  {
+    id: "james-ortiz",
+    name: "James Ortiz",
+    title: "CS Analyst",
+    email: "james.ortiz@acme-corp.com",
+    role: "analyst",
+    avatar_initials: "JO",
+    permissions: {
+      can_run_agents: true, can_run_all: false, can_edit_rules: false, can_edit_autonomy: false,
+      can_view_billing: false, can_configure_personas: false, can_upload_data: false, can_export_audit: false,
+    },
+    tabs: ["inbox", "exceptions"],
+    customer_scope: "assigned",
+    assigned_customers: ["Walmart", "Kroger"],
+  },
+  {
+    id: "priya-nair",
+    name: "Priya Nair",
+    title: "Trade Analyst",
+    email: "priya.nair@acme-corp.com",
+    role: "analyst",
+    avatar_initials: "PN",
+    permissions: {
+      can_run_agents: true, can_run_all: false, can_edit_rules: false, can_edit_autonomy: false,
+      can_view_billing: false, can_configure_personas: false, can_upload_data: false, can_export_audit: true,
+    },
+    tabs: ["exceptions", "quota", "dashboard"],
+    customer_scope: "assigned",
+    assigned_customers: ["Target", "Costco"],
+  },
+];
+
+export const personasApi = {
+  async list(): Promise<PersonaListResponse> {
+    await delay(MOCK_DELAY);
+    return { data: MOCK_PERSONAS };
   },
 };
 

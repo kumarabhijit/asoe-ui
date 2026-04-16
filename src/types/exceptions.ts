@@ -146,6 +146,8 @@ export interface ExceptionSummary {
   final_status?: string;
   created_at: string;
   updated_at: string;
+  /** Customer name for persona-based scope filtering (populated from entity_profile). */
+  customer_name?: string;
 }
 
 /** ExceptionDetail — full detail view (GET /api/v1/exceptions/{id}) */

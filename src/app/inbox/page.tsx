@@ -15,11 +15,13 @@ import {
   Clock, FileText, AlertTriangle, RefreshCw,
 } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
+import { PersonaSwitcher } from "@/components/ui/PersonaSwitcher";
 import { MetricTile } from "@/components/ui/MetricTile";
 import { Badge, categoryVariant, inboxStatusVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
+import { usePersona } from "@/hooks/usePersona";
 import { cn } from "@/lib/utils";
 
 /* ── Display label maps (visual mapping with default fallback) ────── */
@@ -132,12 +134,14 @@ export default function InboxPage() {
   const router = useRouter();
   const { health } = useHealth();
   const { user } = useAuth();
+  const { activePersona, visibleTabs } = usePersona();
   const [selectedId, setSelectedId] = useState("1");
   const [activeTab, setActiveTab] = useState("inbox");
   const [detailTab, setDetailTab] = useState("email");
 
-  const userName = user?.name || "User";
-  const userInitials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const userName = activePersona?.name || user?.name || "User";
+  const userInitials = activePersona?.avatar_initials || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const filteredTabs = visibleTabs(NAV_TABS);
 
   useEffect(() => { document.title = "Customer Inbox — ASOE"; }, []);
 
@@ -149,7 +153,7 @@ export default function InboxPage() {
     <div className="min-h-screen bg-surface-page font-sans text-body text-text-primary leading-normal">
       {/* ── NAV BAR (shared component) ── */}
       <NavBar
-        tabs={NAV_TABS}
+        tabs={filteredTabs}
         activeTab="inbox"
         onTabChange={(id) => {
           const tab = NAV_TABS.find((t) => t.id === id);
@@ -160,6 +164,7 @@ export default function InboxPage() {
         agentCount={health?.allowed_intents?.length || 0}
         onSignOut={() => signOut({ callbackUrl: "/login" })}
         onSettingsClick={() => router.push("/settings")}
+        rightContent={<PersonaSwitcher />}
       />
 
       {/* ── PAGE HEADER ── */}

@@ -25,8 +25,10 @@ import { signOut } from "next-auth/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { Inbox } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
+import { PersonaSwitcher } from "@/components/ui/PersonaSwitcher";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
+import { usePersona } from "@/hooks/usePersona";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { exceptionsApi } from "@/lib/api";
 import type { ExceptionSummary } from "@/types/exceptions";
@@ -55,11 +57,13 @@ function ExceptionQueueContent() {
   const searchParams = useSearchParams();
   const { health } = useHealth();
   const { user } = useAuth();
+  const { activePersona, scopeExceptions, visibleTabs } = usePersona();
 
   useEffect(() => { document.title = "Exception Queue — ASOE"; }, []);
 
-  const userName = user?.name || "User";
-  const userInitials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const userName = activePersona?.name || user?.name || "User";
+  const userInitials = activePersona?.avatar_initials || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const filteredTabs = visibleTabs(NAV_TABS);
 
   /* ── List state ──────────────────────────────────────────────────── */
   const [exceptions, setExceptions] = useState<ExceptionSummary[]>([]);
@@ -157,8 +161,9 @@ function ExceptionQueueContent() {
     onEvent: handleWsEvent,
   });
 
-  /* ── Client-side search filter ───────────────────────────────────── */
-  const filtered = exceptions.filter((exc) => {
+  /* ── Client-side search + persona scope filter ───────────────────── */
+  const scopedExceptions = scopeExceptions(exceptions);
+  const filtered = scopedExceptions.filter((exc) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -190,7 +195,7 @@ function ExceptionQueueContent() {
     <div className="bg-surface-page font-sans min-h-screen">
       {/* ━━ Top Rail: Global Navigation ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <NavBar
-        tabs={NAV_TABS}
+        tabs={filteredTabs}
         activeTab="exceptions"
         onTabChange={(id) => {
           const tab = NAV_TABS.find((t) => t.id === id);
@@ -201,6 +206,7 @@ function ExceptionQueueContent() {
         agentCount={health?.allowed_intents?.length || 0}
         onSignOut={() => signOut({ callbackUrl: "/login" })}
         onSettingsClick={() => router.push("/settings")}
+        rightContent={<PersonaSwitcher />}
       />
 
       {/* ━━ Two-pane Master-Detail Area ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}

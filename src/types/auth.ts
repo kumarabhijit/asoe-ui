@@ -42,3 +42,38 @@ export interface MFAVerifyRequest {
 export interface SSOInitResponse {
   redirect_url: string;
 }
+
+// ---------------------------------------------------------------------------
+// Persona system — mirrors asoe2/api/schemas.py Persona models
+// ---------------------------------------------------------------------------
+
+/** 8 permission flags per persona. */
+export interface PersonaPermissions {
+  can_run_agents: boolean;
+  can_run_all: boolean;
+  can_edit_rules: boolean;
+  can_edit_autonomy: boolean;
+  can_view_billing: boolean;
+  can_configure_personas: boolean;
+  can_upload_data: boolean;
+  can_export_audit: boolean;
+}
+
+/** A predefined user persona with role, permissions, tab visibility, and customer scope. */
+export interface Persona {
+  id: string;
+  name: string;
+  title: string;
+  email: string;
+  role: Role;
+  avatar_initials: string;
+  permissions: PersonaPermissions;
+  tabs: string[];
+  customer_scope: "all" | "assigned" | "region";
+  assigned_customers: string[];
+}
+
+/** Response from GET /api/v1/personas */
+export interface PersonaListResponse {
+  data: Persona[];
+}
