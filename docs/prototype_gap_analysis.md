@@ -589,7 +589,7 @@ These features span the entire application and are not tied to a single tab.
 - Toast notification on permission denial (not `alert()`)
 - Persona switcher dropdown from topbar pill
 
-**asoe-ui status**: Has RBAC roles in `src/lib/roles.ts` (5 roles: analyst, manager, admin, viewer, partner) and `useAuth` hook. But persona switching, tab scoping, and customer scope filtering are **not implemented**.
+**asoe-ui status**: Has server-side user profiles with RBAC-derived tab visibility (`computeVisibleTabs()`), account-based scope filtering via `assigned_accounts` on JWT (server-enforced), and `UserSwitcher` component for sandbox-mode user switching. 6 seed users. No parallel boolean permission flags — uses existing RBAC `{resource}:{action}` permissions. Permission gating on approve/reject/escalate via `hasPermission()`.
 
 ### 6.3 Upload / Data Ingestion
 
@@ -732,7 +732,7 @@ Apple HIG-style toast container (top-right):
 - No `QuotaEvent` type at all
 - No `MailboxEmail` type with `changeRequest`, `constraints`, `entities`
 - No `AutonomyRule` type for the autonomy matrix
-- No `Persona` type with permissions/tabs/scope
+- ~~No `Persona` type with permissions/tabs/scope~~ — **Closed**: Server-side user profiles use `AuthUser` with `title`, `avatar_initials`, `assigned_accounts`, `visible_tabs` fields. Tab visibility derived from RBAC via `computeVisibleTabs()`. No separate `Persona` type needed — RBAC roles and permissions drive scoping.
 
 ### 7.2 Type-Specific Detail Data (`d` Field)
 

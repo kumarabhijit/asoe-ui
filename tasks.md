@@ -248,6 +248,25 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 
 ---
 
+### [x] PHASE 8.11: Server-Side User Profiles & Account Scoping
+- [x] `AuthUser` type updated (`src/types/auth.ts`) — added `title`, `avatar_initials`, `assigned_accounts`, `visible_tabs`; added `UserListResponse` type
+- [x] `ExceptionSummary` type updated (`src/types/exceptions.ts`) — added `account_id`, `account_name`
+- [x] 6 mock users in `src/lib/api.ts` — jane@acme.com (admin), marcus.webb@acme-corp.com (admin), sarah.chen (manager), sarah.chen.sr (analyst), james.ortiz (analyst, scoped to acct-walmart/acct-kroger), priya.nair (analyst, scoped to acct-target/acct-costco)
+- [x] `computeVisibleTabs()`, `listUsers()`, `switchUser()` endpoints in `src/lib/api.ts`
+- [x] NextAuth config (`src/lib/auth.ts`) passes `title`, `avatar_initials`, `assigned_accounts`, `visible_tabs` through JWT→session
+- [x] `useAuth` hook (`src/hooks/useAuth.ts`) exposes `visibleTabs`, `assignedAccounts` from session
+- [x] `UserSwitcher` component (`src/components/ui/UserSwitcher.tsx`) — sandbox-only user switcher with server round-trip via `signIn("credentials")` flow
+- [x] Tab visibility derived from RBAC via `computeVisibleTabs()` — all 4 pages filter tabs via `visibleTabs`
+- [x] Customer scope filtering via `assigned_accounts` on JWT (server-enforced)
+- [x] RBAC permission gating on approve/reject/escalate actions via `hasPermission()` in `ExceptionDetailPanel.tsx`
+- [x] Mock exceptions enriched with `account_id` and `account_name`
+- [x] Test fixtures updated with `assigned_accounts`, `visible_tabs`
+- [x] 17 new architectural tests (`tests/architectural/user_profiles.test.ts`) — 269 total tests
+
+✅ Outcome: Server-side user profiles with RBAC-derived tab visibility, account-based scope filtering, UserSwitcher for sandbox mode, and permission gating on actions. 6 seed users. 269 tests pass. (2026-04-16)
+
+---
+
 ## Remaining Phases
 
 ### [ ] PHASE 9: Settings & Admin Page
@@ -261,7 +280,7 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 ---
 
 ### [ ] PHASE 10: Testing
-**Scope:** Expand test coverage (Vitest + React Testing Library already configured, 252 tests passing).
+**Scope:** Expand test coverage (Vitest + React Testing Library already configured, 269 tests passing).
 - [ ] Component unit tests for PricingWaterfall (new component)
 - [ ] `vitest-axe` accessibility tests on status-related components (Badge, Toast, AgentReasoningCard)
 - [ ] Guardrail #2 lint rule (`no-hardcoded-enums` ESLint custom rule)
