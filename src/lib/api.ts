@@ -51,6 +51,15 @@ function computeVisibleTabs(permissions: string[]): string[] {
 }
 
 const MOCK_USERS: Record<string, AuthUser> = {
+  "jane@acme.com": {
+    id: "usr_jane_doe", sub: "usr_jane_doe",
+    email: "jane@acme.com", name: "Jane Doe",
+    title: "Admin", avatar_initials: "JD",
+    roles: ["admin"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.admin,
+    assigned_accounts: [],
+    visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.admin),
+  },
   "marcus.webb@acme-corp.com": {
     id: "usr_marcus_webb", sub: "usr_marcus_webb",
     email: "marcus.webb@acme-corp.com", name: "Marcus Webb",
