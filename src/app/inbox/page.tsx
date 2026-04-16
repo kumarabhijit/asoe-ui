@@ -15,7 +15,6 @@ import {
   Clock, FileText, AlertTriangle, RefreshCw,
 } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
-import { UserSwitcher } from "@/components/ui/UserSwitcher";
 import { MetricTile } from "@/components/ui/MetricTile";
 import { Badge, categoryVariant, inboxStatusVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -139,6 +138,7 @@ export default function InboxPage() {
 
   const userName = user?.name || "User";
   const userInitials = (user as { avatar_initials?: string })?.avatar_initials || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const userTitle = (user as { title?: string })?.title || "";
   const filteredTabs = visibleTabs.length > 0 ? NAV_TABS.filter((t) => visibleTabs.includes(t.id)) : NAV_TABS;
 
   useEffect(() => { document.title = "Customer Inbox — ASOE"; }, []);
@@ -159,10 +159,10 @@ export default function InboxPage() {
         }}
         userName={userName}
         userInitials={userInitials}
+        userTitle={userTitle}
         agentCount={health?.allowed_intents?.length || 0}
         onSignOut={() => signOut({ callbackUrl: "/login" })}
-        onSettingsClick={() => router.push("/settings")}
-        rightContent={<UserSwitcher />}
+
       />
 
       {/* ── PAGE HEADER ── */}

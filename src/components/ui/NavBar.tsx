@@ -15,9 +15,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "./DropdownMenu";
-import { LogOut, Settings } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
 
 interface NavTab {
   id: string;
@@ -31,11 +30,10 @@ interface NavBarProps {
   onTabChange?: (tabId: string) => void;
   userName?: string;
   userInitials?: string;
+  userTitle?: string;
   agentCount?: number;
   onSignOut?: () => void;
-  onSettingsClick?: () => void;
   className?: string;
-  rightContent?: ReactNode;
 }
 
 export function NavBar({
@@ -44,11 +42,10 @@ export function NavBar({
   onTabChange,
   userName,
   userInitials,
+  userTitle,
   agentCount = 0,
   onSignOut,
-  onSettingsClick,
   className,
-  rightContent,
 }: NavBarProps) {
   return (
     <nav
@@ -95,9 +92,7 @@ export function NavBar({
           </Badge>
         )}
 
-        {rightContent}
-
-        {/* User menu */}
+        {/* User menu — name, title, sign out */}
         {userInitials && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -109,13 +104,15 @@ export function NavBar({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={8}>
-              <DropdownMenuLabel>{userName || "User"}</DropdownMenuLabel>
+              <DropdownMenuLabel>
+                {userName || "User"}
+                {userTitle && (
+                  <span className="block text-[11px] font-normal text-text-tertiary">
+                    {userTitle}
+                  </span>
+                )}
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {onSettingsClick && (
-                <DropdownMenuItem onClick={onSettingsClick}>
-                  <Settings /> Settings
-                </DropdownMenuItem>
-              )}
               {onSignOut && (
                 <DropdownMenuItem onClick={onSignOut}>
                   <LogOut /> Sign out
