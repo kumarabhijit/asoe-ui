@@ -146,14 +146,14 @@ the prototype and asoe-ui. However, the prototype has significantly deeper funct
 
 | # | Type | Icon | Rules | Severity | asoe-ui Status |
 |---|------|------|-------|----------|----------------|
-| 1 | Price Mismatch | 💲 | SO-PRICE-001 (1-10%), SO-PRICE-002 (>10%) | P1, P0 | Has type, **no dedicated renderer** |
+| 1 | Price Mismatch | 💲 | SO-PRICE-001 (1-10%), SO-PRICE-002 (>10%) | P1, P0 | Has type + **dedicated renderer** (`PriceAnalysisSection`) — price delta bars, metric tiles, SAP context |
 | 2 | Delivery Delay | 🚚 | SD-DELAY-001 (2-4d), SD-DELAY-002 (>=5d) | P1, P0 | Has type, **no dedicated renderer** |
-| 3 | Duplicate Order | 👥 | SD-DUP-001 | P1 | Has type, generic renderer |
+| 3 | Duplicate Order | 👥 | SD-DUP-001 | P1 | Has type + dedicated renderer (`DuplicateDetectionSection` + `OrderComparisonSection`) |
 | 4 | Stale Open Order | 🕰️ | SD-STALE-001 (>30d) | P2 | Has type, generic renderer |
-| 5 | Back-Order (OOS) | 📦 | SD-OOS-001 (<50%), SD-OOS-002 (>=50%) | P1, P0 | **Not present** |
-| 6 | Pallet Config | 🧱 | SD-PLT-001 (broken layer), SD-PLT-002 (partial) | P1, P2 | **Not present** |
-| 7 | Over Max | 🔺 | SD-OM-001, SD-OM-002 (>50%) | P1, P0 | **Not present** |
-| 8 | Min Order Qty | 🔻 | SD-MOQ-001 (<25%), SD-MOQ-002 (>=25%) | P1, P0 | **Not present** |
+| 5 | Back-Order (OOS) | 📦 | SD-OOS-001 (<50%), SD-OOS-002 (>=50%) | P1, P0 | Has type + **dedicated renderer** (`BackOrderSection`) — gap bar, DC inventory, resolution options with scoring |
+| 6 | Pallet Config | 🧱 | SD-PLT-001 (broken layer), SD-PLT-002 (partial) | P1, P2 | Has type + **dedicated renderer** (`PalletConfigSection`) — KPI strip, pallet fill bars, suggested plan |
+| 7 | Over Max | 🔺 | SD-OM-001, SD-OM-002 (>50%) | P1, P0 | Has type + **dedicated renderer** (`OverMaxSection`) — exceedance bar, order lines, AI trim plan |
+| 8 | Min Order Qty | 🔻 | SD-MOQ-001 (<25%), SD-MOQ-002 (>=25%) | P1, P0 | Has type + **dedicated renderer** (`MOQSection`) — shortfall bar, V4082 block, round-up plan |
 
 ### 3.3 Type-Specific Detail Panels Required
 
@@ -174,7 +174,7 @@ asoe-ui currently uses a single generic `ExceptionDetailPanel` for all types.
 
 **Bottom**: Inline Knowledge Graph (SVG entity-relationship diagram)
 
-**asoe-ui gap**: Has `PricingWaterfall` component but no dedicated Price Mismatch detail layout. Missing the idle/running/complete state machine.
+**asoe-ui status**: Has `PricingWaterfall` component and a dedicated `PriceAnalysisSection` with price delta bars (ERP vs PO), metric tiles (ERP/unit, PO/unit, Variance %, At Risk), and collapsible SAP context card. Data-presence-driven: renders when `price_analysis` is present in `OrderAnalysis`. Missing: the idle/running/complete AI agent state machine (the section renders final analysis only).
 
 #### 3.3.2 Back-Order / OOS Detail (`renderOOSDetail`)
 
