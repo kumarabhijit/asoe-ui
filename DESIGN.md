@@ -19,7 +19,7 @@ src/
 │   ├── exceptions/
 │   │   ├── page.tsx              # Exception Queue — three-pane Outlook master-detail layout + WebSocket wiring
 │   │   ├── ExceptionListPane.tsx # Middle pane: compact card list with search + filters + left border indicators
-│   │   ├── ExceptionDetailPanel.tsx  # Right pane: orchestrator (~357 lines) composing 5 layer sub-components
+│   │   ├── ExceptionDetailPanel.tsx  # Right pane: orchestrator composing 13 layer sub-components
 │   │   ├── HeaderRibbon.tsx      # Layer 1: breadcrumb context, lifecycle/verdict badges, total value
 │   │   ├── ContextStrip.tsx      # Layer 2: Entity Profile + Impact Metrics (collapsible)
 │   │   ├── AgentAnalysisSection.tsx  # Layer 3: Problem / Root Cause / Recommendation narratives
@@ -27,6 +27,11 @@ src/
 │   │   ├── DiagnosticsSection.tsx    # Layer 5: pipeline progress + trace evidence (behind toggle)
 │   │   ├── DuplicateDetectionSection.tsx  # Data-presence enrichment: original vs duplicate order
 │   │   ├── OrderComparisonSection.tsx     # Data-presence enrichment: side-by-side order comparison
+│   │   ├── PriceAnalysisSection.tsx       # Data-presence enrichment: price delta bars, metric tiles, SAP context
+│   │   ├── BackOrderSection.tsx           # Data-presence enrichment: gap bar, DC inventory, resolution options with scoring
+│   │   ├── OverMaxSection.tsx             # Data-presence enrichment: exceedance bar, order lines, AI trim plan
+│   │   ├── MOQSection.tsx                 # Data-presence enrichment: shortfall bar, SAP V4082 block, round-up plan
+│   │   ├── PalletConfigSection.tsx        # Data-presence enrichment: KPI strip, pallet fill bars, suggested plan
 │   │   ├── shared.tsx            # CollapsibleHeader, fmtPrice helpers
 │   │   └── [id]/page.tsx         # Full-page exception detail (standalone route)
 │   ├── dashboard/page.tsx        # Analytics dashboard (Layout B) + recent activity feed
@@ -39,6 +44,7 @@ src/
 │   ├── Badge.tsx                 # Tinted bg + icon + text, verdict/lifecycle/rootCause helpers
 │   ├── Button.tsx                # 5 variants (brand/neutral/success/ghost/destructive)
 │   ├── Card.tsx                  # Borderless shadow-elevated container
+│   ├── GapBar.tsx                # Horizontal ordered-vs-available/max bar with gap highlight (shortfall/excess modes)
 │   ├── GravitationalOrbs.tsx     # Canvas animated background (login page)
 │   ├── Input.tsx                 # Label + input + error + right icon
 │   ├── Logo.tsx                  # ASOE brand mark with optional tagline
@@ -91,6 +97,7 @@ src/
 | `WaterfallStepper` | Tailwind | 10-node pipeline with per-node states | ExceptionDetailPanel |
 | `AgentReasoningCard` | Tailwind | Layer 1 only (recommendation + actions), verdict-specific behavior | ExceptionDetailPanel |
 | `PricingWaterfall` | Tailwind | Pricing condition chain timeline | ExceptionDetailPanel |
+| `GapBar` | Tailwind | Horizontal bar: primary vs secondary qty, shortfall/excess mode, gap indicator | BackOrderSection, OverMaxSection, MOQSection |
 | `GravitationalOrbs` | Custom (canvas) | Canvas animated background | Login |
 
 **Styling approach (Phase 8.9):** All components use Tailwind utility classes via the design token mapping in `tailwind.config.ts`. CVA (`class-variance-authority`) is used for multi-variant components (Button, Badge). `cn()` utility (`src/lib/utils.ts`) merges Tailwind classes with conflict resolution. Only 18 inline `style={{}}` objects remain across the entire codebase — all are data-driven dynamic values (avatar colors, bar widths, chart colors).
@@ -142,7 +149,7 @@ NavBar (sticky top, 56px)
 
 **Data flow:** `exceptionsApi.list()` + `exceptionsApi.stats()` → list state → render. Filters trigger re-fetch. First item auto-selected and pre-fetched. Subsequent selections trigger on-demand fetch: `exceptionsApi.get(id)` + `exceptionsApi.trace(id)` + `exceptionsApi.lineItems(id)` + `exceptionsApi.orderAnalysis(id)`.
 
-**Polymorphic detail view:** The right pane (`ExceptionDetailPanel.tsx`) orchestrates 8 sub-components decomposed along the **5-layer axis** (not the intent axis). Each sub-component is intent-agnostic — driven by data presence, not intent strings:
+**Polymorphic detail view:** The right pane (`ExceptionDetailPanel.tsx`) orchestrates 13 sub-components decomposed along the **5-layer axis** (not the intent axis). Each sub-component is intent-agnostic — driven by data presence, not intent strings:
 
 | Layer | Sub-Component | File | Purpose |
 |---|---|---|---|
@@ -151,13 +158,23 @@ NavBar (sticky top, 56px)
 | 3 | `AgentAnalysisSection` | `AgentAnalysisSection.tsx` | Problem / Root Cause / Recommendation narratives |
 | 3+ | `DuplicateDetectionSection` | `DuplicateDetectionSection.tsx` | Data-presence enrichment: original vs duplicate order, detection method, confidence, autonomy |
 | 3+ | `OrderComparisonSection` | `OrderComparisonSection.tsx` | Data-presence enrichment: side-by-side order comparison with matching/differing field badges |
+| 3+ | `PriceAnalysisSection` | `PriceAnalysisSection.tsx` | Data-presence enrichment: price delta bars (ERP vs PO), metric tiles, collapsible SAP context card |
+| 3+ | `BackOrderSection` | `BackOrderSection.tsx` | Data-presence enrichment: GapBar (ordered vs available), DC inventory snapshot, substitute SKUs, ranked resolution options with multi-dimensional scoring |
+| 3+ | `OverMaxSection` | `OverMaxSection.tsx` | Data-presence enrichment: exceedance bar (ordered vs max), order lines table, AI trim plan (TRIM/SKIP/OK actions) |
+| 3+ | `MOQSection` | `MOQSection.tsx` | Data-presence enrichment: shortfall bar (ordered vs MOQ), SAP V4082 block detail, AI round-up plan (ROUND_UP/ACCEPT_BELOW/ESCALATE), SAP execution steps |
+| 3+ | `PalletConfigSection` | `PalletConfigSection.tsx` | Data-presence enrichment: KPI strip (cases/loose/labor/freight), per-line pallet fill bars with violation badges, AI suggested plan table |
 | 4 | `EvidenceGrid` | `EvidenceGrid.tsx` | Collapsed by default; line-item table + pricing waterfall |
 | 5 | `DiagnosticsSection` | `DiagnosticsSection.tsx` | Hidden behind "Show Diagnostics" toggle: Pipeline Progress (WaterfallStepper) + Trace Evidence tabs |
 
 **Data-presence enrichment sections** render only when their optional data is present in `OrderAnalysis`:
 ```tsx
+{analysis?.price_analysis && <PriceAnalysisSection data={analysis.price_analysis} />}
 {analysis?.duplicate_detection && <DuplicateDetectionSection data={analysis.duplicate_detection} />}
 {analysis?.order_comparison && <OrderComparisonSection data={analysis.order_comparison} />}
+{analysis?.backorder_analysis && <BackOrderSection data={analysis.backorder_analysis} />}
+{analysis?.overmax_analysis && <OverMaxSection data={analysis.overmax_analysis} />}
+{analysis?.moq_analysis && <MOQSection data={analysis.moq_analysis} />}
+{analysis?.pallet_analysis && <PalletConfigSection data={analysis.pallet_analysis} />}
 ```
 Adding a new enrichment section requires only: (1) add the type to `OrderAnalysis`, (2) create the section component, (3) add the conditional render — zero dispatch logic.
 
@@ -247,7 +264,7 @@ Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 | `PricingConditionType` | Pricing condition type enum (BASE/CONTRACT/TPR/UOM/RESULT/ERROR) | exceptions.ts |
 | `PricingWaterfallStep` | Single step in pricing waterfall visualization | exceptions.ts |
 | `LineItemAnalysis` | Per-line agent analysis with waterfall | exceptions.ts |
-| `OrderAnalysis` | Order-level agent analysis (drives detail panel). Extended with `root_cause`, `recommendation`, `entity_profile`, `impact_metrics`, `duplicate_detection?`, `order_comparison?` | exceptions.ts |
+| `OrderAnalysis` | Order-level agent analysis (drives detail panel). Extended with `root_cause`, `recommendation`, `entity_profile`, `impact_metrics`, `duplicate_detection?`, `order_comparison?`, `price_analysis?`, `backorder_analysis?`, `overmax_analysis?`, `moq_analysis?`, `pallet_analysis?` | exceptions.ts |
 | `EntityProfile` | Master data context for exception entity (customer name, BP number, tier, VIP, credit standing, location) | exceptions.ts |
 | `ImpactMetrics` | Quantitative "blast radius" (revenue at risk, delta, SLA priority, affected lines) | exceptions.ts |
 | `DuplicateDetectionData` | Duplicate detection summary: original/duplicate order snapshots, detection method, confidence, recommended action, autonomy level | exceptions.ts |
@@ -255,6 +272,21 @@ Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 | `OrderComparisonData` | Side-by-side order comparison: orders array, matching fields, differing fields | exceptions.ts |
 | `ComparisonOrder` | Full order for comparison: SO#, PO#, date, customer, line items, total, status | exceptions.ts |
 | `ComparisonLineItem` | Single line item in comparison (SKU, description, qty, unit price) | exceptions.ts |
+| `PriceAnalysisData` | Price delta analysis: ERP/PO unit prices, variance, total at risk, SAP context (doc type/number, SKU, rule, root cause category, contract/promo refs) | exceptions.ts |
+| `BackOrderAnalysisData` | Back-order/OOS analysis: ordered/available/gap qtys, ATP date, primary DC, alternate warehouses, substitutes, production, inbound PO, ranked resolution options | exceptions.ts |
+| `WarehouseInfo` | DC inventory snapshot (plant, name, region, qty) | exceptions.ts |
+| `AlternateWarehouse` | Alternate DC with shipping details (extends WarehouseInfo + eta_days, freight deltas) | exceptions.ts |
+| `SubstituteSKU` | Substitute SKU option (sku, description, available qty, price delta, acceptance rate) | exceptions.ts |
+| `ResolutionOption` | Ranked resolution option with composite score, 4-dimension sub-scores (service/revenue/logistics/preference), SAP steps, recommended flag | exceptions.ts |
+| `OverMaxAnalysisData` | Over Max analysis: total ordered, max qty, excess, exceedance pct, contract ref, block status/reason, order lines, AI trim plan | exceptions.ts |
+| `OverMaxLine` | Per-line Over Max detail (sku, qty, max, excess, even-layer flag) | exceptions.ts |
+| `TrimPlanLine` | AI trim plan line (sku, ordered, trimmed_to, delta, action: TRIM/SKIP/OK) | exceptions.ts |
+| `MOQAnalysisData` | MOQ analysis: ordered/moq/shortfall qtys, MOQ source, SAP V4082 block, round-up plan, SAP execution steps | exceptions.ts |
+| `RoundUpPlanLine` | AI round-up plan line (sku, ordered, round_up_to, delta, action: ROUND_UP/ACCEPT_BELOW/ESCALATE) | exceptions.ts |
+| `SAPStep` | SAP execution step (step number, transaction code, table, field, description) | exceptions.ts |
+| `PalletAnalysisData` | Pallet analysis: total cases, loose cases, extra labor, freight waste, per-line details, AI suggested plan | exceptions.ts |
+| `PalletLine` | Per-line pallet alignment detail (layer/pallet qty, complete layers, loose qty, fill pct, violation type) | exceptions.ts |
+| `PalletSuggestion` | AI pallet alignment suggestion (current/suggested qty, delta, layers, full pallets, reason) | exceptions.ts |
 
 ---
 
@@ -285,7 +317,11 @@ Maps to Section 6.2 REST endpoints:
 
 **Mock strategy:** All endpoints return mock data with simulated latency. To connect to real FastAPI, replace the mock implementations with `fetch()` calls to `NEXT_PUBLIC_API_URL`. The interface (function signatures and return types) stays the same.
 
-**UI-only endpoints:** `lineItems()` and `orderAnalysis()` serve mock data for the enriched line-item grids and pricing waterfall. When `asoe2` adds corresponding endpoints, these will be wired to real `fetch()` calls.
+**Mock exceptions:** 14 exceptions (exc-001 through exc-014) covering all supported intents: CONTRACTUAL_CORRECTION, CREDIT_BLOCK, MASS_PRICING_ERROR, DUPLICATE_PO, BACK_ORDER (exc-010, exc-011), OVER_MAX (exc-012), MIN_ORDER_QTY (exc-013), PALLET_CONFIG (exc-014). Each includes intent-specific `OrderAnalysis` data with the corresponding enrichment fields populated (e.g., `backorder_analysis` for BACK_ORDER, `pallet_analysis` for PALLET_CONFIG).
+
+**Health endpoint recipes:** `allowed_recipes` now includes 7 recipes: `PriceAdjustmentRecipe.py`, `CreditHoldReleaseRecipe.py`, `DuplicatePORecipe.py`, `BackOrderResolutionRecipe.py`, `OverMaxTrimRecipe.py`, `MOQRoundUpRecipe.py`, `PalletAlignmentRecipe.py`. `allowed_intents` includes 8 intents: the original 4 plus `BACK_ORDER`, `OVER_MAX`, `MIN_ORDER_QTY`, `PALLET_CONFIG`.
+
+**UI-only endpoints:** `lineItems()` and `orderAnalysis()` serve mock data for the enriched line-item grids, pricing waterfall, and type-specific enrichment sections. When `asoe2` adds corresponding endpoints, these will be wired to real `fetch()` calls.
 
 ---
 

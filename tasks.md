@@ -230,6 +230,24 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 
 ---
 
+### [x] PHASE 8.10: Exception Type Enrichment Sections (Price, Back-Order, Over Max, MOQ, Pallet Config)
+- [x] `PriceAnalysisSection` (`src/app/exceptions/PriceAnalysisSection.tsx`) — price delta bars (ERP vs PO), metric tiles, collapsible SAP context card
+- [x] `BackOrderSection` (`src/app/exceptions/BackOrderSection.tsx`) — GapBar (ordered vs available), DC inventory snapshot, substitute SKUs, ranked resolution options with multi-dimensional scoring
+- [x] `OverMaxSection` (`src/app/exceptions/OverMaxSection.tsx`) — exceedance bar, collapsible order lines table, AI trim plan with TRIM/SKIP/OK actions and totals
+- [x] `MOQSection` (`src/app/exceptions/MOQSection.tsx`) — shortfall bar, SAP V4082 block detail, AI round-up plan with ROUND_UP/ACCEPT_BELOW/ESCALATE, collapsible SAP execution steps
+- [x] `PalletConfigSection` (`src/app/exceptions/PalletConfigSection.tsx`) — KPI strip (cases/loose/labor/freight), per-line pallet fill bars with violation badges, AI suggested plan table
+- [x] `GapBar` reusable component (`src/components/ui/GapBar.tsx`) — horizontal ordered-vs-available/max bar with shortfall/excess modes, used by BackOrderSection, OverMaxSection, MOQSection
+- [x] New types in `src/types/exceptions.ts`: `PriceAnalysisData`, `BackOrderAnalysisData` + sub-types (`WarehouseInfo`, `AlternateWarehouse`, `SubstituteSKU`, `ResolutionOption`), `OverMaxAnalysisData` + sub-types (`OverMaxLine`, `TrimPlanLine`), `MOQAnalysisData` + sub-types (`RoundUpPlanLine`, `SAPStep`), `PalletAnalysisData` + sub-types (`PalletLine`, `PalletSuggestion`)
+- [x] New `OrderAnalysis` optional fields: `price_analysis?`, `backorder_analysis?`, `overmax_analysis?`, `moq_analysis?`, `pallet_analysis?`
+- [x] New mock exceptions: exc-010/exc-011 (BACK_ORDER), exc-012 (OVER_MAX), exc-013 (MIN_ORDER_QTY), exc-014 (PALLET_CONFIG)
+- [x] Health endpoint expanded: `allowed_intents` now includes BACK_ORDER, OVER_MAX, MIN_ORDER_QTY, PALLET_CONFIG; `allowed_recipes` includes BackOrderResolutionRecipe.py, OverMaxTrimRecipe.py, MOQRoundUpRecipe.py, PalletAlignmentRecipe.py
+- [x] All sections follow data-presence pattern — zero intent-string branching (Guardrail #2)
+- [x] `ExceptionDetailPanel` wires all 5 new sections via conditional render on optional `OrderAnalysis` fields
+
+✅ Outcome: 5 exception type enrichment sections with dedicated renderers. GapBar reusable component. 14 mock exceptions covering 8 intent types. 252 tests pass. (2026-04-16)
+
+---
+
 ## Remaining Phases
 
 ### [ ] PHASE 9: Settings & Admin Page
@@ -243,7 +261,7 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 ---
 
 ### [ ] PHASE 10: Testing
-**Scope:** Expand test coverage (Vitest + React Testing Library already configured, 230 tests passing).
+**Scope:** Expand test coverage (Vitest + React Testing Library already configured, 252 tests passing).
 - [ ] Component unit tests for PricingWaterfall (new component)
 - [ ] `vitest-axe` accessibility tests on status-related components (Badge, Toast, AgentReasoningCard)
 - [ ] Guardrail #2 lint rule (`no-hardcoded-enums` ESLint custom rule)
