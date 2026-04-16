@@ -53,9 +53,10 @@ src/
 │   ├── PricingWaterfall.tsx      # Vertical pricing condition chain timeline
 │   ├── Sidebar.tsx               # 480px slide-right intervention panel
 │   ├── Toast.tsx                 # 4.5s auto-dismiss, status-colored, solid-fill
+│   ├── UserSwitcher.tsx          # Sandbox-only user switcher (signIn credentials flow, server round-trip)
 │   └── WaterfallStepper.tsx      # 10-node pipeline progress visualization
 ├── hooks/
-│   ├── useAuth.ts                # Wraps NextAuth session with typed user
+│   ├── useAuth.ts                # Wraps NextAuth session with typed user + visibleTabs, assignedAccounts
 │   ├── useHealth.ts              # Fetches runtime enums from /api/v1/health
 │   └── useWebSocket.ts           # Section 8 protocol with reconnection backoff
 ├── lib/
@@ -99,6 +100,7 @@ src/
 | `PricingWaterfall` | Tailwind | Pricing condition chain timeline | ExceptionDetailPanel |
 | `GapBar` | Tailwind | Horizontal bar: primary vs secondary qty, shortfall/excess mode, gap indicator | BackOrderSection, OverMaxSection, MOQSection |
 | `GravitationalOrbs` | Custom (canvas) | Canvas animated background | Login |
+| `UserSwitcher` | Tailwind | Sandbox-only user switcher dropdown, server round-trip via `signIn("credentials")` | NavBar (all pages) |
 
 **Styling approach (Phase 8.9):** All components use Tailwind utility classes via the design token mapping in `tailwind.config.ts`. CVA (`class-variance-authority`) is used for multi-variant components (Button, Badge). `cn()` utility (`src/lib/utils.ts`) merges Tailwind classes with conflict resolution. Only 18 inline `style={{}}` objects remain across the entire codebase — all are data-driven dynamic values (avatar colors, bar widths, chart colors).
 
@@ -180,6 +182,8 @@ Adding a new enrichment section requires only: (1) add the type to `OrderAnalysi
 
 **Shared helpers** (`shared.tsx`): `CollapsibleHeader` (used by ContextStrip, DiagnosticsSection) and `fmtPrice` (used by HeaderRibbon, ContextStrip, EvidenceGrid, enrichment sections).
 
+**RBAC permission gating:** Approve/Reject/Escalate action buttons are gated via `hasPermission()` — only users with the required `{resource}:{action}` RBAC permission see the buttons.
+
 **Action feedback:** Approve/Reject/Escalate actions show toast notifications (success/error) via `useToast()`. List auto-refreshes after any action via `onActionComplete` callback.
 
 **WebSocket wiring:** The page orchestrator connects via `useWebSocket` and routes events to the detail panel via `onRefreshRef`. `pipeline_progress` events update the WaterfallStepper in real-time. `exception_update` and `task_complete` events refresh both the list and the currently viewed exception.
@@ -243,7 +247,7 @@ Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 | `PipelineNode` | 10 node names from orchestration/nodes.py | exceptions.ts |
 | `OrderEvent` | `OrderEvent` model | exceptions.ts |
 | `ComplianceDecision` | `ComplianceDecision` model | exceptions.ts |
-| `ExceptionSummary` | `ExceptionSummary` schema | exceptions.ts |
+| `ExceptionSummary` | `ExceptionSummary` schema (+ `account_id`, `account_name`) | exceptions.ts |
 | `ExceptionDetail` | `ExceptionDetailResponse` schema | exceptions.ts |
 | `TraceRecord` | `TraceResponse` schema | exceptions.ts |
 | `HealthResponse` | Health endpoint response | exceptions.ts |
@@ -252,9 +256,10 @@ Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 | `StatsResponse` | Stats endpoint response | api.ts |
 | `WSEvent` | `WSEvent` model (api/events.py) | websocket.ts |
 | `PipelineProgressPayload` | Pipeline progress data | websocket.ts |
-| `AuthUser` | `UserProfile` schema | auth.ts |
+| `AuthUser` | `UserProfile` schema (+ `title`, `avatar_initials`, `assigned_accounts`, `visible_tabs`) | auth.ts |
 | `LoginResponse` | `AuthTokenResponse` schema | auth.ts |
 | `Role` | Role strings from api/deps.py | auth.ts |
+| `UserListResponse` | List of available users for sandbox switching | auth.ts |
 
 **UI display types** (not backend contract mirrors — see CLAUDE.md):
 
@@ -315,9 +320,13 @@ Maps to Section 6.2 REST endpoints:
 | `exceptionsApi.lineItems()` | Line items for an exception (UI mock) | — |
 | `exceptionsApi.orderAnalysis()` | Order-level agent analysis (UI mock) | — |
 
+**User management endpoints:** `usersApi.list()` returns 6 seed users for sandbox switching. `usersApi.switch(email)` triggers a `signIn("credentials")` round-trip to re-derive JWT with the target user's RBAC, `visible_tabs`, and `assigned_accounts`. `computeVisibleTabs()` derives tab visibility from the user's RBAC permissions.
+
 **Mock strategy:** All endpoints return mock data with simulated latency. To connect to real FastAPI, replace the mock implementations with `fetch()` calls to `NEXT_PUBLIC_API_URL`. The interface (function signatures and return types) stays the same.
 
-**Mock exceptions:** 14 exceptions (exc-001 through exc-014) covering all supported intents: CONTRACTUAL_CORRECTION, CREDIT_BLOCK, MASS_PRICING_ERROR, DUPLICATE_PO, BACK_ORDER (exc-010, exc-011), OVER_MAX (exc-012), MIN_ORDER_QTY (exc-013), PALLET_CONFIG (exc-014). Each includes intent-specific `OrderAnalysis` data with the corresponding enrichment fields populated (e.g., `backorder_analysis` for BACK_ORDER, `pallet_analysis` for PALLET_CONFIG).
+**Mock users:** 6 seed users — jane@acme.com (admin), marcus.webb@acme-corp.com (admin), sarah.chen (manager), sarah.chen.sr (analyst), james.ortiz (analyst, scoped to acct-walmart/acct-kroger), priya.nair (analyst, scoped to acct-target/acct-costco). Each user has `title`, `avatar_initials`, `assigned_accounts`, and RBAC-derived `visible_tabs`.
+
+**Mock exceptions:** 14 exceptions (exc-001 through exc-014) with `account_id` and `account_name` fields. covering all supported intents: CONTRACTUAL_CORRECTION, CREDIT_BLOCK, MASS_PRICING_ERROR, DUPLICATE_PO, BACK_ORDER (exc-010, exc-011), OVER_MAX (exc-012), MIN_ORDER_QTY (exc-013), PALLET_CONFIG (exc-014). Each includes intent-specific `OrderAnalysis` data with the corresponding enrichment fields populated (e.g., `backorder_analysis` for BACK_ORDER, `pallet_analysis` for PALLET_CONFIG).
 
 **Health endpoint recipes:** `allowed_recipes` now includes 7 recipes: `PriceAdjustmentRecipe.py`, `CreditHoldReleaseRecipe.py`, `DuplicatePORecipe.py`, `BackOrderResolutionRecipe.py`, `OverMaxTrimRecipe.py`, `MOQRoundUpRecipe.py`, `PalletAlignmentRecipe.py`. `allowed_intents` includes 8 intents: the original 4 plus `BACK_ORDER`, `OVER_MAX`, `MIN_ORDER_QTY`, `PALLET_CONFIG`.
 
@@ -330,8 +339,8 @@ Maps to Section 6.2 REST endpoints:
 **NextAuth config** (`src/lib/auth.ts`):
 - Credentials provider (email/password → `authApi.login()`)
 - JWT session strategy, 7-day expiry
-- JWT callbacks enrich token with `roles`, `org`, `permissions`, `accessToken`
-- Session callbacks expose typed user with RBAC fields
+- JWT callbacks enrich token with `roles`, `org`, `permissions`, `accessToken`, `title`, `avatar_initials`, `assigned_accounts`, `visible_tabs`
+- Session callbacks expose typed user with RBAC fields + `visibleTabs`, `assignedAccounts`
 
 **RBAC** (`src/lib/roles.ts`): Aligned with `asoe2/api/deps.py::_ROLE_PERMISSIONS`:
 
