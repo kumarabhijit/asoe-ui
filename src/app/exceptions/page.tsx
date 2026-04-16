@@ -55,7 +55,7 @@ function ExceptionQueueContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { health } = useHealth();
-  const { user, visibleTabs, assignedAccounts } = useAuth();
+  const { user, visibleTabs } = useAuth();
 
   useEffect(() => { document.title = "Exception Queue — ASOE"; }, []);
 
@@ -161,11 +161,8 @@ function ExceptionQueueContent() {
     onEvent: handleWsEvent,
   });
 
-  /* ── Client-side search + customer scope filter ───────────────────── */
-  const accountSet = assignedAccounts.length > 0 ? new Set(assignedAccounts) : null;
+  /* ── Client-side search filter (account scoping is server-side) ──── */
   const filtered = exceptions.filter((exc) => {
-    // Customer scope: if user has assigned_accounts, only show matching exceptions
-    if (accountSet && exc.customer_name && !accountSet.has(exc.customer_name)) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (

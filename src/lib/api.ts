@@ -84,7 +84,7 @@ const MOCK_USERS: Record<string, AuthUser> = {
     title: "CS Analyst", avatar_initials: "JO",
     roles: ["analyst"], org: "acme-corp",
     permissions: ROLE_PERMISSIONS.analyst,
-    assigned_accounts: ["Walmart", "Kroger"],
+    assigned_accounts: ["acct-walmart", "acct-kroger"],
     visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.analyst),
   },
   "priya.nair@acme-corp.com": {
@@ -93,7 +93,7 @@ const MOCK_USERS: Record<string, AuthUser> = {
     title: "Trade Analyst", avatar_initials: "PN",
     roles: ["analyst"], org: "acme-corp",
     permissions: ROLE_PERMISSIONS.analyst,
-    assigned_accounts: ["Target", "Costco"],
+    assigned_accounts: ["acct-target", "acct-costco"],
     visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.analyst),
   },
 };
@@ -114,7 +114,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "COMPLETE",
     created_at: "2026-04-11T08:12:00Z",
     updated_at: "2026-04-11T08:20:00Z",
-    customer_name: "Walmart",
+    account_id: "acct-walmart", account_name: "Walmart",
   },
   {
     id: "exc-002",
@@ -128,7 +128,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "MANUAL_REVIEW_REQUIRED",
     created_at: "2026-04-11T09:05:00Z",
     updated_at: "2026-04-11T09:13:00Z",
-    customer_name: "Kroger",
+    account_id: "acct-kroger", account_name: "Kroger",
   },
   {
     id: "exc-003",
@@ -142,7 +142,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "BLOCKED",
     created_at: "2026-04-11T10:30:00Z",
     updated_at: "2026-04-11T10:31:00Z",
-    customer_name: "Target",
+    account_id: "acct-target", account_name: "Target",
   },
   {
     id: "exc-004",
@@ -156,7 +156,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: undefined,
     created_at: "2026-04-11T11:00:00Z",
     updated_at: "2026-04-11T11:02:00Z",
-    customer_name: "Costco",
+    account_id: "acct-costco", account_name: "Costco",
   },
   {
     id: "exc-005",
@@ -170,7 +170,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "COMPLETE",
     created_at: "2026-04-10T14:22:00Z",
     updated_at: "2026-04-10T14:30:00Z",
-    customer_name: "Walmart",
+    account_id: "acct-walmart", account_name: "Walmart",
   },
   {
     id: "exc-006",
@@ -184,7 +184,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "MANUAL_REVIEW_REQUIRED",
     created_at: "2026-04-09T16:45:00Z",
     updated_at: "2026-04-11T08:45:00Z",
-    customer_name: "Kroger",
+    account_id: "acct-kroger", account_name: "Kroger",
   },
   {
     id: "exc-007",
@@ -198,7 +198,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "MANUAL_REVIEW_REQUIRED",
     created_at: "2026-04-11T07:15:00Z",
     updated_at: "2026-04-11T07:22:00Z",
-    customer_name: "Target",
+    account_id: "acct-target", account_name: "Target",
   },
   {
     id: "exc-008",
@@ -212,7 +212,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "COMPLETE",
     created_at: "2026-04-08T11:00:00Z",
     updated_at: "2026-04-08T12:30:00Z",
-    customer_name: "Costco",
+    account_id: "acct-costco", account_name: "Costco",
   },
   {
     id: "exc-009",
@@ -226,22 +226,22 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     final_status: "COMPLETE",
     created_at: "2026-04-11T06:20:00Z",
     updated_at: "2026-04-11T06:22:00Z",
-    customer_name: "Walmart",
+    account_id: "acct-walmart", account_name: "Walmart",
   },
   {
-    id: "exc-010", tenant_id: "acme-corp", order_id: "SO-9200", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-12T10:15:00Z", updated_at: "2026-04-12T10:22:00Z", customer_name: "Kroger",
+    id: "exc-010", tenant_id: "acme-corp", order_id: "SO-9200", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-12T10:15:00Z", updated_at: "2026-04-12T10:22:00Z", account_id: "acct-kroger", account_name: "Kroger",
   },
   {
-    id: "exc-011", tenant_id: "acme-corp", order_id: "SO-9450", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "COMPLETE", created_at: "2026-04-12T08:00:00Z", updated_at: "2026-04-12T08:05:00Z", customer_name: "Target",
+    id: "exc-011", tenant_id: "acme-corp", order_id: "SO-9450", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "COMPLETE", created_at: "2026-04-12T08:00:00Z", updated_at: "2026-04-12T08:05:00Z", account_id: "acct-target", account_name: "Target",
   },
   {
-    id: "exc-012", tenant_id: "acme-corp", order_id: "SO-10100", event_type: "OVER_MAX_QTY", intent: "OVER_MAX", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "OverMaxTrimRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-13T09:30:00Z", updated_at: "2026-04-13T09:38:00Z", customer_name: "Costco",
+    id: "exc-012", tenant_id: "acme-corp", order_id: "SO-10100", event_type: "OVER_MAX_QTY", intent: "OVER_MAX", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "OverMaxTrimRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-13T09:30:00Z", updated_at: "2026-04-13T09:38:00Z", account_id: "acct-costco", account_name: "Costco",
   },
   {
-    id: "exc-013", tenant_id: "acme-corp", order_id: "SO-11200", event_type: "MIN_ORDER_QTY", intent: "MIN_ORDER_QTY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "MOQRoundUpRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T07:45:00Z", updated_at: "2026-04-14T07:52:00Z", customer_name: "Walmart",
+    id: "exc-013", tenant_id: "acme-corp", order_id: "SO-11200", event_type: "MIN_ORDER_QTY", intent: "MIN_ORDER_QTY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "MOQRoundUpRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T07:45:00Z", updated_at: "2026-04-14T07:52:00Z", account_id: "acct-walmart", account_name: "Walmart",
   },
   {
-    id: "exc-014", tenant_id: "acme-corp", order_id: "SO-12300", event_type: "PALLET_CONFIG_VIOLATION", intent: "PALLET_CONFIG", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "PalletAlignmentRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T11:20:00Z", updated_at: "2026-04-14T11:28:00Z", customer_name: "Kroger",
+    id: "exc-014", tenant_id: "acme-corp", order_id: "SO-12300", event_type: "PALLET_CONFIG_VIOLATION", intent: "PALLET_CONFIG", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "PalletAlignmentRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T11:20:00Z", updated_at: "2026-04-14T11:28:00Z", account_id: "acct-kroger", account_name: "Kroger",
   },
 ];
 

@@ -71,7 +71,7 @@ export const PARTNER_USER: AuthUser = {
   roles: ["partner"],
   org: "acme-corp",
   permissions: ["exceptions:read"],
-  assigned_accounts: ["Walmart"],
+  assigned_accounts: ["acct-walmart"],
   visible_tabs: ["inbox", "exceptions"],
   env: "sandbox",
   retailer_id: "retailer-001",

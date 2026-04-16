@@ -146,8 +146,10 @@ export interface ExceptionSummary {
   final_status?: string;
   created_at: string;
   updated_at: string;
-  /** Customer name — used for account-based scope filtering. */
-  customer_name?: string;
+  /** Account ID — references the retail customer account within the tenant. */
+  account_id?: string;
+  /** Account name — display label for the retail customer (e.g., "Walmart"). */
+  account_name?: string;
 }
 
 /** ExceptionDetail — full detail view (GET /api/v1/exceptions/{id}) */
