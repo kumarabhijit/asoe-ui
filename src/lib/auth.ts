@@ -30,9 +30,13 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             email: user.email,
             name: user.name,
+            title: user.title,
+            avatar_initials: user.avatar_initials,
             roles: user.roles,
             org: user.org,
             permissions: user.permissions,
+            assigned_accounts: user.assigned_accounts,
+            visible_tabs: user.visible_tabs,
             accessToken: res.access_token,
           };
         } catch {
@@ -49,6 +53,10 @@ export const authOptions: NextAuthOptions = {
         token.org = u.org;
         token.permissions = u.permissions;
         token.accessToken = u.accessToken;
+        token.title = u.title;
+        token.avatar_initials = u.avatar_initials;
+        token.assigned_accounts = u.assigned_accounts;
+        token.visible_tabs = u.visible_tabs;
       }
       return token;
     },
@@ -59,6 +67,10 @@ export const authOptions: NextAuthOptions = {
         u.roles = token.roles;
         u.org = token.org;
         u.permissions = token.permissions;
+        u.title = token.title;
+        u.avatar_initials = token.avatar_initials;
+        u.assigned_accounts = token.assigned_accounts;
+        u.visible_tabs = token.visible_tabs;
       }
       return session;
     },

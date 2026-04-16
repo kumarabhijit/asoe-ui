@@ -21,6 +21,7 @@ import {
   Users,
 } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
+import { UserSwitcher } from "@/components/ui/UserSwitcher";
 import { MetricTile } from "@/components/ui/MetricTile";
 import { Card } from "@/components/ui/Card";
 import { Badge, verdictVariant, lifecycleVariant } from "@/components/ui/Badge";
@@ -50,12 +51,13 @@ const RECENT_ACTIVITY = [
 export default function DashboardPage() {
   const router = useRouter();
   const { health } = useHealth();
-  const { user } = useAuth();
+  const { user, visibleTabs } = useAuth();
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   const userName = user?.name || "User";
-  const userInitials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const userInitials = (user as { avatar_initials?: string })?.avatar_initials || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const filteredTabs = visibleTabs.length > 0 ? NAV_TABS.filter((t) => visibleTabs.includes(t.id)) : NAV_TABS;
 
   useEffect(() => { document.title = "Dashboard — ASOE"; }, []);
 
@@ -80,7 +82,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-surface-page font-sans">
       <NavBar
-        tabs={NAV_TABS}
+        tabs={filteredTabs}
         activeTab="dashboard"
         onTabChange={(id) => {
           const tab = NAV_TABS.find((t) => t.id === id);
@@ -91,6 +93,7 @@ export default function DashboardPage() {
         agentCount={health?.allowed_intents?.length || 0}
         onSignOut={() => signOut({ callbackUrl: "/login" })}
         onSettingsClick={() => router.push("/settings")}
+        rightContent={<UserSwitcher />}
       />
 
       <main id="main-content" className="mx-auto max-w-[1440px] px-32 py-24">
