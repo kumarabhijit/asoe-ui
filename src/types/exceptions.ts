@@ -282,6 +282,8 @@ export interface OrderAnalysis {
   moq_analysis?: MOQAnalysisData;
   /** Present when a pallet config exception produces alignment analysis */
   pallet_analysis?: PalletAnalysisData;
+  /** Present when a delivery delay exception produces timing analysis */
+  delivery_delay_analysis?: DeliveryDelayAnalysisData;
 }
 
 /* ── Duplicate PO enrichment types (UI-only, not backend contract) ──── */
@@ -612,6 +614,54 @@ export interface PalletSuggestion {
   layers: number;
   full_pallets: number;
   reason: string;
+}
+
+/* ── Delivery Delay enrichment types ─────────────────────────────────── */
+
+/** Delivery delay analysis — present when the DeliveryDelay skill/recipe produces it */
+export interface DeliveryDelayAnalysisData {
+  /** Originally promised delivery date */
+  planned_date: string;
+  /** Current projected ETA after the delay */
+  projected_eta: string;
+  /** Days late = projected_eta − planned_date */
+  days_late: number;
+  /** Prototype rule band for visual grouping (e.g., "SD-DELAY-001"). Rendered
+   *  verbatim — not branched on in UI logic (Guardrail #2). */
+  rule_id: string;
+  /** Deterministic delay category (e.g., "CARRIER_DELAY", "PRODUCTION_DELAY",
+   *  "LOGISTICS", "WEATHER", "CUSTOMS"). Rendered verbatim. */
+  delay_category: string;
+  /** One-line human-readable delay reason */
+  delay_reason: string;
+  /** Number of affected lines on the order */
+  affected_lines: number;
+  /** Revenue at risk from the delay (SLA penalties + downstream) */
+  at_risk: number;
+  /** Carrier name */
+  carrier: string;
+  /** Route or lane identifier */
+  route: string;
+  /** SLA deadline (if contractually defined) */
+  sla_deadline?: string;
+  /** Ranked alternate delivery options */
+  alternate_options: AlternateDeliveryOption[];
+}
+
+/** Alternate delivery option with cost/benefit trade-off */
+export interface AlternateDeliveryOption {
+  id: string;
+  /** Free-text type label (e.g., "EXPEDITE", "SPLIT_SHIP", "PARTIAL",
+   *  "RESCHEDULE"). Rendered verbatim — no UI dispatch on the value. */
+  type: string;
+  title: string;
+  description: string;
+  new_eta: string;
+  /** Extra freight / handling cost in currency units (positive = more cost,
+   *  negative = savings). Rendered as-is. */
+  extra_cost: number;
+  /** Whether this is the top-pick option flagged by the agent */
+  recommended: boolean;
 }
 
 /** Entity profile — master data relevant to the exception context */

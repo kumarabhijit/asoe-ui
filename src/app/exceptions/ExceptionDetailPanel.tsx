@@ -44,6 +44,7 @@ import { BackOrderSection } from "./BackOrderSection";
 import { OverMaxSection } from "./OverMaxSection";
 import { MOQSection } from "./MOQSection";
 import { PalletConfigSection } from "./PalletConfigSection";
+import { DeliveryDelaySection } from "./DeliveryDelaySection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -420,6 +421,9 @@ export default function ExceptionDetailPanel({
           )}
           {analysis?.pallet_analysis && (
             <PalletConfigSection data={analysis.pallet_analysis} />
+          )}
+          {analysis?.delivery_delay_analysis && (
+            <DeliveryDelaySection data={analysis.delivery_delay_analysis} />
           )}
 
           {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}

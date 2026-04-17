@@ -279,6 +279,11 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-015", tenant_id: "acme-corp", order_id: "SO-13400", event_type: "ORDER_RECEIVED", intent: "CONTRACTUAL_CORRECTION", lifecycle_state: "FAILED", shadow_verdict: "GREEN", selected_recipe: "PriceAdjustmentRecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-15T14:05:00Z", updated_at: "2026-04-15T14:05:42Z", account_id: "acct-walmart", account_name: "Walmart",
   },
+  // DELIVERY_DELAY — SD-DELAY-002 band (5+ days late). Dedicated section
+  // renders from delivery_delay_analysis via data-presence pattern.
+  {
+    id: "exc-016", tenant_id: "acme-corp", order_id: "SO-14200", event_type: "DELIVERY_DELAY", intent: "DELIVERY_DELAY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "DeliveryDelayResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-16T09:30:00Z", updated_at: "2026-04-16T09:35:00Z", account_id: "acct-target", account_name: "Target",
+  },
 ];
 
 const MOCK_HEALTH: HealthResponse = {
@@ -286,13 +291,13 @@ const MOCK_HEALTH: HealthResponse = {
   version: "0.3.2",
   kill_switch: false,
   explain_mode: false,
-  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG"],
+  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY"],
   lifecycle_states: [
     "INGESTED", "CLASSIFYING", "AUDITING", "PENDING_REVIEW",
     "ESCALATED", "PENDING_ADMIN_REVIEW", "EXECUTING", "RESOLVED",
     "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
-  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py"],
+  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py", "DeliveryDelayResolutionRecipe.py"],
 };
 
 /* ── Auth API (/api/auth/*) ─────��──────────────────────────────────── */
@@ -729,6 +734,12 @@ const MOCK_LINE_ITEMS: Record<string, LineItem[]> = {
     { line_id: "L1", sku: "SKU-3500", description: "Premium Coffee 12oz 24pk", uom: "CS", quantity: 170, erp_price: 36.00, po_price: 36.00 },
     { line_id: "L2", sku: "SKU-3510", description: "Decaf Coffee 12oz 24pk", uom: "CS", quantity: 85, erp_price: 34.50, po_price: 34.50 },
     { line_id: "L3", sku: "SKU-3520", description: "Cold Brew 10oz 12pk", uom: "CS", quantity: 50, erp_price: 42.00, po_price: 42.00 },
+  ],
+  "exc-016": [
+    { line_id: "L1", sku: "SKU-9100", description: "Sparkling Water 16oz 12pk", uom: "CS", quantity: 5000, erp_price: 11.50, po_price: 11.50 },
+    { line_id: "L2", sku: "SKU-9110", description: "Sparkling Water 20oz 12pk", uom: "CS", quantity: 3200, erp_price: 13.80, po_price: 13.80 },
+    { line_id: "L3", sku: "SKU-9120", description: "Electrolyte Blend 12oz 24pk", uom: "CS", quantity: 2400, erp_price: 18.40, po_price: 18.40 },
+    { line_id: "L4", sku: "SKU-9130", description: "Flavored Soda 12oz 24pk", uom: "CS", quantity: 1400, erp_price: 15.20, po_price: 15.20 },
   ],
 };
 
@@ -1661,6 +1672,77 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
         { sku: "SKU-3500", description: "Premium Coffee 24pk", current: 170, suggested: 168, delta: -2, layers: 7, full_pallets: 1, reason: "Round down to full layers (24 CS/layer × 7)" },
         { sku: "SKU-3510", description: "Decaf Coffee 24pk", current: 85, suggested: 84, delta: -1, layers: 6, full_pallets: 1, reason: "Round down to full layers (14 CS/layer × 6)" },
         { sku: "SKU-3520", description: "Cold Brew 12pk", current: 50, suggested: 48, delta: -2, layers: 4, full_pallets: 1, reason: "Round down to full layers (12 CS/layer × 4)" },
+      ],
+    },
+  },
+  /* ── DELIVERY_DELAY: Pending Review (YELLOW) ──────────────────────────── */
+  "exc-016": {
+    diagnosis: "Shipment is 6 days behind the contracted delivery window. Root cause is a carrier hub closure in the Southwest corridor. SLA breach is imminent; three alternate routing options available.",
+    confidence: 88,
+    risk: "HIGH",
+    resolution: "ALTERNATE_ROUTING",
+    root_cause: "Carrier DHL regional hub closure (weather-driven) — affected all southbound lanes for 48h.",
+    recommendation: "Re-route via FedEx Express through Memphis hub; restores ETA to within 1 day of planned, +$620 freight.",
+    entity_profile: {
+      customer_name: "Target Supply Co",
+      bp_number: "BP-TGT-002",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Excellent",
+      location: "DC-042 — Dallas",
+      region: "Southwest",
+    },
+    impact_metrics: {
+      revenue_at_risk: 48600.00,
+      delta_amount: 2430.00,
+      delta_percentage: 5.0,
+      sla_priority: "HIGH",
+      sla_deadline: "2026-04-22T18:00:00Z",
+      affected_lines: 4,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "12,000 CS of grocery SKUs held at DHL Phoenix hub.", resolution: "RE-ROUTE", risk: "MEDIUM", waterfall: [] },
+    ],
+    delivery_delay_analysis: {
+      planned_date: "2026-04-18T00:00:00Z",
+      projected_eta: "2026-04-24T00:00:00Z",
+      days_late: 6,
+      rule_id: "SD-DELAY-002",
+      delay_category: "CARRIER_DELAY",
+      delay_reason: "DHL Phoenix regional hub was closed Apr 16–18 due to severe weather. 12,000 CS of strategic-tier inventory waiting on outbound line-haul. Ripple effect on 3 downstream POs.",
+      affected_lines: 4,
+      at_risk: 48600.00,
+      carrier: "DHL Ground",
+      route: "LGB → PHX → DAL",
+      sla_deadline: "2026-04-22T18:00:00Z",
+      alternate_options: [
+        {
+          id: "opt-1",
+          type: "EXPEDITE",
+          title: "Re-route via FedEx Memphis hub",
+          description: "Swap to FedEx Express line-haul through MEM; bypasses affected PHX corridor. ETA Apr 19.",
+          new_eta: "2026-04-19T00:00:00Z",
+          extra_cost: 620,
+          recommended: true,
+        },
+        {
+          id: "opt-2",
+          type: "SPLIT_SHIP",
+          title: "Partial pickup + priority balance",
+          description: "Release 70% from PHX as soon as hub reopens (Apr 20), expedite remaining 30% via UPS 2-Day.",
+          new_eta: "2026-04-22T00:00:00Z",
+          extra_cost: 280,
+          recommended: false,
+        },
+        {
+          id: "opt-3",
+          type: "RESCHEDULE",
+          title: "Full re-slot to Apr 24 window",
+          description: "Customer confirmed flexibility on 2 of 4 SKUs; negotiate revised PO with 6-day push, no premium.",
+          new_eta: "2026-04-24T00:00:00Z",
+          extra_cost: 0,
+          recommended: false,
+        },
       ],
     },
   },
