@@ -2,17 +2,21 @@
  * Settings — placeholder page for Phase 9.
  *
  * Scope: user management, SSO config, policy overrides, agent settings.
- * RBAC: gated to admin role (future).
+ * RBAC: requires rules:write, policy:write, or users:manage permission.
+ * Unauthorized users are redirected to /exceptions.
  */
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Settings, Users, Shield, Zap, Bell } from "lucide-react";
+import { Settings, Users, Shield, Zap, Bell, ShieldAlert } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
 import { Card } from "@/components/ui/Card";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
+
+const SETTINGS_PERMISSIONS = ["rules:write", "policy:write", "users:manage"] as const;
 
 const NAV_TABS = [
   { id: "inbox", label: "Customer Inbox", href: "/inbox" },
@@ -31,7 +35,32 @@ const SETTING_SECTIONS = [
 export default function SettingsPage() {
   const router = useRouter();
   const { health } = useHealth();
-  const { user, visibleTabs } = useAuth();
+  const { user, visibleTabs, hasPermission, isLoading } = useAuth();
+
+  const hasSettingsAccess = SETTINGS_PERMISSIONS.some((p) => hasPermission(p));
+
+  useEffect(() => {
+    if (!isLoading && !hasSettingsAccess) {
+      router.replace("/exceptions");
+    }
+  }, [isLoading, hasSettingsAccess, router]);
+
+  if (isLoading || !hasSettingsAccess) {
+    return (
+      <div className="min-h-screen bg-surface-page font-sans flex items-center justify-center">
+        <div className="text-center text-text-tertiary">
+          {isLoading ? (
+            <p className="text-body">Loading...</p>
+          ) : (
+            <div className="flex flex-col items-center gap-8">
+              <ShieldAlert size={32} className="text-text-quaternary" />
+              <p className="text-body">Access denied. Redirecting...</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const userName = user?.name || "User";
   const userInitials = (user as { avatar_initials?: string })?.avatar_initials || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
