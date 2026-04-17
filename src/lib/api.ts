@@ -105,6 +105,24 @@ const MOCK_USERS: Record<string, AuthUser> = {
     assigned_accounts: ["acct-target", "acct-costco"],
     visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.analyst),
   },
+  "tom.bradley@walmart.com": {
+    id: "usr_tom_bradley", sub: "usr_tom_bradley",
+    email: "tom.bradley@walmart.com", name: "Tom Bradley",
+    title: "Walmart Buyer Rep", avatar_initials: "TB",
+    roles: ["partner"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.partner,
+    assigned_accounts: ["acct-walmart"],
+    visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.partner),
+  },
+  "lisa.huang@kroger.com": {
+    id: "usr_lisa_huang", sub: "usr_lisa_huang",
+    email: "lisa.huang@kroger.com", name: "Lisa Huang",
+    title: "Kroger Buyer Rep", avatar_initials: "LH",
+    roles: ["partner"], org: "acme-corp",
+    permissions: ROLE_PERMISSIONS.partner,
+    assigned_accounts: ["acct-kroger"],
+    visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.partner),
+  },
 };
 
 /** Default user for backward compatibility */
