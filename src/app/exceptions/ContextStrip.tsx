@@ -2,7 +2,8 @@
  * ContextStrip — Layer 2 of the Exception Detail Panel.
  *
  * Two-column grid: Entity Profile (customer master data) + Impact Metrics (blast radius).
- * Collapsible — default expanded.
+ * Collapsible — default collapsed (user-adjustable). The core decision data
+ * lives in Layer 1; this strip is enrichment the reviewer opens on demand.
  */
 "use client";
 
@@ -18,7 +19,7 @@ interface ContextStripProps {
   defaultOpen?: boolean;
 }
 
-export function ContextStrip({ entityProfile: ep, impactMetrics: im, defaultOpen = true }: ContextStripProps) {
+export function ContextStrip({ entityProfile: ep, impactMetrics: im, defaultOpen = false }: ContextStripProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   if (!ep && !im) return null;
@@ -55,7 +56,10 @@ export function ContextStrip({ entityProfile: ep, impactMetrics: im, defaultOpen
                 {im.fulfillment_gap_pct !== undefined && (
                   <ContextRow icon={<Package size={11} />} label="Gap" value={`${im.fulfillment_gap_pct.toFixed(1)}%`} />
                 )}
-                <ContextRow icon={<Clock size={11} />} label="Priority" value={im.sla_priority} badge={im.sla_priority} />
+                {/* Priority renders as a plain value row — earlier a duplicate
+                    badge was bound to the same string, so Priority appeared
+                    twice side-by-side. */}
+                <ContextRow icon={<Clock size={11} />} label="Priority" value={im.sla_priority} />
               </div>
             )}
           </div>
