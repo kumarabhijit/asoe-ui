@@ -89,6 +89,94 @@ describe("AgentReasoningCard", () => {
     });
   });
 
+  describe("Re-analyze affordance", () => {
+    it("is hidden on GREEN (no outcome-shopping on auto-resolved)", () => {
+      render(
+        <AgentReasoningCard verdict="GREEN" onReanalyze={vi.fn()} />
+      );
+      expect(screen.queryByText("Re-analyze")).not.toBeInTheDocument();
+    });
+
+    it("is shown on YELLOW", () => {
+      render(
+        <AgentReasoningCard verdict="YELLOW" onReanalyze={vi.fn()} />
+      );
+      expect(screen.getByText("Re-analyze")).toBeInTheDocument();
+    });
+
+    it("is shown on RED", () => {
+      render(
+        <AgentReasoningCard verdict="RED" onReanalyze={vi.fn()} />
+      );
+      expect(screen.getByText("Re-analyze")).toBeInTheDocument();
+    });
+
+    it("is shown when executionError is present (regardless of verdict)", () => {
+      render(
+        <AgentReasoningCard
+          verdict="GREEN"
+          executionError={{ message: "Gateway timed out" }}
+          onReanalyze={vi.fn()}
+        />
+      );
+      expect(screen.getByText("Re-analyze")).toBeInTheDocument();
+    });
+
+    it("is hidden when no onReanalyze handler provided (permission-gated)", () => {
+      // Parent wires onReanalyze only when hasPermission('exceptions:override')
+      render(<AgentReasoningCard verdict="YELLOW" />);
+      expect(screen.queryByText("Re-analyze")).not.toBeInTheDocument();
+    });
+
+    it("disables the button when attempts are exhausted", () => {
+      render(
+        <AgentReasoningCard
+          verdict="YELLOW"
+          onReanalyze={vi.fn()}
+          reanalyzeAttempts={3}
+          reanalyzeMax={3}
+        />
+      );
+      // When exhausted the button should not render — same effect as no handler.
+      expect(screen.queryByText("Re-analyze")).not.toBeInTheDocument();
+    });
+
+    it("displays the attempt counter", () => {
+      render(
+        <AgentReasoningCard
+          verdict="YELLOW"
+          onReanalyze={vi.fn()}
+          reanalyzeAttempts={1}
+          reanalyzeMax={3}
+        />
+      );
+      expect(screen.getByText("1/3")).toBeInTheDocument();
+    });
+
+    it("requires a non-empty reason before firing onReanalyze", async () => {
+      const user = userEvent.setup();
+      const onReanalyze = vi.fn();
+      render(<AgentReasoningCard verdict="YELLOW" onReanalyze={onReanalyze} />);
+
+      await user.click(screen.getByText("Re-analyze"));
+      // Reason prompt appears as a dialog.
+      expect(screen.getByText(/Reanalyze Reason \(required\)/)).toBeInTheDocument();
+      // Confirm button disabled with empty reason.
+      const confirm = screen.getByText("Confirm Re-analyze");
+      expect(confirm).toBeDisabled();
+      expect(onReanalyze).not.toHaveBeenCalled();
+
+      // After typing a reason, confirm enables and fires with the reason.
+      await user.type(
+        screen.getByPlaceholderText(/Why should this be re-run/),
+        "Contract uploaded",
+      );
+      expect(confirm).toBeEnabled();
+      await user.click(confirm);
+      expect(onReanalyze).toHaveBeenCalledWith("Contract uploaded");
+    });
+  });
+
   describe("Execution error", () => {
     it("shows 'Execution Failed' badge when executionError is provided", () => {
       render(

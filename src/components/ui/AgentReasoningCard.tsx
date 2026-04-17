@@ -13,7 +13,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Zap, Check, AlertTriangle, ShieldX, MessageSquare, XCircle } from "lucide-react";
+import { Zap, Check, AlertTriangle, ShieldX, MessageSquare, XCircle, RotateCcw } from "lucide-react";
 import { Badge, verdictVariant } from "./Badge";
 import { Button } from "./Button";
 import { cn } from "@/lib/utils";
@@ -46,6 +46,14 @@ interface AgentReasoningCardProps {
   onReject?: (comment: string) => void;
   onEscalate?: () => void;
   onOverride?: () => void;
+  /** Fires when the user confirms a Re-analyze request with a mandatory reason.
+   *  Parent is responsible for calling exceptionsApi.reanalyze and refreshing. */
+  onReanalyze?: (reason: string) => void;
+  /** Number of reanalyses already performed — compared against reanalyzeMax
+   *  to disable the button when exhausted. */
+  reanalyzeAttempts?: number;
+  /** Max re-analyses allowed per exception (mirrors contracts/policy.py). */
+  reanalyzeMax?: number;
   actionLoading?: boolean;
   isAdmin?: boolean;
   className?: string;
@@ -102,18 +110,30 @@ export function AgentReasoningCard({
   onReject,
   onEscalate,
   onOverride,
+  onReanalyze,
+  reanalyzeAttempts = 0,
+  reanalyzeMax = 3,
   actionLoading = false,
   isAdmin = false,
   className,
 }: AgentReasoningCardProps) {
   const isErrored = executionError !== undefined;
   const config = VERDICT_CONFIG[verdict];
-  const [pendingAction, setPendingAction] = useState<"approve" | "reject" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"approve" | "reject" | "reanalyze" | null>(null);
   const [comment, setComment] = useState("");
+  // Re-analyze is eligible when the agent's prior outcome warrants review:
+  // YELLOW/RED compliance verdict, or an execution crash. Not shown for GREEN
+  // (auto-resolved) — matches the backend eligibility gate and closes the
+  // outcome-shopping vector flagged in the expert debate.
+  const canReanalyze =
+    onReanalyze !== undefined
+    && (verdict === "YELLOW" || verdict === "RED" || isErrored)
+    && reanalyzeAttempts < reanalyzeMax;
 
   function confirmAction() {
     if (pendingAction === "approve" && onApprove) onApprove(comment);
     else if (pendingAction === "reject" && onReject) onReject(comment);
+    else if (pendingAction === "reanalyze" && onReanalyze) onReanalyze(comment);
     setPendingAction(null);
     setComment("");
   }
@@ -244,29 +264,76 @@ export function AgentReasoningCard({
                 )}
               </>
             )}
+            {canReanalyze && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={actionLoading}
+                onClick={() => setPendingAction("reanalyze")}
+                title={`Re-run this exception through a fresh Compliance Shadow (attempt ${reanalyzeAttempts + 1} of ${reanalyzeMax})`}
+              >
+                <RotateCcw size={13} className="mr-1" />
+                Re-analyze
+                <span className="ml-1 font-mono opacity-60">
+                  {reanalyzeAttempts}/{reanalyzeMax}
+                </span>
+              </Button>
+            )}
           </div>
         )}
 
-        {/* Comment input */}
+        {/* Comment input — reanalyze requires a non-empty reason (SOX). */}
         {pendingAction && (
-          <div className="flex flex-col gap-8 p-12 bg-surface-secondary rounded-sm">
+          <div
+            className="flex flex-col gap-8 p-12 bg-surface-secondary rounded-sm"
+            role={pendingAction === "reanalyze" ? "dialog" : undefined}
+            aria-modal={pendingAction === "reanalyze" ? true : undefined}
+            aria-label={pendingAction === "reanalyze" ? "Reanalyze reason required" : undefined}
+          >
             <div className="flex items-center gap-6 text-caption font-semibold text-text-secondary">
               <MessageSquare size={14} />
-              {pendingAction === "approve" ? "Approval" : "Rejection"} Comment
+              {pendingAction === "approve"
+                ? "Approval Comment"
+                : pendingAction === "reject"
+                ? "Rejection Comment"
+                : "Reanalyze Reason (required)"}
             </div>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder={pendingAction === "approve" ? "Add approval notes (optional)..." : "Provide rejection reason..."}
+              placeholder={
+                pendingAction === "approve"
+                  ? "Add approval notes (optional)..."
+                  : pendingAction === "reject"
+                  ? "Provide rejection reason..."
+                  : "Why should this be re-run? (e.g., new contract uploaded, gateway was down)"
+              }
               autoFocus
               rows={3}
               className="w-full px-12 py-8 border border-border rounded-sm text-caption font-sans text-text-primary bg-surface-primary resize-y outline-none focus:border-brand"
               onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) confirmAction(); }}
+              required={pendingAction === "reanalyze"}
             />
             <div className="flex gap-8 justify-end">
               <Button variant="ghost" size="sm" onClick={cancelAction}>Cancel</Button>
-              <Button variant={pendingAction === "approve" ? "brand" : "neutral"} size="sm" disabled={actionLoading} onClick={confirmAction}>
-                {actionLoading ? "Processing..." : pendingAction === "approve" ? "Confirm Approval" : "Confirm Rejection"}
+              <Button
+                variant={pendingAction === "approve" ? "brand" : "neutral"}
+                size="sm"
+                disabled={
+                  actionLoading
+                  // Reanalyze reason is mandatory — mirrors the backend
+                  // ReanalyzeRequest schema requirement.
+                  || (pendingAction === "reanalyze" && comment.trim().length === 0)
+                }
+                onClick={confirmAction}
+              >
+                {actionLoading
+                  ? "Processing..."
+                  : pendingAction === "approve"
+                  ? "Confirm Approval"
+                  : pendingAction === "reject"
+                  ? "Confirm Rejection"
+                  : "Confirm Re-analyze"}
               </Button>
             </div>
           </div>
