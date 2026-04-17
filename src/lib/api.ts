@@ -286,6 +286,45 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   },
 ];
 
+/** Per-exception trace enrichment — optional Layer 2 fields demonstrated
+ *  on a couple of representative exceptions. In production these will be
+ *  populated by the recipe layer via TraceRecord extensions. */
+const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
+  "exc-002": {
+    narrative:
+      "Two line items referenced a promotional price under ZPROM condition Q4-WMT-021, which expired on 2025-12-31. The PO was submitted on 2026-01-08, after promo expiry. The deterministic fallback recognised the pricing mismatch as CONTRACTUAL_CORRECTION (not a data-entry error) because the contracted customer-group rate (PR00) sits 11% below the PO price, within the auto-tolerance band.\n\nCompliance Shadow returned YELLOW — auto-resolution is blocked above the $1K single-line at-risk threshold until a reviewer confirms the promo should not be reloaded.",
+    resolution_steps: [
+      "Confirm the expired promo should not be extended for this PO.",
+      "Approve the price correction against the contract base rate (PR00).",
+      "Notify buyer via drafted email (see below) — courtesy communication.",
+    ],
+    sap_actions: [
+      { transaction: "VK13", table: "KONP", field: "KBETR", description: "Verify contract base rate (PR00) currently on file for customer-material group." },
+      { transaction: "VA02", table: "VBAP", field: "KBETR", description: "Apply the corrected line-item price from the contract rate." },
+      { transaction: "V.23", table: "VBAK", field: "LIFSK", description: "Release pricing block once correction is saved." },
+    ],
+    customer_email_draft:
+      "Hi [Buyer name],\n\nThank you for PO 4500020017. We noticed that two line items were priced against our Q4 promotional rate (Q4-WMT-021), which expired 12/31. We've adjusted those lines to your current contract rate (PR00) — an 11% difference from the PO price.\n\nNo action is needed on your side; this correction is within your contract's published auto-adjust band. Confirmation will follow shortly.\n\nBest,\n[CSR name]",
+  },
+  "exc-013": {
+    narrative:
+      "The PO qty (40 CS) falls below the contracted MOQ of 50 CS for SKU-7800. SAP raised block V4082 on the sales order. The deterministic fallback mapped this to MIN_ORDER_QTY → MOQRoundUpRecipe. The autonomy-level policy requires operator sign-off for MOQ round-ups above a 10% uplift; this case is 25%, so automatic execution is blocked.",
+    resolution_steps: [
+      "Approve the round-up to 50 CS (matches contracted MOQ).",
+      "Apply the resulting volume discount tier (condition KA00).",
+      "Release the V4082 block on the sales order.",
+    ],
+    sap_actions: [
+      { transaction: "VA02", table: "VBAP", field: "KWMENG", description: "Update the ordered quantity on SKU-7800 from 40 CS to 50 CS." },
+      { transaction: "VK11", table: "KONV", field: "KBETR", description: "Apply volume-tier pricing condition KA00 at the new qty." },
+      { transaction: "V.23", table: "VBAK", field: "LIFSK", description: "Release V4082 delivery block after quantity adjustment." },
+    ],
+    customer_email_draft:
+      "Hi [Buyer name],\n\nWe received PO [PO#] for 40 cases of SKU-7800 (Organic Kombucha 6pk). The contracted minimum is 50 cases, which would also unlock your next volume-tier rate.\n\nWith your approval, we'll round the order up to 50 cases at the better unit price. Total net change: +$285 at a ~4% lower $/case. Alternately, we can hold and wait for a revised PO — please confirm.\n\nBest,\n[CSR name]",
+  },
+};
+
+
 const MOCK_HEALTH: HealthResponse = {
   status: "ok",
   version: "0.3.2",
@@ -567,6 +606,7 @@ export const exceptionsApi = {
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
     const isFailed = exc.lifecycle_state === "FAILED";
+    const enrichment = MOCK_TRACE_ENRICHMENT[exc.id] ?? {};
     return {
       trace_id: exc.id + "-trace",
       event_id: exc.order_id,
@@ -583,6 +623,7 @@ export const exceptionsApi = {
       explanation: isFailed
         ? "Gateway 'erp:update_condition_record' returned TIMEOUT after 30000ms. Recipe aborted before applying changes; no SAP side effects occurred."
         : "Deterministic execution completed successfully.",
+      ...enrichment,
     };
   },
 

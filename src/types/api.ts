@@ -118,6 +118,15 @@ export interface StatsResponse {
 
 /* ── Trace ─────────────────────────────────────────────────────────── */
 
+/** A recommended SAP transaction-level step. Human-facing only —
+ *  not machine-consumed, no constrained generation required. */
+export interface SAPActionStep {
+  transaction: string;
+  table?: string;
+  field?: string;
+  description: string;
+}
+
 export interface TraceResponse {
   trace_id: string;
   event_id: string;
@@ -132,6 +141,17 @@ export interface TraceResponse {
   is_fallback_generated: boolean;
   final_status?: string;
   explanation?: string;
+
+  /* ── Human-facing structured narrative (Layer 2 enrichment) ─────
+     All optional. Rendered in DiagnosticsSection when present. */
+  /** Multi-paragraph human explanation of what the agent did. */
+  narrative?: string;
+  /** Ordered actionable steps for the operator. */
+  resolution_steps?: string[];
+  /** Recommended SAP steps (T-codes, tables, fields). */
+  sap_actions?: SAPActionStep[];
+  /** Copy-paste-ready customer communication draft. */
+  customer_email_draft?: string;
 }
 
 /* ── Workflow ──────────────────────────────────────────────────────── */
