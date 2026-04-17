@@ -132,6 +132,18 @@ const MOCK_USER = MOCK_USERS["marcus.webb@acme-corp.com"];
 /** Tracks the currently logged-in mock user for account scoping. Set on login. */
 let _currentMockUser: AuthUser = MOCK_USER;
 
+/**
+ * Per-exception reanalysis history, keyed by exception id. Mirrors the
+ * backend ExceptionRecord.reanalysis_history column introduced by V002.
+ * Module-level so the counter persists across repeated reanalyze calls
+ * within a session — previously the mock returned a fresh length-1 array
+ * each time, which is why the UI counter never advanced past 0/3.
+ */
+const MOCK_REANALYSIS_HISTORY: Record<string, ReanalysisEntry[]> = {};
+
+/** Must match REANALYSIS_MAX_ATTEMPTS in asoe2/contracts/policy.py. */
+const MOCK_REANALYSIS_MAX_ATTEMPTS = 3;
+
 const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-001",
@@ -437,6 +449,9 @@ export const exceptionsApi = {
       resolved_by: exc.lifecycle_state === "RESOLVED" ? "system" : undefined,
       resolved_action: undefined,
       resolution_notes: undefined,
+      // Surface persisted reanalysis history so the counter is stable
+      // across refreshes — previously every get() reset it to undefined.
+      reanalysis_history: MOCK_REANALYSIS_HISTORY[id] ?? [],
     };
   },
 
@@ -547,11 +562,24 @@ export const exceptionsApi = {
         "Reanalysis not permitted in this state (requires YELLOW/RED verdict or FAILED/BLOCKED/ESCALATED/PENDING lifecycle).",
       );
     }
+
+    // Persist history per-exception so repeated re-runs increment the
+    // counter. Matches asoe2/api/routes/exceptions.py append_reanalysis.
+    const history = MOCK_REANALYSIS_HISTORY[id] ?? [];
+    if (history.length >= MOCK_REANALYSIS_MAX_ATTEMPTS) {
+      throw new Error(
+        `Reanalysis limit reached (${MOCK_REANALYSIS_MAX_ATTEMPTS} attempts). Escalate to admin for manual resolution.`,
+      );
+    }
+
     const ts = new Date().toISOString();
-    const priorTraceId = exc.id + "-trace";
+    // Prior trace is whatever the last run produced — chain attempts together.
+    const priorTraceId = history.length === 0
+      ? exc.id + "-trace"
+      : history[history.length - 1].new_trace_id ?? exc.id + "-trace";
     const newTraceId = exc.id + "-trace-" + Math.random().toString(36).slice(2, 8);
-    const prior: ReanalysisEntry = {
-      attempt: 1,
+    const entry: ReanalysisEntry = {
+      attempt: history.length + 1,
       triggered_at: ts,
       triggered_by: _currentMockUser?.email ?? "mock-user",
       reason: request.reason,
@@ -564,11 +592,13 @@ export const exceptionsApi = {
       new_final_status: exc.final_status,
       new_lifecycle_state: exc.lifecycle_state,
     };
+    MOCK_REANALYSIS_HISTORY[id] = [...history, entry];
+
     return {
       ...exc,
       trace_id: newTraceId,
       resolution_data: {},
-      reanalysis_history: [prior],
+      reanalysis_history: MOCK_REANALYSIS_HISTORY[id],
       updated_at: ts,
     };
   },
