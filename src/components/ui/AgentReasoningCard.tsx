@@ -13,14 +13,30 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Zap, Check, AlertTriangle, ShieldX, MessageSquare } from "lucide-react";
+import { Zap, Check, AlertTriangle, ShieldX, MessageSquare, XCircle } from "lucide-react";
 import { Badge, verdictVariant } from "./Badge";
 import { Button } from "./Button";
 import { cn } from "@/lib/utils";
-import type { ShadowVerdict } from "@/types/exceptions";
+import type { ShadowVerdict, PipelineNode } from "@/types/exceptions";
+
+/**
+ * ExecutionError — a backend-reported execution failure distinct from a
+ * Compliance Shadow verdict. Raised when a recipe throws, a gateway times
+ * out, or the circuit breaker trips. Not the same as RED (policy block).
+ */
+export interface ExecutionError {
+  /** Pipeline node that failed, if known */
+  node?: PipelineNode;
+  /** Human-readable failure message from backend (trace.explanation) */
+  message: string;
+  /** ISO timestamp of the failure */
+  failedAt?: string;
+}
 
 interface AgentReasoningCardProps {
   verdict: ShadowVerdict;
+  /** When present, overrides verdict display with an execution-error surface. */
+  executionError?: ExecutionError;
   intent?: string;
   confidence?: number;
   recipeName?: string;
@@ -39,6 +55,19 @@ const VERDICT_CONFIG: Record<ShadowVerdict, { label: string; icon: ReactNode }> 
   GREEN: { label: "Auto-resolved", icon: <Check size={14} /> },
   YELLOW: { label: "Review Required", icon: <AlertTriangle size={14} /> },
   RED: { label: "Blocked by Policy", icon: <ShieldX size={14} /> },
+};
+
+const NODE_LABELS: Partial<Record<PipelineNode, string>> = {
+  ingest: "Ingest Event",
+  classify: "Classify Intent",
+  load_skill: "Load Skill",
+  validate_circuit_breaker: "Circuit Breaker",
+  shadow_audit: "Compliance Shadow",
+  select_recipe: "Select Recipe",
+  validate_types: "Validate Types",
+  resolve_dependencies: "Resolve Dependencies",
+  execute_recipe: "Execute Recipe",
+  apply_effects: "Apply Effects",
 };
 
 function ConfidenceBar({ value }: { value: number }) {
@@ -63,6 +92,7 @@ function ConfidenceBar({ value }: { value: number }) {
 
 export function AgentReasoningCard({
   verdict,
+  executionError,
   intent,
   confidence,
   recipeName,
@@ -76,6 +106,7 @@ export function AgentReasoningCard({
   isAdmin = false,
   className,
 }: AgentReasoningCardProps) {
+  const isErrored = executionError !== undefined;
   const config = VERDICT_CONFIG[verdict];
   const [pendingAction, setPendingAction] = useState<"approve" | "reject" | null>(null);
   const [comment, setComment] = useState("");
@@ -102,10 +133,42 @@ export function AgentReasoningCard({
             <Zap size={16} className="text-brand" />
             <span className="text-subhead font-semibold text-text-primary">Agent Analysis</span>
           </div>
-          <Badge variant={verdictVariant(verdict)} icon={config.icon}>
-            {config.label}
-          </Badge>
+          {isErrored ? (
+            <Badge variant="error" icon={<XCircle size={14} />}>Execution Failed</Badge>
+          ) : (
+            <Badge variant={verdictVariant(verdict)} icon={config.icon}>
+              {config.label}
+            </Badge>
+          )}
         </div>
+
+        {/* Execution error banner — present only when the backend reported a
+            runtime failure (recipe threw, gateway timed out, circuit breaker).
+            Distinct from RED verdict, which is a compliance decision. */}
+        {isErrored && (
+          <div
+            role="alert"
+            aria-live="polite"
+            className="px-12 py-10 bg-error-subtle border border-error-border rounded-sm mb-12"
+          >
+            <div className="flex items-center gap-6 mb-4">
+              <XCircle size={14} className="text-error shrink-0" />
+              <span className="text-label font-semibold text-error uppercase tracking-wider">
+                {executionError.node
+                  ? `Failed at ${NODE_LABELS[executionError.node] ?? executionError.node}`
+                  : "Pipeline failure"}
+              </span>
+            </div>
+            <p className="text-caption text-error m-0 leading-normal">
+              {executionError.message}
+            </p>
+            {executionError.failedAt && (
+              <p className="text-label text-error font-mono opacity-70 m-0 mt-4">
+                {new Date(executionError.failedAt).toLocaleString()}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Confidence bar */}
         {confidence !== undefined && (
@@ -133,8 +196,8 @@ export function AgentReasoningCard({
           )}
         </div>
 
-        {/* Explanation */}
-        {explanation && (
+        {/* Explanation — suppressed when errored to avoid misleading success text */}
+        {!isErrored && explanation && (
           <p className="text-body text-text-secondary leading-normal m-0 mb-12">
             {explanation}
           </p>
@@ -155,18 +218,30 @@ export function AgentReasoningCard({
         {/* Action buttons */}
         {!pendingAction && (
           <div className="flex gap-8 flex-wrap">
-            {verdict === "YELLOW" && (
+            {isErrored ? (
+              // Approve/Reject are not meaningful against a crashed execution;
+              // route operator to Escalate for triage.
+              onEscalate && (
+                <Button variant="neutral" size="sm" disabled={actionLoading} onClick={onEscalate}>
+                  Escalate for Triage
+                </Button>
+              )
+            ) : (
               <>
-                {onApprove && <Button variant="brand" size="sm" disabled={actionLoading} onClick={() => setPendingAction("approve")}>Approve</Button>}
-                {onReject && <Button variant="neutral" size="sm" disabled={actionLoading} onClick={() => setPendingAction("reject")}>Reject</Button>}
-                {onEscalate && <Button variant="ghost" size="sm" disabled={actionLoading} onClick={onEscalate}>Escalate</Button>}
-              </>
-            )}
-            {verdict === "RED" && (
-              <>
-                <Button variant="neutral" size="sm" disabled={actionLoading} onClick={() => setPendingAction("approve")}>Acknowledge</Button>
-                {isAdmin && onOverride && <Button variant="destructive" size="sm" disabled={actionLoading} onClick={onOverride}>Override</Button>}
-                {onEscalate && <Button variant="ghost" size="sm" disabled={actionLoading} onClick={onEscalate}>Escalate</Button>}
+                {verdict === "YELLOW" && (
+                  <>
+                    {onApprove && <Button variant="brand" size="sm" disabled={actionLoading} onClick={() => setPendingAction("approve")}>Approve</Button>}
+                    {onReject && <Button variant="neutral" size="sm" disabled={actionLoading} onClick={() => setPendingAction("reject")}>Reject</Button>}
+                    {onEscalate && <Button variant="ghost" size="sm" disabled={actionLoading} onClick={onEscalate}>Escalate</Button>}
+                  </>
+                )}
+                {verdict === "RED" && (
+                  <>
+                    <Button variant="neutral" size="sm" disabled={actionLoading} onClick={() => setPendingAction("approve")}>Acknowledge</Button>
+                    {isAdmin && onOverride && <Button variant="destructive" size="sm" disabled={actionLoading} onClick={onOverride}>Override</Button>}
+                    {onEscalate && <Button variant="ghost" size="sm" disabled={actionLoading} onClick={onEscalate}>Escalate</Button>}
+                  </>
+                )}
               </>
             )}
           </div>

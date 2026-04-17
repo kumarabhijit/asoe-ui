@@ -273,6 +273,11 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-014", tenant_id: "acme-corp", order_id: "SO-12300", event_type: "PALLET_CONFIG_VIOLATION", intent: "PALLET_CONFIG", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "PalletAlignmentRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T11:20:00Z", updated_at: "2026-04-14T11:28:00Z", account_id: "acct-kroger", account_name: "Kroger",
   },
+  // FAILED — pipeline crashed during recipe execution. Demonstrates the
+  // execution-error surface distinct from compliance-blocked (RED verdict).
+  {
+    id: "exc-015", tenant_id: "acme-corp", order_id: "SO-13400", event_type: "ORDER_RECEIVED", intent: "CONTRACTUAL_CORRECTION", lifecycle_state: "FAILED", shadow_verdict: "GREEN", selected_recipe: "PriceAdjustmentRecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-15T14:05:00Z", updated_at: "2026-04-15T14:05:42Z", account_id: "acct-walmart", account_name: "Walmart",
+  },
 ];
 
 const MOCK_HEALTH: HealthResponse = {
@@ -513,6 +518,7 @@ export const exceptionsApi = {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
+    const isFailed = exc.lifecycle_state === "FAILED";
     return {
       trace_id: exc.id + "-trace",
       event_id: exc.order_id,
@@ -526,7 +532,9 @@ export const exceptionsApi = {
       backend_fallback: "deterministic_fallback",
       is_fallback_generated: true,
       final_status: exc.final_status,
-      explanation: "Deterministic execution completed successfully.",
+      explanation: isFailed
+        ? "Gateway 'erp:update_condition_record' returned TIMEOUT after 30000ms. Recipe aborted before applying changes; no SAP side effects occurred."
+        : "Deterministic execution completed successfully.",
     };
   },
 

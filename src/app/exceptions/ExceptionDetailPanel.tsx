@@ -21,7 +21,7 @@
 
 import { useState, useEffect, useCallback, type MutableRefObject } from "react";
 import { AlertTriangle } from "lucide-react";
-import { AgentReasoningCard } from "@/components/ui/AgentReasoningCard";
+import { AgentReasoningCard, type ExecutionError } from "@/components/ui/AgentReasoningCard";
 import type { NodeState } from "@/components/ui/WaterfallStepper";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -251,6 +251,20 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
   const delta = totalPo - totalErp;
   const showPreview = process.env.NEXT_PUBLIC_SHOW_PREVIEW_FEATURES !== "false";
 
+  /* ── Execution-error derivation ──────────────────────────────────────
+     A FAILED lifecycle means the backend pipeline crashed (recipe threw,
+     gateway timed out, circuit breaker). This is distinct from a RED
+     shadow verdict (policy block) or REJECTED (human decision). */
+  const executionError: ExecutionError | undefined =
+    detail.lifecycle_state === "FAILED"
+      ? {
+          node: nodeStates.find((n) => n.status === "failed")?.node,
+          message: trace?.explanation
+            ?? "The pipeline reported a failure but no explanation was returned.",
+          failedAt: detail.updated_at,
+        }
+      : undefined;
+
   const primarySkuLabel =
     lineItems.length === 1
       ? `${lineItems[0].sku} — ${lineItems[0].description}`
@@ -287,10 +301,18 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
           {detail.shadow_verdict ? (
             <AgentReasoningCard
               verdict={detail.shadow_verdict as ShadowVerdict}
+              executionError={executionError}
               intent={detail.intent ?? undefined}
               confidence={analysis?.confidence ? analysis.confidence / 100 : 0.92}
               recipeName={detail.selected_recipe ?? undefined}
-              explanation={trace?.explanation ?? analysis?.diagnosis ?? "Deterministic execution completed successfully."}
+              // Don't fall back to a success-sounding default when the pipeline
+              // actually failed — leave the execution-error banner as the sole
+              // narrative in that case.
+              explanation={
+                executionError
+                  ? undefined
+                  : trace?.explanation ?? analysis?.diagnosis
+              }
               policyHits={trace?.shadow_policy_hits}
               onApprove={handleApprove}
               onReject={handleReject}

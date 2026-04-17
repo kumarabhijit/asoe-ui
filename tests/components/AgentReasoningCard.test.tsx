@@ -89,6 +89,92 @@ describe("AgentReasoningCard", () => {
     });
   });
 
+  describe("Execution error", () => {
+    it("shows 'Execution Failed' badge when executionError is provided", () => {
+      render(
+        <AgentReasoningCard
+          verdict="GREEN"
+          executionError={{
+            node: "execute_recipe",
+            message: "Gateway timed out after 30000ms",
+            failedAt: "2026-04-15T14:05:42Z",
+          }}
+        />
+      );
+      expect(screen.getByText("Execution Failed")).toBeInTheDocument();
+      // Verdict label must not be rendered when errored — avoids contradicting
+      // signals ("Auto-resolved" next to "Execution Failed").
+      expect(screen.queryByText("Auto-resolved")).not.toBeInTheDocument();
+    });
+
+    it("renders the failed pipeline node label", () => {
+      render(
+        <AgentReasoningCard
+          verdict="GREEN"
+          executionError={{ node: "execute_recipe", message: "boom" }}
+        />
+      );
+      expect(screen.getByText("Failed at Execute Recipe")).toBeInTheDocument();
+    });
+
+    it("falls back to generic 'Pipeline failure' label when node is unknown", () => {
+      render(
+        <AgentReasoningCard
+          verdict="GREEN"
+          executionError={{ message: "unexpected error" }}
+        />
+      );
+      expect(screen.getByText("Pipeline failure")).toBeInTheDocument();
+    });
+
+    it("renders the error message verbatim", () => {
+      render(
+        <AgentReasoningCard
+          verdict="GREEN"
+          executionError={{ message: "Gateway returned TIMEOUT after 30s" }}
+        />
+      );
+      expect(screen.getByText("Gateway returned TIMEOUT after 30s")).toBeInTheDocument();
+    });
+
+    it("suppresses the generic explanation when errored (no misleading success text)", () => {
+      render(
+        <AgentReasoningCard
+          verdict="GREEN"
+          explanation="Deterministic execution completed successfully."
+          executionError={{ message: "Execution aborted" }}
+        />
+      );
+      expect(screen.queryByText("Deterministic execution completed successfully.")).not.toBeInTheDocument();
+    });
+
+    it("hides Approve/Reject but keeps Escalate for triage", () => {
+      render(
+        <AgentReasoningCard
+          verdict="YELLOW"
+          executionError={{ message: "Crash" }}
+          onApprove={vi.fn()}
+          onReject={vi.fn()}
+          onEscalate={vi.fn()}
+        />
+      );
+      expect(screen.queryByText("Approve")).not.toBeInTheDocument();
+      expect(screen.queryByText("Reject")).not.toBeInTheDocument();
+      expect(screen.getByText("Escalate for Triage")).toBeInTheDocument();
+    });
+
+    it("uses role=alert with aria-live for screen readers", () => {
+      render(
+        <AgentReasoningCard
+          verdict="GREEN"
+          executionError={{ message: "Crash" }}
+        />
+      );
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveAttribute("aria-live", "polite");
+    });
+  });
+
   describe("RED verdict", () => {
     it("shows 'Blocked by Policy' badge", () => {
       render(<AgentReasoningCard verdict="RED" />);
