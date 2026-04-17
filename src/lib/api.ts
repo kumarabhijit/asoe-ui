@@ -110,6 +110,9 @@ const MOCK_USERS: Record<string, AuthUser> = {
 /** Default user for backward compatibility */
 const MOCK_USER = MOCK_USERS["marcus.webb@acme-corp.com"];
 
+/** Tracks the currently logged-in mock user for account scoping. Set on login. */
+let _currentMockUser: AuthUser = MOCK_USER;
+
 const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-001",
@@ -275,6 +278,7 @@ export const authApi = {
     await delay(MOCK_DELAY);
     const user = MOCK_USERS[credentials.email];
     if (user && credentials.password) {
+      _currentMockUser = user;
       return {
         access_token: `mock-access-token-${user.id}`,
         refresh_token: `mock-refresh-token-${user.id}`,
@@ -337,6 +341,11 @@ export const exceptionsApi = {
   }): Promise<ExceptionListResponse> {
     await delay(MOCK_DELAY);
     let filtered = [...MOCK_EXCEPTIONS];
+    // Account scoping: mirror server-side assigned_accounts filter
+    if (_currentMockUser.assigned_accounts.length > 0) {
+      const allowed = new Set(_currentMockUser.assigned_accounts);
+      filtered = filtered.filter((e) => e.account_id && allowed.has(e.account_id));
+    }
     if (params?.status) {
       filtered = filtered.filter((e) => e.lifecycle_state === params.status);
     }
