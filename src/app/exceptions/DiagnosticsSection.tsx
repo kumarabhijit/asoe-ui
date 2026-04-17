@@ -83,6 +83,7 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
                 <WaterfallStepper
                   nodes={nodeStates}
                   intent={detail.intent ?? undefined}
+                  allowReplay
                 />
               </div>
             )}

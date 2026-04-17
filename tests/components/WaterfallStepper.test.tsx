@@ -1,7 +1,8 @@
 /**
  * WaterfallStepper tests — node states, pipeline visualization.
  */
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { WaterfallStepper, type NodeState } from "@/components/ui/WaterfallStepper";
 import type { PipelineNode } from "@/types/exceptions";
 
@@ -63,5 +64,48 @@ describe("WaterfallStepper", () => {
     // All nodes should show completed state (checkmark icons)
     const svgs = document.querySelectorAll("svg");
     expect(svgs.length).toBeGreaterThanOrEqual(10);
+  });
+
+  describe("Replay control", () => {
+    it("hides the Replay button unless allowReplay is enabled", () => {
+      const nodes = makeNodeStates(10);
+      render(<WaterfallStepper nodes={nodes} />);
+      expect(screen.queryByRole("button", { name: /replay/i })).not.toBeInTheDocument();
+    });
+
+    it("hides Replay while the pipeline is still in progress", () => {
+      const nodes = makeNodeStates(3, true);
+      render(<WaterfallStepper nodes={nodes} allowReplay />);
+      expect(screen.queryByRole("button", { name: /replay/i })).not.toBeInTheDocument();
+    });
+
+    it("shows Replay only when every node completed and timings exist", () => {
+      const nodes = makeNodeStates(10);
+      render(<WaterfallStepper nodes={nodes} allowReplay />);
+      expect(screen.getByRole("button", { name: /replay/i })).toBeInTheDocument();
+    });
+
+    it("hides Replay if no node carries a duration", () => {
+      // Pipeline finished but no timings were captured — nothing meaningful
+      // to animate, so the button stays hidden.
+      const nodes: NodeState[] = ALL_NODES.map((node) => ({ node, status: "completed" }));
+      render(<WaterfallStepper nodes={nodes} allowReplay />);
+      expect(screen.queryByRole("button", { name: /replay/i })).not.toBeInTheDocument();
+    });
+
+    it("swaps Replay for Stop while animating, and Stop cancels back", async () => {
+      const user = userEvent.setup();
+      const nodes = makeNodeStates(10);
+      render(<WaterfallStepper nodes={nodes} allowReplay />);
+
+      await user.click(screen.getByRole("button", { name: /replay/i }));
+      // Animation started — Stop is now visible, Replay is hidden.
+      expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /replay/i })).not.toBeInTheDocument();
+
+      // User can cancel an in-progress replay and return to the idle state.
+      await user.click(screen.getByRole("button", { name: /stop/i }));
+      expect(screen.getByRole("button", { name: /replay/i })).toBeInTheDocument();
+    });
   });
 });
