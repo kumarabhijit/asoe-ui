@@ -26,7 +26,9 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [pipelineOpen, setPipelineOpen] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [detailTab, setDetailTab] = useState("evidence");
+  const history = detail.reanalysis_history ?? [];
 
   const DETAIL_TABS = [
     { id: "evidence", label: "Evidence" },
@@ -85,6 +87,67 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
               </div>
             )}
           </section>
+
+          {/* Reanalysis History — append-only audit trail of human-triggered
+              graph replays. Rendered only when history exists. */}
+          {history.length > 0 && (
+            <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
+              <CollapsibleHeader
+                title="Reanalysis History"
+                open={historyOpen}
+                onToggle={() => setHistoryOpen((v) => !v)}
+                badge={`${history.length} attempt${history.length === 1 ? "" : "s"}`}
+                badgeVariant="info"
+              />
+              {historyOpen && (
+                <div className="border-t border-border px-16 py-12 flex flex-col gap-12">
+                  {history.map((entry) => (
+                    <div
+                      key={`${entry.attempt}-${entry.triggered_at}`}
+                      className="border-l-[3px] border-brand pl-12 py-4"
+                    >
+                      <div className="flex items-baseline justify-between mb-4">
+                        <span className="text-caption font-semibold text-text-primary">
+                          Attempt {entry.attempt}
+                        </span>
+                        <span className="text-label font-mono text-text-tertiary">
+                          {new Date(entry.triggered_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="text-label text-text-quaternary uppercase tracking-wider mb-2">
+                        Triggered by
+                      </div>
+                      <div className="text-caption text-text-secondary mb-6 font-mono">
+                        {entry.triggered_by}
+                      </div>
+                      <div className="text-label text-text-quaternary uppercase tracking-wider mb-2">
+                        Reason
+                      </div>
+                      <p className="text-caption text-text-secondary m-0 mb-8 whitespace-pre-wrap">
+                        {entry.reason}
+                      </p>
+                      <div className="grid grid-cols-2 gap-8 text-label">
+                        <div>
+                          <span className="text-text-quaternary uppercase tracking-wider">Prior</span>
+                          <div className="text-caption text-text-secondary mt-px">
+                            {entry.prior_shadow_verdict ?? "—"} /{" "}
+                            {entry.prior_final_status ?? "—"}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-text-quaternary uppercase tracking-wider">After</span>
+                          <div className="text-caption text-text-secondary mt-px">
+                            {entry.new_shadow_verdict ?? "—"} /{" "}
+                            {entry.new_final_status ?? "—"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Trace Evidence */}
           <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">

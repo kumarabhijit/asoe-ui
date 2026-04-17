@@ -19,6 +19,7 @@ import type {
   ApproveRequest,
   RejectRequest,
   ChallengeRequest,
+  ReanalyzeRequest,
   AdminReleaseRequest,
   StatsResponse,
   TraceResponse,
@@ -28,7 +29,7 @@ import type {
   PolicyOverrideResponse,
   APIError,
 } from "@/types/api";
-import type { HealthResponse, ExceptionSummary, LineItem, OrderAnalysis } from "@/types/exceptions";
+import type { HealthResponse, ExceptionSummary, LineItem, OrderAnalysis, ReanalysisEntry } from "@/types/exceptions";
 import { ROLE_PERMISSIONS } from "./roles";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -483,6 +484,48 @@ export const exceptionsApi = {
       },
       resolved_by: "jane.doe@acme.com",
       resolution_notes: request?.reason,
+    };
+  },
+
+  async reanalyze(id: string, request: ReanalyzeRequest): Promise<ExceptionDetailResponse> {
+    await delay(MOCK_DELAY);
+    const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
+    if (!exc) throw new Error("Exception not found");
+    // Mirror backend eligibility gates — the real API returns 409 for
+    // GREEN/RESOLVED/CLOSED. Match that contract here so UI logic written
+    // against the mock behaves identically against the real backend.
+    const eligibleVerdict = exc.shadow_verdict === "YELLOW" || exc.shadow_verdict === "RED";
+    const eligibleLifecycle = [
+      "PENDING_REVIEW", "ESCALATED", "PENDING_ADMIN_REVIEW", "BLOCKED", "FAILED",
+    ].includes(exc.lifecycle_state);
+    if (!(eligibleVerdict || eligibleLifecycle)) {
+      throw new Error(
+        "Reanalysis not permitted in this state (requires YELLOW/RED verdict or FAILED/BLOCKED/ESCALATED/PENDING lifecycle).",
+      );
+    }
+    const ts = new Date().toISOString();
+    const priorTraceId = exc.id + "-trace";
+    const newTraceId = exc.id + "-trace-" + Math.random().toString(36).slice(2, 8);
+    const prior: ReanalysisEntry = {
+      attempt: 1,
+      triggered_at: ts,
+      triggered_by: _currentMockUser?.email ?? "mock-user",
+      reason: request.reason,
+      prior_trace_id: priorTraceId,
+      prior_shadow_verdict: exc.shadow_verdict,
+      prior_final_status: exc.final_status,
+      prior_lifecycle_state: exc.lifecycle_state,
+      new_trace_id: newTraceId,
+      new_shadow_verdict: exc.shadow_verdict,
+      new_final_status: exc.final_status,
+      new_lifecycle_state: exc.lifecycle_state,
+    };
+    return {
+      ...exc,
+      trace_id: newTraceId,
+      resolution_data: {},
+      reanalysis_history: [prior],
+      updated_at: ts,
     };
   },
 

@@ -152,6 +152,23 @@ export interface ExceptionSummary {
   account_name?: string;
 }
 
+/** One append-only entry in an exception's reanalysis audit trail.
+ *  Matches asoe2/api/routes/exceptions.py prior_entry construction. */
+export interface ReanalysisEntry {
+  attempt: number;
+  triggered_at: string;
+  triggered_by: string;
+  reason: string;
+  prior_trace_id?: string;
+  prior_shadow_verdict?: string;
+  prior_final_status?: string;
+  prior_lifecycle_state?: string;
+  new_trace_id?: string;
+  new_shadow_verdict?: string;
+  new_final_status?: string;
+  new_lifecycle_state?: string;
+}
+
 /** ExceptionDetail — full detail view (GET /api/v1/exceptions/{id}) */
 export interface ExceptionDetail extends ExceptionSummary {
   trace_id?: string;
@@ -159,6 +176,8 @@ export interface ExceptionDetail extends ExceptionSummary {
   resolved_by?: string;
   resolved_action?: string;
   resolution_notes?: string;
+  /** Append-only history of human-triggered re-analyses. */
+  reanalysis_history?: ReanalysisEntry[];
 }
 
 /** TraceRecord — full audit trail (GET /api/v1/exceptions/{id}/trace) */

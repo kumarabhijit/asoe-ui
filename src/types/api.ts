@@ -81,6 +81,13 @@ export interface RejectRequest {
   reason?: string;
 }
 
+/* ── Reanalyze (YELLOW/RED/FAILED — manager+) ─────────────────────── */
+
+export interface ReanalyzeRequest {
+  /** Mandatory free-text justification (SOX audit trail). */
+  reason: string;
+}
+
 /* ── Challenge (GREEN tier — analyst+) ────────────────────────────── */
 
 export interface ChallengeRequest {

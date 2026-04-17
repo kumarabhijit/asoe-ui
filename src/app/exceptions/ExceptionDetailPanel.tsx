@@ -161,6 +161,32 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
     } finally { setActionLoading(false); }
   }
 
+  async function handleReanalyze(reason: string) {
+    // Same permission as override — manager+. Debated as the correct scope in
+    // the expert synthesis: re-running the graph is materially similar to
+    // overriding an agent decision.
+    if (!hasPermission("exceptions:override")) {
+      addToast("warning", "Permission denied: your role cannot re-analyze exceptions.");
+      return;
+    }
+    if (!reason.trim()) {
+      addToast("warning", "A reason is required for re-analysis.");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const updated = await exceptionsApi.reanalyze(exceptionId, { reason });
+      setDetail(updated);
+      await refreshDetail();
+      addToast("success", `Exception ${exceptionId} re-analyzed`);
+      onActionComplete?.();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Re-analysis failed.";
+      console.error("Reanalyze failed:", err);
+      addToast("error", msg);
+    } finally { setActionLoading(false); }
+  }
+
   /* ── Data Fetching ───────────────────────────────────────────────── */
 
   const refreshDetail = useCallback(async () => {
@@ -317,6 +343,12 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
               onApprove={handleApprove}
               onReject={handleReject}
               onEscalate={handleEscalate}
+              // Only expose Re-analyze when the user is authorized — the
+              // card itself additionally gates on verdict/error state.
+              onReanalyze={
+                hasPermission("exceptions:override") ? handleReanalyze : undefined
+              }
+              reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
               actionLoading={actionLoading}
             />
           ) : (
