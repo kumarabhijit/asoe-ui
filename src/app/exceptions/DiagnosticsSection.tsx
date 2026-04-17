@@ -8,7 +8,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Terminal } from "lucide-react";
+import { ChevronDown, Terminal, ClipboardCopy, CheckCircle2 } from "lucide-react";
 import { WaterfallStepper, type NodeState } from "@/components/ui/WaterfallStepper";
 import { cn } from "@/lib/utils";
 import { CollapsibleHeader } from "./shared";
@@ -83,6 +83,7 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
                 <WaterfallStepper
                   nodes={nodeStates}
                   intent={detail.intent ?? undefined}
+                  allowReplay
                 />
               </div>
             )}
@@ -176,7 +177,21 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
                 </div>
 
                 {detailTab === "evidence" && trace && (
-                  <div className="text-caption text-text-secondary">
+                  <div className="text-caption text-text-secondary flex flex-col gap-14">
+                    {/* Human-facing structured narrative — renders only when
+                        the recipe produced these fields. Purely informational;
+                        no UI logic branches on their values. */}
+                    {trace.narrative && <NarrativeBlock text={trace.narrative} />}
+                    {trace.resolution_steps && trace.resolution_steps.length > 0 && (
+                      <ResolutionSteps steps={trace.resolution_steps} />
+                    )}
+                    {trace.sap_actions && trace.sap_actions.length > 0 && (
+                      <SAPActionsList actions={trace.sap_actions} />
+                    )}
+                    {trace.customer_email_draft && (
+                      <CustomerEmailDraft body={trace.customer_email_draft} />
+                    )}
+
                     <div className="flex flex-col gap-8">
                       <TraceField label="Trace ID" value={trace.trace_id} mono />
                       <TraceField label="Skill" value={trace.skill_name} />
@@ -233,6 +248,123 @@ function TraceField({ label, value, mono }: { label: string; value?: string | nu
       <div className={cn("text-text-secondary mt-px text-caption break-all", mono && "font-mono")}>
         {value}
       </div>
+    </div>
+  );
+}
+
+/* ── Layer 2 narrative sub-components ───────────────────────────────── */
+
+function NarrativeBlock({ text }: { text: string }) {
+  return (
+    <div>
+      <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-6">
+        Agent Narrative
+      </div>
+      {text.split("\n\n").map((para, i) => (
+        <p key={i} className="text-caption text-text-secondary leading-normal m-0 mb-8 last:mb-0">
+          {para}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function ResolutionSteps({ steps }: { steps: string[] }) {
+  return (
+    <div>
+      <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-6">
+        Resolution Steps
+      </div>
+      <ol className="list-decimal pl-20 m-0 flex flex-col gap-4">
+        {steps.map((s, i) => (
+          <li key={i} className="text-caption text-text-secondary leading-normal">
+            {s}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function SAPActionsList({ actions }: {
+  actions: Array<{ transaction: string; table?: string; field?: string; description: string }>;
+}) {
+  return (
+    <div>
+      <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-6">
+        Recommended SAP Actions
+      </div>
+      <div className="rounded-sm border border-border overflow-hidden">
+        <table className="w-full text-caption">
+          <thead className="bg-surface-secondary">
+            <tr>
+              <th className="text-left px-10 py-6 text-label font-semibold text-text-tertiary uppercase tracking-wider">Tx</th>
+              <th className="text-left px-10 py-6 text-label font-semibold text-text-tertiary uppercase tracking-wider">Table / Field</th>
+              <th className="text-left px-10 py-6 text-label font-semibold text-text-tertiary uppercase tracking-wider">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {actions.map((a, i) => (
+              <tr key={i} className="border-t border-border">
+                <td className="px-10 py-6 font-mono text-text-primary font-semibold align-top">
+                  {a.transaction}
+                </td>
+                <td className="px-10 py-6 font-mono text-text-tertiary align-top">
+                  {a.table ?? "—"}
+                  {a.field && <span className="text-text-quaternary"> / {a.field}</span>}
+                </td>
+                <td className="px-10 py-6 text-text-secondary align-top">
+                  {a.description}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CustomerEmailDraft({ body }: { body: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function copy() {
+    navigator.clipboard.writeText(body).then(() => {
+      setCopied(true);
+      const t = setTimeout(() => setCopied(false), 2000);
+      return () => clearTimeout(t);
+    }).catch(() => {
+      // navigator.clipboard may be unavailable in test environments;
+      // swallow silently — the draft is still visible to copy manually.
+    });
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <span className="text-label font-bold uppercase tracking-wider text-text-quaternary">
+          Customer Email Draft
+        </span>
+        <button
+          onClick={copy}
+          className="flex items-center gap-4 px-8 py-2 rounded-sm bg-transparent border border-border text-label text-text-secondary hover:text-text-primary hover:border-text-quaternary cursor-pointer font-sans"
+        >
+          {copied ? (
+            <>
+              <CheckCircle2 size={11} className="text-success" />
+              Copied
+            </>
+          ) : (
+            <>
+              <ClipboardCopy size={11} />
+              Copy
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="m-0 p-10 rounded-sm bg-surface-secondary text-caption text-text-secondary font-sans leading-normal whitespace-pre-wrap">
+        {body}
+      </pre>
     </div>
   );
 }

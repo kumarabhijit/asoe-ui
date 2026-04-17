@@ -4,12 +4,22 @@
  *
  * Node states: Pending → In Progress → Completed / Failed
  * Uses ActivityIndicator for domain-aware loading messages.
+ *
+ * Replay mode (optional, props.allowReplay):
+ *   When a pipeline has finished and every node carries a real duration_ms,
+ *   the operator can click Replay to re-animate the *actual* trace timings.
+ *   Unlike the prototype's simulated "watch the AI think" sub-steps, this
+ *   plays back verifiable backend data only — the compliance-safe answer
+ *   to the debated cognitive-theatre concern.
+ *   Respects prefers-reduced-motion: when set, the replay button is hidden.
  */
 "use client";
 
-import { Check, X, Minus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, X, Minus, RotateCcw, Pause } from "lucide-react";
 import type { PipelineNode } from "@/types/exceptions";
 import { ActivityIndicator } from "./ActivityIndicator";
+import { Button } from "./Button";
 import { cn } from "@/lib/utils";
 
 export interface NodeState {
@@ -23,6 +33,9 @@ interface WaterfallStepperProps {
   nodes: NodeState[];
   intent?: string;
   className?: string;
+  /** When true and all nodes have real durations, shows a Replay control
+   *  that animates the pipeline through its recorded timings. */
+  allowReplay?: boolean;
 }
 
 const NODE_LABELS: Record<PipelineNode, string> = {
@@ -89,11 +102,108 @@ function dataSummary(node: PipelineNode, data?: Record<string, unknown>): string
   }
 }
 
-export function WaterfallStepper({ nodes, intent, className }: WaterfallStepperProps) {
+/** Replay pace divisor — we scale recorded durations down so the replay
+ *  is watchable even for sub-second nodes, but we never stretch them. */
+const REPLAY_PACE_DIVISOR = 3;
+/** Minimum per-node dwell during replay, so ultra-fast nodes are still
+ *  perceivable. */
+const REPLAY_MIN_MS = 180;
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
+export function WaterfallStepper({ nodes, intent, className, allowReplay }: WaterfallStepperProps) {
+  const [replayIndex, setReplayIndex] = useState<number | null>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Replay is only meaningful when every node finished and we have real
+  // timings to play back. Hide the button otherwise.
+  const canReplay = useMemo(() => {
+    if (!allowReplay) return false;
+    if (prefersReducedMotion()) return false;
+    return (
+      nodes.length > 0
+      && nodes.every((n) => n.status === "completed" || n.status === "skipped")
+      && nodes.some((n) => (n.duration_ms ?? 0) > 0)
+    );
+  }, [allowReplay, nodes]);
+
+  function clearTimers() {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  }
+
+  useEffect(() => clearTimers, []);
+
+  function startReplay() {
+    clearTimers();
+    setReplayIndex(0);
+    let acc = 0;
+    nodes.forEach((n, i) => {
+      // Skipped nodes don't participate in the active dwell — but we still
+      // advance past them quickly so the visible head stays meaningful.
+      const dwell = n.status === "skipped"
+        ? REPLAY_MIN_MS
+        : Math.max(REPLAY_MIN_MS, Math.floor((n.duration_ms ?? 300) / REPLAY_PACE_DIVISOR));
+      acc += dwell;
+      timersRef.current.push(setTimeout(() => {
+        // Advance past this node to the next one; when we pass the last
+        // node, `replayIndex === nodes.length` = "replay finished".
+        setReplayIndex(i + 1);
+      }, acc));
+    });
+  }
+
+  function stopReplay() {
+    clearTimers();
+    setReplayIndex(null);
+  }
+
+  // Synthesise node states during replay. Before the head index we show
+  // completed/skipped as recorded; at the head we show `started`; after
+  // the head we show pending. When replay has finished (index === length)
+  // we're back to the real data.
+  const displayNodes: NodeState[] = useMemo(() => {
+    if (replayIndex === null || replayIndex >= nodes.length) return nodes;
+    return nodes.map((n, i) => {
+      if (i < replayIndex) {
+        // Preserve the original terminal status so failed/skipped replays
+        // show the real outcome, not a fake "completed".
+        return n;
+      }
+      if (i === replayIndex) {
+        return { ...n, status: "started" as const };
+      }
+      return { ...n, status: "pending" as const };
+    });
+  }, [nodes, replayIndex]);
+
+  const isReplaying = replayIndex !== null && replayIndex < nodes.length;
+
   return (
     <div className={cn("flex flex-col", className)}>
-      {nodes.map((n, i) => {
-        const isLast = i === nodes.length - 1;
+      {canReplay && (
+        <div className="flex justify-end mb-8">
+          {isReplaying ? (
+            <Button variant="ghost" size="sm" onClick={stopReplay}>
+              <Pause size={12} className="mr-1" /> Stop
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={startReplay}
+              title="Re-animate the pipeline using the recorded node timings"
+            >
+              <RotateCcw size={12} className="mr-1" /> Replay
+            </Button>
+          )}
+        </div>
+      )}
+      {displayNodes.map((n, i) => {
+        const isLast = i === displayNodes.length - 1;
         const summary = n.status === "completed" ? dataSummary(n.node, n.data) : null;
 
         return (

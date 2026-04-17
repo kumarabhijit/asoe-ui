@@ -279,20 +279,64 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-015", tenant_id: "acme-corp", order_id: "SO-13400", event_type: "ORDER_RECEIVED", intent: "CONTRACTUAL_CORRECTION", lifecycle_state: "FAILED", shadow_verdict: "GREEN", selected_recipe: "PriceAdjustmentRecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-15T14:05:00Z", updated_at: "2026-04-15T14:05:42Z", account_id: "acct-walmart", account_name: "Walmart",
   },
+  // DELIVERY_DELAY — SD-DELAY-002 band (5+ days late). Dedicated section
+  // renders from delivery_delay_analysis via data-presence pattern.
+  {
+    id: "exc-016", tenant_id: "acme-corp", order_id: "SO-14200", event_type: "DELIVERY_DELAY", intent: "DELIVERY_DELAY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "DeliveryDelayResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-16T09:30:00Z", updated_at: "2026-04-16T09:35:00Z", account_id: "acct-target", account_name: "Target",
+  },
 ];
+
+/** Per-exception trace enrichment — optional Layer 2 fields demonstrated
+ *  on a couple of representative exceptions. In production these will be
+ *  populated by the recipe layer via TraceRecord extensions. */
+const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
+  "exc-002": {
+    narrative:
+      "Two line items referenced a promotional price under ZPROM condition Q4-WMT-021, which expired on 2025-12-31. The PO was submitted on 2026-01-08, after promo expiry. The deterministic fallback recognised the pricing mismatch as CONTRACTUAL_CORRECTION (not a data-entry error) because the contracted customer-group rate (PR00) sits 11% below the PO price, within the auto-tolerance band.\n\nCompliance Shadow returned YELLOW — auto-resolution is blocked above the $1K single-line at-risk threshold until a reviewer confirms the promo should not be reloaded.",
+    resolution_steps: [
+      "Confirm the expired promo should not be extended for this PO.",
+      "Approve the price correction against the contract base rate (PR00).",
+      "Notify buyer via drafted email (see below) — courtesy communication.",
+    ],
+    sap_actions: [
+      { transaction: "VK13", table: "KONP", field: "KBETR", description: "Verify contract base rate (PR00) currently on file for customer-material group." },
+      { transaction: "VA02", table: "VBAP", field: "KBETR", description: "Apply the corrected line-item price from the contract rate." },
+      { transaction: "V.23", table: "VBAK", field: "LIFSK", description: "Release pricing block once correction is saved." },
+    ],
+    customer_email_draft:
+      "Hi [Buyer name],\n\nThank you for PO 4500020017. We noticed that two line items were priced against our Q4 promotional rate (Q4-WMT-021), which expired 12/31. We've adjusted those lines to your current contract rate (PR00) — an 11% difference from the PO price.\n\nNo action is needed on your side; this correction is within your contract's published auto-adjust band. Confirmation will follow shortly.\n\nBest,\n[CSR name]",
+  },
+  "exc-013": {
+    narrative:
+      "The PO qty (40 CS) falls below the contracted MOQ of 50 CS for SKU-7800. SAP raised block V4082 on the sales order. The deterministic fallback mapped this to MIN_ORDER_QTY → MOQRoundUpRecipe. The autonomy-level policy requires operator sign-off for MOQ round-ups above a 10% uplift; this case is 25%, so automatic execution is blocked.",
+    resolution_steps: [
+      "Approve the round-up to 50 CS (matches contracted MOQ).",
+      "Apply the resulting volume discount tier (condition KA00).",
+      "Release the V4082 block on the sales order.",
+    ],
+    sap_actions: [
+      { transaction: "VA02", table: "VBAP", field: "KWMENG", description: "Update the ordered quantity on SKU-7800 from 40 CS to 50 CS." },
+      { transaction: "VK11", table: "KONV", field: "KBETR", description: "Apply volume-tier pricing condition KA00 at the new qty." },
+      { transaction: "V.23", table: "VBAK", field: "LIFSK", description: "Release V4082 delivery block after quantity adjustment." },
+    ],
+    customer_email_draft:
+      "Hi [Buyer name],\n\nWe received PO [PO#] for 40 cases of SKU-7800 (Organic Kombucha 6pk). The contracted minimum is 50 cases, which would also unlock your next volume-tier rate.\n\nWith your approval, we'll round the order up to 50 cases at the better unit price. Total net change: +$285 at a ~4% lower $/case. Alternately, we can hold and wait for a revised PO — please confirm.\n\nBest,\n[CSR name]",
+  },
+};
+
 
 const MOCK_HEALTH: HealthResponse = {
   status: "ok",
   version: "0.3.2",
   kill_switch: false,
   explain_mode: false,
-  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG"],
+  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY"],
   lifecycle_states: [
     "INGESTED", "CLASSIFYING", "AUDITING", "PENDING_REVIEW",
     "ESCALATED", "PENDING_ADMIN_REVIEW", "EXECUTING", "RESOLVED",
     "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
-  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py"],
+  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py", "DeliveryDelayResolutionRecipe.py"],
 };
 
 /* ── Auth API (/api/auth/*) ─────��──────────────────────────────────── */
@@ -562,6 +606,7 @@ export const exceptionsApi = {
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
     const isFailed = exc.lifecycle_state === "FAILED";
+    const enrichment = MOCK_TRACE_ENRICHMENT[exc.id] ?? {};
     return {
       trace_id: exc.id + "-trace",
       event_id: exc.order_id,
@@ -578,6 +623,7 @@ export const exceptionsApi = {
       explanation: isFailed
         ? "Gateway 'erp:update_condition_record' returned TIMEOUT after 30000ms. Recipe aborted before applying changes; no SAP side effects occurred."
         : "Deterministic execution completed successfully.",
+      ...enrichment,
     };
   },
 
@@ -729,6 +775,12 @@ const MOCK_LINE_ITEMS: Record<string, LineItem[]> = {
     { line_id: "L1", sku: "SKU-3500", description: "Premium Coffee 12oz 24pk", uom: "CS", quantity: 170, erp_price: 36.00, po_price: 36.00 },
     { line_id: "L2", sku: "SKU-3510", description: "Decaf Coffee 12oz 24pk", uom: "CS", quantity: 85, erp_price: 34.50, po_price: 34.50 },
     { line_id: "L3", sku: "SKU-3520", description: "Cold Brew 10oz 12pk", uom: "CS", quantity: 50, erp_price: 42.00, po_price: 42.00 },
+  ],
+  "exc-016": [
+    { line_id: "L1", sku: "SKU-9100", description: "Sparkling Water 16oz 12pk", uom: "CS", quantity: 5000, erp_price: 11.50, po_price: 11.50 },
+    { line_id: "L2", sku: "SKU-9110", description: "Sparkling Water 20oz 12pk", uom: "CS", quantity: 3200, erp_price: 13.80, po_price: 13.80 },
+    { line_id: "L3", sku: "SKU-9120", description: "Electrolyte Blend 12oz 24pk", uom: "CS", quantity: 2400, erp_price: 18.40, po_price: 18.40 },
+    { line_id: "L4", sku: "SKU-9130", description: "Flavored Soda 12oz 24pk", uom: "CS", quantity: 1400, erp_price: 15.20, po_price: 15.20 },
   ],
 };
 
@@ -1661,6 +1713,77 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
         { sku: "SKU-3500", description: "Premium Coffee 24pk", current: 170, suggested: 168, delta: -2, layers: 7, full_pallets: 1, reason: "Round down to full layers (24 CS/layer × 7)" },
         { sku: "SKU-3510", description: "Decaf Coffee 24pk", current: 85, suggested: 84, delta: -1, layers: 6, full_pallets: 1, reason: "Round down to full layers (14 CS/layer × 6)" },
         { sku: "SKU-3520", description: "Cold Brew 12pk", current: 50, suggested: 48, delta: -2, layers: 4, full_pallets: 1, reason: "Round down to full layers (12 CS/layer × 4)" },
+      ],
+    },
+  },
+  /* ── DELIVERY_DELAY: Pending Review (YELLOW) ──────────────────────────── */
+  "exc-016": {
+    diagnosis: "Shipment is 6 days behind the contracted delivery window. Root cause is a carrier hub closure in the Southwest corridor. SLA breach is imminent; three alternate routing options available.",
+    confidence: 88,
+    risk: "HIGH",
+    resolution: "ALTERNATE_ROUTING",
+    root_cause: "Carrier DHL regional hub closure (weather-driven) — affected all southbound lanes for 48h.",
+    recommendation: "Re-route via FedEx Express through Memphis hub; restores ETA to within 1 day of planned, +$620 freight.",
+    entity_profile: {
+      customer_name: "Target Supply Co",
+      bp_number: "BP-TGT-002",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Excellent",
+      location: "DC-042 — Dallas",
+      region: "Southwest",
+    },
+    impact_metrics: {
+      revenue_at_risk: 48600.00,
+      delta_amount: 2430.00,
+      delta_percentage: 5.0,
+      sla_priority: "HIGH",
+      sla_deadline: "2026-04-22T18:00:00Z",
+      affected_lines: 4,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "12,000 CS of grocery SKUs held at DHL Phoenix hub.", resolution: "RE-ROUTE", risk: "MEDIUM", waterfall: [] },
+    ],
+    delivery_delay_analysis: {
+      planned_date: "2026-04-18T00:00:00Z",
+      projected_eta: "2026-04-24T00:00:00Z",
+      days_late: 6,
+      rule_id: "SD-DELAY-002",
+      delay_category: "CARRIER_DELAY",
+      delay_reason: "DHL Phoenix regional hub was closed Apr 16–18 due to severe weather. 12,000 CS of strategic-tier inventory waiting on outbound line-haul. Ripple effect on 3 downstream POs.",
+      affected_lines: 4,
+      at_risk: 48600.00,
+      carrier: "DHL Ground",
+      route: "LGB → PHX → DAL",
+      sla_deadline: "2026-04-22T18:00:00Z",
+      alternate_options: [
+        {
+          id: "opt-1",
+          type: "EXPEDITE",
+          title: "Re-route via FedEx Memphis hub",
+          description: "Swap to FedEx Express line-haul through MEM; bypasses affected PHX corridor. ETA Apr 19.",
+          new_eta: "2026-04-19T00:00:00Z",
+          extra_cost: 620,
+          recommended: true,
+        },
+        {
+          id: "opt-2",
+          type: "SPLIT_SHIP",
+          title: "Partial pickup + priority balance",
+          description: "Release 70% from PHX as soon as hub reopens (Apr 20), expedite remaining 30% via UPS 2-Day.",
+          new_eta: "2026-04-22T00:00:00Z",
+          extra_cost: 280,
+          recommended: false,
+        },
+        {
+          id: "opt-3",
+          type: "RESCHEDULE",
+          title: "Full re-slot to Apr 24 window",
+          description: "Customer confirmed flexibility on 2 of 4 SKUs; negotiate revised PO with 6-day push, no premium.",
+          new_eta: "2026-04-24T00:00:00Z",
+          extra_cost: 0,
+          recommended: false,
+        },
       ],
     },
   },

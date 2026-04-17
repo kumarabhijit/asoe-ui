@@ -20,7 +20,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, type MutableRefObject } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, RotateCcw } from "lucide-react";
 import { AgentReasoningCard, type ExecutionError } from "@/components/ui/AgentReasoningCard";
 import type { NodeState } from "@/components/ui/WaterfallStepper";
 import { useToast } from "@/components/ui/Toast";
@@ -44,6 +44,7 @@ import { BackOrderSection } from "./BackOrderSection";
 import { OverMaxSection } from "./OverMaxSection";
 import { MOQSection } from "./MOQSection";
 import { PalletConfigSection } from "./PalletConfigSection";
+import { DeliveryDelaySection } from "./DeliveryDelaySection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -53,6 +54,14 @@ interface ExceptionDetailPanelProps {
   onActionComplete?: () => void;
   /** Mutable ref that the parent sets to trigger a detail refresh (e.g., on WebSocket events) */
   onRefreshRef?: MutableRefObject<(() => void) | null>;
+  /** Live reanalysis banner state — set by the parent on reanalysis_started
+   *  WebSocket events, cleared on task_complete. */
+  reanalyzing?: {
+    exceptionId: string;
+    attempt: number;
+    reason: string;
+    triggeredBy: string;
+  } | null;
 }
 
 /* ── Pipeline node state builder ─────────────────────────────────────── */
@@ -97,7 +106,12 @@ function buildNodeData(node: PipelineNode, exc: ExceptionDetail): Record<string,
 
 /* ── Component ───────────────────────────────────────────────────────── */
 
-export default function ExceptionDetailPanel({ exceptionId, onActionComplete, onRefreshRef }: ExceptionDetailPanelProps) {
+export default function ExceptionDetailPanel({
+  exceptionId,
+  onActionComplete,
+  onRefreshRef,
+  reanalyzing,
+}: ExceptionDetailPanelProps) {
   const { addToast } = useToast();
   const { hasPermission } = useAuth();
   const [detail, setDetail] = useState<ExceptionDetail | null>(null);
@@ -320,6 +334,31 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
       <div className="flex-1 overflow-auto p-16">
         <div className="flex flex-col gap-16">
 
+          {/* Live reanalysis banner — appears the moment a manager clicks
+              Re-analyze and a reanalysis_started event arrives. Cleared on
+              task_complete. Gives the user a visible "re-running" signal
+              before the pipeline_progress events start streaming. */}
+          {reanalyzing && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex items-center gap-10 px-14 py-10 bg-info-subtle border border-info-border rounded-sm"
+            >
+              <RotateCcw size={16} className="text-info shrink-0 animate-spin" />
+              <div className="flex-1">
+                <div className="text-caption font-semibold text-info">
+                  Re-analyzing (attempt {reanalyzing.attempt})
+                </div>
+                <div className="text-label text-text-secondary mt-px">
+                  Triggered by{" "}
+                  <span className="font-mono">{reanalyzing.triggeredBy}</span>
+                  {" — "}
+                  <span className="italic">{reanalyzing.reason}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Agent Analysis: Problem / Root Cause / Recommendation */}
           {analysis && <AgentAnalysisSection analysis={analysis} />}
 
@@ -382,6 +421,9 @@ export default function ExceptionDetailPanel({ exceptionId, onActionComplete, on
           )}
           {analysis?.pallet_analysis && (
             <PalletConfigSection data={analysis.pallet_analysis} />
+          )}
+          {analysis?.delivery_delay_analysis && (
+            <DeliveryDelaySection data={analysis.delivery_delay_analysis} />
           )}
 
           {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}

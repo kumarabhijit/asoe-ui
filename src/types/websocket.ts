@@ -13,7 +13,8 @@ export type WSEventType =
   | "pipeline_progress"
   | "exception_update"
   | "task_complete"
-  | "error";
+  | "error"
+  | "reanalysis_started";
 
 export interface WSEvent {
   type: WSEventType;
@@ -21,7 +22,12 @@ export interface WSEvent {
   exception_id: string;
   tenant_id: string;
   timestamp: string;
-  payload: PipelineProgressPayload | ExceptionUpdatePayload | TaskCompletePayload | WSErrorPayload;
+  payload:
+    | PipelineProgressPayload
+    | ExceptionUpdatePayload
+    | TaskCompletePayload
+    | WSErrorPayload
+    | ReanalysisStartedPayload;
 }
 
 /* ── Payload types ─────────────────────────────────────────────────── */
@@ -55,6 +61,18 @@ export interface TaskCompletePayload {
 export interface WSErrorPayload {
   code: string;
   message: string;
+}
+
+/** Published at the start of a human-triggered reanalysis, before
+ *  run_graph runs. UI uses this to flip the detail panel into a
+ *  "re-running" state ahead of the streaming pipeline_progress events. */
+export interface ReanalysisStartedPayload {
+  attempt: number;
+  triggered_by: string;
+  reason: string;
+  prior_trace_id?: string;
+  prior_shadow_verdict?: string;
+  prior_final_status?: string;
 }
 
 /* ── Auth message (first message after connect) ────────────────────── */

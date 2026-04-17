@@ -133,6 +133,15 @@ function ExceptionQueueContent() {
 
   /* ── WebSocket — real-time pipeline updates ──────────────────────── */
   const detailRefreshRef = useRef<(() => void) | null>(null);
+  // Tracks whether a reanalysis is mid-flight for the currently-viewed
+  // exception. Cleared on task_complete. Passed to the detail panel so it
+  // can show a live "Re-running…" banner while pipeline events stream in.
+  const [reanalyzing, setReanalyzing] = useState<{
+    exceptionId: string;
+    attempt: number;
+    reason: string;
+    triggeredBy: string;
+  } | null>(null);
 
   const handleWsEvent = useCallback((event: WSEvent) => {
     if (event.type === "pipeline_progress") {
@@ -147,10 +156,24 @@ function ExceptionQueueContent() {
         detailRefreshRef.current?.();
       }
     } else if (event.type === "task_complete") {
-      // Task finished — refresh everything
+      // Task finished — refresh everything and clear any reanalysis banner.
       fetchData();
       if (event.exception_id === selectedId) {
         detailRefreshRef.current?.();
+      }
+      setReanalyzing((cur) => (cur?.exceptionId === event.exception_id ? null : cur));
+    } else if (event.type === "reanalysis_started") {
+      // Surface the re-running state for the currently viewed exception.
+      const payload = event.payload as {
+        attempt: number; triggered_by: string; reason: string;
+      };
+      if (event.exception_id === selectedId) {
+        setReanalyzing({
+          exceptionId: event.exception_id,
+          attempt: payload.attempt,
+          reason: payload.reason,
+          triggeredBy: payload.triggered_by,
+        });
       }
     }
   }, [selectedId, fetchData]);
@@ -245,6 +268,9 @@ function ExceptionQueueContent() {
                 exceptionId={selectedId}
                 onActionComplete={fetchData}
                 onRefreshRef={detailRefreshRef}
+                reanalyzing={
+                  reanalyzing?.exceptionId === selectedId ? reanalyzing : null
+                }
               />
             ) : (
               <EmptyDetailState />
