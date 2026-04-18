@@ -11,7 +11,7 @@
  *            the operator has exceptions:override.
  *   RED    → [Override…] [Escalate]. No "Acknowledge" — that was
  *            semantically calling approve silently.
- *   FAILED/isErrored → [Escalate for Triage] only.
+ *   FAILED/isErrored → [Escalate] only.
  *
  * Label history: originally "Override…", renamed briefly to "Decide…" in
  * Phase 3 after voice-of-user research found analysts avoided the button
@@ -354,7 +354,7 @@ export function AgentReasoningCard({
                   onClick={onEscalate}
                   aria-label="Send for triage"
                 >
-                  {actionInFlight === "escalate" ? "Escalating…" : "Escalate for Triage"}
+                  {visibleLabel("Escalate", "Escalating", "escalate")}
                 </Button>
               )
             ) : (
