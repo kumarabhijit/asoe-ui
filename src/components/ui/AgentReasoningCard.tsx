@@ -50,6 +50,10 @@ export type ActionInFlight =
   | "override"
   | "escalate"
   | "reanalyze"
+  // Phase 2 #5 — four-eyes cosign in flight. Owned by the cosign banner
+  // in ExceptionDetailPanel, not by AgentReasoningCard itself.
+  | "cosign-approve"
+  | "cosign-reject"
   | null;
 
 interface AgentReasoningCardProps {

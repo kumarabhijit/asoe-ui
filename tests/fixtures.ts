@@ -164,6 +164,7 @@ export const MOCK_HEALTH: HealthResponse = {
   ],
   allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py"],
   allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION"],
+  allowed_override_reason_tags: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
 };
 
 /* ── Stats fixture ─────────────────────────────────────────────────── */

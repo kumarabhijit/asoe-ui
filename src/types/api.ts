@@ -65,31 +65,20 @@ export type ExceptionDetailResponse = ExceptionDetail;
 
 /* ── Override (privileged — GREEN/YELLOW/RED) ─────────────────────── */
 
-/**
- * OverrideRequest — mirrors asoe2/api/schemas.py.
+/* ── Override / Cosign / Escalate ────────────────────────────────────
  *
- * `resolved_by` was removed as part of the trust-boundary fix: the backend
- * always uses the caller's identity (from the auth dependency), not a value
- * supplied by the client.
+ * Phase 2 #9: these DTOs are now re-exported from ./contracts.ts, which
+ * in turn pulls from ./generated.ts (produced by `npm run generate-types`
+ * from asoe2's committed OpenAPI schema). Hand-editing the shape of these
+ * requests is no longer allowed — change the Pydantic model in
+ * asoe2/api/schemas.py and regenerate.
  */
-export interface OverrideRequest {
-  action: string;
-  notes: string;  // mandatory (SOX)
-}
-
-/* ── Escalate (analyst+) ──────────────────────────────────────────── */
-
-/**
- * EscalateRequest — POST /api/v1/exceptions/{id}/escalate.
- *
- * Decoupled from Override: routing action only, does not resolve the
- * exception. `to_role` is optional — backend routes to the caller's
- * next-up by default.
- */
-export interface EscalateRequest {
-  reason: string;
-  to_role?: "admin" | "manager";
-}
+export type {
+  OverrideRequest,
+  CosignRequest,
+  EscalateRequest,
+  DispositionRequest,
+} from "./contracts";
 
 /* ── Shared mutating-request options ──────────────────────────────── */
 

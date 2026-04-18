@@ -127,7 +127,7 @@ export default function ExceptionDetailPanel({
   reanalyzing,
 }: ExceptionDetailPanelProps) {
   const { addToast } = useToast();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const { health } = useHealth();
   const [detail, setDetail] = useState<ExceptionDetail | null>(null);
   const [trace, setTrace] = useState<TraceResponse | null>(null);
@@ -144,6 +144,9 @@ export default function ExceptionDetailPanel({
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideAction, setOverrideAction] = useState<string>("");
   const [overrideNotes, setOverrideNotes] = useState("");
+  // Phase 2 #4 — controlled-vocabulary category alongside the free-text
+  // notes. Sourced from health.allowed_override_reason_tags per Guardrail #2.
+  const [overrideReasonTag, setOverrideReasonTag] = useState<string>("");
 
   /* ── Actions (RBAC-gated via hasPermission) ─────────────────────── */
 
@@ -223,12 +226,17 @@ export default function ExceptionDetailPanel({
     }
     setOverrideAction("");
     setOverrideNotes("");
+    setOverrideReasonTag("");
     setOverrideOpen(true);
   }
 
   async function submitOverride() {
     if (!overrideAction) {
       addToast("warning", "Select a resolution action.");
+      return;
+    }
+    if (!overrideReasonTag) {
+      addToast("warning", "Select a reason category.");
       return;
     }
     if (!overrideNotes.trim()) {
@@ -240,6 +248,7 @@ export default function ExceptionDetailPanel({
       const updated = await exceptionsApi.override(exceptionId, {
         action: overrideAction,
         notes: overrideNotes.trim(),
+        reason_tag: overrideReasonTag,
       });
       setDetail(updated);
       setOverrideOpen(false);
@@ -247,7 +256,51 @@ export default function ExceptionDetailPanel({
       onActionComplete?.();
     } catch (err) {
       console.error("Override failed:", err);
+      // Surface the server error code where possible so operators understand
+      // SoD rejections etc. The api client unwraps { error: { code, message } }
+      // into Error("<code>: <message>") so a simple message string is fine.
       const msg = err instanceof Error ? err.message : "Failed to override exception.";
+      addToast("error", msg);
+    } finally { setActionInFlight(null); }
+  }
+
+  /**
+   * Four-eyes cosign (Phase 2 #5). Called from the PENDING_COSIGN banner.
+   * Reason is captured via window.prompt — deliberately minimal UX; a
+   * richer modal can replace this in a later phase. The backend enforces
+   * SoD (caller must not be the initiator) and non-empty notes.
+   */
+  async function handleCosign(approve: boolean) {
+    if (!hasPermission("exceptions:override")) {
+      addToast("warning", "Permission denied: your role cannot cosign overrides.");
+      return;
+    }
+    const promptLabel = approve
+      ? "Cosign approval — notes (required, SOX):"
+      : "Cosign rejection — reason (required, SOX):";
+    const notes = typeof window !== "undefined" ? window.prompt(promptLabel) : "";
+    if (notes === null) return;  // user cancelled
+    if (!notes.trim()) {
+      addToast("warning", "Notes are required (SOX audit trail).");
+      return;
+    }
+    setActionInFlight(approve ? "cosign-approve" : "cosign-reject");
+    try {
+      const updated = await exceptionsApi.cosign(exceptionId, {
+        approve,
+        notes: notes.trim(),
+      });
+      setDetail(updated);
+      addToast(
+        "success",
+        approve
+          ? `Override cosigned and applied (${updated.resolved_action ?? ""})`
+          : "Override rejected; exception restored to prior state",
+      );
+      onActionComplete?.();
+    } catch (err) {
+      console.error("Cosign failed:", err);
+      const msg = err instanceof Error ? err.message : "Cosign failed.";
       addToast("error", msg);
     } finally { setActionInFlight(null); }
   }
@@ -410,6 +463,68 @@ export default function ExceptionDetailPanel({
       {/* ━━ 3. Scrollable Body ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="flex-1 overflow-auto p-16">
         <div className="flex flex-col gap-16">
+
+          {/* Four-eyes cosign banner — shown when a high-value override
+              was initiated and is awaiting a second manager+ reviewer.
+              Non-initiators with exceptions:override see Approve/Reject
+              cosign buttons; the initiator sees a read-only status. */}
+          {detail.lifecycle_state === "PENDING_COSIGN" && (() => {
+            const pending = (detail.resolution_data as Record<string, unknown> | undefined)?.pending_override as
+              | { action?: string; reason_tag?: string; initiator?: string; initiated_at?: string; financial_impact_usd?: number }
+              | undefined;
+            if (!pending) return null;
+            const isInitiator = (user?.email ?? "") === pending.initiator;
+            const canCosign = hasPermission("exceptions:override") && !isInitiator;
+            return (
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex flex-col gap-10 px-14 py-10 bg-warning-subtle border border-warning-border rounded-sm"
+              >
+                <div className="text-caption font-semibold text-warning">
+                  Awaiting second-reviewer cosign
+                </div>
+                <div className="text-label text-text-secondary">
+                  Initiator: <span className="font-mono">{pending.initiator}</span>
+                  {" — "}
+                  Action: <span className="font-mono">{pending.action}</span>
+                  {" — "}
+                  Reason: <span className="italic">{(pending.reason_tag ?? "").replace(/_/g, " ")}</span>
+                  {typeof pending.financial_impact_usd === "number" && (
+                    <>
+                      {" — "}Impact: <span className="font-mono">${pending.financial_impact_usd.toLocaleString()}</span>
+                    </>
+                  )}
+                </div>
+                {canCosign ? (
+                  <div className="flex gap-8">
+                    <Button
+                      variant="brand"
+                      size="sm"
+                      aria-label="Approve cosign"
+                      disabled={actionInFlight === "cosign-approve" || actionInFlight === "cosign-reject"}
+                      onClick={() => handleCosign(true)}
+                    >
+                      {actionInFlight === "cosign-approve" ? "Approving…" : "Approve cosign"}
+                    </Button>
+                    <Button
+                      variant="neutral"
+                      size="sm"
+                      aria-label="Reject cosign"
+                      disabled={actionInFlight === "cosign-approve" || actionInFlight === "cosign-reject"}
+                      onClick={() => handleCosign(false)}
+                    >
+                      {actionInFlight === "cosign-reject" ? "Rejecting…" : "Reject cosign"}
+                    </Button>
+                  </div>
+                ) : isInitiator ? (
+                  <div className="text-label text-text-tertiary italic">
+                    You initiated this override. A different manager or admin must cosign before it is applied.
+                  </div>
+                ) : null}
+              </div>
+            );
+          })()}
 
           {/* Live reanalysis banner — appears the moment a manager clicks
               Re-analyze and a reanalysis_started event arrives. Cleared on
@@ -587,6 +702,23 @@ export default function ExceptionDetailPanel({
                     <option key={a} value={a}>{a.replace(/_/g, " ")}</option>
                   ));
                 })()}
+              </select>
+            </label>
+            <label className="flex flex-col gap-4 text-caption text-text-secondary">
+              Reason category
+              {/* Controlled vocabulary (Guardrail #2). Feeds ML clustering
+                  of overrides by category downstream — free-text notes are
+                  captured below but are not a reliable training signal. */}
+              <select
+                value={overrideReasonTag}
+                onChange={(e) => setOverrideReasonTag(e.target.value)}
+                aria-label="Override reason category"
+                className="h-[32px] w-full rounded-md border border-border bg-surface-primary px-8 text-caption font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
+              >
+                <option value="">Select a reason…</option>
+                {(health?.allowed_override_reason_tags ?? []).map((t) => (
+                  <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                ))}
               </select>
             </label>
             <label className="flex flex-col gap-4 text-caption text-text-secondary">

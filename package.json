@@ -9,7 +9,9 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "generate-types": "openapi-typescript ../asoe2/openapi/asoe2.openapi.json -o src/types/generated.ts",
+    "verify-types": "openapi-typescript ../asoe2/openapi/asoe2.openapi.json -o /tmp/asoe-ui.generated.ts && diff -q src/types/generated.ts /tmp/asoe-ui.generated.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -39,6 +41,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.4.20",
     "jsdom": "^29.0.2",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
