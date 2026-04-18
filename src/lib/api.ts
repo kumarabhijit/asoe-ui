@@ -51,26 +51,23 @@ const MOCK_DELAY = 400;
 const USE_REAL_API = process.env.NEXT_PUBLIC_USE_REAL_API === "1";
 
 /**
- * Lazy, cached read of the NextAuth session's `accessToken`. Only used
- * in browser context; on the server (no `window`) we skip the session
- * read and return undefined — callers that need auth should pass
- * `authToken` explicitly.
+ * Read the NextAuth session's `accessToken` for outgoing authenticated
+ * calls. Deliberately NOT cached — on the initial render of the first
+ * authenticated page, two near-simultaneous callers can race against a
+ * cached-promise pattern (one fires before the promise resolves, one
+ * after). `getSession()` is cheap (cookie read + route handler fetch
+ * to /api/auth/session) and is memoized by next-auth/react internally
+ * under the hood, so per-call invocation stays fast.
  */
-let _cachedTokenPromise: Promise<string | undefined> | null = null;
 async function getAuthToken(): Promise<string | undefined> {
   if (typeof window === "undefined") return undefined;
-  if (!_cachedTokenPromise) {
-    _cachedTokenPromise = (async () => {
-      try {
-        const { getSession } = await import("next-auth/react");
-        const s = await getSession();
-        return (s as unknown as { accessToken?: string } | null)?.accessToken;
-      } catch {
-        return undefined;
-      }
-    })();
+  try {
+    const { getSession } = await import("next-auth/react");
+    const s = await getSession();
+    return (s as unknown as { accessToken?: string } | null)?.accessToken;
+  } catch {
+    return undefined;
   }
-  return _cachedTokenPromise;
 }
 
 /**
@@ -1010,6 +1007,9 @@ export const exceptionsApi = {
   },
 
   async trace(id: string): Promise<TraceResponse> {
+    if (USE_REAL_API) {
+      return http<TraceResponse>(`/api/v1/exceptions/${id}/trace`);
+    }
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
