@@ -37,6 +37,103 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MOCK_DELAY = 400;
 
 /**
+ * Phase 4 live-backend switch. When `NEXT_PUBLIC_USE_REAL_API === "1"`,
+ * the client methods marked below (`authApi.login`, `healthApi.get`, and
+ * the Playwright-critical `exceptionsApi.*` methods) hit the FastAPI
+ * backend over HTTP instead of returning mock data. The mock path is
+ * preserved for local dev + vitest runs; only explicit opt-in flips to
+ * real-backend mode.
+ *
+ * Not every method has been migrated yet — mock remains the default for
+ * `lineItems`, `orderAnalysis`, `workflows`, `policy`, etc. The migration
+ * is demand-driven: we convert a method when a browser test needs it.
+ */
+const USE_REAL_API = process.env.NEXT_PUBLIC_USE_REAL_API === "1";
+
+/**
+ * Lazy, cached read of the NextAuth session's `accessToken`. Only used
+ * in browser context; on the server (no `window`) we skip the session
+ * read and return undefined — callers that need auth should pass
+ * `authToken` explicitly.
+ */
+let _cachedTokenPromise: Promise<string | undefined> | null = null;
+async function getAuthToken(): Promise<string | undefined> {
+  if (typeof window === "undefined") return undefined;
+  if (!_cachedTokenPromise) {
+    _cachedTokenPromise = (async () => {
+      try {
+        const { getSession } = await import("next-auth/react");
+        const s = await getSession();
+        return (s as unknown as { accessToken?: string } | null)?.accessToken;
+      } catch {
+        return undefined;
+      }
+    })();
+  }
+  return _cachedTokenPromise;
+}
+
+/**
+ * Test-only escape hatch — Playwright fixtures set a pre-minted token
+ * via `window.__asoeTestAccessToken` before driving the page, so the
+ * api client can make authenticated calls without going through the
+ * full NextAuth credentials flow.
+ */
+function getTestAccessToken(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return (window as unknown as { __asoeTestAccessToken?: string }).__asoeTestAccessToken;
+}
+
+interface HttpOptions {
+  method?: string;
+  body?: unknown;
+  idempotencyKey?: string;
+  authToken?: string;
+  query?: Record<string, string | number | undefined>;
+}
+
+/**
+ * Thin fetch wrapper enforcing the asoe2 error envelope
+ * `{ error: { code, message } }` and translating it into a thrown
+ * Error whose `message` is `"<CODE>: <human message>"`. Idempotency-Key
+ * is propagated when provided.
+ */
+async function http<T>(path: string, options: HttpOptions = {}): Promise<T> {
+  const qs = options.query
+    ? "?" + new URLSearchParams(
+        Object.entries(options.query)
+          .filter(([, v]) => v !== undefined && v !== null && v !== "")
+          .map(([k, v]) => [k, String(v)]),
+      ).toString()
+    : "";
+  const url = `${API_URL}${path}${qs}`;
+  const headers: Record<string, string> = {};
+  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+  const token = options.authToken ?? getTestAccessToken() ?? (await getAuthToken());
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
+  const res = await fetch(url, {
+    method: options.method ?? "GET",
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+  const text = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch {
+    parsed = { error: { code: `HTTP_${res.status}`, message: text || res.statusText } };
+  }
+  if (!res.ok) {
+    const envelope = parsed as { error?: { code?: string; message?: string } };
+    const code = envelope?.error?.code ?? `HTTP_${res.status}`;
+    const message = envelope?.error?.message ?? res.statusText;
+    throw new Error(`${code}: ${message}`);
+  }
+  return parsed as T;
+}
+
+/**
  * Mirrors asoe2/contracts/policy.py::HIGH_VALUE_OVERRIDE_THRESHOLD_USD.
  * Backend is authoritative; this constant is only used by the mock api so
  * mock-mode and real-backend behavior stay aligned. Kept next to the mock
@@ -485,6 +582,13 @@ const MOCK_HEALTH: HealthResponse = {
 
 export const authApi = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
+    if (USE_REAL_API) {
+      // /api/auth/login (note the non-v1 prefix — see asoe2/api/app.py).
+      return http<LoginResponse>("/api/auth/login", {
+        method: "POST",
+        body: credentials,
+      });
+    }
     await delay(MOCK_DELAY);
     const user = MOCK_USERS[credentials.email];
     if (user && credentials.password) {
@@ -535,6 +639,7 @@ export const authApi = {
 
 export const healthApi = {
   async get(): Promise<HealthResponse> {
+    if (USE_REAL_API) return http<HealthResponse>("/api/v1/health");
     await delay(100);
     return MOCK_HEALTH;
   },
@@ -549,6 +654,16 @@ export const exceptionsApi = {
     cursor?: string;
     limit?: number;
   }): Promise<ExceptionListResponse> {
+    if (USE_REAL_API) {
+      return http<ExceptionListResponse>("/api/v1/exceptions", {
+        query: {
+          lifecycle_state: params?.status,
+          intent: params?.intent,
+          cursor: params?.cursor,
+          limit: params?.limit,
+        },
+      });
+    }
     await delay(MOCK_DELAY);
     let filtered = [...MOCK_EXCEPTIONS];
     // Account scoping: mirror server-side assigned_accounts filter
@@ -566,6 +681,9 @@ export const exceptionsApi = {
   },
 
   async get(id: string): Promise<ExceptionDetailResponse> {
+    if (USE_REAL_API) {
+      return http<ExceptionDetailResponse>(`/api/v1/exceptions/${id}`);
+    }
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
@@ -646,6 +764,13 @@ export const exceptionsApi = {
   ): Promise<ExceptionDetailResponse> {
     // Phase 2 #5 — second-reviewer on a pending high-value override.
     const idempotencyKey = resolveIdempotencyKey(options);
+    if (USE_REAL_API) {
+      return http<ExceptionDetailResponse>(`/api/v1/exceptions/${id}/override/cosign`, {
+        method: "POST",
+        body: request,
+        idempotencyKey,
+      });
+    }
     const cached = idempotencyLookup(`cosign:${id}`, idempotencyKey, request);
     if (cached) return cached;
 
@@ -725,6 +850,13 @@ export const exceptionsApi = {
     options?: RequestOptions,
   ): Promise<ExceptionDetailResponse> {
     const idempotencyKey = resolveIdempotencyKey(options);
+    if (USE_REAL_API) {
+      return http<ExceptionDetailResponse>(`/api/v1/exceptions/${id}/disposition`, {
+        method: "PATCH",
+        body: request,
+        idempotencyKey,
+      });
+    }
     const cached = idempotencyLookup(`disposition:${id}`, idempotencyKey, request);
     if (cached) return cached;
 
@@ -759,6 +891,13 @@ export const exceptionsApi = {
     options?: RequestOptions,
   ): Promise<ExceptionDetailResponse> {
     const idempotencyKey = resolveIdempotencyKey(options);
+    if (USE_REAL_API) {
+      return http<ExceptionDetailResponse>(`/api/v1/exceptions/${id}/escalate`, {
+        method: "POST",
+        body: request,
+        idempotencyKey,
+      });
+    }
     const cached = idempotencyLookup(`escalate:${id}`, idempotencyKey, request);
     if (cached) return cached;
 
