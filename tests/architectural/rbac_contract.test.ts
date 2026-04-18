@@ -13,6 +13,7 @@ describe("RBAC Contract — aligned with asoe2/api/deps.py", () => {
       expect(PERMISSIONS.EXCEPTIONS_READ).toBe("exceptions:read");
       expect(PERMISSIONS.EXCEPTIONS_APPROVE).toBe("exceptions:approve");
       expect(PERMISSIONS.EXCEPTIONS_OVERRIDE).toBe("exceptions:override");
+      expect(PERMISSIONS.EXCEPTIONS_ESCALATE).toBe("exceptions:escalate");
     });
 
     it("includes all backend permission keys", () => {
@@ -20,6 +21,7 @@ describe("RBAC Contract — aligned with asoe2/api/deps.py", () => {
         "exceptions:read",
         "exceptions:approve",
         "exceptions:override",
+        "exceptions:escalate",
         "rules:write",
         "users:manage",
         "policy:write",
@@ -34,18 +36,20 @@ describe("RBAC Contract — aligned with asoe2/api/deps.py", () => {
   });
 
   describe("Role-permission mapping matches backend", () => {
-    it("analyst has read + approve + dashboard", () => {
+    it("analyst has read + approve + escalate + dashboard", () => {
       expect(ROLE_PERMISSIONS.analyst).toContain("exceptions:read");
       expect(ROLE_PERMISSIONS.analyst).toContain("exceptions:approve");
+      expect(ROLE_PERMISSIONS.analyst).toContain("exceptions:escalate");
       expect(ROLE_PERMISSIONS.analyst).toContain("dashboard:read");
       expect(ROLE_PERMISSIONS.analyst).not.toContain("exceptions:override");
       expect(ROLE_PERMISSIONS.analyst).not.toContain("users:manage");
     });
 
-    it("manager has analyst permissions + override + rules:write", () => {
+    it("manager has analyst permissions + override + escalate + rules:write", () => {
       expect(ROLE_PERMISSIONS.manager).toContain("exceptions:read");
       expect(ROLE_PERMISSIONS.manager).toContain("exceptions:approve");
       expect(ROLE_PERMISSIONS.manager).toContain("exceptions:override");
+      expect(ROLE_PERMISSIONS.manager).toContain("exceptions:escalate");
       expect(ROLE_PERMISSIONS.manager).toContain("rules:write");
       expect(ROLE_PERMISSIONS.manager).not.toContain("users:manage");
       expect(ROLE_PERMISSIONS.manager).not.toContain("policy:write");

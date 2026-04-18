@@ -16,6 +16,8 @@ import type {
   ExceptionListResponse,
   ExceptionDetailResponse,
   OverrideRequest,
+  EscalateRequest,
+  RequestOptions,
   ApproveRequest,
   RejectRequest,
   ChallengeRequest,
@@ -37,6 +39,81 @@ const MOCK_DELAY = 400;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/* ── Idempotency-Key handling ──────────────────────────────────────
+ *
+ * Every mutating call generates a UUID v4 client-side unless the caller
+ * supplies one — protects against double-clicks and network retries.
+ * Matches the backend contract: same key within 24h returns the cached
+ * response; same key + different body → 409.
+ *
+ * The mock implementation keeps a per-endpoint LRU of (key → response)
+ * so tests exercising the mock see the same semantics as the real API.
+ */
+
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
+/** Generates a client-side idempotency key (UUID v4). */
+export function generateIdempotencyKey(): string {
+  return crypto.randomUUID();
+}
+
+/** Resolves the effective idempotency key for a mutating call. */
+function resolveIdempotencyKey(options?: RequestOptions): string {
+  if (options?.idempotencyKey) {
+    if (!IDEMPOTENCY_KEY_PATTERN.test(options.idempotencyKey)) {
+      throw new Error(
+        "Invalid Idempotency-Key: must be 1-128 chars of [A-Za-z0-9_-].",
+      );
+    }
+    return options.idempotencyKey;
+  }
+  return generateIdempotencyKey();
+}
+
+/** Per-endpoint idempotency cache: key → { bodyFingerprint, response } */
+interface IdempotencyCacheEntry {
+  bodyFingerprint: string;
+  response: ExceptionDetailResponse;
+}
+const MOCK_IDEMPOTENCY: Record<string, Map<string, IdempotencyCacheEntry>> = {};
+
+function idempotencyLookup(
+  endpoint: string,
+  key: string,
+  body: unknown,
+): ExceptionDetailResponse | null {
+  const bucket = MOCK_IDEMPOTENCY[endpoint];
+  if (!bucket) return null;
+  const entry = bucket.get(key);
+  if (!entry) return null;
+  const fingerprint = JSON.stringify(body);
+  if (entry.bodyFingerprint !== fingerprint) {
+    // Matches the real backend: same key + different body → 409 Conflict.
+    throw new Error(
+      "Idempotency-Key conflict: same key was used with a different request body.",
+    );
+  }
+  return entry.response;
+}
+
+function idempotencyStore(
+  endpoint: string,
+  key: string,
+  body: unknown,
+  response: ExceptionDetailResponse,
+): void {
+  const bucket = MOCK_IDEMPOTENCY[endpoint] ?? new Map();
+  bucket.set(key, { bodyFingerprint: JSON.stringify(body), response });
+  MOCK_IDEMPOTENCY[endpoint] = bucket;
+}
+
+/** Test-only helper — clears the mock idempotency cache. */
+export function __resetMockIdempotencyCache(): void {
+  for (const key of Object.keys(MOCK_IDEMPOTENCY)) {
+    delete MOCK_IDEMPOTENCY[key];
+  }
 }
 
 /* ── Mock data — 5 seed users matching asoe2/api/users.py ─────────── */
@@ -491,19 +568,66 @@ export const exceptionsApi = {
     };
   },
 
-  async override(id: string, request: OverrideRequest): Promise<ExceptionDetailResponse> {
+  async override(
+    id: string,
+    request: OverrideRequest,
+    options?: RequestOptions,
+  ): Promise<ExceptionDetailResponse> {
+    // Resolve-or-generate the Idempotency-Key before the network call so
+    // retries re-use the same key and hit the backend cache. In the real
+    // client this would be set as an `Idempotency-Key` request header.
+    const idempotencyKey = resolveIdempotencyKey(options);
+    const cached = idempotencyLookup(`override:${id}`, idempotencyKey, request);
+    if (cached) return cached;
+
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
-    return {
+    const response: ExceptionDetailResponse = {
       ...exc,
       lifecycle_state: "RESOLVED",
       final_status: "COMPLETE",
       resolution_data: {},
-      resolved_by: request.resolved_by,
+      // Backend derives resolved_by from the caller's identity (trust
+      // boundary fix). The mock mirrors that — no client-supplied value.
+      resolved_by: _currentMockUser?.email ?? "mock-user",
       resolved_action: request.action,
       resolution_notes: request.notes,
     };
+    idempotencyStore(`override:${id}`, idempotencyKey, request, response);
+    return response;
+  },
+
+  async escalate(
+    id: string,
+    request: EscalateRequest,
+    options?: RequestOptions,
+  ): Promise<ExceptionDetailResponse> {
+    const idempotencyKey = resolveIdempotencyKey(options);
+    const cached = idempotencyLookup(`escalate:${id}`, idempotencyKey, request);
+    if (cached) return cached;
+
+    await delay(MOCK_DELAY);
+    const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
+    if (!exc) throw new Error("Exception not found");
+    // Mirror backend lifecycle gate — escalate permitted from
+    // PENDING_REVIEW, FAILED, or BLOCKED.
+    const eligible = ["PENDING_REVIEW", "FAILED", "BLOCKED"].includes(
+      exc.lifecycle_state,
+    );
+    if (!eligible) {
+      throw new Error(
+        "Escalate not permitted in this state (requires PENDING_REVIEW, FAILED, or BLOCKED).",
+      );
+    }
+    const response: ExceptionDetailResponse = {
+      ...exc,
+      lifecycle_state: "ESCALATED",
+      resolution_data: {},
+      resolution_notes: `ESCALATED: ${request.reason}`,
+    };
+    idempotencyStore(`escalate:${id}`, idempotencyKey, request, response);
+    return response;
   },
 
   async approve(id: string, request?: ApproveRequest): Promise<ExceptionDetailResponse> {

@@ -289,10 +289,11 @@ describe("CREDIT_BLOCK type contracts", () => {
   });
 
   it("credit block can be overridden with a different action", () => {
+    // `resolved_by` was removed as part of the trust-boundary fix — backend
+    // always uses the caller's identity, never a client-supplied value.
     const req: OverrideRequest = {
       action: "ALLOW_BOTH",
       notes: "One-time exception — VIP customer with pending payment confirmed",
-      resolved_by: "manager@example.com",
     };
     expect(req.action).toBe("ALLOW_BOTH");
     expect(typeof req.notes).toBe("string");

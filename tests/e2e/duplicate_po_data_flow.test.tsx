@@ -428,14 +428,15 @@ describe("DUPLICATE_PO HITL action data flow", () => {
   });
 
   it("override request shape matches backend OverrideRequest", () => {
+    // `resolved_by` is no longer part of OverrideRequest (trust-boundary
+    // fix — backend always uses the caller's identity).
     const overridePayload = {
       action: "ALLOW_BOTH",
       notes: "Buyer confirmed both POs are intentional",
-      resolved_by: "manager@example.com",
     };
     expect(overridePayload.action).toBe("ALLOW_BOTH");
     expect(typeof overridePayload.notes).toBe("string");
-    expect(typeof overridePayload.resolved_by).toBe("string");
+    expect("resolved_by" in overridePayload).toBe(false);
   });
 
   it("override response updates detail with resolved_* fields", () => {

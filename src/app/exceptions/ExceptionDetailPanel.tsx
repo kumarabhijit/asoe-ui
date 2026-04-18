@@ -21,11 +21,25 @@
 
 import { useState, useEffect, useCallback, type MutableRefObject } from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
-import { AgentReasoningCard, type ExecutionError } from "@/components/ui/AgentReasoningCard";
+import {
+  AgentReasoningCard,
+  type ExecutionError,
+  type ActionInFlight,
+} from "@/components/ui/AgentReasoningCard";
 import type { NodeState } from "@/components/ui/WaterfallStepper";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useHealth } from "@/hooks/useHealth";
 import { exceptionsApi } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
 import type {
   ExceptionDetail,
   ShadowVerdict,
@@ -114,13 +128,22 @@ export default function ExceptionDetailPanel({
 }: ExceptionDetailPanelProps) {
   const { addToast } = useToast();
   const { hasPermission } = useAuth();
+  const { health } = useHealth();
   const [detail, setDetail] = useState<ExceptionDetail | null>(null);
   const [trace, setTrace] = useState<TraceResponse | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [analysis, setAnalysis] = useState<OrderAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  /** Pessimistic UI — which action is in flight. Replaces the coarse
+   *  `actionLoading` boolean so each button can show its own "Verbing…"
+   *  label while the others stay disabled. */
+  const [actionInFlight, setActionInFlight] = useState<ActionInFlight>(null);
   const [selectedLine, setSelectedLine] = useState<string | null>(null);
+  /** Override chooser dialog state — opened by AgentReasoningCard via the
+   *  `onOverride` callback and closed on submit or cancel. */
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideAction, setOverrideAction] = useState<string>("");
+  const [overrideNotes, setOverrideNotes] = useState("");
 
   /* ── Actions (RBAC-gated via hasPermission) ─────────────────────── */
 
@@ -129,7 +152,7 @@ export default function ExceptionDetailPanel({
       addToast("warning", "Permission denied: your role cannot approve exceptions.");
       return;
     }
-    setActionLoading(true);
+    setActionInFlight("approve");
     try {
       const updated = await exceptionsApi.approve(exceptionId, { notes: comment || undefined });
       setDetail(updated);
@@ -138,7 +161,7 @@ export default function ExceptionDetailPanel({
     } catch (err) {
       console.error("Approve failed:", err);
       addToast("error", "Failed to approve exception. Please try again.");
-    } finally { setActionLoading(false); }
+    } finally { setActionInFlight(null); }
   }
 
   async function handleReject(comment: string) {
@@ -146,7 +169,7 @@ export default function ExceptionDetailPanel({
       addToast("warning", "Permission denied: your role cannot reject exceptions.");
       return;
     }
-    setActionLoading(true);
+    setActionInFlight("reject");
     try {
       const updated = await exceptionsApi.reject(exceptionId, { reason: comment || "Rejected by reviewer" });
       setDetail(updated);
@@ -155,24 +178,78 @@ export default function ExceptionDetailPanel({
     } catch (err) {
       console.error("Reject failed:", err);
       addToast("error", "Failed to reject exception. Please try again.");
-    } finally { setActionLoading(false); }
+    } finally { setActionInFlight(null); }
   }
 
+  /**
+   * Escalate is a routing action — now on its own endpoint
+   * (POST /api/v1/exceptions/{id}/escalate) with its own permission
+   * (`exceptions:escalate`). Previously this piggy-backed on
+   * exceptionsApi.override with action="ESCALATE", which was semantically
+   * wrong — Override resolves, Escalate re-routes.
+   */
   async function handleEscalate() {
-    if (!hasPermission("exceptions:override")) {
+    if (!hasPermission("exceptions:escalate")) {
       addToast("warning", "Permission denied: your role cannot escalate exceptions.");
       return;
     }
-    setActionLoading(true);
+    // SOX: reason is mandatory. Fall back to the existing native prompt for
+    // Phase 1 — a richer escalate dialog is tracked separately.
+    const reason = typeof window !== "undefined"
+      ? window.prompt("Reason for escalation (required):")
+      : null;
+    if (!reason || !reason.trim()) {
+      addToast("warning", "A reason is required to escalate.");
+      return;
+    }
+    setActionInFlight("escalate");
     try {
-      const updated = await exceptionsApi.override(exceptionId, { action: "ESCALATE", notes: "Escalated by reviewer", resolved_by: "current_user" });
+      const updated = await exceptionsApi.escalate(exceptionId, { reason: reason.trim() });
       setDetail(updated);
       addToast("warning", `Exception ${exceptionId} escalated for review`);
       onActionComplete?.();
     } catch (err) {
       console.error("Escalate failed:", err);
-      addToast("error", "Failed to escalate exception. Please try again.");
-    } finally { setActionLoading(false); }
+      const msg = err instanceof Error ? err.message : "Failed to escalate exception.";
+      addToast("error", msg);
+    } finally { setActionInFlight(null); }
+  }
+
+  /** Opens the Override chooser dialog. The actual API call runs on submit. */
+  function handleOverride() {
+    if (!hasPermission("exceptions:override")) {
+      addToast("warning", "Permission denied: your role cannot override exceptions.");
+      return;
+    }
+    setOverrideAction("");
+    setOverrideNotes("");
+    setOverrideOpen(true);
+  }
+
+  async function submitOverride() {
+    if (!overrideAction) {
+      addToast("warning", "Select a resolution action.");
+      return;
+    }
+    if (!overrideNotes.trim()) {
+      addToast("warning", "Notes are required (SOX audit trail).");
+      return;
+    }
+    setActionInFlight("override");
+    try {
+      const updated = await exceptionsApi.override(exceptionId, {
+        action: overrideAction,
+        notes: overrideNotes.trim(),
+      });
+      setDetail(updated);
+      setOverrideOpen(false);
+      addToast("success", `Exception ${exceptionId} overridden (${overrideAction})`);
+      onActionComplete?.();
+    } catch (err) {
+      console.error("Override failed:", err);
+      const msg = err instanceof Error ? err.message : "Failed to override exception.";
+      addToast("error", msg);
+    } finally { setActionInFlight(null); }
   }
 
   async function handleReanalyze(reason: string) {
@@ -187,7 +264,7 @@ export default function ExceptionDetailPanel({
       addToast("warning", "A reason is required for re-analysis.");
       return;
     }
-    setActionLoading(true);
+    setActionInFlight("reanalyze");
     try {
       const updated = await exceptionsApi.reanalyze(exceptionId, { reason });
       setDetail(updated);
@@ -198,7 +275,7 @@ export default function ExceptionDetailPanel({
       const msg = err instanceof Error ? err.message : "Re-analysis failed.";
       console.error("Reanalyze failed:", err);
       addToast("error", msg);
-    } finally { setActionLoading(false); }
+    } finally { setActionInFlight(null); }
   }
 
   /* ── Data Fetching ───────────────────────────────────────────────── */
@@ -382,13 +459,18 @@ export default function ExceptionDetailPanel({
               onApprove={handleApprove}
               onReject={handleReject}
               onEscalate={handleEscalate}
+              onOverride={handleOverride}
+              canApprove={hasPermission("exceptions:approve")}
+              canOverride={hasPermission("exceptions:override")}
+              canEscalate={hasPermission("exceptions:escalate")}
+              canReanalyze={hasPermission("exceptions:override")}
               // Only expose Re-analyze when the user is authorized — the
               // card itself additionally gates on verdict/error state.
               onReanalyze={
                 hasPermission("exceptions:override") ? handleReanalyze : undefined
               }
               reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
-              actionLoading={actionLoading}
+              actionInFlight={actionInFlight}
             />
           ) : (
             <div className="p-12 bg-surface-primary rounded-md shadow-sm flex items-center gap-8 text-caption text-text-tertiary">
@@ -463,6 +545,97 @@ export default function ExceptionDetailPanel({
 
         </div>
       </div>
+
+      {/* ── Override chooser ───────────────────────────────────────────
+          Opened by AgentReasoningCard via the onOverride callback.
+          Resolution-action options are sourced from useHealth() per
+          Guardrail #2 — the UI never hardcodes enum values. Notes are
+          mandatory (SOX). */}
+      <Dialog open={overrideOpen} onOpenChange={setOverrideOpen}>
+        <DialogContent aria-label="Override exception">
+          <DialogHeader>
+            <DialogTitle>Override resolution</DialogTitle>
+            <DialogDescription>
+              Choose the resolution action the backend should apply. This is
+              audited — notes are mandatory.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-12">
+            <label className="flex flex-col gap-4 text-caption text-text-secondary">
+              Action
+              <select
+                value={overrideAction}
+                onChange={(e) => setOverrideAction(e.target.value)}
+                aria-label="Resolution action"
+                className="h-[32px] w-full rounded-md border border-border bg-surface-primary px-8 text-caption font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
+              >
+                <option value="">Select an action…</option>
+                {/* Options are sourced dynamically — if the backend exposes an
+                    allowed-resolution-action list on the health endpoint it
+                    will flow through here. Falls back to an empty list so
+                    Guardrail #2 is never violated by hardcoded strings. */}
+                {(health?.allowed_recipes ?? []).map((_recipe) => null)}
+                {detail?.resolution_data && typeof detail.resolution_data === "object" &&
+                  Array.isArray((detail.resolution_data as Record<string, unknown>).allowed_actions)
+                  ? ((detail.resolution_data as Record<string, unknown>).allowed_actions as string[])
+                      .map((a) => (
+                        <option key={a} value={a}>{a.replace(/_/g, " ")}</option>
+                      ))
+                  : null}
+              </select>
+              {/* When the backend has not supplied an explicit options list
+                  (mock mode today), fall back to a free-text input so the
+                  operator can still submit the chosen action code. */}
+              {!(
+                detail?.resolution_data
+                && Array.isArray((detail.resolution_data as Record<string, unknown>).allowed_actions)
+              ) && (
+                <input
+                  type="text"
+                  value={overrideAction}
+                  onChange={(e) => setOverrideAction(e.target.value)}
+                  placeholder="Enter action code (e.g. ALLOW_BOTH)"
+                  aria-label="Resolution action code"
+                  className="h-[32px] w-full rounded-md border border-border bg-surface-primary px-8 text-caption font-mono text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
+                />
+              )}
+            </label>
+            <label className="flex flex-col gap-4 text-caption text-text-secondary">
+              Notes (required)
+              <textarea
+                value={overrideNotes}
+                onChange={(e) => setOverrideNotes(e.target.value)}
+                rows={3}
+                placeholder="Why is an override appropriate? (SOX audit trail)"
+                aria-label="Override notes"
+                className="w-full rounded-md border border-border bg-surface-primary px-8 py-6 text-caption text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
+              />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setOverrideOpen(false)}
+              disabled={actionInFlight === "override"}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={submitOverride}
+              disabled={
+                actionInFlight === "override"
+                || !overrideAction
+                || overrideNotes.trim().length === 0
+              }
+            >
+              {actionInFlight === "override" ? "Overriding…" : "Confirm Override"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -63,12 +63,44 @@ export type ExceptionListResponse = PaginatedResponse<ExceptionSummary>;
 
 export type ExceptionDetailResponse = ExceptionDetail;
 
-/* ── Override (YELLOW tier — manager+) ────────────────────────────── */
+/* ── Override (privileged — GREEN/YELLOW/RED) ─────────────────────── */
 
+/**
+ * OverrideRequest — mirrors asoe2/api/schemas.py.
+ *
+ * `resolved_by` was removed as part of the trust-boundary fix: the backend
+ * always uses the caller's identity (from the auth dependency), not a value
+ * supplied by the client.
+ */
 export interface OverrideRequest {
   action: string;
   notes: string;  // mandatory (SOX)
-  resolved_by: string;
+}
+
+/* ── Escalate (analyst+) ──────────────────────────────────────────── */
+
+/**
+ * EscalateRequest — POST /api/v1/exceptions/{id}/escalate.
+ *
+ * Decoupled from Override: routing action only, does not resolve the
+ * exception. `to_role` is optional — backend routes to the caller's
+ * next-up by default.
+ */
+export interface EscalateRequest {
+  reason: string;
+  to_role?: "admin" | "manager";
+}
+
+/* ── Shared mutating-request options ──────────────────────────────── */
+
+/**
+ * Per-request options for mutating API calls. Supplies an Idempotency-Key
+ * when the caller wants to coordinate retries; otherwise the client
+ * generates one automatically (UUID v4) per invocation to guard against
+ * double-clicks and network retries.
+ */
+export interface RequestOptions {
+  idempotencyKey?: string;
 }
 
 /* ── Approve / Reject (HITL) ──────────────────────────────────────── */
