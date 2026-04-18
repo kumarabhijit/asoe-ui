@@ -106,10 +106,11 @@ describe("GREEN tier — Challenge type contract", () => {
 
 describe("YELLOW tier — Override type contract (updated)", () => {
   it("OverrideRequest has mandatory notes (SOX)", () => {
+    // `resolved_by` was removed as part of the trust-boundary fix — backend
+    // always uses the caller's identity, never a client-supplied value.
     const req: OverrideRequest = {
       action: "ALLOW_BOTH",
       notes: "Buyer confirmed both POs are intentional",
-      resolved_by: "manager@example.com",
     };
     expect(typeof req.notes).toBe("string");
     // notes is now required, not optional
@@ -125,7 +126,6 @@ describe("YELLOW tier — Override type contract (updated)", () => {
       const req: OverrideRequest = {
         action,
         notes: `Testing ${action}`,
-        resolved_by: "manager@example.com",
       };
       expect(validActions).toContain(req.action);
     }
@@ -295,7 +295,6 @@ describe("Backend ↔ Frontend alignment — three-tier schemas", () => {
     const req: OverrideRequest = {
       action: "ALLOW_BOTH",
       notes: "Mandatory for SOX",
-      resolved_by: "manager@example.com",
     };
     // TypeScript enforces non-optional notes
     expect(typeof req.notes).toBe("string");

@@ -93,10 +93,11 @@ describe("RBAC Enforcement — Security Fixes", () => {
       expect(ROLE_PERMISSIONS).toHaveProperty("analyst");
     });
 
-    it("analyst role has exactly 3 permissions", () => {
-      expect(ROLE_PERMISSIONS.analyst).toHaveLength(3);
+    it("analyst role has exactly 4 permissions", () => {
+      expect(ROLE_PERMISSIONS.analyst).toHaveLength(4);
       expect(ROLE_PERMISSIONS.analyst).toContain(PERMISSIONS.EXCEPTIONS_READ);
       expect(ROLE_PERMISSIONS.analyst).toContain(PERMISSIONS.EXCEPTIONS_APPROVE);
+      expect(ROLE_PERMISSIONS.analyst).toContain(PERMISSIONS.EXCEPTIONS_ESCALATE);
       expect(ROLE_PERMISSIONS.analyst).toContain(PERMISSIONS.DASHBOARD_READ);
     });
 
