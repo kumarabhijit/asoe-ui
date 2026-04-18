@@ -406,7 +406,7 @@ export function AgentReasoningCard({
                     )}
                     {onEscalate && effectiveCanEscalate && (
                       <Button
-                        variant="ghost"
+                        variant="neutral"
                         size="sm"
                         disabled={anyActionInFlight}
                         onClick={onEscalate}
@@ -433,7 +433,7 @@ export function AgentReasoningCard({
                     )}
                     {onEscalate && effectiveCanEscalate && (
                       <Button
-                        variant="ghost"
+                        variant="neutral"
                         size="sm"
                         disabled={anyActionInFlight}
                         onClick={onEscalate}
