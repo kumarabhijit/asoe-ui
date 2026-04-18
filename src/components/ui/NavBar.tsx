@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "./DropdownMenu";
+import { ThemeToggle } from "./ThemeToggle";
 import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -84,13 +85,15 @@ export function NavBar({
         })}
       </div>
 
-      {/* Right section */}
-      <div className="flex items-center gap-16">
+      {/* Right section — system state, then personal controls */}
+      <div className="flex items-center gap-12">
         {agentCount > 0 && (
           <Badge variant="brand" icon={<span className="agent-active-dot" />}>
             {agentCount} Agent{agentCount !== 1 ? "s" : ""} Live
           </Badge>
         )}
+
+        <ThemeToggle />
 
         {/* User menu — name, title, sign out */}
         {userInitials && (
