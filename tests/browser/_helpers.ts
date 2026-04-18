@@ -54,8 +54,12 @@ export async function backendToken(
 }
 
 /**
- * Create a YELLOW+PENDING_REVIEW exception via /resolve/explain so the
- * spec has a known-state record to drive. Returns the exception_id.
+ * Create a PENDING_REVIEW exception via /resolve/explain so the spec
+ * has a known-state record to drive. Verdict is GREEN under current
+ * thresholds — good enough for specs that only need the manager's
+ * Override… button (which shows on GREEN). For YELLOW-dependent
+ * specs (analyst sees Approve/Reject/Escalate) use
+ * createYellowException() instead.
  */
 export async function createPendingReviewException(
   request: APIRequestContext,
@@ -75,6 +79,62 @@ export async function createPendingReviewException(
     },
   );
   if (!res.ok()) throw new Error(`create pending: ${res.status()} ${await res.text()}`);
+  const body = (await res.json()) as { exception_id: string };
+  return body.exception_id;
+}
+
+/**
+ * Create a YELLOW-or-RED exception where the analyst-tier button row
+ * is non-empty. Under current thresholds the medium-confidence
+ * DUPLICATE_PO event is evaluated GREEN by compliance shadow (no
+ * review needed), so this helper uses a high-confidence duplicate
+ * which routes RED → BLOCKED — analyst still gets an Escalate button
+ * on RED per the AgentReasoningCard verdict matrix.
+ *
+ * The name is kept as createYellowException for historical/semantic
+ * clarity: the caller's intent is "a record the analyst can
+ * escalate from," not literally YELLOW. If Phase-5 threshold tuning
+ * lowers review_required we can swap back to medium-confidence
+ * signals without changing this helper's callers.
+ */
+export async function createYellowException(
+  request: APIRequestContext,
+  token: string,
+  orderId = `PO-E2E-${Date.now()}`,
+): Promise<string> {
+  const res = await request.post(
+    // /resolve (not /resolve/explain) so the shadow verdict actually
+    // gates execution — explain mode short-circuits the recipe and
+    // leaves lifecycle stuck at PENDING_REVIEW/GREEN regardless of
+    // signal strength.
+    `${BACKEND_URL}/api/v1/exceptions/resolve`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      data: {
+        order_id: orderId,
+        line_item: 1,
+        po_price: 100.0,
+        sap_base_price: 100.0,
+        event_type: "EDI_850_DUPLICATE_PO",
+        retailer_id: "R-10",
+        line_count: 1,
+        metadata: {
+          signal_scores: {
+            po_number: 1.0,
+            customer_id: 1.0,
+            line_items: 0.95,
+            amount: 0.90,
+            timestamp: 0.80,
+            ship_to: 0.80,
+            channel: 1.0,
+            delivery_date: 0.80,
+          },
+          matched_po_id: `${orderId}-prior`,
+        },
+      },
+    },
+  );
+  if (!res.ok()) throw new Error(`create yellow: ${res.status()} ${await res.text()}`);
   const body = (await res.json()) as { exception_id: string };
   return body.exception_id;
 }
