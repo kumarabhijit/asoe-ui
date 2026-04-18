@@ -74,7 +74,6 @@ export type ExceptionDetailResponse = ExceptionDetail;
  * asoe2/api/schemas.py and regenerate.
  */
 export type {
-  OverrideRequest,
   CosignRequest,
   EscalateRequest,
   DispositionRequest,
@@ -90,16 +89,6 @@ export type {
  */
 export interface RequestOptions {
   idempotencyKey?: string;
-}
-
-/* ── Approve / Reject (HITL) ──────────────────────────────────────── */
-
-export interface ApproveRequest {
-  notes?: string;
-}
-
-export interface RejectRequest {
-  reason?: string;
 }
 
 /* ── Reanalyze (YELLOW/RED/FAILED — manager+) ─────────────────────── */

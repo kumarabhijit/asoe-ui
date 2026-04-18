@@ -547,42 +547,44 @@ describe("ExceptionDetailPanel escalate contract (source-level)", () => {
 });
 
 describe("exceptionsApi — Idempotency-Key contract", () => {
-  it("override() with an explicit idempotencyKey returns the cached response on retry", async () => {
-    const key = "test-override-key-abc";
-    const first = await exceptionsApi.override(
+  // Phase 3: override/approve/reject were deleted — the idempotency
+  // contract now applies to PATCH /disposition (the unified primitive).
+  it("disposition() with an explicit idempotencyKey returns the cached response on retry", async () => {
+    const key = "test-disposition-key-abc";
+    const first = await exceptionsApi.disposition(
       "exc-002",
-      { action: "ALLOW_BOTH", notes: "Retry test" },
+      { action: "ALLOW_BOTH", notes: "Retry test", reason_tag: "other" },
       { idempotencyKey: key },
     );
-    const second = await exceptionsApi.override(
+    const second = await exceptionsApi.disposition(
       "exc-002",
-      { action: "ALLOW_BOTH", notes: "Retry test" },
+      { action: "ALLOW_BOTH", notes: "Retry test", reason_tag: "other" },
       { idempotencyKey: key },
     );
     expect(second).toEqual(first);
   });
 
-  it("override() with same key + different body raises 409-equivalent conflict", async () => {
-    const key = "test-override-conflict";
-    await exceptionsApi.override(
+  it("disposition() with same key + different body raises 409-equivalent conflict", async () => {
+    const key = "test-disposition-conflict";
+    await exceptionsApi.disposition(
       "exc-002",
-      { action: "ALLOW_BOTH", notes: "First" },
+      { action: "ALLOW_BOTH", notes: "First", reason_tag: "other" },
       { idempotencyKey: key },
     );
     await expect(
-      exceptionsApi.override(
+      exceptionsApi.disposition(
         "exc-002",
-        { action: "MERGE", notes: "Second" },
+        { action: "MERGE", notes: "Second", reason_tag: "other" },
         { idempotencyKey: key },
       ),
     ).rejects.toThrow(/Idempotency-Key conflict/);
   });
 
-  it("override() rejects malformed idempotency keys", async () => {
+  it("disposition() rejects malformed idempotency keys", async () => {
     await expect(
-      exceptionsApi.override(
+      exceptionsApi.disposition(
         "exc-002",
-        { action: "ALLOW_BOTH", notes: "bad key" },
+        { action: "ALLOW_BOTH", notes: "bad key", reason_tag: "other" },
         { idempotencyKey: "bad key with spaces" },
       ),
     ).rejects.toThrow(/Invalid Idempotency-Key/);
