@@ -73,7 +73,12 @@ export type ExceptionDetailResponse = ExceptionDetail;
  * requests is no longer allowed — change the Pydantic model in
  * asoe2/api/schemas.py and regenerate.
  */
-export type { OverrideRequest, CosignRequest, EscalateRequest } from "./contracts";
+export type {
+  OverrideRequest,
+  CosignRequest,
+  EscalateRequest,
+  DispositionRequest,
+} from "./contracts";
 
 /* ── Shared mutating-request options ──────────────────────────────── */
 

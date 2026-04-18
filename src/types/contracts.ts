@@ -24,6 +24,7 @@ import type { components } from "./generated";
 export type OverrideRequest = components["schemas"]["OverrideRequest"];
 export type EscalateRequest = components["schemas"]["EscalateRequest"];
 export type CosignRequest = components["schemas"]["CosignRequest"];
+export type DispositionRequest = components["schemas"]["DispositionRequest"];
 export type HealthResponse = components["schemas"]["HealthResponse"];
 export type ApproveRequest = components["schemas"]["ApproveRequest"];
 export type RejectRequest = components["schemas"]["RejectRequest"];

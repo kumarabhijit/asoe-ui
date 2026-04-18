@@ -19,6 +19,7 @@ import type {
   EscalateRequest,
   CosignRequest,
   RequestOptions,
+  DispositionRequest,
   ApproveRequest,
   RejectRequest,
   ChallengeRequest,
@@ -759,6 +760,51 @@ export const exceptionsApi = {
     }
     delete MOCK_PENDING_OVERRIDES[id];
     idempotencyStore(`cosign:${id}`, idempotencyKey, request, response);
+    return response;
+  },
+
+  /**
+   * v2 consolidation — unified Approve/Reject/Override disposition. The
+   * backend derives sub_type from (chosen_action, recommended_action):
+   *   chosen == NO_ACTION        → REJECT (exceptions:approve)
+   *   chosen == recommended      → APPROVE (exceptions:approve)
+   *   chosen != recommended      → OVERRIDE (exceptions:override,
+   *                                           four-eyes gates may fire)
+   *
+   * Additive for now — existing override/approve/reject methods stay.
+   * Phase 3 will migrate call sites and deprecate them.
+   */
+  async disposition(
+    id: string,
+    request: DispositionRequest,
+    options?: RequestOptions,
+  ): Promise<ExceptionDetailResponse> {
+    const idempotencyKey = resolveIdempotencyKey(options);
+    const cached = idempotencyLookup(`disposition:${id}`, idempotencyKey, request);
+    if (cached) return cached;
+
+    await delay(MOCK_DELAY);
+    const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
+    if (!exc) throw new Error("Exception not found");
+    if (!request.notes || !request.notes.trim()) {
+      throw new Error("NOTES_REQUIRED: notes are required (SOX audit trail).");
+    }
+    // Mock does not persist recommended_action on the summary; treat the
+    // chosen action as APPROVE when it matches a minimal known default,
+    // REJECT on NO_ACTION, OVERRIDE otherwise — close enough for demo.
+    let newLifecycle: LifecycleState;
+    if (request.action === "NO_ACTION") newLifecycle = "REJECTED";
+    else newLifecycle = "RESOLVED";
+    const response: ExceptionDetailResponse = {
+      ...exc,
+      lifecycle_state: newLifecycle,
+      final_status: newLifecycle === "RESOLVED" ? "COMPLETE" : "REJECTED",
+      resolved_by: _currentMockUser?.email ?? "mock-user",
+      resolved_action: request.action,
+      resolution_notes: request.notes,
+      resolution_data: {},
+    };
+    idempotencyStore(`disposition:${id}`, idempotencyKey, request, response);
     return response;
   },
 

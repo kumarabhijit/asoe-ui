@@ -310,6 +310,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exceptions/{exception_id}/disposition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Disposition Exception
+         * @description Unified HITL disposition: single endpoint for Approve/Reject/Override.
+         *
+         *     See module comment above for sub-type rules and permission gating.
+         *     Emits EXCEPTION_RESOLVED with sub_type=APPROVE|REJECT|OVERRIDE so
+         *     compliance tooling can answer "how often do managers deviate from
+         *     the agent?" with one SQL query across a consistent event stream.
+         */
+        patch: operations["disposition_exception_api_v1_exceptions__exception_id__disposition_patch"];
+        trace?: never;
+    };
     "/api/v1/exceptions/{exception_id}/escalate": {
         parameters: {
             query?: never;
@@ -670,6 +695,35 @@ export interface components {
             approve: boolean;
             /** Notes */
             notes: string;
+        };
+        /**
+         * DispositionRequest
+         * @description PATCH /api/v1/exceptions/{id}/disposition — unified HITL primitive
+         *     (v2 consolidation).
+         *
+         *     Single endpoint collapsing Approve + Reject + Override into a
+         *     sub-type-discriminated resolution. The caller specifies the chosen
+         *     action; the server derives the sub-type:
+         *       - chosen_action == recommended_action → APPROVE (exceptions:approve)
+         *       - chosen_action == "NO_ACTION"        → REJECT  (exceptions:approve)
+         *       - chosen_action != recommended_action → OVERRIDE (exceptions:override,
+         *                                                          four-eyes applies)
+         *
+         *     Notes are mandatory (SOX). reason_tag is validated against
+         *     AllowedOverrideReasonTag when present; it defaults to "other" for
+         *     Phase 2 compatibility. Emits a single EXCEPTION_RESOLVED audit event
+         *     with sub_type in new_value so downstream analytics stay consistent.
+         */
+        DispositionRequest: {
+            /** Action */
+            action: string;
+            /** Notes */
+            notes: string;
+            /**
+             * Reason Tag
+             * @default other
+             */
+            reason_tag: string;
         };
         /**
          * EscalateRequest
@@ -1783,6 +1837,44 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ChallengeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExceptionDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disposition_exception_api_v1_exceptions__exception_id__disposition_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+                Authorization?: string | null;
+            };
+            path: {
+                exception_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispositionRequest"];
             };
         };
         responses: {
