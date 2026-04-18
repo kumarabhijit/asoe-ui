@@ -2,10 +2,10 @@
  * AgentReasoningCard tests — Layer 1 cognition, verdict × permission matrix.
  *
  * Option A (stakeholder-approved) button matrix:
- *   GREEN  → [Override…] only when canOverride && onOverride.
+ *   GREEN  → [Decide…] only when canOverride && onOverride.
  *   YELLOW → [Approve] [Reject] [Escalate] when canApprove/canEscalate;
- *            [Override…] when canOverride.
- *   RED    → [Override…] when canOverride, [Escalate] when canEscalate.
+ *            [Decide…] when canOverride.
+ *   RED    → [Decide…] when canOverride, [Escalate] when canEscalate.
  *   FAILED/isErrored → [Escalate for Triage] only.
  *
  * Accessible names are the long noun-phrase form (Approve recommendation,
@@ -261,9 +261,12 @@ describe("AgentReasoningCard", () => {
         <AgentReasoningCard verdict="YELLOW" canOverride onOverride={vi.fn()} />,
       );
       const btn = screen.getByRole("button", { name: "Choose different action" });
-      expect(btn).toHaveTextContent("Override");
-      // Trailing ellipsis on the visible label.
+      // Visible label renamed from "Override…" to "Decide…" (Phase 3 UX
+      // panel — "override" carried negative connotation). aria-label and
+      // hover tooltip keep the long-form "Choose different action".
+      expect(btn).toHaveTextContent("Decide");
       expect(btn.textContent).toContain("…");
+      expect(btn).toHaveAttribute("title", "Choose different action");
     });
 
     it("Escalate → 'Send for triage'", () => {
@@ -287,10 +290,37 @@ describe("AgentReasoningCard", () => {
         screen.getByRole("button", { name: "Re-analyze exception" }),
       ).toBeInTheDocument();
     });
+
+    it("Approve button surfaces the recipe's recommended action via tooltip + aria-label", () => {
+      // Phase 3 UX panel: the 1-click happy path on YELLOW needs to make
+      // the exact action clear before the click. We show it as a hover
+      // tooltip (title) and an expanded aria-label so screen-reader users
+      // hear it without opening the card's reasoning details.
+      render(
+        <AgentReasoningCard
+          verdict="YELLOW"
+          canApprove
+          recommendedAction="APPLY_CONTRACT_PRICE"
+          onApprove={vi.fn()}
+        />,
+      );
+      const btn = screen.getByRole("button", {
+        name: /Approve recommendation: Apply Contract Price/,
+      });
+      expect(btn).toHaveAttribute("title", "Approve: Apply Contract Price");
+    });
+
+    it("Approve button falls back to plain label when no recommendedAction", () => {
+      render(
+        <AgentReasoningCard verdict="YELLOW" canApprove onApprove={vi.fn()} />,
+      );
+      const btn = screen.getByRole("button", { name: "Approve recommendation" });
+      expect(btn).not.toHaveAttribute("title");
+    });
   });
 
   describe("Pessimistic UI — actionInFlight", () => {
-    it("shows 'Overriding…' and disables peers when actionInFlight='override'", () => {
+    it("shows 'Deciding…' and disables peers when actionInFlight='override'", () => {
       render(
         <AgentReasoningCard
           verdict="YELLOW"
@@ -305,7 +335,7 @@ describe("AgentReasoningCard", () => {
         />,
       );
       const override = screen.getByRole("button", { name: "Choose different action" });
-      expect(override).toHaveTextContent("Overriding…");
+      expect(override).toHaveTextContent("Deciding…");
       expect(override).toBeDisabled();
       // Peers are disabled too — no double-submit.
       expect(

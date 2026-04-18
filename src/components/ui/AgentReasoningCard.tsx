@@ -6,12 +6,20 @@
  *   in ExceptionDetailPanel to avoid duplication.
  *
  * Verdict × permission button matrix (Option A — stakeholder approved):
- *   GREEN  → [Override…] (privileged only). GREEN is passive; no Approve.
- *   YELLOW → [Approve] [Reject] [Escalate] for analysts; [Override…] when
+ *   GREEN  → [Decide…] (privileged only). GREEN is passive; no Approve.
+ *   YELLOW → [Approve] [Reject] [Escalate] for analysts; [Decide…] when
  *            the operator has exceptions:override.
- *   RED    → [Override…] [Escalate]. No "Acknowledge" — that was
+ *   RED    → [Decide…] [Escalate]. No "Acknowledge" — that was
  *            semantically calling approve silently.
  *   FAILED/isErrored → [Escalate for Triage] only.
+ *
+ * Label history: the "choose different action" button was labelled
+ * "Override…" through Phase 2. Voice-of-user research surfaced that
+ * "override" carries negative connotation ("I'm contradicting the
+ * system") and was being avoided even when warranted. Renamed to
+ * "Decide…" per the Phase 3 UX panel; aria-label and hover tooltip
+ * keep the long-form "Choose different action" for screen-reader and
+ * mouse-over discoverability.
  *
  * Permissions are derived in the parent (`hasPermission('exceptions:*')`)
  * and passed as `canApprove / canOverride / canEscalate`.
@@ -65,6 +73,11 @@ interface AgentReasoningCardProps {
   recipeName?: string;
   explanation?: string;
   policyHits?: string[];
+  /** Agent's recommended action (from record.resolution_data.recommended_action).
+   *  Surfaced on the Approve button as a hover tooltip so the reviewer sees
+   *  exactly which action will be applied — e.g. "Apply contract price $9.80".
+   *  Optional: when absent, Approve shows its generic label only. */
+  recommendedAction?: string;
   onApprove?: (comment: string) => void;
   onReject?: (comment: string) => void;
   onEscalate?: () => void;
@@ -85,7 +98,7 @@ interface AgentReasoningCardProps {
   actionInFlight?: ActionInFlight;
   /** Caller has `exceptions:approve` — shows Approve / Reject on YELLOW. */
   canApprove?: boolean;
-  /** Caller has `exceptions:override` — shows Override… on GREEN/YELLOW/RED. */
+  /** Caller has `exceptions:override` — shows Decide… on GREEN/YELLOW/RED. */
   canOverride?: boolean;
   /** Caller has `exceptions:escalate` — shows Escalate. */
   canEscalate?: boolean;
@@ -116,6 +129,17 @@ const NODE_LABELS: Partial<Record<PipelineNode, string>> = {
   apply_effects: "Apply Effects",
 };
 
+/** Human-friendly rendering of an AllowedResolutionAction code for the
+ *  Approve-button tooltip. ALLOW_BOTH → "Allow both". The action code itself
+ *  is still passed to the backend unchanged — this is a display-layer
+ *  transform only. */
+function formatActionLabel(action: string): string {
+  return action
+    .split("_")
+    .map((w) => (w.length ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(" ");
+}
+
 function ConfidenceBar({ value }: { value: number }) {
   const pct = Math.round(value * 100);
   return (
@@ -144,6 +168,7 @@ export function AgentReasoningCard({
   recipeName,
   explanation,
   policyHits,
+  recommendedAction,
   onApprove,
   onReject,
   onEscalate,
@@ -338,7 +363,16 @@ export function AgentReasoningCard({
                         size="sm"
                         disabled={anyActionInFlight}
                         onClick={() => setPendingAction("approve")}
-                        aria-label="Approve recommendation"
+                        aria-label={
+                          recommendedAction
+                            ? `Approve recommendation: ${formatActionLabel(recommendedAction)}`
+                            : "Approve recommendation"
+                        }
+                        title={
+                          recommendedAction
+                            ? `Approve: ${formatActionLabel(recommendedAction)}`
+                            : undefined
+                        }
                       >
                         {visibleLabel("Approve", "Approving", "approve")}
                       </Button>
@@ -361,8 +395,9 @@ export function AgentReasoningCard({
                         disabled={anyActionInFlight}
                         onClick={onOverride}
                         aria-label="Choose different action"
+                        title="Choose different action"
                       >
-                        {actionInFlight === "override" ? "Overriding…" : "Override…"}
+                        {actionInFlight === "override" ? "Deciding…" : "Decide…"}
                       </Button>
                     )}
                     {onEscalate && effectiveCanEscalate && (
@@ -387,8 +422,9 @@ export function AgentReasoningCard({
                         disabled={anyActionInFlight}
                         onClick={onOverride}
                         aria-label="Choose different action"
+                        title="Choose different action"
                       >
-                        {actionInFlight === "override" ? "Overriding…" : "Override…"}
+                        {actionInFlight === "override" ? "Deciding…" : "Decide…"}
                       </Button>
                     )}
                     {onEscalate && effectiveCanEscalate && (
@@ -411,8 +447,9 @@ export function AgentReasoningCard({
                     disabled={anyActionInFlight}
                     onClick={onOverride}
                     aria-label="Choose different action"
+                    title="Choose different action"
                   >
-                    {actionInFlight === "override" ? "Overriding…" : "Override…"}
+                    {actionInFlight === "override" ? "Deciding…" : "Decide…"}
                   </Button>
                 )}
               </>

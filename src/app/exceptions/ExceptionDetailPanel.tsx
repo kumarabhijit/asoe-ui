@@ -598,6 +598,9 @@ export default function ExceptionDetailPanel({
               intent={detail.intent ?? undefined}
               confidence={analysis?.confidence ? analysis.confidence / 100 : 0.92}
               recipeName={detail.selected_recipe ?? undefined}
+              // Surfaced as a hover tooltip on the Approve button so the
+              // reviewer sees the exact action they're accepting.
+              recommendedAction={_recommendedAction() ?? undefined}
               // Don't fall back to a success-sounding default when the pipeline
               // actually failed — leave the execution-error banner as the sole
               // narrative in that case.
