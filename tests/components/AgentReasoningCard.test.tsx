@@ -6,7 +6,7 @@
  *   YELLOW → [Approve] [Reject] [Escalate] when canApprove/canEscalate;
  *            [Override…] when canOverride.
  *   RED    → [Override…] when canOverride, [Escalate] when canEscalate.
- *   FAILED/isErrored → [Escalate for Triage] only.
+ *   FAILED/isErrored → [Escalate] only.
  *
  * Accessible names are the long noun-phrase form (Approve recommendation,
  * Reject recommendation, Choose different action, Send for triage,
@@ -217,7 +217,13 @@ describe("AgentReasoningCard", () => {
   });
 
   describe("FAILED / execution error", () => {
-    it("shows only 'Escalate for Triage'", () => {
+    it("shows only 'Escalate'", () => {
+      // Vocabulary note: the FAILED-branch button used to read "Escalate
+      // for Triage" — distinct from the YELLOW/RED branch's plain
+      // "Escalate". That inconsistency confused operators (same backend
+      // endpoint, same permission, same audit event — different label
+      // depending on verdict). Normalised to "Escalate" everywhere; the
+      // aria-label "Send for triage" remains for screen-reader context.
       render(
         <AgentReasoningCard
           verdict="YELLOW"
@@ -231,7 +237,7 @@ describe("AgentReasoningCard", () => {
       );
       expect(
         screen.getByRole("button", { name: "Send for triage" }),
-      ).toHaveTextContent("Escalate for Triage");
+      ).toHaveTextContent("Escalate");
       expect(screen.queryByText("Approve")).not.toBeInTheDocument();
       expect(screen.queryByText("Reject")).not.toBeInTheDocument();
     });
