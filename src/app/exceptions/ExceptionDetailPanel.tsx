@@ -144,6 +144,9 @@ export default function ExceptionDetailPanel({
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideAction, setOverrideAction] = useState<string>("");
   const [overrideNotes, setOverrideNotes] = useState("");
+  // Phase 2 #4 — controlled-vocabulary category alongside the free-text
+  // notes. Sourced from health.allowed_override_reason_tags per Guardrail #2.
+  const [overrideReasonTag, setOverrideReasonTag] = useState<string>("");
 
   /* ── Actions (RBAC-gated via hasPermission) ─────────────────────── */
 
@@ -223,12 +226,17 @@ export default function ExceptionDetailPanel({
     }
     setOverrideAction("");
     setOverrideNotes("");
+    setOverrideReasonTag("");
     setOverrideOpen(true);
   }
 
   async function submitOverride() {
     if (!overrideAction) {
       addToast("warning", "Select a resolution action.");
+      return;
+    }
+    if (!overrideReasonTag) {
+      addToast("warning", "Select a reason category.");
       return;
     }
     if (!overrideNotes.trim()) {
@@ -240,6 +248,7 @@ export default function ExceptionDetailPanel({
       const updated = await exceptionsApi.override(exceptionId, {
         action: overrideAction,
         notes: overrideNotes.trim(),
+        reason_tag: overrideReasonTag,
       });
       setDetail(updated);
       setOverrideOpen(false);
@@ -247,6 +256,9 @@ export default function ExceptionDetailPanel({
       onActionComplete?.();
     } catch (err) {
       console.error("Override failed:", err);
+      // Surface the server error code where possible so operators understand
+      // SoD rejections etc. The api client unwraps { error: { code, message } }
+      // into Error("<code>: <message>") so a simple message string is fine.
       const msg = err instanceof Error ? err.message : "Failed to override exception.";
       addToast("error", msg);
     } finally { setActionInFlight(null); }
@@ -587,6 +599,23 @@ export default function ExceptionDetailPanel({
                     <option key={a} value={a}>{a.replace(/_/g, " ")}</option>
                   ));
                 })()}
+              </select>
+            </label>
+            <label className="flex flex-col gap-4 text-caption text-text-secondary">
+              Reason category
+              {/* Controlled vocabulary (Guardrail #2). Feeds ML clustering
+                  of overrides by category downstream — free-text notes are
+                  captured below but are not a reliable training signal. */}
+              <select
+                value={overrideReasonTag}
+                onChange={(e) => setOverrideReasonTag(e.target.value)}
+                aria-label="Override reason category"
+                className="h-[32px] w-full rounded-md border border-border bg-surface-primary px-8 text-caption font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
+              >
+                <option value="">Select a reason…</option>
+                {(health?.allowed_override_reason_tags ?? []).map((t) => (
+                  <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                ))}
               </select>
             </label>
             <label className="flex flex-col gap-4 text-caption text-text-secondary">

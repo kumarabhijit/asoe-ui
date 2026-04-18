@@ -430,6 +430,8 @@ const MOCK_HEALTH: HealthResponse = {
   // authoritative at runtime (/api/v1/health); this mock list exists only for
   // local development.
   allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION"],
+  // Mirrors asoe2/constraints/specs.py AllowedOverrideReasonTag.
+  allowed_override_reason_tags: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
 };
 
 /* ── Auth API (/api/auth/*) ─────��──────────────────────────────────── */

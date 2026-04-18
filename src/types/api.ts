@@ -75,6 +75,12 @@ export type ExceptionDetailResponse = ExceptionDetail;
 export interface OverrideRequest {
   action: string;
   notes: string;  // mandatory (SOX)
+  /**
+   * Controlled-vocabulary tag categorizing the override reason. Must be one
+   * of health.allowed_override_reason_tags. Phase 2 compatibility: omitting
+   * defaults to "other" server-side; Phase 3 will require it.
+   */
+  reason_tag?: string;
 }
 
 /* ── Escalate (analyst+) ──────────────────────────────────────────── */

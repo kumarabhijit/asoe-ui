@@ -703,4 +703,11 @@ export interface HealthResponse {
    * .tsx (Guardrail #2).
    */
   allowed_resolution_actions: string[];
+  /**
+   * Controlled vocabulary for override reason-tag categories
+   * (asoe2/constraints/specs.py::AllowedOverrideReasonTag). Populates the
+   * second chooser in the Override dialog so reason_tag codes are never
+   * hardcoded in .tsx.
+   */
+  allowed_override_reason_tags: string[];
 }
