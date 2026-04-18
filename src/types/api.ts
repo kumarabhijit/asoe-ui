@@ -83,6 +83,22 @@ export interface OverrideRequest {
   reason_tag?: string;
 }
 
+/* ── Cosign (manager+, Phase 2 four-eyes) ────────────────────────── */
+
+/**
+ * CosignRequest — POST /api/v1/exceptions/{id}/override/cosign.
+ *
+ * Second-reviewer decision on a pending high-value override. `approve=true`
+ * applies the pending override (lifecycle → RESOLVED); `approve=false`
+ * restores the prior lifecycle. Notes are mandatory (SOX) in both cases.
+ * The cosigner must be different from the override's initiator — backend
+ * returns 403 SOD_VIOLATION otherwise.
+ */
+export interface CosignRequest {
+  approve: boolean;
+  notes: string;
+}
+
 /* ── Escalate (analyst+) ──────────────────────────────────────────── */
 
 /**

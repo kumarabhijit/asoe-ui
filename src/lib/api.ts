@@ -17,6 +17,7 @@ import type {
   ExceptionDetailResponse,
   OverrideRequest,
   EscalateRequest,
+  CosignRequest,
   RequestOptions,
   ApproveRequest,
   RejectRequest,
@@ -31,11 +32,20 @@ import type {
   PolicyOverrideResponse,
   APIError,
 } from "@/types/api";
-import type { HealthResponse, ExceptionSummary, LineItem, OrderAnalysis, ReanalysisEntry } from "@/types/exceptions";
+import type { HealthResponse, ExceptionSummary, LifecycleState, LineItem, OrderAnalysis, ReanalysisEntry } from "@/types/exceptions";
 import { ROLE_PERMISSIONS } from "./roles";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MOCK_DELAY = 400;
+
+/**
+ * Mirrors asoe2/contracts/policy.py::HIGH_VALUE_OVERRIDE_THRESHOLD_USD.
+ * Backend is authoritative; this constant is only used by the mock api so
+ * mock-mode and real-backend behavior stay aligned. Kept next to the mock
+ * implementation, not exported — the UI renders state it's given, it does
+ * not compute the threshold itself.
+ */
+const HIGH_VALUE_OVERRIDE_THRESHOLD_USD = 10_000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -220,6 +230,37 @@ const MOCK_REANALYSIS_HISTORY: Record<string, ReanalysisEntry[]> = {};
 
 /** Must match REANALYSIS_MAX_ATTEMPTS in asoe2/contracts/policy.py. */
 const MOCK_REANALYSIS_MAX_ATTEMPTS = 3;
+
+/**
+ * Per-exception explicit financial impact for demo purposes. Mirrors the
+ * backend's record.resolution_data.financial_impact_usd lookup. Any value
+ * here at/above HIGH_VALUE_OVERRIDE_THRESHOLD_USD triggers the four-eyes
+ * cosign flow on /override. Exceptions not listed here are treated as
+ * "impact unknown" and the gate does not fire.
+ */
+const MOCK_FINANCIAL_IMPACT_USD: Record<string, number> = {
+  // Demo seeds — pick a couple of price-correction exceptions for the
+  // cosign flow demo; real records would carry this on resolution_data.
+  "exc-001": 25_000,
+  "exc-010": 42_500,
+};
+
+/**
+ * Pending override staging area for the mock four-eyes flow. In production
+ * this lives on the exception record's resolution_data.pending_override.
+ * Here it's a module-level dict so cosign() can read what override() wrote
+ * on the preceding call — MOCK_EXCEPTIONS itself isn't mutated.
+ */
+interface MockPendingOverride {
+  action: string;
+  notes: string;
+  reason_tag: string;
+  initiator: string;
+  initiated_at: string;
+  financial_impact_usd: number;
+  from_lifecycle_state: LifecycleState;
+}
+const MOCK_PENDING_OVERRIDES: Record<string, MockPendingOverride> = {};
 
 const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
@@ -522,6 +563,24 @@ export const exceptionsApi = {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
+    // Four-eyes: if a pending override was staged in a prior override()
+    // call, surface it here so a page reload or peer-user navigation
+    // shows the PENDING_COSIGN banner.
+    const pending = MOCK_PENDING_OVERRIDES[id];
+    if (pending) {
+      return {
+        ...exc,
+        lifecycle_state: "PENDING_COSIGN",
+        resolution_data: {
+          financial_impact_usd: pending.financial_impact_usd,
+          pending_override: pending,
+        },
+        resolved_by: undefined,
+        resolved_action: undefined,
+        resolution_notes: undefined,
+        reanalysis_history: MOCK_REANALYSIS_HISTORY[id] ?? [],
+      };
+    }
     return {
       ...exc,
       resolution_data: exc.final_status === "COMPLETE" ? {
@@ -589,6 +648,36 @@ export const exceptionsApi = {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
+
+    // Four-eyes (Phase 2 #5): mirror the backend. If the record's declared
+    // financial impact is at/above the threshold, stage the override as
+    // PENDING_COSIGN instead of resolving immediately. The UI looks up
+    // impact from MOCK_FINANCIAL_IMPACT_USD; in prod the backend reads
+    // record.resolution_data.financial_impact_usd.
+    const impact = MOCK_FINANCIAL_IMPACT_USD[id] ?? null;
+    if (impact !== null && impact >= HIGH_VALUE_OVERRIDE_THRESHOLD_USD) {
+      const pending: MockPendingOverride = {
+        action: request.action,
+        notes: request.notes,
+        reason_tag: request.reason_tag ?? "other",
+        initiator: _currentMockUser?.email ?? "mock-user",
+        initiated_at: new Date().toISOString(),
+        financial_impact_usd: impact,
+        from_lifecycle_state: exc.lifecycle_state,
+      };
+      MOCK_PENDING_OVERRIDES[id] = pending;
+      const response: ExceptionDetailResponse = {
+        ...exc,
+        lifecycle_state: "PENDING_COSIGN",
+        resolution_data: {
+          financial_impact_usd: impact,
+          pending_override: pending,
+        },
+      };
+      idempotencyStore(`override:${id}`, idempotencyKey, request, response);
+      return response;
+    }
+
     const response: ExceptionDetailResponse = {
       ...exc,
       lifecycle_state: "RESOLVED",
@@ -601,6 +690,75 @@ export const exceptionsApi = {
       resolution_notes: request.notes,
     };
     idempotencyStore(`override:${id}`, idempotencyKey, request, response);
+    return response;
+  },
+
+  async cosign(
+    id: string,
+    request: CosignRequest,
+    options?: RequestOptions,
+  ): Promise<ExceptionDetailResponse> {
+    // Phase 2 #5 — second-reviewer on a pending high-value override.
+    const idempotencyKey = resolveIdempotencyKey(options);
+    const cached = idempotencyLookup(`cosign:${id}`, idempotencyKey, request);
+    if (cached) return cached;
+
+    await delay(MOCK_DELAY);
+    const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
+    if (!exc) throw new Error("Exception not found");
+    const pending = MOCK_PENDING_OVERRIDES[id];
+    if (!pending) {
+      throw new Error(
+        "Cosign not permitted: no pending override on this exception.",
+      );
+    }
+    const caller = _currentMockUser?.email ?? "mock-user";
+    if (pending.initiator === caller) {
+      throw new Error(
+        "SOD_VIOLATION: the initiator of the override cannot cosign their own action.",
+      );
+    }
+    if (!request.notes || !request.notes.trim()) {
+      throw new Error("NOTES_REQUIRED: cosign notes are mandatory (SOX).");
+    }
+
+    let response: ExceptionDetailResponse;
+    if (request.approve) {
+      response = {
+        ...exc,
+        lifecycle_state: "RESOLVED",
+        final_status: "COMPLETE",
+        resolved_by: pending.initiator,
+        resolved_action: pending.action,
+        resolution_notes: pending.notes,
+        resolution_data: {
+          financial_impact_usd: pending.financial_impact_usd,
+          cosign: {
+            cosigned_by: caller,
+            cosigned_at: new Date().toISOString(),
+            cosign_notes: request.notes,
+            initiator: pending.initiator,
+            initiated_at: pending.initiated_at,
+          },
+        },
+      };
+    } else {
+      response = {
+        ...exc,
+        lifecycle_state: pending.from_lifecycle_state,
+        resolution_data: {
+          financial_impact_usd: pending.financial_impact_usd,
+          cosign_rejection: {
+            rejected_by: caller,
+            rejected_at: new Date().toISOString(),
+            rejection_notes: request.notes,
+            initiator: pending.initiator,
+          },
+        },
+      };
+    }
+    delete MOCK_PENDING_OVERRIDES[id];
+    idempotencyStore(`cosign:${id}`, idempotencyKey, request, response);
     return response;
   },
 

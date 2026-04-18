@@ -37,6 +37,8 @@ export type LifecycleState =
   | "PENDING_REVIEW"
   | "ESCALATED"
   | "PENDING_ADMIN_REVIEW"
+  /** Phase 2 #5 — high-value override staged for second-reviewer cosign. */
+  | "PENDING_COSIGN"
   | "EXECUTING"
   | "RESOLVED"
   | "FAILED"
