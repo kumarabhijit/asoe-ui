@@ -163,6 +163,7 @@ export const MOCK_HEALTH: HealthResponse = {
     "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
   allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py"],
+  allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION"],
 };
 
 /* ── Stats fixture ─────────────────────────────────────────────────── */

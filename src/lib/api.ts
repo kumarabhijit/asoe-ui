@@ -426,6 +426,10 @@ const MOCK_HEALTH: HealthResponse = {
     "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
   allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py", "DeliveryDelayResolutionRecipe.py"],
+  // Mirrors asoe2/constraints/specs.py AllowedResolutionAction. Backend is
+  // authoritative at runtime (/api/v1/health); this mock list exists only for
+  // local development.
+  allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION"],
 };
 
 /* ── Auth API (/api/auth/*) ─────��──────────────────────────────────── */

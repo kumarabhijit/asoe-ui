@@ -570,35 +570,24 @@ export default function ExceptionDetailPanel({
                 className="h-[32px] w-full rounded-md border border-border bg-surface-primary px-8 text-caption font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
               >
                 <option value="">Select an action…</option>
-                {/* Options are sourced dynamically — if the backend exposes an
-                    allowed-resolution-action list on the health endpoint it
-                    will flow through here. Falls back to an empty list so
-                    Guardrail #2 is never violated by hardcoded strings. */}
-                {(health?.allowed_recipes ?? []).map((_recipe) => null)}
-                {detail?.resolution_data && typeof detail.resolution_data === "object" &&
-                  Array.isArray((detail.resolution_data as Record<string, unknown>).allowed_actions)
-                  ? ((detail.resolution_data as Record<string, unknown>).allowed_actions as string[])
-                      .map((a) => (
-                        <option key={a} value={a}>{a.replace(/_/g, " ")}</option>
-                      ))
-                  : null}
+                {/* Options come from /api/v1/health.allowed_resolution_actions
+                    (authoritative source = asoe2/constraints/specs.py). When
+                    the server narrows the set for this specific exception via
+                    resolution_data.allowed_actions, prefer that narrower list
+                    — otherwise show the full vocabulary. Guardrail #2: no
+                    resolution-action string literal appears in this file. */}
+                {(() => {
+                  const narrowed = detail?.resolution_data
+                    && typeof detail.resolution_data === "object"
+                    && Array.isArray((detail.resolution_data as Record<string, unknown>).allowed_actions)
+                    ? ((detail.resolution_data as Record<string, unknown>).allowed_actions as string[])
+                    : null;
+                  const options = narrowed ?? health?.allowed_resolution_actions ?? [];
+                  return options.map((a) => (
+                    <option key={a} value={a}>{a.replace(/_/g, " ")}</option>
+                  ));
+                })()}
               </select>
-              {/* When the backend has not supplied an explicit options list
-                  (mock mode today), fall back to a free-text input so the
-                  operator can still submit the chosen action code. */}
-              {!(
-                detail?.resolution_data
-                && Array.isArray((detail.resolution_data as Record<string, unknown>).allowed_actions)
-              ) && (
-                <input
-                  type="text"
-                  value={overrideAction}
-                  onChange={(e) => setOverrideAction(e.target.value)}
-                  placeholder="Enter action code (e.g. ALLOW_BOTH)"
-                  aria-label="Resolution action code"
-                  className="h-[32px] w-full rounded-md border border-border bg-surface-primary px-8 text-caption font-mono text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
-                />
-              )}
             </label>
             <label className="flex flex-col gap-4 text-caption text-text-secondary">
               Notes (required)

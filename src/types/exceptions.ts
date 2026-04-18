@@ -697,4 +697,10 @@ export interface HealthResponse {
   allowed_intents: string[];
   lifecycle_states: string[];
   allowed_recipes: string[];
+  /**
+   * Full AllowedResolutionAction set (asoe2/constraints/specs.py). Consumed by
+   * the Override chooser so resolution action codes are never hardcoded in
+   * .tsx (Guardrail #2).
+   */
+  allowed_resolution_actions: string[];
 }
