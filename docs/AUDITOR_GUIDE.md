@@ -10,22 +10,38 @@
 
 Action buttons are gated by user role per Section 9.2. The backend enforces RBAC at the API layer; the UI complements this by rendering only the actions available to the authenticated user's role.
 
-| Role | YELLOW Verdict Actions | RED Verdict Actions | GREEN Verdict Actions |
-|---|---|---|---|
-| `analyst` | Approve, Reject, Escalate | Acknowledge, Escalate | (no actions — auto-resolved) |
-| `manager` | Approve, Reject, Escalate | Acknowledge, Escalate | (no actions — auto-resolved) |
-| `admin` | Approve, Reject, Escalate | Acknowledge, **Override** (requires `resolution_notes`), Escalate | (no actions — auto-resolved) |
-| `viewer` | None (view only) | None (view only) | (no actions — view only) |
-| `partner` | None (scoped view of own orders) | None | None |
+| Role | YELLOW Verdict Actions | RED Verdict Actions | GREEN Verdict Actions | PENDING_COSIGN |
+|---|---|---|---|---|
+| `analyst` | Approve, Reject, Escalate | Escalate | (no actions — auto-resolved) | (read-only awaiting-cosign banner) |
+| `manager` | Approve, Reject, **Decide…**, Escalate | **Decide…**, Escalate | **Decide…** (privileged override of auto-resolution) | Approve cosign / Reject cosign (if non-initiator) |
+| `admin` | Approve, Reject, **Decide…**, Escalate | **Decide…**, Escalate | **Decide…** | Approve cosign / Reject cosign (if non-initiator) |
+| `viewer` | None (view only) | None (view only) | (no actions — view only) | None |
+| `partner` | None (scoped view of own orders) | None | None | None |
 
-**RED Override safeguard (Section 11.1):** The Override button on RED exceptions is gated to the `admin` role via the `isAdmin` prop on `AgentReasoningCard`. Override requires a mandatory `resolution_notes` entry recorded in `policy_audit_log` for SOX compliance.
+**Button-to-permission mapping (Option A, Phase 3):**
+
+| Visible Button | aria-label | Required Permission | Endpoint |
+|---|---|---|---|
+| `Approve` | Approve recommendation (suffixed with recipe-recommended action when supplied) | `exceptions:approve` | `PATCH /api/v1/exceptions/{id}/disposition` |
+| `Reject` | Reject recommendation | `exceptions:approve` | `PATCH /api/v1/exceptions/{id}/disposition` |
+| `Decide…` | Choose different action | `exceptions:override` | `PATCH /api/v1/exceptions/{id}/disposition` (after chooser) |
+| `Escalate` / `Escalate for Triage` | Send for triage | `exceptions:escalate` | `POST /api/v1/exceptions/{id}/escalate` |
+| `Approve cosign` | Approve cosign | `exceptions:override` (non-initiator) | `POST /api/v1/exceptions/{id}/cosign` |
+| `Reject cosign` | Reject cosign | `exceptions:override` (non-initiator) | `POST /api/v1/exceptions/{id}/cosign` |
+| `Re-analyze` | Re-analyze exception | `exceptions:override` | `POST /api/v1/exceptions/{id}/reanalyze` |
+
+**Label evolution (Phase 3 UX panel):** The visible verb `Override…` was renamed to `Decide…` following voice-of-user research that "override" carried a negative connotation and was being avoided even when warranted. The aria-label and hover tooltip preserve the long-form "Choose different action" for screen-reader and mouse-over discoverability. The underlying permission name (`exceptions:override`) is unchanged.
+
+**Override chooser safeguards (SOX):** Clicking `Decide…` opens a bounded-vocabulary dialog. The resolution-action select is sourced from `GET /api/v1/health.allowed_resolution_actions` (or a server-narrowed subset on `resolution_data.allowed_actions`); the reason-category select is sourced from `health.allowed_override_reason_tags_by_intent[detail.intent]` (falling back to the global list). Notes are mandatory. Free-text action input was removed in Phase 3 — the reviewer can only choose from the authoritative vocabulary defined in `asoe2/constraints/specs.py`. This is the UI enforcement of Guardrail #2 for override actions.
+
+**Four-eyes cosign (Phase 2 #5 / asoe2 Phase 20):** When a privileged override exceeds the backend's financial-impact threshold, the record transitions to `lifecycle_state === "PENDING_COSIGN"` and a banner renders above the AgentReasoningCard showing initiator, staged action, reason_tag, and impact. A non-initiator manager+ cosigns; the initiator sees a read-only "Awaiting cosign" message — SoD (segregation of duties) is backend-enforced and the UI mirrors it. All cosign decisions carry mandatory notes.
 
 **Review Authority model (Phase 8.6):** The Exception Detail view enforces that human users act as **Review Authority** only. There are no "Execute Recipe", "Run Engine", or "Process" buttons in the UI. The human may Approve, Reject, or Escalate the agent's proposed resolution — execution is triggered by the backend upon approval, not by the UI. The Compliance Shadow verdict (GREEN/YELLOW/RED) is displayed as a **read-only badge**, not as an actionable control.
 
 **How to verify:**
-- `src/components/ui/AgentReasoningCard.tsx` — verdict-specific button rendering logic (Approve/Reject/Escalate only)
-- `src/app/exceptions/ExceptionDetailPanel.tsx` — no execution trigger buttons; Shadow Verdict as read-only badge in header ribbon
-- `src/lib/roles.ts` — `ROLE_PERMISSIONS` mapping aligned with `asoe2/api/deps.py`
+- `src/components/ui/AgentReasoningCard.tsx` — verdict × permission button matrix via `canApprove` / `canOverride` / `canEscalate` props; `actionInFlight` pessimistic UI
+- `src/app/exceptions/ExceptionDetailPanel.tsx` — `handleApprove` / `handleReject` / `handleEscalate` / `handleOverride` / `submitOverride` / `handleCosign` handlers; cosign banner on `PENDING_COSIGN`; Override chooser dialog; no execution trigger buttons; Shadow Verdict as read-only badge
+- `src/lib/roles.ts` — `ROLE_PERMISSIONS` mapping aligned with `asoe2/api/deps.py` (includes `exceptions:escalate` on analyst/manager/admin)
 
 **SOX relevance:** Prevents unauthorized financial exception resolution. Ensures separation of duty — agents propose, humans review, backend executes.
 
@@ -63,9 +79,18 @@ UI ← WebSocket event (WSEvent.trace_id) ← Redis pub/sub ← Worker
 - The `trace_id` and TraceRecord fields (skill_name, intent_selected, shadow_verdict, recipe_name, gateway_calls) are displayed in the **Trace Evidence** collapsible section within ExceptionDetailPanel, accessible via the "Show Diagnostics" toggle
 - Resolution Data (JSON) is also nested within Trace Evidence for audit review
 
-**How to verify:** Check `src/app/exceptions/ExceptionDetailPanel.tsx` — Trace Evidence section (inside Diagnostics toggle) displays all trace fields and resolution data.
+**Idempotency-Key emission (Phase 2 #9):** Every mutating client method (`disposition`, `escalate`, `cosign`, `reanalyze`, `resolve`, `resolveAsync`) emits an `Idempotency-Key` header on the outbound request. When the caller does not supply one via `RequestOptions.idempotencyKey`, `src/lib/api.ts::generateIdempotencyKey()` produces a UUID v4 per invocation. This guards against double-click and network-retry replays: the backend honours the key by returning the prior response when a duplicate arrives, preventing accidental double-dispositions. Together with `X-Trace-ID` this gives every mutating UI action a stable client-side identity that survives retries.
 
-**SOX relevance:** Every financial decision traceable from UI action to ERP effect.
+**Audit event visibility:** The UI does not render the hash-chained audit log itself (asoe2 Phase 20 `audit_log` is server-side, verifiable out-of-band by auditors). The UI displays the **human-consumable projection** of that chain:
+- `reanalysis_history` — prior re-analysis attempts with reasons (rendered in DiagnosticsSection)
+- `pending_override` cosign metadata — initiator, action, reason_tag, financial_impact_usd, initiated_at (rendered in the cosign banner when `lifecycle_state === "PENDING_COSIGN"`)
+- `cosign` metadata after sign-off — cosigned_by, cosigned_at, cosign_notes (rendered in resolution data)
+
+For cryptographic chain verification, auditors query the backend `audit_log` directly.
+
+**How to verify:** Check `src/app/exceptions/ExceptionDetailPanel.tsx` — Trace Evidence section (inside Diagnostics toggle) displays all trace fields and resolution data. Check `src/lib/api.ts` — `resolveIdempotencyKey()` / `generateIdempotencyKey()` for header emission logic.
+
+**SOX relevance:** Every financial decision traceable from UI action to ERP effect; replay-safe dispositions.
 
 ---
 

@@ -17,6 +17,20 @@ npm run dev
 
 ---
 
+## Demo flows (mock mode)
+
+The mock API (`src/lib/api.ts`) is seeded so you can exercise every governance flow locally without a backend:
+
+- **Approve / Reject (1-click):** any YELLOW exception — e.g. `exc-002`, `exc-007`, `exc-013`. Analyst role sees `Approve` + `Reject` + `Escalate`.
+- **Decide… (override chooser):** sign in as a manager or admin (e.g. `sarah.chen@acme-corp.com`, `jane@acme.com`) and click `Decide…` on any YELLOW or RED record. The chooser sources its resolution-action and reason-category vocabularies from `GET /api/v1/health`. Notes are mandatory.
+- **Four-eyes cosign:** exception IDs `exc-001` and `exc-010` are seeded in `MOCK_FINANCIAL_IMPACT_USD` above the cosign threshold ($25K and $42.5K respectively). Sign in as one manager, click `Decide…` and submit an override — the record transitions to `PENDING_COSIGN` and the cosign banner appears. Sign in as a **different** manager/admin (via the `UserSwitcher` in the nav) to see `[Approve cosign]` / `[Reject cosign]`. The initiator sees a read-only "Awaiting cosign" message (segregation of duties).
+- **Escalate:** available to analyst+ via the `exceptions:escalate` permission; wired to `exceptionsApi.escalate()`.
+- **Re-analyze:** YELLOW / RED / FAILED records show a `Re-analyze` button (manager+). Mandatory reason. Capped at 3 attempts.
+
+Every mutating call sends a client-generated `Idempotency-Key` (UUID v4) so repeated clicks are safe.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
