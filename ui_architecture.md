@@ -21,6 +21,7 @@
 9. [Alignment & Drift Register](#9-alignment--drift-register)
 10. [Proposed Backend Changes (asoe2)](#10-proposed-backend-changes-asoe2)
 11. [ADR References](#11-adr-references)
+12. [Override Action Governance (Option A)](#12-override-action-governance-option-a)
 
 ---
 
@@ -361,9 +362,10 @@ This preserves Guardrail #2: a new intent added in `asoe2` that populates `dupli
 | `exceptionsApi.resolve()` | `POST /api/v1/exceptions/resolve` | analyst+ | Mock | ALIGNED |
 | `exceptionsApi.resolveAsync()` | `POST /api/v1/exceptions/resolve/async` | analyst+ | Mock | ALIGNED |
 | `exceptionsApi.explain()` | `POST /api/v1/exceptions/resolve/explain` | analyst+ | Mock | ALIGNED |
-| `exceptionsApi.override()` | `PATCH /api/v1/exceptions/{id}/override` | manager+ | Mock | ALIGNED |
-| `exceptionsApi.approve()` | `POST /api/v1/exceptions/{id}/approve` | manager+ | Mock | ALIGNED |
-| `exceptionsApi.reject()` | `POST /api/v1/exceptions/{id}/reject` | manager+ | Mock | ALIGNED |
+| `exceptionsApi.disposition()` | `PATCH /api/v1/exceptions/{id}/disposition` | analyst+ / manager+ (sub_type-dependent) | Mock | ALIGNED (Phase 3 consolidation — replaces override/approve/reject) |
+| `exceptionsApi.escalate()` | `POST /api/v1/exceptions/{id}/escalate` | `exceptions:escalate` | Mock | ALIGNED |
+| `exceptionsApi.cosign()` | `POST /api/v1/exceptions/{id}/cosign` | manager+ (non-initiator) | Mock | ALIGNED (four-eyes) |
+| `exceptionsApi.reanalyze()` | `POST /api/v1/exceptions/{id}/reanalyze` | manager+ | Mock | ALIGNED |
 | `exceptionsApi.trace()` | `GET /api/v1/exceptions/{id}/trace` | analyst+ | Mock | ALIGNED |
 | `exceptionsApi.stats()` | `GET /api/v1/exceptions/stats` | analyst+ | Mock | ALIGNED |
 | `exceptionsApi.lineItems()` | `GET /api/v1/exceptions/{id}/line-items` | analyst+ | Mock | ALIGNED |
@@ -472,21 +474,25 @@ interface WSEvent {
 
 | Role | Permissions | UI Enforcement |
 |---|---|---|
-| `analyst` | `exceptions:read`, `exceptions:approve`, `dashboard:read` | View queue, approve individual |
-| `manager` | analyst + `exceptions:override`, `rules:write` | Override, bulk actions |
-| `admin` | manager + `users:manage`, `policy:write`, `audit:read` | User mgmt, settings, override with notes |
+| `analyst` | `exceptions:read`, `exceptions:approve`, `exceptions:escalate`, `dashboard:read` | View queue, approve/reject, escalate |
+| `manager` | analyst + `exceptions:override`, `rules:write` | Decide… (override chooser), cosign, bulk actions |
+| `admin` | manager + `users:manage`, `policy:write`, `audit:read` | User mgmt, settings, override + cosign |
 | `viewer` | `exceptions:read`, `dashboard:read` | View only — no action buttons |
 | `partner` | `exceptions:read` (scoped to own orders) | Scoped view within tenant |
 
 **Implementation:** `src/lib/roles.ts` — `ROLE_PERMISSIONS` mapping matches `asoe2/api/deps.py::_ROLE_PERMISSIONS` exactly (verified in pre-session audit).
 
-### Verdict-Action RBAC Matrix
+### Verdict-Action RBAC Matrix (Option A — Phase 3)
 
 | Verdict | analyst | manager | admin | viewer |
 |---|---|---|---|---|
-| GREEN | View Details | View Details | View Details | View Details |
-| YELLOW | Approve, Reject, Escalate | Approve, Reject, Escalate | Approve, Reject, Escalate | None |
-| RED | Acknowledge, Escalate | Acknowledge, Escalate | Acknowledge, **Override** (+ notes), Escalate | None |
+| GREEN | View Details | View Details, **Decide…** | View Details, **Decide…** | View Details |
+| YELLOW | Approve, Reject, Escalate | Approve, Reject, **Decide…**, Escalate | Approve, Reject, **Decide…**, Escalate | None |
+| RED | Escalate | **Decide…**, Escalate | **Decide…**, Escalate | None |
+| FAILED | Escalate for Triage | Escalate for Triage | Escalate for Triage | None |
+| PENDING_COSIGN | (awaiting-cosign banner, read-only) | Approve cosign / Reject cosign (if non-initiator) | Approve cosign / Reject cosign (if non-initiator) | None |
+
+**Option A rationale:** analysts clear YELLOW in one click with the primary Approve/Reject verbs. Managers get the `Decide…` affordance (override chooser) where they have `exceptions:override`. The prior `Acknowledge` verb was removed — it was calling Approve silently and hid the semantic choice. See Section 9 drift entry D12.
 
 ### Multi-Tenancy
 
@@ -547,6 +553,9 @@ _D1-D7 resolved during architecture alignment (2026-04-11)._
 | D9 | Polymorphic detail view | ExceptionDetailPanel adapts per intent via EntityProfile + ImpactMetrics. Dynamic header ribbon, context strip, Problem/Root Cause/Recommendation narrative. | **RESOLVED** — consol_arch.md Section 11.5 updated (2026-04-12) |
 | D10 | Governance: Review Authority model | Removed "Execute Recipe" button. Human acts as Review Authority only (Approve/Reject/Escalate). Shadow Verdict displayed as read-only badge. Execution triggered by backend on approval. | **RESOLVED** — consol_arch.md Section 11.5 updated, AUDITOR_GUIDE updated (2026-04-12) |
 | D11 | Intent-specific detail rendering | Adopted **data-presence pattern** over intent-dispatch pattern. The detail panel renders optional sections based on data fields present in `OrderAnalysis` (e.g., `duplicate_detection`, `pricing_waterfall`), not by branching on the intent string. This preserves Guardrail #2 and the polymorphic data-driven architecture. Full rationale in `prompts/exception_queue_duplicate_po.md`. | **RESOLVED** — architectural decision documented (2026-04-15) |
+| D12 | Override action verb rename | The "choose different action" button was labelled `Override…` through Phase 2. Voice-of-user research surfaced that "override" carries negative connotation ("I'm contradicting the system") and was being avoided even when warranted. Renamed to `Decide…` per the Phase 3 UX panel. aria-label and hover tooltip retain the long-form "Choose different action" for screen-reader parity. The API path, permission name (`exceptions:override`), and internal handler names (`handleOverride`, `submitOverride`) are unchanged — only the user-visible verb evolved. | **RESOLVED** — documented in Section 12 (2026-04-18) |
+| D13 | Disposition endpoint consolidation | `PATCH /override` + `POST /approve` + `POST /reject` collapsed into a single `PATCH /disposition` with a server-derived `sub_type` (APPROVE / REJECT / OVERRIDE). Client methods `exceptionsApi.override/approve/reject` deleted in Phase 3 — every disposition flows through `exceptionsApi.disposition(id, { action, notes, reason_tag })`. Mirrors asoe2 Phase 19 backend consolidation. | **RESOLVED** — documented in Section 6 + Section 12 (2026-04-18) |
+| D14 | Four-eyes cosign UI | New `PENDING_COSIGN` lifecycle state and cosign banner on the exception detail view. Mirrors asoe2 Phase 20 hash-chained audit + four-eyes staging. `LifecycleState` union dropped `EXECUTING`, added `PENDING_COSIGN`. | **RESOLVED** — documented in Section 12 (2026-04-18) |
 
 ### TYPE CONTRACT DRIFT (needs code or backend fix)
 
@@ -706,3 +715,84 @@ This needs architectural decision before backend implementation.
 | **ADR-009** | Per-node WebSocket events with typed envelope | Powers WaterfallStepper real-time visualization |
 
 All ADRs documented in `consol_arch.md` Section 13.
+
+---
+
+## 12. Override Action Governance (Option A)
+
+**Status:** SHIPPED (UI Phase 12 — paired with asoe2 Phase 19 backend consolidation + Phase 20 hash-chained audit). Replaces the pre-Phase-3 Override/Approve/Reject model.
+
+### 12.1 Verdict × Permission × Button Matrix
+
+The decision surface on an exception is assembled at render time from three orthogonal inputs: the Compliance Shadow verdict, the operator's RBAC permission flags (`canApprove` / `canOverride` / `canEscalate`), and the `actionInFlight` pessimistic UI state. No button visibility derives from `isAdmin` or role-string literals.
+
+| Verdict / State | `canApprove` only (analyst) | `canOverride` added (manager+) | `canEscalate` only |
+|---|---|---|---|
+| GREEN | View Details | `[Decide…]` | — |
+| YELLOW | `[Approve] [Reject] [Escalate]` | `[Approve] [Reject] [Decide…] [Escalate]` | `[Escalate]` |
+| RED | `[Escalate]` | `[Decide…] [Escalate]` | `[Escalate]` |
+| FAILED / execution error | `[Escalate for Triage]` | `[Escalate for Triage]` | `[Escalate for Triage]` |
+| PENDING_COSIGN | (initiator read-only banner) | `[Approve cosign] [Reject cosign]` (non-initiator) | — |
+
+**Guarantees:**
+
+- Analysts clear YELLOW in a single click via `Approve` / `Reject` (primary verbs).
+- The `Decide…` affordance is visible only to operators with `exceptions:override`. Clicking it opens the Override chooser dialog (Layer 2 expansion — see 12.3).
+- The prior `Acknowledge` button was removed — it was calling Approve silently and hid the semantic choice.
+- `actionInFlight` swaps the in-flight button's visible label to `Verbing…` (e.g. `Approving…`) and disables peer buttons to prevent double-submission. aria-label remains the noun-phrase form for screen-reader parity.
+- `Approve` carries a hover tooltip (`title`) previewing the recipe's recommended action when the record supplies one — e.g. `Approve: Apply Contract Price`. The aria-label absorbs the same preview.
+
+**Implementation:** `src/components/ui/AgentReasoningCard.tsx` renders the matrix; `src/app/exceptions/ExceptionDetailPanel.tsx` wires the handlers and permission props.
+
+### 12.2 Four-Eyes Cosign Banner
+
+When a privileged override exceeds the backend's financial-impact threshold, the backend stages it for second-reviewer sign-off (mirrors asoe2 Phase 20 policy `HIGH_VALUE_OVERRIDE_THRESHOLD_USD`). The record transitions to `lifecycle_state === "PENDING_COSIGN"` and the UI shows a cosign banner above the AgentReasoningCard.
+
+**Banner contents:** initiator email, staged action code, reason_tag, financial_impact_usd, and initiated_at. All sourced from `detail.resolution_data.pending_override` — no UI-side business logic.
+
+**RBAC split:**
+- Non-initiator with `exceptions:override` sees `[Approve cosign] [Reject cosign]`. Submission routes through `exceptionsApi.cosign(id, { approve, notes })` with mandatory notes.
+- The initiator sees the banner in read-only "Awaiting cosign" mode. SoD (segregation of duties) is enforced at the backend and mirrored in the UI; the UI never renders the cosign buttons to the initiator.
+
+**ActionInFlight extension:** the `ActionInFlight` union gained `cosign-approve` / `cosign-reject` for pessimistic UI on the cosign banner.
+
+**Implementation:** `ExceptionDetailPanel.tsx` `handleCosign(approve: boolean)` handler; inline banner rendering gated on `detail.lifecycle_state === "PENDING_COSIGN"`.
+
+### 12.3 Layer 1 / Layer 2 Reconciliation
+
+The Override chooser dialog is the **Layer 2 expansion** of the `Decide…` button (which lives in Layer 1 of AgentReasoningCard). It opens only on explicit user intent — consistent with Section 1's two-layer cognition rule that Layer 2 is never shown by default.
+
+**Chooser content:**
+
+| Field | Source | Notes |
+|---|---|---|
+| Resolution action (select) | `detail.resolution_data.allowed_actions` when server-narrowed, else `health.allowed_resolution_actions` | Guardrail #2 — no string literals in `.tsx`. Backend `asoe2/constraints/specs.py::AllowedResolutionAction` is authoritative. |
+| Reason category (select) | `health.allowed_override_reason_tags_by_intent[detail.intent]` → falls back to `health.allowed_override_reason_tags` | Per-intent narrowing framework already wired; real curation deferred (see Phase 5 cross-link below). |
+| Notes (textarea) | Free-text, mandatory | SOX audit trail. Submission blocked when empty. |
+
+**Free-text action input removed in Phase 3** — the chooser is a bounded-vocabulary select only.
+
+**Submission path:** `submitOverride` calls `exceptionsApi.disposition(id, { action, notes, reason_tag })`. The backend derives `sub_type` server-side from whether the chosen action equals the recommended action; the UI never computes APPROVE vs OVERRIDE.
+
+### 12.4 Contract-Driven Types + Idempotency
+
+DTOs are aliased from `src/types/generated.ts` (produced by `openapi-typescript` from the committed `asoe2/openapi/asoe2.openapi.json`) via the curated surface `src/types/contracts.ts`. `DispositionRequest`, `EscalateRequest`, `CosignRequest`, `ReanalyzeRequest`, and `ChallengeRequest` are all sourced this way. `OverrideRequest` / `ApproveRequest` / `RejectRequest` were deleted in Phase 3.
+
+`LifecycleState` dropped `EXECUTING` (no longer a persisted state) and added `PENDING_COSIGN`.
+
+Every mutating client method accepts a `RequestOptions` second argument (`{ idempotencyKey?: string }`). When omitted, the client generates a UUID v4 via `generateIdempotencyKey()` and sends it as the `Idempotency-Key` header. The mock implementation maintains a per-endpoint replay cache that mirrors backend semantics — replay-safe by default, even in local demo mode.
+
+### 12.5 Cross-Link: Phase 5 Deferred
+
+Per-intent reason_tag vocabulary curation is deferred — tracked in `asoe2/tasks.md` Phase 5. The UI already consumes `health.allowed_override_reason_tags_by_intent[detail.intent]`, so when product/compliance ships curated per-intent vocabularies a single `npm run generate-types` refreshes both sides; no `.tsx` changes are required.
+
+### 12.6 File Map
+
+| Concern | File |
+|---|---|
+| Button matrix + pessimistic UI | `src/components/ui/AgentReasoningCard.tsx` |
+| Handlers + cosign banner + Override chooser dialog | `src/app/exceptions/ExceptionDetailPanel.tsx` |
+| API client methods + Idempotency-Key | `src/lib/api.ts` (`disposition`, `escalate`, `cosign`, `reanalyze`) |
+| Permission flags | `src/lib/roles.ts` (`exceptions:approve`, `exceptions:override`, `exceptions:escalate`) |
+| Request/response DTOs | `src/types/contracts.ts` (aliases from `generated.ts`) |
+| Lifecycle state union | `src/types/exceptions.ts` (`LifecycleState`) |

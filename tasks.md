@@ -297,3 +297,126 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 - [ ] GitHub Actions CI: lint, type-check, test, build
 - [ ] `truffleHog` CI scan for credential detection
 - [ ] Docker Compose integration with `asoe2` containers
+
+---
+
+## PHASE 12 — Override Action UI (stakeholder "Option A"): complete
+
+Branch: `claude/fix-override-action-agents-IkRPl`. Paired with
+asoe2 Phase 19 (backend consolidation) + Phase 20 (hash-chained audit).
+
+### 12.1 AgentReasoningCard button matrix (Option A)
+- [x] YELLOW / analyst: `[Approve] [Reject] [Escalate]` (1-click)
+- [x] YELLOW / manager+: adds `[Decide…]` to the row (opens chooser)
+- [x] GREEN / manager+: `[Decide…]` only (passive auto-ack on list)
+- [x] RED / manager+: `[Decide…] [Escalate]`
+- [x] FAILED / isErrored: `[Escalate for Triage]` only
+- [x] Removed old "Acknowledge" button (was silently calling Approve)
+- [x] `canOverride` / `canApprove` / `canEscalate` props replace the
+      legacy `isAdmin` gate
+- [x] `actionInFlight` prop drives pessimistic UI — disables peer
+      buttons, swaps the in-flight button's label to "Verbing…"
+✅ Outcome: analyst queue-clearing is 1 click; manager+ sees the chooser
+   affordance only when they have the permission.
+
+### 12.2 Label + accessibility
+- [x] Visible labels: short verbs (Approve / Reject / Decide… / Escalate
+      / Re-analyze)
+- [x] aria-label / translation-key source strings: long-form noun
+      phrases (Approve recommendation / Reject recommendation / Choose
+      different action / Send for triage / Re-analyze exception)
+- [x] Approve shows a hover tooltip preview of the recipe's
+      recommended action when available
+      ("Approve: Apply Contract Price")
+- [x] Decide… hover tooltip carries "Choose different action"
+- [x] `Override…` → `Decide…` rename (voice-of-user research: the
+      word "override" carried negative connotation and was avoided)
+✅ Outcome: screen readers still hear the full noun phrase; visual
+   users see short verbs; mouse-hover reveals the full description.
+
+### 12.3 ExceptionDetailPanel wiring
+- [x] Passes the missing `onOverride` / `canOverride` / `canApprove` /
+      `canEscalate` / `actionInFlight` props that were never hooked up
+      in Phase 1 (original bug)
+- [x] `handleOverride` opens the chooser dialog; `submitOverride`
+      validates action + reason_tag + notes before the network call
+- [x] Override chooser dialog:
+      - Resolution-action select sourced from
+        `health.allowed_resolution_actions` (falls back to
+        record-specific narrower set if server supplied one)
+      - Reason-category select sourced from
+        `health.allowed_override_reason_tags_by_intent[detail.intent]`,
+        falling back to the global list (Guardrail #2 — zero hardcoded
+        codes in .tsx)
+      - Mandatory notes (SOX)
+- [x] Four-eyes cosign banner when `lifecycle_state === "PENDING_COSIGN"`:
+      shows initiator / action / reason / impact; non-initiator
+      manager+ sees [Approve cosign] / [Reject cosign]; initiator sees
+      read-only "awaiting cosign" message
+- [x] `handleEscalate` now calls `exceptionsApi.escalate` (was
+      piggybacking on `exceptionsApi.override({ action: "ESCALATE" })`)
+- [x] `handleApprove` / `handleReject` / `submitOverride` all route
+      through `exceptionsApi.disposition` after Phase 3 consolidation
+      (old `approve`/`reject`/`override` client methods deleted)
+✅ Outcome: Option A UI is fully wired end-to-end; no unreachable
+   buttons; no semantic mismatches between visible action and network
+   call.
+
+### 12.4 Types and API client
+- [x] `OverrideRequest` (Phase 2) → re-exported from `contracts.ts` →
+      deleted in Phase 3 once all call sites migrated to `DispositionRequest`
+- [x] `EscalateRequest` added with `reason` + optional `to_role`
+- [x] `CosignRequest` added with `approve` + mandatory `notes`
+- [x] `DispositionRequest` with `action`, `notes`, `reason_tag`
+- [x] `HealthResponse` extended with `allowed_resolution_actions`,
+      `allowed_override_reason_tags`, and
+      `allowed_override_reason_tags_by_intent`
+- [x] `LifecycleState` union: dropped `EXECUTING`, added `PENDING_COSIGN`
+- [x] Shared generated types (`src/types/generated.ts` via
+      `openapi-typescript`); curated aliases in `src/types/contracts.ts`
+- [x] Drift test `tests/architectural/openapi_drift.test.ts`
+- [x] npm scripts: `generate-types`, `verify-types`
+- [x] `exceptionsApi.disposition()` / `.escalate()` / `.cosign()`
+- [x] Client-generated Idempotency-Key (UUID v4) on every mutating call
+- [x] Mock implementations mirror backend four-eyes semantics —
+      `MOCK_PENDING_OVERRIDES` staging + `MOCK_FINANCIAL_IMPACT_USD`
+      so `exc-001` and `exc-010` trigger the cosign flow in demo mode
+✅ Outcome: types are contract-driven; mock mode behaves identically
+   to real-backend mode for every new flow.
+
+### 12.5 RBAC
+- [x] `exceptions:escalate` permission added to analyst / manager /
+      admin in `src/lib/roles.ts` (mirrors asoe2 `api/deps.py`)
+- [x] `exceptions:override` narrows to manager + admin (unchanged)
+- [x] All mutating button visibility derives from `hasPermission(...)`
+      at the page level and `canX` flags at the component level —
+      never `isAdmin` / `userRole === "admin"` literals
+✅ Outcome: permission gating is one layer (props) that mirrors the
+   backend permission surface.
+
+### 12.6 Tests
+- [x] 322 passed (+ audit-chain + drift + four-eyes + aria-label +
+      idempotency + Decide… rename + Approve tooltip + disposition
+      migration)
+- [x] Full matrix coverage: verdict × role × action for visible button
+      presence, aria-labels, titles, in-flight pessimistic states
+✅ Outcome: regression safety for every Option A eligibility row.
+
+### 12.7 Documentation
+- [x] `DESIGN.md` — new components, handlers, types, endpoints, cosign
+      banner, Decide… rename
+- [x] `ui_architecture.md` — Section 12 Override Action governance
+      (added); drift-register entry for the rename
+- [x] `docs/AUDITOR_GUIDE.md` — new RBAC surface + audit event sub_type
+      semantics
+- [x] `README.md` — mock demo (four-eyes at `exc-001` / `exc-010`)
+- [x] `tasks.md` — this checklist
+
+---
+
+## Phase 5 — Deferred: curated per-intent reason_tag vocabularies
+**(Tracked in asoe2/tasks.md Phase 5.)** The framework ships on the UI
+side as well: the Override chooser already narrows by
+`health.allowed_override_reason_tags_by_intent[detail.intent]`. When
+product/compliance curates per-intent categories, a single regen
+(`npm run generate-types`) updates the UI — no .tsx changes required.

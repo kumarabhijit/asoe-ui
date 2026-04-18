@@ -96,7 +96,7 @@ src/
 | `Sidebar` | Tailwind | 480px panel, escape-to-close, focus trap | (Available, not used in Outlook layout) |
 | `ActivityIndicator` | Tailwind | Node-specific domain-aware messages | WaterfallStepper |
 | `WaterfallStepper` | Tailwind | 10-node pipeline with per-node states | ExceptionDetailPanel |
-| `AgentReasoningCard` | Tailwind | Layer 1 only (recommendation + actions), verdict-specific behavior | ExceptionDetailPanel |
+| `AgentReasoningCard` | Tailwind | Layer 1 only (recommendation + actions), verdict × permission button matrix (Option A): `canApprove` / `canOverride` / `canEscalate` / `actionInFlight` / `recommendedAction` props. `Decide…` + Approve-tooltip preview. | ExceptionDetailPanel |
 | `PricingWaterfall` | Tailwind | Pricing condition chain timeline | ExceptionDetailPanel |
 | `GapBar` | Tailwind | Horizontal bar: primary vs secondary qty, shortfall/excess mode, gap indicator | BackOrderSection, OverMaxSection, MOQSection |
 | `GravitationalOrbs` | Custom (canvas) | Canvas animated background | Login |
@@ -182,9 +182,15 @@ Adding a new enrichment section requires only: (1) add the type to `OrderAnalysi
 
 **Shared helpers** (`shared.tsx`): `CollapsibleHeader` (used by ContextStrip, DiagnosticsSection) and `fmtPrice` (used by HeaderRibbon, ContextStrip, EvidenceGrid, enrichment sections).
 
-**RBAC permission gating:** Approve/Reject/Escalate action buttons are gated via `hasPermission()` — only users with the required `{resource}:{action}` RBAC permission see the buttons.
+**RBAC permission gating:** Approve/Reject/Decide…/Escalate action buttons are gated via `hasPermission()` — only users with the required `{resource}:{action}` RBAC permission see the buttons. Gates resolve to component props: `canApprove` (`exceptions:approve`), `canOverride` (`exceptions:override`), `canEscalate` (`exceptions:escalate`).
 
-**Action feedback:** Approve/Reject/Escalate actions show toast notifications (success/error) via `useToast()`. List auto-refreshes after any action via `onActionComplete` callback.
+**Override chooser dialog (Phase 3):** The `Decide…` button on `AgentReasoningCard` opens an override chooser dialog rendered inline in `ExceptionDetailPanel.tsx`. The dialog sources its resolution-action options from `health.allowed_resolution_actions` (preferring a record-specific narrower list from `resolution_data.allowed_actions` when the server supplies one), and its reason-category options from `health.allowed_override_reason_tags_by_intent[detail.intent]` (falling back to the global `health.allowed_override_reason_tags`). Notes are mandatory (SOX). Submission calls `exceptionsApi.disposition()` with `{ action, notes, reason_tag }`. No free-text action input — Guardrail #2.
+
+**Four-eyes cosign banner:** When `detail.lifecycle_state === "PENDING_COSIGN"`, `ExceptionDetailPanel` renders a cosign banner above the AgentReasoningCard showing initiator, staged action, reason_tag, and financial impact (from `resolution_data.pending_override`). Non-initiator manager+ users see `[Approve cosign] [Reject cosign]` buttons wired to `handleCosign(approve: boolean)` → `exceptionsApi.cosign()`. The initiator sees a read-only "awaiting cosign" message (SoD enforcement mirrored from backend). `ActionInFlight` extends with `cosign-approve` / `cosign-reject` for pessimistic UI.
+
+**Disposition handlers:** `handleApprove`, `handleReject`, and `submitOverride` all route through `exceptionsApi.disposition()` after Phase 3 consolidation — the server derives sub_type from whether the chosen action equals the recommended action. `handleEscalate` calls `exceptionsApi.escalate()` directly (no longer piggybacking on override with `action: "ESCALATE"`).
+
+**Action feedback:** All mutations show toast notifications (success/error) via `useToast()`. List auto-refreshes after any action via `onActionComplete` callback.
 
 **WebSocket wiring:** The page orchestrator connects via `useWebSocket` and routes events to the detail panel via `onRefreshRef`. `pipeline_progress` events update the WaterfallStepper in real-time. `exception_update` and `task_complete` events refresh both the list and the currently viewed exception.
 
@@ -243,14 +249,20 @@ Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 | `Intent` | `Intent` enum (contracts/models.py) | exceptions.ts |
 | `ShadowVerdict` | `ShadowStatus` enum | exceptions.ts |
 | `TerminalStatus` | `TerminalStatus` enum | exceptions.ts |
-| `LifecycleState` | `LIFECYCLE_STATES` list | exceptions.ts |
+| `LifecycleState` | `LIFECYCLE_STATES` list — `EXECUTING` removed, `PENDING_COSIGN` added (Phase 2 #5 four-eyes staging state) | exceptions.ts |
 | `PipelineNode` | 10 node names from orchestration/nodes.py | exceptions.ts |
 | `OrderEvent` | `OrderEvent` model | exceptions.ts |
 | `ComplianceDecision` | `ComplianceDecision` model | exceptions.ts |
 | `ExceptionSummary` | `ExceptionSummary` schema (+ `account_id`, `account_name`) | exceptions.ts |
 | `ExceptionDetail` | `ExceptionDetailResponse` schema | exceptions.ts |
 | `TraceRecord` | `TraceResponse` schema | exceptions.ts |
-| `HealthResponse` | Health endpoint response | exceptions.ts |
+| `HealthResponse` | Health endpoint response — extended with `allowed_resolution_actions`, `allowed_override_reason_tags`, and `allowed_override_reason_tags_by_intent` | exceptions.ts |
+| `DispositionRequest` | `DispositionRequest` (schemas.py) — `{ action, notes, reason_tag }`; single unified disposition DTO (replaces OverrideRequest / ApproveRequest / RejectRequest, all deleted in Phase 3) | contracts.ts (re-exported via api.ts) |
+| `EscalateRequest` | `EscalateRequest` (schemas.py) — `{ reason, to_role? }` | contracts.ts |
+| `CosignRequest` | `CosignRequest` (schemas.py) — `{ approve, notes }`; notes mandatory (SOX) | contracts.ts |
+| `ReanalyzeRequest` | `ReanalyzeRequest` (schemas.py) — `{ reason }` (mandatory) | contracts.ts |
+| `ChallengeRequest` | `ChallengeRequest` (schemas.py) | contracts.ts |
+| `RequestOptions` | Per-call options for mutating requests — `{ idempotencyKey? }`. When omitted the client generates a UUID v4 per call. | api.ts |
 | `ResolveRequest` | `ResolveRequest` schema | api.ts |
 | `ResolveResponse` | `ResolveResponse` schema | api.ts |
 | `StatsResponse` | Stats endpoint response | api.ts |
@@ -312,9 +324,10 @@ Maps to Section 6.2 REST endpoints:
 | `exceptionsApi.resolve()` | `POST /api/v1/exceptions/resolve` | 6.2 |
 | `exceptionsApi.resolveAsync()` | `POST /api/v1/exceptions/resolve/async` | 6.2 |
 | `exceptionsApi.explain()` | `POST /api/v1/exceptions/resolve/explain` | 6.2 |
-| `exceptionsApi.override()` | `PATCH /api/v1/exceptions/{id}/override` | 6.2 |
-| `exceptionsApi.approve()` | `POST /api/v1/exceptions/{id}/approve` | 6.2 |
-| `exceptionsApi.reject()` | `POST /api/v1/exceptions/{id}/reject` | 6.2 |
+| `exceptionsApi.disposition()` | `PATCH /api/v1/exceptions/{id}/disposition` | 6.2 (Phase 3 consolidation — replaces override/approve/reject) |
+| `exceptionsApi.escalate()` | `POST /api/v1/exceptions/{id}/escalate` | 6.2 |
+| `exceptionsApi.cosign()` | `POST /api/v1/exceptions/{id}/cosign` | 6.2 (four-eyes second-reviewer) |
+| `exceptionsApi.reanalyze()` | `POST /api/v1/exceptions/{id}/reanalyze` | 6.2 |
 | `exceptionsApi.trace()` | `GET /api/v1/exceptions/{id}/trace` | 6.2 |
 | `exceptionsApi.stats()` | `GET /api/v1/exceptions/stats` | 6.2 |
 | `exceptionsApi.lineItems()` | Line items for an exception (UI mock) | — |
@@ -323,6 +336,12 @@ Maps to Section 6.2 REST endpoints:
 **User management endpoints:** `usersApi.list()` returns 6 seed users for sandbox switching. `usersApi.switch(email)` triggers a `signIn("credentials")` round-trip to re-derive JWT with the target user's RBAC, `visible_tabs`, and `assigned_accounts`. `computeVisibleTabs()` derives tab visibility from the user's RBAC permissions.
 
 **Mock strategy:** All endpoints return mock data with simulated latency. To connect to real FastAPI, replace the mock implementations with `fetch()` calls to `NEXT_PUBLIC_API_URL`. The interface (function signatures and return types) stays the same.
+
+**Idempotency-Key handling:** Every mutating client method (`disposition`, `escalate`, `cosign`, `reanalyze`, `resolve`, `resolveAsync`) accepts an optional `RequestOptions` second argument with `idempotencyKey?: string`. When omitted, the client generates a UUID v4 per invocation via `generateIdempotencyKey()` and sends it as the `Idempotency-Key` header. The mock implementation maintains a per-endpoint cache keyed by `(endpoint, key)` so replayed calls return the cached response and key-with-different-body raises a conflict — mirroring backend behavior.
+
+**Contract-driven DTOs (Phase 2 #9):** `DispositionRequest`, `EscalateRequest`, `CosignRequest`, `ReanalyzeRequest`, and `ChallengeRequest` are aliased from `src/types/generated.ts`, which is produced by `npm run generate-types` from the committed `asoe2/openapi/asoe2.openapi.json`. Hand-editing these shapes is not permitted — change the Pydantic model in `asoe2/api/schemas.py`, re-export OpenAPI, regenerate. `tests/architectural/openapi_drift.test.ts` fails CI on drift.
+
+**Four-eyes mock:** `MOCK_FINANCIAL_IMPACT_USD` seeds `exc-001` ($25K) and `exc-010` ($42.5K) above the cosign threshold so the mock `disposition` call stages a `MOCK_PENDING_OVERRIDES` entry, transitions the record to `PENDING_COSIGN`, and lets `exceptionsApi.cosign()` exercise the full four-eyes roundtrip in local demo mode. Matches backend semantics exactly.
 
 **Mock users:** 6 seed users — jane@acme.com (admin), marcus.webb@acme-corp.com (admin), sarah.chen (manager), sarah.chen.sr (analyst), james.ortiz (analyst, scoped to acct-walmart/acct-kroger), priya.nair (analyst, scoped to acct-target/acct-costco). Each user has `title`, `avatar_initials`, `assigned_accounts`, and RBAC-derived `visible_tabs`.
 
@@ -346,11 +365,19 @@ Maps to Section 6.2 REST endpoints:
 
 | Role | Permissions |
 |---|---|
-| `analyst` | `exceptions:read`, `exceptions:approve`, `dashboard:read` |
+| `analyst` | `exceptions:read`, `exceptions:approve`, `exceptions:escalate`, `dashboard:read` |
 | `manager` | analyst + `exceptions:override`, `rules:write` |
 | `admin` | manager + `users:manage`, `policy:write`, `audit:read` |
 | `viewer` | `exceptions:read`, `dashboard:read` |
 | `partner` | `exceptions:read` (scoped to own orders) |
+
+**Permission-to-button mapping (Option A):**
+
+| Permission | Button | Visible on |
+|---|---|---|
+| `exceptions:approve` | Approve / Reject | YELLOW only |
+| `exceptions:override` | Decide… (opens chooser) / cosign Approve/Reject | GREEN / YELLOW / RED; cosign banner on PENDING_COSIGN |
+| `exceptions:escalate` | Escalate / Escalate for Triage | YELLOW / RED / FAILED |
 
 **Middleware** (`src/middleware.ts`): Protects all routes except `/login`, `/auth/callback`, `/api/auth`. Redirects unauthenticated users to `/login`.
 
