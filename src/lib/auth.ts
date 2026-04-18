@@ -72,6 +72,13 @@ export const authOptions: NextAuthOptions = {
         u.assigned_accounts = token.assigned_accounts;
         u.visible_tabs = token.visible_tabs;
       }
+      // Expose the backend-issued JWT on the session root so client code
+      // (src/lib/api.ts::getAuthToken) can attach it as the
+      // Authorization: Bearer header on outgoing fetch() calls. Without
+      // this the api client sees no token, every authenticated call
+      // goes unauthenticated, and asoe2 returns empty list / 404 detail.
+      (session as unknown as Record<string, unknown>).accessToken =
+        token.accessToken;
       return session;
     },
   },

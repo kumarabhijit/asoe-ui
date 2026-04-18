@@ -10,6 +10,11 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.{ts,tsx}"],
+    // Playwright browser-driven specs live under tests/browser/ and are
+    // run by `npm run test:browser`. Vitest must not pick them up — they
+    // use @playwright/test's test() + page fixture which has a different
+    // runtime model.
+    exclude: ["tests/browser/**", "node_modules/**", "dist/**", ".next/**"],
     css: false,
   },
 });

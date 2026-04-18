@@ -11,7 +11,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "generate-types": "openapi-typescript ../asoe2/openapi/asoe2.openapi.json -o src/types/generated.ts",
-    "verify-types": "openapi-typescript ../asoe2/openapi/asoe2.openapi.json -o /tmp/asoe-ui.generated.ts && diff -q src/types/generated.ts /tmp/asoe-ui.generated.ts"
+    "verify-types": "openapi-typescript ../asoe2/openapi/asoe2.openapi.json -o /tmp/asoe-ui.generated.ts && diff -q src/types/generated.ts /tmp/asoe-ui.generated.ts",
+    "test:browser": "playwright test",
+    "test:browser:ui": "playwright test --ui",
+    "test:browser:headed": "playwright test --headed"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -32,6 +35,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
