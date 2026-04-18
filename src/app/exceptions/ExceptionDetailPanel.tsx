@@ -150,20 +150,45 @@ export default function ExceptionDetailPanel({
 
   /* ── Actions (RBAC-gated via hasPermission) ─────────────────────── */
 
+  /**
+   * Phase 3: Approve / Reject / Override all route through the unified
+   * PATCH /disposition endpoint. Sub-type is derived server-side from the
+   * chosen action vs. the recipe's recommended_action:
+   *   chosen == recommended      → APPROVE (exceptions:approve)
+   *   chosen == "NO_ACTION"      → REJECT  (exceptions:approve)
+   *   chosen != recommended      → OVERRIDE (exceptions:override,
+   *                                           four-eyes applies)
+   */
+  function _recommendedAction(): string | null {
+    const rd = (detail?.resolution_data ?? {}) as Record<string, unknown>;
+    const v = rd.recommended_action;
+    return typeof v === "string" ? v : null;
+  }
+
   async function handleApprove(comment: string) {
     if (!hasPermission("exceptions:approve")) {
       addToast("warning", "Permission denied: your role cannot approve exceptions.");
       return;
     }
+    const recommended = _recommendedAction();
+    if (!recommended) {
+      addToast("warning", "No recipe recommendation on this exception — use Override to choose an action.");
+      return;
+    }
     setActionInFlight("approve");
     try {
-      const updated = await exceptionsApi.approve(exceptionId, { notes: comment || undefined });
+      const updated = await exceptionsApi.disposition(exceptionId, {
+        action: recommended,
+        notes: comment || "Approved by reviewer",
+        reason_tag: "other",
+      });
       setDetail(updated);
-      addToast("success", `Exception ${exceptionId} approved`);
+      addToast("success", `Exception ${exceptionId} approved (${recommended})`);
       onActionComplete?.();
     } catch (err) {
       console.error("Approve failed:", err);
-      addToast("error", "Failed to approve exception. Please try again.");
+      const msg = err instanceof Error ? err.message : "Failed to approve exception.";
+      addToast("error", msg);
     } finally { setActionInFlight(null); }
   }
 
@@ -174,13 +199,18 @@ export default function ExceptionDetailPanel({
     }
     setActionInFlight("reject");
     try {
-      const updated = await exceptionsApi.reject(exceptionId, { reason: comment || "Rejected by reviewer" });
+      const updated = await exceptionsApi.disposition(exceptionId, {
+        action: "NO_ACTION",
+        notes: comment || "Rejected by reviewer",
+        reason_tag: "other",
+      });
       setDetail(updated);
       addToast("success", `Exception ${exceptionId} rejected`);
       onActionComplete?.();
     } catch (err) {
       console.error("Reject failed:", err);
-      addToast("error", "Failed to reject exception. Please try again.");
+      const msg = err instanceof Error ? err.message : "Failed to reject exception.";
+      addToast("error", msg);
     } finally { setActionInFlight(null); }
   }
 
@@ -245,7 +275,13 @@ export default function ExceptionDetailPanel({
     }
     setActionInFlight("override");
     try {
-      const updated = await exceptionsApi.override(exceptionId, {
+      // Phase 3: every disposition goes through /disposition. The server
+      // classifies sub_type (APPROVE/REJECT/OVERRIDE) from the chosen
+      // action vs. the record's recommended_action. For this chooser the
+      // user has explicitly picked a resolution action + reason_tag, so
+      // sub_type will be OVERRIDE (or APPROVE if they happened to pick
+      // the recommended action — also valid).
+      const updated = await exceptionsApi.disposition(exceptionId, {
         action: overrideAction,
         notes: overrideNotes.trim(),
         reason_tag: overrideReasonTag,
@@ -562,6 +598,9 @@ export default function ExceptionDetailPanel({
               intent={detail.intent ?? undefined}
               confidence={analysis?.confidence ? analysis.confidence / 100 : 0.92}
               recipeName={detail.selected_recipe ?? undefined}
+              // Surfaced as a hover tooltip on the Approve button so the
+              // reviewer sees the exact action they're accepting.
+              recommendedAction={_recommendedAction() ?? undefined}
               // Don't fall back to a success-sounding default when the pipeline
               // actually failed — leave the execution-error banner as the sole
               // narrative in that case.
@@ -708,18 +747,29 @@ export default function ExceptionDetailPanel({
               Reason category
               {/* Controlled vocabulary (Guardrail #2). Feeds ML clustering
                   of overrides by category downstream — free-text notes are
-                  captured below but are not a reliable training signal. */}
-              <select
-                value={overrideReasonTag}
-                onChange={(e) => setOverrideReasonTag(e.target.value)}
-                aria-label="Override reason category"
-                className="h-[32px] w-full rounded-md border border-border bg-surface-primary px-8 text-caption font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
-              >
-                <option value="">Select a reason…</option>
-                {(health?.allowed_override_reason_tags ?? []).map((t) => (
-                  <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
-                ))}
-              </select>
+                  captured below but are not a reliable training signal.
+                  Phase 3 Option A: prefer the per-intent narrowed list
+                  when the backend provides one for this record's intent;
+                  fall back to the global list otherwise. */}
+              {(() => {
+                const perIntent = detail?.intent
+                  ? health?.allowed_override_reason_tags_by_intent?.[detail.intent]
+                  : undefined;
+                const options = perIntent ?? health?.allowed_override_reason_tags ?? [];
+                return (
+                  <select
+                    value={overrideReasonTag}
+                    onChange={(e) => setOverrideReasonTag(e.target.value)}
+                    aria-label="Override reason category"
+                    className="h-[32px] w-full rounded-md border border-border bg-surface-primary px-8 text-caption font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
+                  >
+                    <option value="">Select a reason…</option>
+                    {options.map((t) => (
+                      <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                    ))}
+                  </select>
+                );
+              })()}
             </label>
             <label className="flex flex-col gap-4 text-caption text-text-secondary">
               Notes (required)

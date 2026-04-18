@@ -712,4 +712,14 @@ export interface HealthResponse {
    * hardcoded in .tsx.
    */
   allowed_override_reason_tags: string[];
+  /**
+   * Per-intent narrowing of the reason-tag vocabulary
+   * (asoe2/constraints/specs.py::INTENT_REASON_TAGS). Keys match
+   * allowed_intents; values are the subset of allowed_override_reason_tags
+   * that apply to each intent. The Override chooser narrows its option
+   * list by detail.intent when a match exists; otherwise it falls back to
+   * the global list. Today every intent maps to the full global set —
+   * curated per-intent categories are a follow-up (Phase 5 deferred item).
+   */
+  allowed_override_reason_tags_by_intent: Record<string, string[]>;
 }

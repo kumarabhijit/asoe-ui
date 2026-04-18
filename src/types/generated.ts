@@ -270,23 +270,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exceptions/{exception_id}/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Approve Exception */
-        post: operations["approve_exception_api_v1_exceptions__exception_id__approve_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/exceptions/{exception_id}/challenge": {
         parameters: {
             query?: never;
@@ -380,41 +363,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exceptions/{exception_id}/override": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Override Exception
-         * @description Override the agent's recommended action (Option A, Phase 1).
-         *
-         *     Privileged users (manager+) may Override across GREEN (RESOLVED),
-         *     YELLOW (PENDING_REVIEW/ESCALATED), and RED (BLOCKED) verdicts.
-         *     Analysts cannot Override (they use Approve/Reject on YELLOW).
-         *
-         *     The shadow_verdict must be one of GREEN/YELLOW/RED — FAILED-lifecycle
-         *     exceptions (where no agent decision exists to override) are rejected
-         *     with 409 INVALID_VERDICT.
-         *
-         *     The auditor identity is always ``user.sub`` (JWT); clients must not
-         *     pass ``resolved_by``. Notes are mandatory (SOX audit requirement).
-         *
-         *     Supports an optional ``Idempotency-Key`` header. Repeat calls within
-         *     24h return the cached response; conflicting bodies with the same key
-         *     return 409 IDEMPOTENCY_CONFLICT.
-         */
-        patch: operations["override_exception_api_v1_exceptions__exception_id__override_patch"];
-        trace?: never;
-    };
     "/api/v1/exceptions/{exception_id}/override/cosign": {
         parameters: {
             query?: never;
@@ -473,23 +421,6 @@ export interface paths {
          *       and in the policy audit log (SOX).
          */
         post: operations["reanalyze_exception_api_v1_exceptions__exception_id__reanalyze_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/exceptions/{exception_id}/reject": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reject Exception */
-        post: operations["reject_exception_api_v1_exceptions__exception_id__reject_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -624,14 +555,6 @@ export interface components {
             risk: string;
         };
         /**
-         * ApproveRequest
-         * @description POST /api/v1/exceptions/{id}/approve — resume paused exception.
-         */
-        ApproveRequest: {
-            /** Notes */
-            notes?: string | null;
-        };
-        /**
          * AsyncResolveResponse
          * @description POST /api/v1/exceptions/resolve/async — queued task.
          */
@@ -719,10 +642,7 @@ export interface components {
             action: string;
             /** Notes */
             notes: string;
-            /**
-             * Reason Tag
-             * @default other
-             */
+            /** Reason Tag */
             reason_tag: string;
         };
         /**
@@ -850,6 +770,10 @@ export interface components {
             allowed_intents: string[];
             /** Allowed Override Reason Tags */
             allowed_override_reason_tags: string[];
+            /** Allowed Override Reason Tags By Intent */
+            allowed_override_reason_tags_by_intent: {
+                [key: string]: string[];
+            };
             /** Allowed Recipes */
             allowed_recipes: string[];
             /** Allowed Resolution Actions */
@@ -935,30 +859,6 @@ export interface components {
             mfa_token: string;
         };
         /**
-         * OverrideRequest
-         * @description PATCH /api/v1/exceptions/{id}/override — human override of agent recommendation.
-         *
-         *     Option A (Phase 1 unified action model): available on PENDING_REVIEW,
-         *     ESCALATED, RESOLVED (GREEN), and BLOCKED (RED) exceptions. Analysts
-         *     cannot Override — this is a manager+ action. Action must be a valid
-         *     AllowedResolutionAction. Notes are mandatory (SOX).
-         *
-         *     The auditor identity is derived server-side from the authenticated
-         *     user (user.sub) — clients must not pass a ``resolved_by`` field
-         *     (identity-spoofing risk). Any such extra field is rejected (422).
-         */
-        OverrideRequest: {
-            /** Action */
-            action: string;
-            /** Notes */
-            notes: string;
-            /**
-             * Reason Tag
-             * @default other
-             */
-            reason_tag: string;
-        };
-        /**
          * PolicyOverrideResponse
          * @description Response for policy update.
          */
@@ -1031,14 +931,6 @@ export interface components {
         RefreshRequest: {
             /** Refresh Token */
             refresh_token: string;
-        };
-        /**
-         * RejectRequest
-         * @description POST /api/v1/exceptions/{id}/reject — reject paused exception.
-         */
-        RejectRequest: {
-            /** Reason */
-            reason?: string | null;
         };
         /**
          * ResolveRequest
@@ -1786,43 +1678,6 @@ export interface operations {
             };
         };
     };
-    approve_exception_api_v1_exceptions__exception_id__approve_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                Authorization?: string | null;
-            };
-            path: {
-                exception_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ApproveRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExceptionDetailResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     challenge_exception_api_v1_exceptions__exception_id__challenge_post: {
         parameters: {
             query?: never;
@@ -1969,44 +1824,6 @@ export interface operations {
             };
         };
     };
-    override_exception_api_v1_exceptions__exception_id__override_patch: {
-        parameters: {
-            query?: never;
-            header?: {
-                "Idempotency-Key"?: string | null;
-                Authorization?: string | null;
-            };
-            path: {
-                exception_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["OverrideRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExceptionDetailResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     cosign_override_api_v1_exceptions__exception_id__override_cosign_post: {
         parameters: {
             query?: never;
@@ -2059,43 +1876,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ReanalyzeRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExceptionDetailResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reject_exception_api_v1_exceptions__exception_id__reject_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                Authorization?: string | null;
-            };
-            path: {
-                exception_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RejectRequest"];
             };
         };
         responses: {

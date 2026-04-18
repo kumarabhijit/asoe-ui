@@ -21,12 +21,12 @@
 
 import type { components } from "./generated";
 
-export type OverrideRequest = components["schemas"]["OverrideRequest"];
+// Phase 3: OverrideRequest / ApproveRequest / RejectRequest removed —
+// their endpoints were deleted and all dispositions flow through
+// DispositionRequest on PATCH /disposition (sub_type discriminated).
 export type EscalateRequest = components["schemas"]["EscalateRequest"];
 export type CosignRequest = components["schemas"]["CosignRequest"];
 export type DispositionRequest = components["schemas"]["DispositionRequest"];
 export type HealthResponse = components["schemas"]["HealthResponse"];
-export type ApproveRequest = components["schemas"]["ApproveRequest"];
-export type RejectRequest = components["schemas"]["RejectRequest"];
 export type ChallengeRequest = components["schemas"]["ChallengeRequest"];
 export type ReanalyzeRequest = components["schemas"]["ReanalyzeRequest"];

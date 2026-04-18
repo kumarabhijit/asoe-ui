@@ -15,13 +15,10 @@ import type {
   AsyncResolveResponse,
   ExceptionListResponse,
   ExceptionDetailResponse,
-  OverrideRequest,
   EscalateRequest,
   CosignRequest,
   RequestOptions,
   DispositionRequest,
-  ApproveRequest,
-  RejectRequest,
   ChallengeRequest,
   ReanalyzeRequest,
   AdminReleaseRequest,
@@ -474,6 +471,14 @@ const MOCK_HEALTH: HealthResponse = {
   allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION"],
   // Mirrors asoe2/constraints/specs.py AllowedOverrideReasonTag.
   allowed_override_reason_tags: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
+  // Per-intent narrowing (Phase 3 Option A framework). Mock currently
+  // seeds every intent with the full global set — matches the backend's
+  // behavior until real curation arrives.
+  allowed_override_reason_tags_by_intent: Object.fromEntries(
+    ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY"].map(
+      (intent) => [intent, ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"]],
+    ),
+  ),
 };
 
 /* ── Auth API (/api/auth/*) ─────��──────────────────────────────────── */
@@ -634,66 +639,6 @@ export const exceptionsApi = {
     };
   },
 
-  async override(
-    id: string,
-    request: OverrideRequest,
-    options?: RequestOptions,
-  ): Promise<ExceptionDetailResponse> {
-    // Resolve-or-generate the Idempotency-Key before the network call so
-    // retries re-use the same key and hit the backend cache. In the real
-    // client this would be set as an `Idempotency-Key` request header.
-    const idempotencyKey = resolveIdempotencyKey(options);
-    const cached = idempotencyLookup(`override:${id}`, idempotencyKey, request);
-    if (cached) return cached;
-
-    await delay(MOCK_DELAY);
-    const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
-    if (!exc) throw new Error("Exception not found");
-
-    // Four-eyes (Phase 2 #5): mirror the backend. If the record's declared
-    // financial impact is at/above the threshold, stage the override as
-    // PENDING_COSIGN instead of resolving immediately. The UI looks up
-    // impact from MOCK_FINANCIAL_IMPACT_USD; in prod the backend reads
-    // record.resolution_data.financial_impact_usd.
-    const impact = MOCK_FINANCIAL_IMPACT_USD[id] ?? null;
-    if (impact !== null && impact >= HIGH_VALUE_OVERRIDE_THRESHOLD_USD) {
-      const pending: MockPendingOverride = {
-        action: request.action,
-        notes: request.notes,
-        reason_tag: request.reason_tag ?? "other",
-        initiator: _currentMockUser?.email ?? "mock-user",
-        initiated_at: new Date().toISOString(),
-        financial_impact_usd: impact,
-        from_lifecycle_state: exc.lifecycle_state,
-      };
-      MOCK_PENDING_OVERRIDES[id] = pending;
-      const response: ExceptionDetailResponse = {
-        ...exc,
-        lifecycle_state: "PENDING_COSIGN",
-        resolution_data: {
-          financial_impact_usd: impact,
-          pending_override: pending,
-        },
-      };
-      idempotencyStore(`override:${id}`, idempotencyKey, request, response);
-      return response;
-    }
-
-    const response: ExceptionDetailResponse = {
-      ...exc,
-      lifecycle_state: "RESOLVED",
-      final_status: "COMPLETE",
-      resolution_data: {},
-      // Backend derives resolved_by from the caller's identity (trust
-      // boundary fix). The mock mirrors that — no client-supplied value.
-      resolved_by: _currentMockUser?.email ?? "mock-user",
-      resolved_action: request.action,
-      resolution_notes: request.notes,
-    };
-    idempotencyStore(`override:${id}`, idempotencyKey, request, response);
-    return response;
-  },
-
   async cosign(
     id: string,
     request: CosignRequest,
@@ -838,46 +783,6 @@ export const exceptionsApi = {
     };
     idempotencyStore(`escalate:${id}`, idempotencyKey, request, response);
     return response;
-  },
-
-  async approve(id: string, request?: ApproveRequest): Promise<ExceptionDetailResponse> {
-    await delay(MOCK_DELAY);
-    const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
-    if (!exc) throw new Error("Exception not found");
-    const ts = new Date().toISOString();
-    // Backend resumes graph execution to completion on approve
-    return {
-      ...exc,
-      lifecycle_state: "RESOLVED",
-      final_status: "COMPLETE",
-      resolution_data: {
-        action: "APPROVED_BY_REVIEWER",
-        recipe_result: "Resolution applied successfully",
-        reviewer_comment: request?.notes || null,
-        reviewed_at: ts,
-      },
-      resolved_by: "jane.doe@acme.com",
-      resolution_notes: request?.notes,
-    };
-  },
-
-  async reject(id: string, request?: RejectRequest): Promise<ExceptionDetailResponse> {
-    await delay(MOCK_DELAY);
-    const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
-    if (!exc) throw new Error("Exception not found");
-    const ts = new Date().toISOString();
-    return {
-      ...exc,
-      lifecycle_state: "REJECTED",
-      final_status: "REJECTED",
-      resolution_data: {
-        action: "REJECTED_BY_REVIEWER",
-        rejection_reason: request?.reason || "No reason provided",
-        reviewed_at: ts,
-      },
-      resolved_by: "jane.doe@acme.com",
-      resolution_notes: request?.reason,
-    };
   },
 
   async reanalyze(id: string, request: ReanalyzeRequest): Promise<ExceptionDetailResponse> {

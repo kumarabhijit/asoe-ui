@@ -2,10 +2,10 @@
  * AgentReasoningCard tests — Layer 1 cognition, verdict × permission matrix.
  *
  * Option A (stakeholder-approved) button matrix:
- *   GREEN  → [Override…] only when canOverride && onOverride.
+ *   GREEN  → [Decide…] only when canOverride && onOverride.
  *   YELLOW → [Approve] [Reject] [Escalate] when canApprove/canEscalate;
- *            [Override…] when canOverride.
- *   RED    → [Override…] when canOverride, [Escalate] when canEscalate.
+ *            [Decide…] when canOverride.
+ *   RED    → [Decide…] when canOverride, [Escalate] when canEscalate.
  *   FAILED/isErrored → [Escalate for Triage] only.
  *
  * Accessible names are the long noun-phrase form (Approve recommendation,
@@ -261,9 +261,12 @@ describe("AgentReasoningCard", () => {
         <AgentReasoningCard verdict="YELLOW" canOverride onOverride={vi.fn()} />,
       );
       const btn = screen.getByRole("button", { name: "Choose different action" });
-      expect(btn).toHaveTextContent("Override");
-      // Trailing ellipsis on the visible label.
+      // Visible label renamed from "Override…" to "Decide…" (Phase 3 UX
+      // panel — "override" carried negative connotation). aria-label and
+      // hover tooltip keep the long-form "Choose different action".
+      expect(btn).toHaveTextContent("Decide");
       expect(btn.textContent).toContain("…");
+      expect(btn).toHaveAttribute("title", "Choose different action");
     });
 
     it("Escalate → 'Send for triage'", () => {
@@ -287,10 +290,37 @@ describe("AgentReasoningCard", () => {
         screen.getByRole("button", { name: "Re-analyze exception" }),
       ).toBeInTheDocument();
     });
+
+    it("Approve button surfaces the recipe's recommended action via tooltip + aria-label", () => {
+      // Phase 3 UX panel: the 1-click happy path on YELLOW needs to make
+      // the exact action clear before the click. We show it as a hover
+      // tooltip (title) and an expanded aria-label so screen-reader users
+      // hear it without opening the card's reasoning details.
+      render(
+        <AgentReasoningCard
+          verdict="YELLOW"
+          canApprove
+          recommendedAction="APPLY_CONTRACT_PRICE"
+          onApprove={vi.fn()}
+        />,
+      );
+      const btn = screen.getByRole("button", {
+        name: /Approve recommendation: Apply Contract Price/,
+      });
+      expect(btn).toHaveAttribute("title", "Approve: Apply Contract Price");
+    });
+
+    it("Approve button falls back to plain label when no recommendedAction", () => {
+      render(
+        <AgentReasoningCard verdict="YELLOW" canApprove onApprove={vi.fn()} />,
+      );
+      const btn = screen.getByRole("button", { name: "Approve recommendation" });
+      expect(btn).not.toHaveAttribute("title");
+    });
   });
 
   describe("Pessimistic UI — actionInFlight", () => {
-    it("shows 'Overriding…' and disables peers when actionInFlight='override'", () => {
+    it("shows 'Deciding…' and disables peers when actionInFlight='override'", () => {
       render(
         <AgentReasoningCard
           verdict="YELLOW"
@@ -305,7 +335,7 @@ describe("AgentReasoningCard", () => {
         />,
       );
       const override = screen.getByRole("button", { name: "Choose different action" });
-      expect(override).toHaveTextContent("Overriding…");
+      expect(override).toHaveTextContent("Deciding…");
       expect(override).toBeDisabled();
       // Peers are disabled too — no double-submit.
       expect(
@@ -547,42 +577,44 @@ describe("ExceptionDetailPanel escalate contract (source-level)", () => {
 });
 
 describe("exceptionsApi — Idempotency-Key contract", () => {
-  it("override() with an explicit idempotencyKey returns the cached response on retry", async () => {
-    const key = "test-override-key-abc";
-    const first = await exceptionsApi.override(
+  // Phase 3: override/approve/reject were deleted — the idempotency
+  // contract now applies to PATCH /disposition (the unified primitive).
+  it("disposition() with an explicit idempotencyKey returns the cached response on retry", async () => {
+    const key = "test-disposition-key-abc";
+    const first = await exceptionsApi.disposition(
       "exc-002",
-      { action: "ALLOW_BOTH", notes: "Retry test" },
+      { action: "ALLOW_BOTH", notes: "Retry test", reason_tag: "other" },
       { idempotencyKey: key },
     );
-    const second = await exceptionsApi.override(
+    const second = await exceptionsApi.disposition(
       "exc-002",
-      { action: "ALLOW_BOTH", notes: "Retry test" },
+      { action: "ALLOW_BOTH", notes: "Retry test", reason_tag: "other" },
       { idempotencyKey: key },
     );
     expect(second).toEqual(first);
   });
 
-  it("override() with same key + different body raises 409-equivalent conflict", async () => {
-    const key = "test-override-conflict";
-    await exceptionsApi.override(
+  it("disposition() with same key + different body raises 409-equivalent conflict", async () => {
+    const key = "test-disposition-conflict";
+    await exceptionsApi.disposition(
       "exc-002",
-      { action: "ALLOW_BOTH", notes: "First" },
+      { action: "ALLOW_BOTH", notes: "First", reason_tag: "other" },
       { idempotencyKey: key },
     );
     await expect(
-      exceptionsApi.override(
+      exceptionsApi.disposition(
         "exc-002",
-        { action: "MERGE", notes: "Second" },
+        { action: "MERGE", notes: "Second", reason_tag: "other" },
         { idempotencyKey: key },
       ),
     ).rejects.toThrow(/Idempotency-Key conflict/);
   });
 
-  it("override() rejects malformed idempotency keys", async () => {
+  it("disposition() rejects malformed idempotency keys", async () => {
     await expect(
-      exceptionsApi.override(
+      exceptionsApi.disposition(
         "exc-002",
-        { action: "ALLOW_BOTH", notes: "bad key" },
+        { action: "ALLOW_BOTH", notes: "bad key", reason_tag: "other" },
         { idempotencyKey: "bad key with spaces" },
       ),
     ).rejects.toThrow(/Invalid Idempotency-Key/);
