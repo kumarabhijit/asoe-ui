@@ -65,53 +65,15 @@ export type ExceptionDetailResponse = ExceptionDetail;
 
 /* ── Override (privileged — GREEN/YELLOW/RED) ─────────────────────── */
 
-/**
- * OverrideRequest — mirrors asoe2/api/schemas.py.
+/* ── Override / Cosign / Escalate ────────────────────────────────────
  *
- * `resolved_by` was removed as part of the trust-boundary fix: the backend
- * always uses the caller's identity (from the auth dependency), not a value
- * supplied by the client.
+ * Phase 2 #9: these DTOs are now re-exported from ./contracts.ts, which
+ * in turn pulls from ./generated.ts (produced by `npm run generate-types`
+ * from asoe2's committed OpenAPI schema). Hand-editing the shape of these
+ * requests is no longer allowed — change the Pydantic model in
+ * asoe2/api/schemas.py and regenerate.
  */
-export interface OverrideRequest {
-  action: string;
-  notes: string;  // mandatory (SOX)
-  /**
-   * Controlled-vocabulary tag categorizing the override reason. Must be one
-   * of health.allowed_override_reason_tags. Phase 2 compatibility: omitting
-   * defaults to "other" server-side; Phase 3 will require it.
-   */
-  reason_tag?: string;
-}
-
-/* ── Cosign (manager+, Phase 2 four-eyes) ────────────────────────── */
-
-/**
- * CosignRequest — POST /api/v1/exceptions/{id}/override/cosign.
- *
- * Second-reviewer decision on a pending high-value override. `approve=true`
- * applies the pending override (lifecycle → RESOLVED); `approve=false`
- * restores the prior lifecycle. Notes are mandatory (SOX) in both cases.
- * The cosigner must be different from the override's initiator — backend
- * returns 403 SOD_VIOLATION otherwise.
- */
-export interface CosignRequest {
-  approve: boolean;
-  notes: string;
-}
-
-/* ── Escalate (analyst+) ──────────────────────────────────────────── */
-
-/**
- * EscalateRequest — POST /api/v1/exceptions/{id}/escalate.
- *
- * Decoupled from Override: routing action only, does not resolve the
- * exception. `to_role` is optional — backend routes to the caller's
- * next-up by default.
- */
-export interface EscalateRequest {
-  reason: string;
-  to_role?: "admin" | "manager";
-}
+export type { OverrideRequest, CosignRequest, EscalateRequest } from "./contracts";
 
 /* ── Shared mutating-request options ──────────────────────────────── */
 
