@@ -307,9 +307,9 @@ asoe2 Phase 19 (backend consolidation) + Phase 20 (hash-chained audit).
 
 ### 12.1 AgentReasoningCard button matrix (Option A)
 - [x] YELLOW / analyst: `[Approve] [Reject] [Escalate]` (1-click)
-- [x] YELLOW / manager+: adds `[Decide…]` to the row (opens chooser)
-- [x] GREEN / manager+: `[Decide…]` only (passive auto-ack on list)
-- [x] RED / manager+: `[Decide…] [Escalate]`
+- [x] YELLOW / manager+: adds `[Override…]` to the row (opens chooser)
+- [x] GREEN / manager+: `[Override…]` only (passive auto-ack on list)
+- [x] RED / manager+: `[Override…] [Escalate]`
 - [x] FAILED / isErrored: `[Escalate for Triage]` only
 - [x] Removed old "Acknowledge" button (was silently calling Approve)
 - [x] `canOverride` / `canApprove` / `canEscalate` props replace the
@@ -320,7 +320,7 @@ asoe2 Phase 19 (backend consolidation) + Phase 20 (hash-chained audit).
    affordance only when they have the permission.
 
 ### 12.2 Label + accessibility
-- [x] Visible labels: short verbs (Approve / Reject / Decide… / Escalate
+- [x] Visible labels: short verbs (Approve / Reject / Override… / Escalate
       / Re-analyze)
 - [x] aria-label / translation-key source strings: long-form noun
       phrases (Approve recommendation / Reject recommendation / Choose
@@ -328,9 +328,11 @@ asoe2 Phase 19 (backend consolidation) + Phase 20 (hash-chained audit).
 - [x] Approve shows a hover tooltip preview of the recipe's
       recommended action when available
       ("Approve: Apply Contract Price")
-- [x] Decide… hover tooltip carries "Choose different action"
-- [x] `Override…` → `Decide…` rename (voice-of-user research: the
-      word "override" carried negative connotation and was avoided)
+- [x] Override… hover tooltip carries "Choose different action"
+- [x] Visible label stayed `Override…` after a Phase 3 rename-and-revert
+      cycle (briefly `Decide…`; reverted in Phase 4 because the button
+      is manager+ only and SOX §404 names the act "management override").
+      See ui_architecture.md drift register D12.
 ✅ Outcome: screen readers still hear the full noun phrase; visual
    users see short verbs; mouse-hover reveals the full description.
 
@@ -396,17 +398,16 @@ asoe2 Phase 19 (backend consolidation) + Phase 20 (hash-chained audit).
 
 ### 12.6 Tests
 - [x] 322 passed (+ audit-chain + drift + four-eyes + aria-label +
-      idempotency + Decide… rename + Approve tooltip + disposition
-      migration)
+      idempotency + Approve tooltip + disposition migration)
 - [x] Full matrix coverage: verdict × role × action for visible button
       presence, aria-labels, titles, in-flight pessimistic states
 ✅ Outcome: regression safety for every Option A eligibility row.
 
 ### 12.7 Documentation
 - [x] `DESIGN.md` — new components, handlers, types, endpoints, cosign
-      banner, Decide… rename
+      banner
 - [x] `ui_architecture.md` — Section 12 Override Action governance
-      (added); drift-register entry for the rename
+      (added); drift register D12 captures the Phase 3 rename-and-revert
 - [x] `docs/AUDITOR_GUIDE.md` — new RBAC surface + audit event sub_type
       semantics
 - [x] `README.md` — mock demo (four-eyes at `exc-001` / `exc-010`)

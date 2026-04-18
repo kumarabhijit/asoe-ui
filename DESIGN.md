@@ -96,7 +96,7 @@ src/
 | `Sidebar` | Tailwind | 480px panel, escape-to-close, focus trap | (Available, not used in Outlook layout) |
 | `ActivityIndicator` | Tailwind | Node-specific domain-aware messages | WaterfallStepper |
 | `WaterfallStepper` | Tailwind | 10-node pipeline with per-node states | ExceptionDetailPanel |
-| `AgentReasoningCard` | Tailwind | Layer 1 only (recommendation + actions), verdict × permission button matrix (Option A): `canApprove` / `canOverride` / `canEscalate` / `actionInFlight` / `recommendedAction` props. `Decide…` + Approve-tooltip preview. | ExceptionDetailPanel |
+| `AgentReasoningCard` | Tailwind | Layer 1 only (recommendation + actions), verdict × permission button matrix (Option A): `canApprove` / `canOverride` / `canEscalate` / `actionInFlight` / `recommendedAction` props. `Override…` + Approve-tooltip preview. | ExceptionDetailPanel |
 | `PricingWaterfall` | Tailwind | Pricing condition chain timeline | ExceptionDetailPanel |
 | `GapBar` | Tailwind | Horizontal bar: primary vs secondary qty, shortfall/excess mode, gap indicator | BackOrderSection, OverMaxSection, MOQSection |
 | `GravitationalOrbs` | Custom (canvas) | Canvas animated background | Login |
@@ -182,9 +182,9 @@ Adding a new enrichment section requires only: (1) add the type to `OrderAnalysi
 
 **Shared helpers** (`shared.tsx`): `CollapsibleHeader` (used by ContextStrip, DiagnosticsSection) and `fmtPrice` (used by HeaderRibbon, ContextStrip, EvidenceGrid, enrichment sections).
 
-**RBAC permission gating:** Approve/Reject/Decide…/Escalate action buttons are gated via `hasPermission()` — only users with the required `{resource}:{action}` RBAC permission see the buttons. Gates resolve to component props: `canApprove` (`exceptions:approve`), `canOverride` (`exceptions:override`), `canEscalate` (`exceptions:escalate`).
+**RBAC permission gating:** Approve/Reject/Override…/Escalate action buttons are gated via `hasPermission()` — only users with the required `{resource}:{action}` RBAC permission see the buttons. Gates resolve to component props: `canApprove` (`exceptions:approve`), `canOverride` (`exceptions:override`), `canEscalate` (`exceptions:escalate`).
 
-**Override chooser dialog (Phase 3):** The `Decide…` button on `AgentReasoningCard` opens an override chooser dialog rendered inline in `ExceptionDetailPanel.tsx`. The dialog sources its resolution-action options from `health.allowed_resolution_actions` (preferring a record-specific narrower list from `resolution_data.allowed_actions` when the server supplies one), and its reason-category options from `health.allowed_override_reason_tags_by_intent[detail.intent]` (falling back to the global `health.allowed_override_reason_tags`). Notes are mandatory (SOX). Submission calls `exceptionsApi.disposition()` with `{ action, notes, reason_tag }`. No free-text action input — Guardrail #2.
+**Override chooser dialog (Phase 3):** The `Override…` button on `AgentReasoningCard` opens an override chooser dialog rendered inline in `ExceptionDetailPanel.tsx`. The dialog sources its resolution-action options from `health.allowed_resolution_actions` (preferring a record-specific narrower list from `resolution_data.allowed_actions` when the server supplies one), and its reason-category options from `health.allowed_override_reason_tags_by_intent[detail.intent]` (falling back to the global `health.allowed_override_reason_tags`). Notes are mandatory (SOX). Submission calls `exceptionsApi.disposition()` with `{ action, notes, reason_tag }`. No free-text action input — Guardrail #2.
 
 **Four-eyes cosign banner:** When `detail.lifecycle_state === "PENDING_COSIGN"`, `ExceptionDetailPanel` renders a cosign banner above the AgentReasoningCard showing initiator, staged action, reason_tag, and financial impact (from `resolution_data.pending_override`). Non-initiator manager+ users see `[Approve cosign] [Reject cosign]` buttons wired to `handleCosign(approve: boolean)` → `exceptionsApi.cosign()`. The initiator sees a read-only "awaiting cosign" message (SoD enforcement mirrored from backend). `ActionInFlight` extends with `cosign-approve` / `cosign-reject` for pessimistic UI.
 
@@ -376,7 +376,7 @@ Maps to Section 6.2 REST endpoints:
 | Permission | Button | Visible on |
 |---|---|---|
 | `exceptions:approve` | Approve / Reject | YELLOW only |
-| `exceptions:override` | Decide… (opens chooser) / cosign Approve/Reject | GREEN / YELLOW / RED; cosign banner on PENDING_COSIGN |
+| `exceptions:override` | Override… (opens chooser) / cosign Approve/Reject | GREEN / YELLOW / RED; cosign banner on PENDING_COSIGN |
 | `exceptions:escalate` | Escalate / Escalate for Triage | YELLOW / RED / FAILED |
 
 **Middleware** (`src/middleware.ts`): Protects all routes except `/login`, `/auth/callback`, `/api/auth`. Redirects unauthenticated users to `/login`.

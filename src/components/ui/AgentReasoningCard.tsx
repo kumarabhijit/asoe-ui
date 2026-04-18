@@ -6,20 +6,24 @@
  *   in ExceptionDetailPanel to avoid duplication.
  *
  * Verdict × permission button matrix (Option A — stakeholder approved):
- *   GREEN  → [Decide…] (privileged only). GREEN is passive; no Approve.
- *   YELLOW → [Approve] [Reject] [Escalate] for analysts; [Decide…] when
+ *   GREEN  → [Override…] (privileged only). GREEN is passive; no Approve.
+ *   YELLOW → [Approve] [Reject] [Escalate] for analysts; [Override…] when
  *            the operator has exceptions:override.
- *   RED    → [Decide…] [Escalate]. No "Acknowledge" — that was
+ *   RED    → [Override…] [Escalate]. No "Acknowledge" — that was
  *            semantically calling approve silently.
  *   FAILED/isErrored → [Escalate for Triage] only.
  *
- * Label history: the "choose different action" button was labelled
- * "Override…" through Phase 2. Voice-of-user research surfaced that
- * "override" carries negative connotation ("I'm contradicting the
- * system") and was being avoided even when warranted. Renamed to
- * "Decide…" per the Phase 3 UX panel; aria-label and hover tooltip
- * keep the long-form "Choose different action" for screen-reader and
- * mouse-over discoverability.
+ * Label history: originally "Override…", renamed briefly to "Decide…" in
+ * Phase 3 after voice-of-user research found analysts avoided the button
+ * — but the button is only visible to manager+, and that research
+ * population never saw it. Reverted to "Override…" in Phase 4 after the
+ * UX panel reconvened: managers exercise authority, SOX §404 names this
+ * act "management override of controls," and the backend sub_type and
+ * audit event (EXCEPTION_RESOLVED sub_type=OVERRIDE) already use the
+ * word — keeping a single vocabulary from button to audit row. The
+ * destructive (red) button variant pairs naturally with "Override."
+ * aria-label and hover tooltip remain "Choose different action" for
+ * screen-reader and mouse-over discoverability.
  *
  * Permissions are derived in the parent (`hasPermission('exceptions:*')`)
  * and passed as `canApprove / canOverride / canEscalate`.
@@ -98,7 +102,7 @@ interface AgentReasoningCardProps {
   actionInFlight?: ActionInFlight;
   /** Caller has `exceptions:approve` — shows Approve / Reject on YELLOW. */
   canApprove?: boolean;
-  /** Caller has `exceptions:override` — shows Decide… on GREEN/YELLOW/RED. */
+  /** Caller has `exceptions:override` — shows Override… on GREEN/YELLOW/RED. */
   canOverride?: boolean;
   /** Caller has `exceptions:escalate` — shows Escalate. */
   canEscalate?: boolean;
@@ -397,7 +401,7 @@ export function AgentReasoningCard({
                         aria-label="Choose different action"
                         title="Choose different action"
                       >
-                        {actionInFlight === "override" ? "Deciding…" : "Decide…"}
+                        {actionInFlight === "override" ? "Overriding…" : "Override…"}
                       </Button>
                     )}
                     {onEscalate && effectiveCanEscalate && (
@@ -424,7 +428,7 @@ export function AgentReasoningCard({
                         aria-label="Choose different action"
                         title="Choose different action"
                       >
-                        {actionInFlight === "override" ? "Deciding…" : "Decide…"}
+                        {actionInFlight === "override" ? "Overriding…" : "Override…"}
                       </Button>
                     )}
                     {onEscalate && effectiveCanEscalate && (
@@ -449,7 +453,7 @@ export function AgentReasoningCard({
                     aria-label="Choose different action"
                     title="Choose different action"
                   >
-                    {actionInFlight === "override" ? "Deciding…" : "Decide…"}
+                    {actionInFlight === "override" ? "Overriding…" : "Override…"}
                   </Button>
                 )}
               </>
