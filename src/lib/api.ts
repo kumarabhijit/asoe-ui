@@ -471,6 +471,14 @@ const MOCK_HEALTH: HealthResponse = {
   allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION"],
   // Mirrors asoe2/constraints/specs.py AllowedOverrideReasonTag.
   allowed_override_reason_tags: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
+  // Per-intent narrowing (Phase 3 Option A framework). Mock currently
+  // seeds every intent with the full global set — matches the backend's
+  // behavior until real curation arrives.
+  allowed_override_reason_tags_by_intent: Object.fromEntries(
+    ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY"].map(
+      (intent) => [intent, ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"]],
+    ),
+  ),
 };
 
 /* ── Auth API (/api/auth/*) ─────��──────────────────────────────────── */

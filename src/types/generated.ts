@@ -770,6 +770,10 @@ export interface components {
             allowed_intents: string[];
             /** Allowed Override Reason Tags */
             allowed_override_reason_tags: string[];
+            /** Allowed Override Reason Tags By Intent */
+            allowed_override_reason_tags_by_intent: {
+                [key: string]: string[];
+            };
             /** Allowed Recipes */
             allowed_recipes: string[];
             /** Allowed Resolution Actions */

@@ -165,6 +165,12 @@ export const MOCK_HEALTH: HealthResponse = {
   allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py"],
   allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION"],
   allowed_override_reason_tags: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
+  allowed_override_reason_tags_by_intent: {
+    CONTRACTUAL_CORRECTION: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
+    CREDIT_BLOCK: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
+    MASS_PRICING_ERROR: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
+    DUPLICATE_PO: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
+  },
 };
 
 /* ── Stats fixture ─────────────────────────────────────────────────── */

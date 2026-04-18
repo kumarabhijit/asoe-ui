@@ -744,18 +744,29 @@ export default function ExceptionDetailPanel({
               Reason category
               {/* Controlled vocabulary (Guardrail #2). Feeds ML clustering
                   of overrides by category downstream — free-text notes are
-                  captured below but are not a reliable training signal. */}
-              <select
-                value={overrideReasonTag}
-                onChange={(e) => setOverrideReasonTag(e.target.value)}
-                aria-label="Override reason category"
-                className="h-[32px] w-full rounded-md border border-border bg-surface-primary px-8 text-caption font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
-              >
-                <option value="">Select a reason…</option>
-                {(health?.allowed_override_reason_tags ?? []).map((t) => (
-                  <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
-                ))}
-              </select>
+                  captured below but are not a reliable training signal.
+                  Phase 3 Option A: prefer the per-intent narrowed list
+                  when the backend provides one for this record's intent;
+                  fall back to the global list otherwise. */}
+              {(() => {
+                const perIntent = detail?.intent
+                  ? health?.allowed_override_reason_tags_by_intent?.[detail.intent]
+                  : undefined;
+                const options = perIntent ?? health?.allowed_override_reason_tags ?? [];
+                return (
+                  <select
+                    value={overrideReasonTag}
+                    onChange={(e) => setOverrideReasonTag(e.target.value)}
+                    aria-label="Override reason category"
+                    className="h-[32px] w-full rounded-md border border-border bg-surface-primary px-8 text-caption font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
+                  >
+                    <option value="">Select a reason…</option>
+                    {options.map((t) => (
+                      <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                    ))}
+                  </select>
+                );
+              })()}
             </label>
             <label className="flex flex-col gap-4 text-caption text-text-secondary">
               Notes (required)
