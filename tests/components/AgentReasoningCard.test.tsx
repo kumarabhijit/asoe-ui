@@ -2,10 +2,10 @@
  * AgentReasoningCard tests — Layer 1 cognition, verdict × permission matrix.
  *
  * Option A (stakeholder-approved) button matrix:
- *   GREEN  → [Decide…] only when canOverride && onOverride.
+ *   GREEN  → [Override…] only when canOverride && onOverride.
  *   YELLOW → [Approve] [Reject] [Escalate] when canApprove/canEscalate;
- *            [Decide…] when canOverride.
- *   RED    → [Decide…] when canOverride, [Escalate] when canEscalate.
+ *            [Override…] when canOverride.
+ *   RED    → [Override…] when canOverride, [Escalate] when canEscalate.
  *   FAILED/isErrored → [Escalate for Triage] only.
  *
  * Accessible names are the long noun-phrase form (Approve recommendation,
@@ -261,10 +261,14 @@ describe("AgentReasoningCard", () => {
         <AgentReasoningCard verdict="YELLOW" canOverride onOverride={vi.fn()} />,
       );
       const btn = screen.getByRole("button", { name: "Choose different action" });
-      // Visible label renamed from "Override…" to "Decide…" (Phase 3 UX
-      // panel — "override" carried negative connotation). aria-label and
-      // hover tooltip keep the long-form "Choose different action".
-      expect(btn).toHaveTextContent("Decide");
+      // Visible label is "Override…" — reverted from the brief "Decide…"
+      // rename after the Phase 4 UX panel reconvened. The rename was
+      // based on analyst psychology, but the button is only visible to
+      // manager+ (exceptions:override), and those users exercise
+      // authority — "override" is the right verb. The long-form
+      // "Choose different action" stays on aria-label and the hover
+      // tooltip so screen-reader + mouse users still get the mechanic.
+      expect(btn).toHaveTextContent("Override");
       expect(btn.textContent).toContain("…");
       expect(btn).toHaveAttribute("title", "Choose different action");
     });
@@ -320,7 +324,7 @@ describe("AgentReasoningCard", () => {
   });
 
   describe("Pessimistic UI — actionInFlight", () => {
-    it("shows 'Deciding…' and disables peers when actionInFlight='override'", () => {
+    it("shows 'Overriding…' and disables peers when actionInFlight='override'", () => {
       render(
         <AgentReasoningCard
           verdict="YELLOW"
@@ -335,7 +339,7 @@ describe("AgentReasoningCard", () => {
         />,
       );
       const override = screen.getByRole("button", { name: "Choose different action" });
-      expect(override).toHaveTextContent("Deciding…");
+      expect(override).toHaveTextContent("Overriding…");
       expect(override).toBeDisabled();
       // Peers are disabled too — no double-submit.
       expect(

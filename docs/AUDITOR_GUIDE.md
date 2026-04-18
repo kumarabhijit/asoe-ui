@@ -13,8 +13,8 @@ Action buttons are gated by user role per Section 9.2. The backend enforces RBAC
 | Role | YELLOW Verdict Actions | RED Verdict Actions | GREEN Verdict Actions | PENDING_COSIGN |
 |---|---|---|---|---|
 | `analyst` | Approve, Reject, Escalate | Escalate | (no actions — auto-resolved) | (read-only awaiting-cosign banner) |
-| `manager` | Approve, Reject, **Decide…**, Escalate | **Decide…**, Escalate | **Decide…** (privileged override of auto-resolution) | Approve cosign / Reject cosign (if non-initiator) |
-| `admin` | Approve, Reject, **Decide…**, Escalate | **Decide…**, Escalate | **Decide…** | Approve cosign / Reject cosign (if non-initiator) |
+| `manager` | Approve, Reject, **Override…**, Escalate | **Override…**, Escalate | **Override…** (privileged override of auto-resolution) | Approve cosign / Reject cosign (if non-initiator) |
+| `admin` | Approve, Reject, **Override…**, Escalate | **Override…**, Escalate | **Override…** | Approve cosign / Reject cosign (if non-initiator) |
 | `viewer` | None (view only) | None (view only) | (no actions — view only) | None |
 | `partner` | None (scoped view of own orders) | None | None | None |
 
@@ -24,15 +24,15 @@ Action buttons are gated by user role per Section 9.2. The backend enforces RBAC
 |---|---|---|---|
 | `Approve` | Approve recommendation (suffixed with recipe-recommended action when supplied) | `exceptions:approve` | `PATCH /api/v1/exceptions/{id}/disposition` |
 | `Reject` | Reject recommendation | `exceptions:approve` | `PATCH /api/v1/exceptions/{id}/disposition` |
-| `Decide…` | Choose different action | `exceptions:override` | `PATCH /api/v1/exceptions/{id}/disposition` (after chooser) |
+| `Override…` | Choose different action | `exceptions:override` | `PATCH /api/v1/exceptions/{id}/disposition` (after chooser) |
 | `Escalate` / `Escalate for Triage` | Send for triage | `exceptions:escalate` | `POST /api/v1/exceptions/{id}/escalate` |
 | `Approve cosign` | Approve cosign | `exceptions:override` (non-initiator) | `POST /api/v1/exceptions/{id}/cosign` |
 | `Reject cosign` | Reject cosign | `exceptions:override` (non-initiator) | `POST /api/v1/exceptions/{id}/cosign` |
 | `Re-analyze` | Re-analyze exception | `exceptions:override` | `POST /api/v1/exceptions/{id}/reanalyze` |
 
-**Label evolution (Phase 3 UX panel):** The visible verb `Override…` was renamed to `Decide…` following voice-of-user research that "override" carried a negative connotation and was being avoided even when warranted. The aria-label and hover tooltip preserve the long-form "Choose different action" for screen-reader and mouse-over discoverability. The underlying permission name (`exceptions:override`) is unchanged.
+**Label evolution (Phase 3 → Phase 4 UX panels):** The visible verb was briefly renamed to `Decide…` in Phase 3 after voice-of-user research found analysts hesitated to click "Override." The change was reverted in Phase 4: the button is only visible to manager+ with `exceptions:override`, and SOX §404 names the control itself "management override of controls" — so the button, the permission, the audit event `EXCEPTION_RESOLVED sub_type=OVERRIDE`, and the compliance narrative now share one vocabulary. The aria-label and hover tooltip retain the long-form "Choose different action" for screen-reader and mouse-over discoverability. See `ui_architecture.md` drift register D12.
 
-**Override chooser safeguards (SOX):** Clicking `Decide…` opens a bounded-vocabulary dialog. The resolution-action select is sourced from `GET /api/v1/health.allowed_resolution_actions` (or a server-narrowed subset on `resolution_data.allowed_actions`); the reason-category select is sourced from `health.allowed_override_reason_tags_by_intent[detail.intent]` (falling back to the global list). Notes are mandatory. Free-text action input was removed in Phase 3 — the reviewer can only choose from the authoritative vocabulary defined in `asoe2/constraints/specs.py`. This is the UI enforcement of Guardrail #2 for override actions.
+**Override chooser safeguards (SOX):** Clicking `Override…` opens a bounded-vocabulary dialog. The resolution-action select is sourced from `GET /api/v1/health.allowed_resolution_actions` (or a server-narrowed subset on `resolution_data.allowed_actions`); the reason-category select is sourced from `health.allowed_override_reason_tags_by_intent[detail.intent]` (falling back to the global list). Notes are mandatory. Free-text action input was removed in Phase 3 — the reviewer can only choose from the authoritative vocabulary defined in `asoe2/constraints/specs.py`. This is the UI enforcement of Guardrail #2 for override actions.
 
 **Four-eyes cosign (Phase 2 #5 / asoe2 Phase 20):** When a privileged override exceeds the backend's financial-impact threshold, the record transitions to `lifecycle_state === "PENDING_COSIGN"` and a banner renders above the AgentReasoningCard showing initiator, staged action, reason_tag, and impact. A non-initiator manager+ cosigns; the initiator sees a read-only "Awaiting cosign" message — SoD (segregation of duties) is backend-enforced and the UI mirrors it. All cosign decisions carry mandatory notes.
 
