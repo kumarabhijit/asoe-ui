@@ -106,56 +106,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/_sandbox/seed/financial-impact": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Seed Financial Impact
-         * @description Stamp financial_impact_usd onto an exception's resolution_data.
-         *
-         *     Used by the Playwright four-eyes spec to push an existing record
-         *     past HIGH_VALUE_OVERRIDE_THRESHOLD_USD so the next /disposition
-         *     call stages to PENDING_COSIGN. No new audit event is emitted —
-         *     this is test fixture wiring, not a SOX-relevant state transition.
-         */
-        post: operations["seed_financial_impact_api_v1__sandbox_seed_financial_impact_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/_sandbox/tenant/reset": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reset Tenant
-         * @description Clear in-memory exception records for a tenant.
-         *
-         *     For the in-memory store (the default sandbox mode), this wipes all
-         *     exceptions belonging to the target tenant_id so the next spec starts
-         *     from a clean slate. For the DB-backed store, this is a no-op — tests
-         *     against a real DB spin up their own SQLite :memory: per run.
-         */
-        post: operations["reset_tenant_api_v1__sandbox_tenant_reset_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/accounts": {
         parameters: {
             query?: never;
@@ -1071,13 +1021,6 @@ export interface components {
             /** Transaction */
             transaction: string;
         };
-        /** SeedFinancialImpactRequest */
-        SeedFinancialImpactRequest: {
-            /** Exception Id */
-            exception_id: string;
-            /** Financial Impact Usd */
-            financial_impact_usd: number;
-        };
         /**
          * StatsResponse
          * @description GET /api/v1/exceptions/stats — dashboard metrics.
@@ -1127,11 +1070,6 @@ export interface components {
              * @default 0
              */
             total_exceptions: number;
-        };
-        /** TenantResetRequest */
-        TenantResetRequest: {
-            /** Tenant Id */
-            tenant_id?: string | null;
         };
         /**
          * TraceResponse
@@ -1427,80 +1365,6 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
-                };
-            };
-        };
-    };
-    seed_financial_impact_api_v1__sandbox_seed_financial_impact_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                Authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SeedFinancialImpactRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reset_tenant_api_v1__sandbox_tenant_reset_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                Authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TenantResetRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
