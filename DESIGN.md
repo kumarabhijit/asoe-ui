@@ -32,6 +32,8 @@ src/
 │   │   ├── OverMaxSection.tsx             # Data-presence enrichment: exceedance bar, order lines, AI trim plan
 │   │   ├── MOQSection.tsx                 # Data-presence enrichment: shortfall bar, SAP V4082 block, round-up plan
 │   │   ├── PalletConfigSection.tsx        # Data-presence enrichment: KPI strip, pallet fill bars, suggested plan
+│   │   ├── PriceHoldSection.tsx           # Data-presence enrichment: PO vs SAP price, signed variance, tolerance/hard-block strip, recipe action
+│   │   ├── EdiMismatchSection.tsx         # Data-presence enrichment: sub_type badge, expected vs received cards, classification, autonomy
 │   │   ├── shared.tsx            # CollapsibleHeader, fmtPrice helpers
 │   │   └── [id]/page.tsx         # Full-page exception detail (standalone route)
 │   ├── dashboard/page.tsx        # Analytics dashboard (Layout B) + recent activity feed
@@ -57,8 +59,11 @@ src/
 │   └── WaterfallStepper.tsx      # 10-node pipeline progress visualization
 ├── hooks/
 │   ├── useAuth.ts                # Wraps NextAuth session with typed user + visibleTabs, assignedAccounts
+│   ├── useErpProfile.ts          # ERP-vendor-aware label resolver (useIntentLabel, useSubTypeLabel)
 │   ├── useHealth.ts              # Fetches runtime enums from /api/v1/health
 │   └── useWebSocket.ts           # Section 8 protocol with reconnection backoff
+├── config/
+│   └── erp-label-map.ts          # Per-vendor (SAP / Oracle / Salesforce / GENERIC) display-label maps for intents + EDI sub_types
 ├── lib/
 │   ├── api.ts                    # API client: auth + health + exceptions + line items
 │   ├── auth.ts                   # NextAuth options (credentials provider, JWT callbacks)
@@ -165,6 +170,8 @@ NavBar (sticky top, 56px)
 | 3+ | `OverMaxSection` | `OverMaxSection.tsx` | Data-presence enrichment: exceedance bar (ordered vs max), order lines table, AI trim plan (TRIM/SKIP/OK actions) |
 | 3+ | `MOQSection` | `MOQSection.tsx` | Data-presence enrichment: shortfall bar (ordered vs MOQ), SAP V4082 block detail, AI round-up plan (ROUND_UP/ACCEPT_BELOW/ESCALATE), SAP execution steps |
 | 3+ | `PalletConfigSection` | `PalletConfigSection.tsx` | Data-presence enrichment: KPI strip (cases/loose/labor/freight), per-line pallet fill bars with violation badges, AI suggested plan table |
+| 3+ | `PriceHoldSection` | `PriceHoldSection.tsx` | Data-presence enrichment for `PRICE_HOLD_RELEASE`: PO vs SAP base price cards, signed `variance_pct`, hold_status / tolerance / hard_block thresholds, recipe `action` badge (AUTO_RELEASE / ESCALATE / HARD_BLOCK), reason text |
+| 3+ | `EdiMismatchSection` | `EdiMismatchSection.tsx` | Data-presence enrichment for `EDI_MISMATCH`: `sub_type` rendered verbatim, `expected_value` vs `received_value` (any shape — string / number / object), `classification` badge (HARD_REJECT / REVIEW / ESCALATE), `recommended_action`, `autonomy_level`. PRICE_MISMATCH is routed to `CONTRACTUAL_CORRECTION` at backend classifier time and never mounts this section. |
 | 4 | `EvidenceGrid` | `EvidenceGrid.tsx` | Collapsed by default; line-item table + pricing waterfall |
 | 5 | `DiagnosticsSection` | `DiagnosticsSection.tsx` | Hidden behind "Show Diagnostics" toggle: Pipeline Progress (WaterfallStepper) + Trace Evidence tabs |
 
@@ -177,6 +184,8 @@ NavBar (sticky top, 56px)
 {analysis?.overmax_analysis && <OverMaxSection data={analysis.overmax_analysis} />}
 {analysis?.moq_analysis && <MOQSection data={analysis.moq_analysis} />}
 {analysis?.pallet_analysis && <PalletConfigSection data={analysis.pallet_analysis} />}
+{analysis?.price_hold_analysis && <PriceHoldSection data={analysis.price_hold_analysis} />}
+{analysis?.edi_mismatch_analysis && <EdiMismatchSection data={analysis.edi_mismatch_analysis} />}
 ```
 Adding a new enrichment section requires only: (1) add the type to `OrderAnalysis`, (2) create the section component, (3) add the conditional render — zero dispatch logic.
 
@@ -345,9 +354,9 @@ Maps to Section 6.2 REST endpoints:
 
 **Mock users:** 6 seed users — jane@acme.com (admin), marcus.webb@acme-corp.com (admin), sarah.chen (manager), sarah.chen.sr (analyst), james.ortiz (analyst, scoped to acct-walmart/acct-kroger), priya.nair (analyst, scoped to acct-target/acct-costco). Each user has `title`, `avatar_initials`, `assigned_accounts`, and RBAC-derived `visible_tabs`.
 
-**Mock exceptions:** 14 exceptions (exc-001 through exc-014) with `account_id` and `account_name` fields. covering all supported intents: CONTRACTUAL_CORRECTION, CREDIT_BLOCK, MASS_PRICING_ERROR, DUPLICATE_PO, BACK_ORDER (exc-010, exc-011), OVER_MAX (exc-012), MIN_ORDER_QTY (exc-013), PALLET_CONFIG (exc-014). Each includes intent-specific `OrderAnalysis` data with the corresponding enrichment fields populated (e.g., `backorder_analysis` for BACK_ORDER, `pallet_analysis` for PALLET_CONFIG).
+**Mock exceptions:** 21 exceptions (exc-001 through exc-021) with `account_id` and `account_name` fields, covering all supported intents: CONTRACTUAL_CORRECTION, CREDIT_BLOCK, MASS_PRICING_ERROR, DUPLICATE_PO, BACK_ORDER (exc-010, exc-011), OVER_MAX (exc-012), MIN_ORDER_QTY (exc-013), PALLET_CONFIG (exc-014), DELIVERY_DELAY (exc-016), PRICE_HOLD_RELEASE (exc-017 GREEN auto-release, exc-018 YELLOW escalate), EDI_MISMATCH (exc-019 RED SKU hard-reject, exc-020 YELLOW QTY review), and the PRICE_MISMATCH routing-fork demonstrator (exc-021 — `event_type=EDI_850_LINE_MISMATCH` + `metadata.mismatch_sub_type=PRICE_MISMATCH` lands as `CONTRACTUAL_CORRECTION` and renders `PriceAnalysisSection`, NOT `EdiMismatchSection`). Each includes intent-specific `OrderAnalysis` data with the corresponding enrichment fields populated (e.g., `backorder_analysis` for BACK_ORDER, `pallet_analysis` for PALLET_CONFIG, `price_hold_analysis` for PRICE_HOLD_RELEASE, `edi_mismatch_analysis` for EDI_MISMATCH, `price_analysis` for the PRICE_MISMATCH routing-fork case).
 
-**Health endpoint recipes:** `allowed_recipes` now includes 7 recipes: `PriceAdjustmentRecipe.py`, `CreditHoldReleaseRecipe.py`, `DuplicatePORecipe.py`, `BackOrderResolutionRecipe.py`, `OverMaxTrimRecipe.py`, `MOQRoundUpRecipe.py`, `PalletAlignmentRecipe.py`. `allowed_intents` includes 8 intents: the original 4 plus `BACK_ORDER`, `OVER_MAX`, `MIN_ORDER_QTY`, `PALLET_CONFIG`.
+**Health endpoint recipes:** `allowed_recipes` includes 10 recipes: `PriceAdjustmentRecipe.py`, `CreditHoldReleaseRecipe.py`, `DuplicatePORecipe.py`, `BackOrderResolutionRecipe.py`, `OverMaxTrimRecipe.py`, `MOQRoundUpRecipe.py`, `PalletAlignmentRecipe.py`, `DeliveryDelayResolutionRecipe.py`, `PriceHoldReleaseRecipe.py`, `EdiMismatchRecipe.py`. `allowed_intents` includes 11 intents: the original 4 plus `BACK_ORDER`, `OVER_MAX`, `MIN_ORDER_QTY`, `PALLET_CONFIG`, `DELIVERY_DELAY`, `PRICE_HOLD_RELEASE`, `EDI_MISMATCH`.
 
 **UI-only endpoints:** `lineItems()` and `orderAnalysis()` serve mock data for the enriched line-item grids, pricing waterfall, and type-specific enrichment sections. When `asoe2` adds corresponding endpoints, these will be wired to real `fetch()` calls.
 
@@ -405,6 +414,47 @@ Per Guardrail #2, the `useHealth` hook fetches `GET /api/v1/health` which return
 - `kill_switch`, `explain_mode` — platform status
 
 Used in: Exception Queue filters, Dashboard platform health card.
+
+---
+
+## 8.1 ERP-vendor display labels (`src/config/erp-label-map.ts` + `src/hooks/useErpProfile.ts`)
+
+Backend intent codes (`CONTRACTUAL_CORRECTION`, `PRICE_HOLD_RELEASE`, etc.)
+are ASOE-internal canonical names — they remain the single source of truth
+for control flow (Guardrail #1). Different ERPs describe the same operational
+exception with different terminology, though: SAP says "Pricing Block
+Release", Oracle says "Price Hold Release", Salesforce says "Order Hold
+Release". This config layer maps canonical codes to vendor-specific
+display strings without forking the backend vocabulary.
+
+**`src/config/erp-label-map.ts`** — pure data + two resolvers:
+- `ErpVendor` type union: `SAP | ORACLE | SALESFORCE | GENERIC`.
+- `ERP_LABEL_MAPS` — per-vendor `{ intents, sub_types }` table. Every
+  vendor map has an entry for every canonical intent + EDI sub_type;
+  GENERIC is the always-populated fallback.
+- `intentLabelFor(intent, vendor)` and `subTypeLabelFor(subType, vendor)`
+  — two-tier fallback (vendor → GENERIC → title-cased code) so the UI
+  never renders a raw machine string.
+
+**`src/hooks/useErpProfile.ts`** — module-memoised parse of
+`process.env.NEXT_PUBLIC_ASOE_ERP_VENDOR`. Exposes `useErpProfile()`,
+`useIntentLabel(intent)`, `useSubTypeLabel(subType)`.
+
+**Default vendor:** committed to `next.config.mjs` as `SAP` so production
+deployments and previews render SAP-native vocabulary out of the box.
+Override per environment via Vercel Project Settings → Environment
+Variables, or via `.env.local` for local dev.
+
+**Wired display sites (4):**
+- `src/app/dashboard/page.tsx` — `by_intent` stats list label.
+- `src/app/exceptions/ExceptionListPane.tsx` — intent filter dropdown
+  options + intent badge on each exception row.
+- `src/components/ui/AgentReasoningCard.tsx` — Intent key-data label on
+  the Layer-1 reasoning card.
+
+This config is **display-only**. No control flow branches on the active
+vendor; intent codes still flow through `useHealth().allowed_intents`
+unchanged, and audit trails / trace logs never see the labels.
 
 ---
 
