@@ -529,3 +529,54 @@ Salesforce / GENERIC terminology without touching backend contracts.
 ✅ Outcome: PRICE_HOLD_RELEASE and EDI_MISMATCH exceptions render with
 the same Layer-1 + Layer-2 treatment as the older intents. ERP-vendor
 display labels swap with a single env var, no code changes.
+
+---
+
+## TODO — `NEXT_PUBLIC_SHOW_PREVIEW_INTENTS` contract gate (backlog)
+
+**Status:** deferred. Asoe2 is landing backend support for the 5 intents
+that are currently UI-only (BACK_ORDER, OVER_MAX, MIN_ORDER_QTY,
+PALLET_CONFIG, DELIVERY_DELAY). Once that lands, the UI mock no longer
+diverges from real backend for these intents and the gate is
+unnecessary. Keep this entry in case a future wave of speculative UI
+work outpaces backend again.
+
+**Motivation (from cross-repo drift review):** mock `src/lib/api.ts`
+ships with intents the backend doesn't classify. The moment the UI
+points at a real backend, preview intents disappear from filters and
+mock fixtures stop rendering. A silent drift is worse than a loud one.
+
+**Proposed design:**
+- New env var `NEXT_PUBLIC_SHOW_PREVIEW_INTENTS` (default `true` in
+  dev / demo, `false` in CI + production builds). Distinct from
+  `NEXT_PUBLIC_SHOW_PREVIEW_FEATURES` — that flag gates preview *tabs*
+  on the detail panel, this one gates the *mock health contract shape*.
+- Maintain a `PREVIEW_INTENTS` constant in `src/lib/api.ts` listing
+  whichever intents are currently UI-only (empty once asoe2 has
+  parity).
+- When the flag is `false`:
+  - `MOCK_HEALTH.allowed_intents` drops the preview entries.
+  - `exceptionsApi.list()` filters out mock exceptions whose intent is
+    in `PREVIEW_INTENTS`.
+  - Analysis fixtures for those intents never reach the detail panel.
+- Preview-only fields on `OrderAnalysis` (e.g., `backorder_analysis`
+  once BACK_ORDER is backend-backed, hypothetical new additions later)
+  should carry a `// preview-only` comment so real-backend code
+  doesn't read them expecting data that may never arrive.
+- Lint rule or code review discipline for the comment marker.
+
+**Proposed test:** `tests/architectural/real_backend_parity.test.ts`.
+With the flag set to `false`, fetch the real backend's `/api/v1/health`
+(in CI that means the asoe2 FastAPI container) and assert
+`MOCK_HEALTH.allowed_intents === realHealth.allowed_intents`. Catches
+the day a new intent is added to one side without the other.
+
+**Drift register:** entry D17 in `ui_architecture.md` §9 once the gate
+lands, documenting the bounded preview pattern.
+
+**Rationale for deferral:** the reason the gate was proposed — 5
+UI-only intents diverging from the backend — is about to be eliminated
+by backend parity work in asoe2. Shipping the gate now would be
+defensive infrastructure for a problem the backlog is actively
+closing. Keep the design notes here so the pattern is ready to revive
+if the situation recurs.
