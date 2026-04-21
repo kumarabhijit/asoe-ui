@@ -421,3 +421,111 @@ side as well: the Override chooser already narrows by
 `health.allowed_override_reason_tags_by_intent[detail.intent]`. When
 product/compliance curates per-intent categories, a single regen
 (`npm run generate-types`) updates the UI — no .tsx changes required.
+
+---
+
+## PHASE 13 — OM Coverage Expansion: PRICE_HOLD_RELEASE + EDI_MISMATCH + ERP label map
+
+UI side of asoe2's PHASE 21 (see
+`asoe2/docs/adr/ADR-024-om-coverage-expansion.md`). Two new asoe2
+intents land as data-presence enrichment sections; a display-only ERP
+label-map config lets the same canonical codes render in SAP / Oracle /
+Salesforce / GENERIC terminology without touching backend contracts.
+
+### 13.1 Types (additive only)
+- [x] `src/types/exceptions.ts` — `PriceHoldAnalysisData`,
+      `PriceHoldAction`, `EdiMismatchAnalysisData`,
+      `EdiMismatchClassification` interfaces; optional
+      `price_hold_analysis` / `edi_mismatch_analysis` fields on
+      `OrderAnalysis`. `Intent` / `RecipeName` unions left untouched
+      (already-stale dead exports per architecture review).
+- [x] `npm run generate-types` regen against asoe2's OpenAPI snapshot.
+
+### 13.2 Section components (data-presence enrichment)
+- [x] `src/app/exceptions/PriceHoldSection.tsx` — PO vs SAP base price
+      cards, signed `variance_pct`, hold_status / tolerance /
+      hard_block thresholds, recipe action badge (AUTO_RELEASE /
+      ESCALATE / HARD_BLOCK), reason. Reads only from
+      `analysis.price_hold_analysis`; matches the invariant held by
+      all 8 existing sections.
+- [x] `src/app/exceptions/EdiMismatchSection.tsx` — sub_type rendered
+      verbatim (matching `delay_category` convention),
+      `expected_value` vs `received_value` cards (any shape via
+      `renderUnknown` helper), classification badge, recommended
+      action, autonomy level.
+- [x] `ExceptionDetailPanel.tsx` — two new conditional render blocks
+      added to the data-presence enrichment area.
+
+### 13.3 ERP label-map config
+- [x] `src/config/erp-label-map.ts` — `ErpVendor` union,
+      `ERP_LABEL_MAPS` table for SAP / Oracle / Salesforce / GENERIC,
+      `intentLabelFor()` and `subTypeLabelFor()` resolvers with two-tier
+      fallback (vendor → GENERIC → title-cased code).
+- [x] `src/hooks/useErpProfile.ts` — module-memoised env parse.
+      `useErpProfile()`, `useIntentLabel()`, `useSubTypeLabel()`.
+- [x] `next.config.mjs` — `NEXT_PUBLIC_ASOE_ERP_VENDOR` default `SAP`
+      committed so production + previews render SAP-native vocabulary
+      without per-environment Vercel setup.
+- [x] Wired four display sites: dashboard `by_intent`, exception list
+      filter dropdown, exception list row badge, AgentReasoningCard
+      Intent label.
+
+### 13.4 Mock fixtures
+- [x] `tests/fixtures.ts` — `MOCK_HEALTH` updated to the 6-intent
+      vocabulary; `MOCK_STATS` bumped (8 → 12) with consistent totals
+      across `by_intent` / `by_lifecycle_state` / `by_shadow_verdict`;
+      seven new exception fixtures (3 PHR action branches + 4 EDM
+      sub_types); routing-fork fixture
+      `PRICE_MISMATCH_CONTRACTUAL_EXCEPTION`; helper factories
+      `makePriceHoldAnalysis()` and `makeEdiMismatchAnalysis()`.
+- [x] `src/lib/api.ts` — five new mock exceptions (exc-017..021) with
+      full `OrderAnalysis` payloads matching the density of the
+      pre-existing entries (entity_profile, impact_metrics, lines,
+      pricing waterfalls). exc-021 demonstrates the routing fork —
+      `event_type=EDI_850_LINE_MISMATCH` lands as `CONTRACTUAL_CORRECTION`
+      and renders `PriceAnalysisSection` (not `EdiMismatchSection`).
+- [x] Atomic golden updates: `tests/architectural/type_contracts.test.ts`
+      `toHaveLength(4)/3` rewritten as `toContain(...)` so future
+      vocabulary expansions don't require the same sweep;
+      `guardrail2.test.ts` `INTENT_LITERALS` extended.
+
+### 13.5 Tests
+- [x] Component: `tests/components/PriceHoldSection.test.tsx` (8 cases),
+      `tests/components/EdiMismatchSection.test.tsx` (8 cases).
+- [x] Contract: `tests/e2e/price_hold_release_data_flow.test.tsx` and
+      `tests/e2e/edi_mismatch_data_flow.test.tsx` mirror the 9-group
+      structure of `duplicate_po_data_flow.test.tsx`. Includes the
+      PRICE_MISMATCH non-double-render invariant — RTL assertion that
+      `EdiMismatchSection` does NOT mount when only `price_analysis`
+      is present.
+- [x] Three-tier HITL: `tests/e2e/three_tier_hitl.test.tsx` extended
+      with PHR HARD_BLOCK admin-release + EDM SKU admin-release cases.
+- [x] Architectural: `tests/architectural/rbac_enforcement.test.ts`
+      gains permission-gating cases for both new intents.
+- [x] Accessibility: `tests/accessibility/status_components.test.tsx`
+      jest-axe sweep over both new sections.
+- [x] Browser: `tests/browser/price-hold-detail.spec.ts` and
+      `tests/browser/edi-mismatch-detail.spec.ts` — Playwright,
+      live-backend. Section-render assertions are `test.skip` pending
+      asoe2 promotion of `OrderAnalysis.price_hold_analysis` /
+      `edi_mismatch_analysis` to the live response.
+- [x] Config resolver: `tests/config/erp-label-map.test.ts` (21
+      cases) — per-vendor coverage, vendor-specific resolution,
+      fallback chain, invalid-vendor coercion.
+
+### 13.6 Documentation
+- [x] `DESIGN.md` — new section components catalogued (Section 1
+      module structure + Section 2 sub-component table); data-presence
+      snippet extended; mock-data stats updated (14 → 21 exceptions,
+      8 → 11 intents, 7 → 10 recipes); new Section 8.1 for the ERP
+      label-map config + hook.
+- [x] `ui_architecture.md` — Section 5.2 sub-component table extended;
+      data-presence snippet extended; drift entries D15 (OM coverage
+      expansion) and D16 (ERP-vendor display labels) added to Section 9.
+- [x] `README.md` — `NEXT_PUBLIC_ASOE_ERP_VENDOR` added to the
+      Environment Variables table.
+- [x] `tasks.md` — this checklist.
+
+✅ Outcome: PRICE_HOLD_RELEASE and EDI_MISMATCH exceptions render with
+the same Layer-1 + Layer-2 treatment as the older intents. ERP-vendor
+display labels swap with a single env var, no code changes.

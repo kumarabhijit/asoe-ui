@@ -107,6 +107,7 @@ asoe-ui/
 | `NEXTAUTH_SECRET` | — | JWT signing secret (required) |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | FastAPI backend URL |
 | `NEXT_PUBLIC_SHOW_PREVIEW_FEATURES` | `true` | Show preview/upcoming feature tabs (SAP Data, Change Analysis). Set to `"false"` for production to hide. |
+| `NEXT_PUBLIC_ASOE_ERP_VENDOR` | `SAP` (committed default in `next.config.mjs`) | ERP vocabulary used for intent / sub_type display labels. Allowed values: `SAP`, `ORACLE`, `SALESFORCE`, `GENERIC`. Invalid / missing values fall back to `GENERIC`. See `src/config/erp-label-map.ts` for the per-vendor maps and `src/hooks/useErpProfile.ts` for the resolver. Canonical backend codes (intent enum, recipe names) are unaffected. |
 | `SSO_CLIENT_ID` | — | OIDC client ID (per IdP) |
 | `SSO_CLIENT_SECRET` | — | OIDC client secret (per IdP) |
 | `SSO_ISSUER_URL` | — | OIDC issuer URL (per IdP) |
