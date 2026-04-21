@@ -564,20 +564,27 @@ describe("ExceptionDetailPanel escalate contract (source-level)", () => {
   // exceptionsApi.override({ action: "ESCALATE" }) piggy-back.
   //
   // Reading the source verifies the wiring without coupling to a brittle
-  // NextAuth test harness.
+  // NextAuth test harness. Post-M3 the action handlers live in
+  // useExceptionActions; the panel wires them through JSX. Read both
+  // files so the contract can be grepped across the refactor boundary.
   const fs = require("fs") as typeof import("fs");
   const path = require("path") as typeof import("path");
   const panel = fs.readFileSync(
     path.resolve(__dirname, "../../src/app/exceptions/ExceptionDetailPanel.tsx"),
     "utf-8",
   );
+  const hook = fs.readFileSync(
+    path.resolve(__dirname, "../../src/hooks/useExceptionActions.ts"),
+    "utf-8",
+  );
+  const combined = panel + "\n" + hook;
 
   it("handleEscalate calls exceptionsApi.escalate", () => {
-    expect(panel).toMatch(/exceptionsApi\.escalate\(/);
+    expect(combined).toMatch(/exceptionsApi\.escalate\(/);
   });
 
   it("no longer piggy-backs escalation on override with action=ESCALATE", () => {
-    expect(panel).not.toMatch(/override\([^)]*action:\s*["']ESCALATE["']/);
+    expect(combined).not.toMatch(/override\([^)]*action:\s*["']ESCALATE["']/);
   });
 
   it("wires canOverride / canApprove / canEscalate through to AgentReasoningCard", () => {
@@ -587,8 +594,11 @@ describe("ExceptionDetailPanel escalate contract (source-level)", () => {
   });
 
   it("wires onOverride to a handler that opens the chooser", () => {
+    // Panel wires onOverride={handleOverride}; the handler itself lives
+    // in useExceptionActions and flips overrideOpen via setOverrideOpen(true).
     expect(panel).toMatch(/onOverride=\{handleOverride\}/);
-    expect(panel).toMatch(/function handleOverride\(\)/);
+    expect(hook).toMatch(/handleOverride\s*=\s*useCallback/);
+    expect(hook).toMatch(/setOverrideOpen\(true\)/);
   });
 });
 
