@@ -9,6 +9,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { intentLabelFor } from "@/config/erp-label-map";
+import { useErpProfile } from "@/hooks/useErpProfile";
 import {
   BarChart3,
   TrendingUp,
@@ -51,6 +53,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { health } = useHealth();
   const { user, visibleTabs } = useAuth();
+  const erp = useErpProfile();
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -171,7 +174,7 @@ export default function DashboardPage() {
                 {Object.entries(stats.by_intent).map(([intent, count]) => (
                   <div key={intent} className="flex items-center gap-12">
                     <span className="flex-1 text-body text-text-secondary">
-                      {intent.replace(/_/g, " ")}
+                      {intentLabelFor(intent, erp)}
                     </span>
                     <BarSegment value={count} max={stats.total_exceptions} />
                     <span className="min-w-[24px] text-right font-mono text-caption font-semibold text-text-primary">

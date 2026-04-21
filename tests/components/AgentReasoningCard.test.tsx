@@ -31,7 +31,9 @@ describe("AgentReasoningCard", () => {
 
     it("renders intent when provided", () => {
       render(<AgentReasoningCard verdict="GREEN" intent="CONTRACTUAL_CORRECTION" />);
-      expect(screen.getByText("CONTRACTUAL CORRECTION")).toBeInTheDocument();
+      // Resolved via GENERIC vendor (test env has no NEXT_PUBLIC_ASOE_ERP_VENDOR
+      // configured). See src/config/erp-label-map.ts.
+      expect(screen.getByText("Contractual Correction")).toBeInTheDocument();
     });
 
     it("renders recipe name when provided", () => {
