@@ -357,17 +357,18 @@ const _DEFAULT_PHR_ANALYSIS: PriceHoldAnalysisData = {
 };
 
 /**
- * Build an ExceptionDetail for a PRICE_HOLD_RELEASE summary, populating
- * `analysis.price_hold_analysis` with a shape consistent with the
+ * Build an OrderAnalysis for a PRICE_HOLD_RELEASE summary, populating
+ * `price_hold_analysis` with a shape consistent with the
  * `summary.shadow_verdict` (GREEN→AUTO_RELEASE, YELLOW→ESCALATE,
- * RED→HARD_BLOCK). The bare `makeExceptionDetail` returns empty
- * resolution_data for non-COMPLETE cases — insufficient for exercising
- * PriceHoldSection.
+ * RED→HARD_BLOCK). Analysis is fetched separately from ExceptionDetail
+ * in the live UI (analysisApi), so the helper returns just the
+ * analysis payload — pair it with `makeExceptionDetail(summary)` when
+ * a test needs both surfaces.
  */
-export function makePriceHoldExceptionDetail(
+export function makePriceHoldAnalysis(
   summary: ExceptionSummary,
   overrides: Partial<PriceHoldAnalysisData> = {},
-): ExceptionDetail {
+): { detail: ExceptionDetail; analysis: OrderAnalysis } {
   const action: PriceHoldAnalysisData["action"] =
     summary.shadow_verdict === "GREEN" ? "AUTO_RELEASE" :
     summary.shadow_verdict === "RED" ? "HARD_BLOCK" : "ESCALATE";
@@ -383,7 +384,7 @@ export function makePriceHoldExceptionDetail(
     ...overrides,
   };
   return {
-    ...makeExceptionDetail(summary),
+    detail: makeExceptionDetail(summary),
     analysis: { price_hold_analysis: phr } as Partial<OrderAnalysis> as OrderAnalysis,
   };
 }
@@ -402,20 +403,20 @@ const _ACTION_BY_CLASSIFICATION: Record<EdiMismatchAnalysisData["classification"
 };
 
 /**
- * Build an ExceptionDetail for an EDI_MISMATCH summary, populating
- * `analysis.edi_mismatch_analysis` keyed on the sub_type. Defaults
- * cover the four accepted sub_types; pass `expected_value` /
- * `received_value` overrides to exercise the `unknown` shape matrix
- * (string vs number vs object).
+ * Build an OrderAnalysis for an EDI_MISMATCH summary, populating
+ * `edi_mismatch_analysis` keyed on the sub_type. Defaults cover the
+ * four accepted sub_types; pass `expected_value` / `received_value`
+ * overrides to exercise the `unknown` shape matrix (string / number /
+ * object).
  */
-export function makeEdiMismatchExceptionDetail(
+export function makeEdiMismatchAnalysis(
   summary: ExceptionSummary,
   opts: {
     sub_type: string;
     expected_value?: unknown;
     received_value?: unknown;
   },
-): ExceptionDetail {
+): { detail: ExceptionDetail; analysis: OrderAnalysis } {
   const classification = _CLASSIFICATION_BY_SUB_TYPE[opts.sub_type] ?? "REVIEW";
   const recommended_action = _ACTION_BY_CLASSIFICATION[classification];
   const autonomy: EdiMismatchAnalysisData["autonomy_level"] =
@@ -434,7 +435,7 @@ export function makeEdiMismatchExceptionDetail(
       "edi_line_mismatch_inquiry",
   };
   return {
-    ...makeExceptionDetail(summary),
+    detail: makeExceptionDetail(summary),
     analysis: { edi_mismatch_analysis: edm } as Partial<OrderAnalysis> as OrderAnalysis,
   };
 }

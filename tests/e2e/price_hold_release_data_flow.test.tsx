@@ -29,7 +29,7 @@ import {
   PHR_HARD_BLOCK_EXCEPTION,
   MOCK_HEALTH,
   MOCK_STATS,
-  makePriceHoldExceptionDetail,
+  makePriceHoldAnalysis,
 } from "../fixtures";
 
 // ---------------------------------------------------------------------------
@@ -55,10 +55,10 @@ describe("PRICE_HOLD_RELEASE type contract alignment", () => {
     expect(summary.selected_recipe).toBe("PriceHoldReleaseRecipe.py");
   });
 
-  it("ExceptionDetail carries optional resolution_data + analysis", () => {
-    const detail = makePriceHoldExceptionDetail(PHR_ESCALATE_EXCEPTION);
+  it("makePriceHoldAnalysis returns paired ExceptionDetail + OrderAnalysis", () => {
+    const { detail, analysis } = makePriceHoldAnalysis(PHR_ESCALATE_EXCEPTION);
     expect(detail.id).toBe(PHR_ESCALATE_EXCEPTION.id);
-    expect(detail.analysis?.price_hold_analysis).toBeDefined();
+    expect(analysis.price_hold_analysis).toBeDefined();
   });
 
   it("ResolveResponse compiles for the PHR happy path", () => {
@@ -153,10 +153,10 @@ describe("PRICE_HOLD_RELEASE OrderAnalysis type contract", () => {
     expect(actions).toHaveLength(3);
   });
 
-  it("makePriceHoldExceptionDetail derives action from shadow_verdict", () => {
-    expect(makePriceHoldExceptionDetail(PHR_AUTO_RELEASE_EXCEPTION).analysis!.price_hold_analysis!.action).toBe("AUTO_RELEASE");
-    expect(makePriceHoldExceptionDetail(PHR_ESCALATE_EXCEPTION).analysis!.price_hold_analysis!.action).toBe("ESCALATE");
-    expect(makePriceHoldExceptionDetail(PHR_HARD_BLOCK_EXCEPTION).analysis!.price_hold_analysis!.action).toBe("HARD_BLOCK");
+  it("makePriceHoldAnalysis derives action from shadow_verdict", () => {
+    expect(makePriceHoldAnalysis(PHR_AUTO_RELEASE_EXCEPTION).analysis.price_hold_analysis!.action).toBe("AUTO_RELEASE");
+    expect(makePriceHoldAnalysis(PHR_ESCALATE_EXCEPTION).analysis.price_hold_analysis!.action).toBe("ESCALATE");
+    expect(makePriceHoldAnalysis(PHR_HARD_BLOCK_EXCEPTION).analysis.price_hold_analysis!.action).toBe("HARD_BLOCK");
   });
 });
 
@@ -166,14 +166,14 @@ describe("PRICE_HOLD_RELEASE OrderAnalysis type contract", () => {
 
 describe("PRICE_HOLD_RELEASE variance arithmetic", () => {
   it("AUTO_RELEASE branch carries variance ≤ tolerance", () => {
-    const detail = makePriceHoldExceptionDetail(PHR_AUTO_RELEASE_EXCEPTION);
-    const phr = detail.analysis!.price_hold_analysis!;
+    const { analysis } = makePriceHoldAnalysis(PHR_AUTO_RELEASE_EXCEPTION);
+    const phr = analysis.price_hold_analysis!;
     expect(Math.abs(phr.variance_pct)).toBeLessThanOrEqual(phr.tolerance_pct);
   });
 
   it("HARD_BLOCK branch carries variance > hard_block", () => {
-    const detail = makePriceHoldExceptionDetail(PHR_HARD_BLOCK_EXCEPTION);
-    const phr = detail.analysis!.price_hold_analysis!;
+    const { analysis } = makePriceHoldAnalysis(PHR_HARD_BLOCK_EXCEPTION);
+    const phr = analysis.price_hold_analysis!;
     expect(Math.abs(phr.variance_pct)).toBeGreaterThan(phr.hard_block_pct);
   });
 });

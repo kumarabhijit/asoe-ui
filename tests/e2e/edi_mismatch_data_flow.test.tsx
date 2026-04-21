@@ -31,7 +31,7 @@ import {
   PRICE_MISMATCH_CONTRACTUAL_EXCEPTION,
   MOCK_HEALTH,
   MOCK_STATS,
-  makeEdiMismatchExceptionDetail,
+  makeEdiMismatchAnalysis,
 } from "../fixtures";
 
 import { EdiMismatchSection } from "@/app/exceptions/EdiMismatchSection";
@@ -153,18 +153,18 @@ describe("EDI_MISMATCH OrderAnalysis type contract", () => {
   });
 
   it("expected_value / received_value tolerate string, number, and object shapes", () => {
-    const stringEdm = makeEdiMismatchExceptionDetail(EDM_SKU_EXCEPTION, { sub_type: "SKU_MISMATCH" });
-    expect(typeof stringEdm.analysis!.edi_mismatch_analysis!.expected_value).toBe("string");
+    const stringEdm = makeEdiMismatchAnalysis(EDM_SKU_EXCEPTION, { sub_type: "SKU_MISMATCH" });
+    expect(typeof stringEdm.analysis.edi_mismatch_analysis!.expected_value).toBe("string");
 
-    const numericEdm = makeEdiMismatchExceptionDetail(EDM_QTY_EXCEPTION, { sub_type: "QTY_MISMATCH", expected_value: 10, received_value: 12 });
-    expect(numericEdm.analysis!.edi_mismatch_analysis!.expected_value).toBe(10);
+    const numericEdm = makeEdiMismatchAnalysis(EDM_QTY_EXCEPTION, { sub_type: "QTY_MISMATCH", expected_value: 10, received_value: 12 });
+    expect(numericEdm.analysis.edi_mismatch_analysis!.expected_value).toBe(10);
 
-    const objectEdm = makeEdiMismatchExceptionDetail(EDM_SHIP_TO_EXCEPTION, {
+    const objectEdm = makeEdiMismatchAnalysis(EDM_SHIP_TO_EXCEPTION, {
       sub_type: "SHIP_TO_MISMATCH",
       expected_value: { country: "US", region: "NW" },
       received_value: { country: "US", region: "SE" },
     });
-    expect(typeof objectEdm.analysis!.edi_mismatch_analysis!.expected_value).toBe("object");
+    expect(typeof objectEdm.analysis.edi_mismatch_analysis!.expected_value).toBe("object");
   });
 });
 
@@ -202,8 +202,8 @@ describe("EDI_MISMATCH PRICE_MISMATCH routing fork", () => {
     // Sanity inverse: prove the section renders when supplied with the
     // matching data shape — confirms the previous test's negative
     // assertion is not vacuous.
-    const detail = makeEdiMismatchExceptionDetail(EDM_SKU_EXCEPTION, { sub_type: "SKU_MISMATCH" });
-    render(<EdiMismatchSection data={detail.analysis!.edi_mismatch_analysis!} />);
+    const { analysis } = makeEdiMismatchAnalysis(EDM_SKU_EXCEPTION, { sub_type: "SKU_MISMATCH" });
+    render(<EdiMismatchSection data={analysis.edi_mismatch_analysis!} />);
     expect(screen.getByText(/EDI Line Mismatch/i)).toBeInTheDocument();
   });
 });
