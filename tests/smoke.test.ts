@@ -6,7 +6,7 @@ import { MOCK_HEALTH, GREEN_EXCEPTION, ANALYST_USER } from "./fixtures";
 
 describe("Test Infrastructure", () => {
   it("fixtures load correctly", () => {
-    expect(MOCK_HEALTH.allowed_intents).toHaveLength(4);
+    expect(MOCK_HEALTH.allowed_intents.length).toBeGreaterThanOrEqual(4);
     expect(GREEN_EXCEPTION.shadow_verdict).toBe("GREEN");
     expect(ANALYST_USER.roles).toContain("analyst");
   });

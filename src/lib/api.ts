@@ -506,6 +506,32 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-016", tenant_id: "acme-corp", order_id: "SO-14200", event_type: "DELIVERY_DELAY", intent: "DELIVERY_DELAY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "DeliveryDelayResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-16T09:30:00Z", updated_at: "2026-04-16T09:35:00Z", account_id: "acct-target", account_name: "Target",
   },
+  // PRICE_HOLD_RELEASE — auto-release branch (variance within tolerance).
+  // Renders PriceHoldSection via OrderAnalysis.price_hold_analysis.
+  {
+    id: "exc-017", tenant_id: "acme-corp", order_id: "PO-PHR-001", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "COMPLETE", created_at: "2026-04-17T08:00:00Z", updated_at: "2026-04-17T08:01:00Z", account_id: "acct-walmart", account_name: "Walmart",
+  },
+  // PRICE_HOLD_RELEASE — escalate band (> tolerance, ≤ hard-block).
+  {
+    id: "exc-018", tenant_id: "acme-corp", order_id: "PO-PHR-002", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-17T08:05:00Z", updated_at: "2026-04-17T08:06:00Z", account_id: "acct-kroger", account_name: "Kroger",
+  },
+  // EDI_MISMATCH — SKU sub_type, hard reject.
+  {
+    id: "exc-019", tenant_id: "acme-corp", order_id: "PO-EDM-SKU-001", event_type: "EDI_850_LINE_MISMATCH", intent: "EDI_MISMATCH", lifecycle_state: "BLOCKED", shadow_verdict: "RED", selected_recipe: "EdiMismatchRecipe.py", final_status: "BLOCKED", created_at: "2026-04-17T09:00:00Z", updated_at: "2026-04-17T09:01:00Z", account_id: "acct-target", account_name: "Target",
+  },
+  // EDI_MISMATCH — QTY sub_type, review required.
+  {
+    id: "exc-020", tenant_id: "acme-corp", order_id: "PO-EDM-QTY-001", event_type: "EDI_850_LINE_MISMATCH", intent: "EDI_MISMATCH", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "EdiMismatchRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-17T09:05:00Z", updated_at: "2026-04-17T09:06:00Z", account_id: "acct-costco", account_name: "Costco",
+  },
+  // PRICE_MISMATCH routing fork: EDI_850_LINE_MISMATCH event whose
+  // metadata.mismatch_sub_type=PRICE_MISMATCH lands as
+  // CONTRACTUAL_CORRECTION at backend classifier time. Renders the
+  // existing PriceAnalysisSection (via price_analysis), NOT a new EDI
+  // mismatch panel — proves the single-source-of-truth invariant for
+  // pricing (CLAUDE.md §1).
+  {
+    id: "exc-021", tenant_id: "acme-corp", order_id: "PO-PM-ROUTING-001", event_type: "EDI_850_LINE_MISMATCH", intent: "CONTRACTUAL_CORRECTION", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "PriceAdjustmentRecipe.py", final_status: "COMPLETE", created_at: "2026-04-17T10:00:00Z", updated_at: "2026-04-17T10:01:00Z", account_id: "acct-walmart", account_name: "Walmart",
+  },
 ];
 
 /** Per-exception trace enrichment — optional Layer 2 fields demonstrated
@@ -552,13 +578,13 @@ const MOCK_HEALTH: HealthResponse = {
   version: "0.3.2",
   kill_switch: false,
   explain_mode: false,
-  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY"],
+  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY", "PRICE_HOLD_RELEASE", "EDI_MISMATCH"],
   lifecycle_states: [
     "INGESTED", "CLASSIFYING", "AUDITING", "PENDING_REVIEW",
     "ESCALATED", "PENDING_ADMIN_REVIEW", "EXECUTING", "RESOLVED",
     "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
-  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py", "DeliveryDelayResolutionRecipe.py"],
+  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py", "DeliveryDelayResolutionRecipe.py", "PriceHoldReleaseRecipe.py", "EdiMismatchRecipe.py"],
   // Mirrors asoe2/constraints/specs.py AllowedResolutionAction. Backend is
   // authoritative at runtime (/api/v1/health); this mock list exists only for
   // local development.
@@ -569,7 +595,7 @@ const MOCK_HEALTH: HealthResponse = {
   // seeds every intent with the full global set — matches the backend's
   // behavior until real curation arrives.
   allowed_override_reason_tags_by_intent: Object.fromEntries(
-    ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY"].map(
+    ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY", "PRICE_HOLD_RELEASE", "EDI_MISMATCH"].map(
       (intent) => [intent, ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"]],
     ),
   ),
