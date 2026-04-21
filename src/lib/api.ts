@@ -1216,6 +1216,21 @@ const MOCK_LINE_ITEMS: Record<string, LineItem[]> = {
     { line_id: "L3", sku: "SKU-9120", description: "Electrolyte Blend 12oz 24pk", uom: "CS", quantity: 2400, erp_price: 18.40, po_price: 18.40 },
     { line_id: "L4", sku: "SKU-9130", description: "Flavored Soda 12oz 24pk", uom: "CS", quantity: 1400, erp_price: 15.20, po_price: 15.20 },
   ],
+  "exc-017": [
+    { line_id: "L1", sku: "SKU-101", description: "12oz Craft Soda Variety 24pk", uom: "CS", quantity: 10, erp_price: 100.00, po_price: 101.00 },
+  ],
+  "exc-018": [
+    { line_id: "L1", sku: "SKU-102", description: "16oz Energy Drink 12pk", uom: "CS", quantity: 50, erp_price: 100.00, po_price: 105.00 },
+  ],
+  "exc-019": [
+    { line_id: "L1", sku: "SKU-999-UNKNOWN", description: "Unknown SKU — not in master data", uom: "CS", quantity: 0, erp_price: 0, po_price: 0 },
+  ],
+  "exc-020": [
+    { line_id: "L1", sku: "SKU-202", description: "32oz Sports Drink 6pk", uom: "CS", quantity: 144, erp_price: 50.00, po_price: 50.00 },
+  ],
+  "exc-021": [
+    { line_id: "L1", sku: "SKU-PRICE-MM", description: "Routed-from-EDI line — pricing path", uom: "CS", quantity: 100, erp_price: 100.00, po_price: 95.00 },
+  ],
 };
 
 const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
@@ -2219,6 +2234,210 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
           recommended: false,
         },
       ],
+    },
+  },
+  /* ── PRICE_HOLD_RELEASE: Auto-release (GREEN) ────────────────────────── */
+  "exc-017": {
+    diagnosis: "EDI 850 held because PO unit price ($101.00) deviates +1.0% from SAP base ($100.00). Variance is within the 2.0% auto-release tolerance — PriceHoldReleaseRecipe auto-released the hold.",
+    confidence: 96,
+    risk: "LOW",
+    resolution: "AUTO_RELEASE",
+    root_cause: "Rounding variance within contractual tolerance. Release permitted per hold-release policy.",
+    recommendation: "No human action required. Hold released; order proceeds to fulfilment.",
+    entity_profile: {
+      customer_name: "Walmart Inc",
+      bp_number: "BP-WMT-001",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Excellent",
+      location: "DC-Bentonville",
+      region: "South Central",
+    },
+    impact_metrics: {
+      revenue_at_risk: 1010.00,
+      delta_amount: 10.00,
+      delta_percentage: 1.0,
+      sla_priority: "LOW",
+      sla_deadline: "2026-04-18T12:00:00Z",
+      affected_lines: 1,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "Line 1 — PO $101.00 vs SAP $100.00 (+1.0%).", resolution: "AUTO_RELEASE", risk: "LOW", waterfall: [] },
+    ],
+    price_hold_analysis: {
+      hold_status: "RELEASED",
+      po_price: 101.00,
+      sap_base_price: 100.00,
+      variance_pct: 0.01,
+      tolerance_pct: 0.02,
+      hard_block_pct: 0.10,
+      action: "AUTO_RELEASE",
+      reason: "Variance +1.0% within tolerance (+2.0%); auto-release per PriceHoldReleaseRecipe.",
+    },
+  },
+  /* ── PRICE_HOLD_RELEASE: Escalate (YELLOW) ──────────────────────────── */
+  "exc-018": {
+    diagnosis: "EDI 850 held because PO unit price ($105.00) deviates +5.0% from SAP base ($100.00). Variance exceeds the 2.0% auto-release tolerance but stays within the 10.0% hard-block ceiling — PriceHoldReleaseRecipe escalated for manager review.",
+    confidence: 90,
+    risk: "MEDIUM",
+    resolution: "ESCALATE",
+    root_cause: "Price variance above auto-release tolerance. Human review required to confirm customer intent.",
+    recommendation: "Manager reviews the variance; approve to release or override to hard-block.",
+    entity_profile: {
+      customer_name: "Kroger",
+      bp_number: "BP-KRG-003",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Good",
+      location: "DC-Cincinnati",
+      region: "Midwest",
+    },
+    impact_metrics: {
+      revenue_at_risk: 5250.00,
+      delta_amount: 250.00,
+      delta_percentage: 5.0,
+      sla_priority: "MEDIUM",
+      sla_deadline: "2026-04-18T18:00:00Z",
+      affected_lines: 1,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "Line 1 — PO $105.00 vs SAP $100.00 (+5.0%).", resolution: "ESCALATE", risk: "MEDIUM", waterfall: [] },
+    ],
+    price_hold_analysis: {
+      hold_status: "HELD",
+      po_price: 105.00,
+      sap_base_price: 100.00,
+      variance_pct: 0.05,
+      tolerance_pct: 0.02,
+      hard_block_pct: 0.10,
+      action: "ESCALATE",
+      reason: "Variance +5.0% above tolerance (+2.0%); under hard-block (+10.0%). Manager review required.",
+    },
+  },
+  /* ── EDI_MISMATCH: SKU hard reject (RED) ─────────────────────────────── */
+  "exc-019": {
+    diagnosis: "EDI 850 line 1 references SKU-999-UNKNOWN — not in the SAP material master. EdiMismatchRecipe classified the line as HARD_REJECT; order has been blocked pending buyer notification.",
+    confidence: 99,
+    risk: "HIGH",
+    resolution: "BLOCK_AND_NOTIFY",
+    root_cause: "Received SKU does not match any material record. Order cannot fulfil as received.",
+    recommendation: "Buyer notified automatically. Await corrected PO before resuming fulfilment.",
+    entity_profile: {
+      customer_name: "Target",
+      bp_number: "BP-TGT-002",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Excellent",
+      location: "DC-Minneapolis",
+      region: "North Central",
+    },
+    impact_metrics: {
+      revenue_at_risk: 0,
+      delta_amount: 0,
+      delta_percentage: 0,
+      sla_priority: "HIGH",
+      sla_deadline: "2026-04-18T12:00:00Z",
+      affected_lines: 1,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "SKU-001 expected; SKU-999-UNKNOWN received.", resolution: "HARD_REJECT", risk: "HIGH", waterfall: [] },
+    ],
+    edi_mismatch_analysis: {
+      sub_type: "SKU_MISMATCH",
+      classification: "HARD_REJECT",
+      recommended_action: "BLOCK_AND_NOTIFY",
+      autonomy_level: "L3",
+      expected_value: "SKU-001",
+      received_value: "SKU-999-UNKNOWN",
+      notification_template: "edi_line_mismatch_blocked",
+    },
+  },
+  /* ── EDI_MISMATCH: QTY review required (YELLOW) ──────────────────────── */
+  "exc-020": {
+    diagnosis: "EDI 850 line 1 received quantity 144 instead of the contract-aligned 120. EdiMismatchRecipe classified the variance as REVIEW; buyer confirmation is required before fulfilment.",
+    confidence: 87,
+    risk: "MEDIUM",
+    resolution: "REQUEST_BUYER_CONFIRMATION",
+    root_cause: "Quantity mismatch outside pallet-tolerance. Likely buyer-side PO upsize or an EDI translation error.",
+    recommendation: "Confirm upsize with buyer; approve to fulfil at 144 or override to the contract quantity.",
+    entity_profile: {
+      customer_name: "Costco Wholesale",
+      bp_number: "BP-CSC-004",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Excellent",
+      location: "DC-Issaquah",
+      region: "Pacific NW",
+    },
+    impact_metrics: {
+      revenue_at_risk: 7200.00,
+      delta_amount: 1200.00,
+      delta_percentage: 20.0,
+      sla_priority: "MEDIUM",
+      sla_deadline: "2026-04-18T18:00:00Z",
+      affected_lines: 1,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "Expected qty 120; received qty 144 (+20%).", resolution: "REQUEST_BUYER_CONFIRMATION", risk: "MEDIUM", waterfall: [] },
+    ],
+    edi_mismatch_analysis: {
+      sub_type: "QTY_MISMATCH",
+      classification: "REVIEW",
+      recommended_action: "REQUEST_BUYER_CONFIRMATION",
+      autonomy_level: "L2",
+      expected_value: 120,
+      received_value: 144,
+      notification_template: "edi_line_mismatch_inquiry",
+    },
+  },
+  /* ── PRICE_MISMATCH routing fork: lands as CONTRACTUAL_CORRECTION ─────
+   * Backend classifier routed this EDI_850_LINE_MISMATCH (sub_type
+   * PRICE_MISMATCH) to CONTRACTUAL_CORRECTION + PriceAdjustmentRecipe —
+   * preserving the single source of truth for pricing (CLAUDE.md §1).
+   * The UI renders PriceAnalysisSection (not EdiMismatchSection) because
+   * only `price_analysis` is populated; edi_mismatch_analysis is absent.
+   */
+  "exc-021": {
+    diagnosis: "EDI 850 line 1 arrived with a price mismatch (received $95.00 vs expected $100.00). Backend classifier routed the event to CONTRACTUAL_CORRECTION so PriceAdjustmentRecipe owns the resolution — variance of −5.0% is within the 15% discount ceiling, GREEN shadow verdict, auto-override applied.",
+    confidence: 94,
+    risk: "LOW",
+    resolution: "AUTO_OVERRIDE",
+    root_cause: "PO line references a contract discount outside the base pricing condition. Variance within allowed discount ceiling.",
+    recommendation: "No human action required. Price adjusted via YK07 customer-match condition.",
+    entity_profile: {
+      customer_name: "Walmart Inc",
+      bp_number: "BP-WMT-001",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Excellent",
+      location: "DC-Bentonville",
+      region: "South Central",
+    },
+    impact_metrics: {
+      revenue_at_risk: 9500.00,
+      delta_amount: 500.00,
+      delta_percentage: 5.0,
+      sla_priority: "LOW",
+      sla_deadline: "2026-04-18T18:00:00Z",
+      affected_lines: 1,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "PO $95.00 vs contract $100.00 (−5.0%) — within discount ceiling.", resolution: "AUTO_OVERRIDE", risk: "LOW", waterfall: [] },
+    ],
+    price_analysis: {
+      erp_unit_price: 100.00,
+      po_unit_price: 95.00,
+      variance_amount: 5.00,
+      variance_pct: 5.0,
+      total_at_risk: 9500.00,
+      total_quantity: 100,
+      uom: "CS",
+      doc_type: "Sales Order",
+      doc_number: "SO-PM-ROUTING-001",
+      sku: "SKU-PRICE-MM",
+      material_desc: "Routed from EDI_850_LINE_MISMATCH with sub_type=PRICE_MISMATCH",
+      order_date: "2026-04-17T10:00:00Z",
+      rule_id: "SO-PRICE-002",
     },
   },
 };
