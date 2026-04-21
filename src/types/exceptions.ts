@@ -286,6 +286,62 @@ export interface OrderAnalysis {
   pallet_analysis?: PalletAnalysisData;
   /** Present when a delivery delay exception produces timing analysis */
   delivery_delay_analysis?: DeliveryDelayAnalysisData;
+  /** Present when a price-hold release event produces variance + action analysis */
+  price_hold_analysis?: PriceHoldAnalysisData;
+  /** Present when an EDI 850 line mismatch produces sub_type classification */
+  edi_mismatch_analysis?: EdiMismatchAnalysisData;
+}
+
+/* ── Price Hold Release enrichment types (UI-only, not backend contract) ── */
+
+/** Recipe action for a held order — one per branch in PriceHoldReleaseRecipe.py */
+export type PriceHoldAction = "AUTO_RELEASE" | "ESCALATE" | "HARD_BLOCK";
+
+/** Price-hold variance + action summary — present when PriceHoldReleaseRecipe runs */
+export interface PriceHoldAnalysisData {
+  hold_status: "HELD" | "RELEASED";
+  po_price: number;
+  sap_base_price: number;
+  /** Signed fraction (po − sap) / sap. */
+  variance_pct: number;
+  /** Auto-release ceiling (decimal fraction) — policy-injected. */
+  tolerance_pct: number;
+  /** Hard-block floor (decimal fraction) — policy-injected. */
+  hard_block_pct: number;
+  action: PriceHoldAction;
+  /** Human-readable reason (policy hit). */
+  reason: string;
+}
+
+/* ── EDI Mismatch enrichment types (UI-only, not backend contract) ──── */
+
+/** Recipe classification — one per branch in EdiMismatchRecipe.py */
+export type EdiMismatchClassification = "HARD_REJECT" | "REVIEW" | "ESCALATE";
+
+/**
+ * EDI 850 line mismatch summary — present when EdiMismatchRecipe runs.
+ *
+ * `sub_type` is rendered verbatim, matching the pattern used by
+ * `delay_category` / `root_cause_category` elsewhere in this file
+ * ("Rendered verbatim — no UI dispatch on the value"). Keeping it
+ * `string` avoids re-introducing the Guardrail #2 smell that the
+ * hand-written Intent / RecipeName unions represent.
+ *
+ * Note: PRICE_MISMATCH is intentionally absent from the backend's
+ * AllowedEdiMismatchSubType vocabulary — it routes to
+ * CONTRACTUAL_CORRECTION at classifier time and renders the existing
+ * PriceAnalysisSection instead. This section is therefore never
+ * mounted for PRICE_MISMATCH.
+ */
+export interface EdiMismatchAnalysisData {
+  sub_type: string;
+  classification: EdiMismatchClassification;
+  /** Recipe-recommended action (e.g., BLOCK_AND_NOTIFY, REQUEST_BUYER_CONFIRMATION). */
+  recommended_action: string;
+  autonomy_level: "L1" | "L2" | "L3";
+  expected_value: unknown;
+  received_value: unknown;
+  notification_template: string | null;
 }
 
 /* ── Duplicate PO enrichment types (UI-only, not backend contract) ──── */

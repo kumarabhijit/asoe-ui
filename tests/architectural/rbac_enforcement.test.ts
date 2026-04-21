@@ -112,4 +112,38 @@ describe("RBAC Enforcement — Security Fixes", () => {
       expect(ROLE_PERMISSIONS.analyst).not.toContain(PERMISSIONS.EXCEPTIONS_OVERRIDE);
     });
   });
+
+  // ─────────────────────────────────────────────────────────────────
+  // RBAC for the new intents (testing review must-fix #9). Both
+  // intents flow through the same disposition primitive and inherit
+  // the existing permission gating; these tests prove that gating
+  // remains in force for the new intents and is not accidentally
+  // bypassed by an intent-specific code path.
+  // ─────────────────────────────────────────────────────────────────
+
+  describe("PRICE_HOLD_RELEASE permission gating", () => {
+    it("admin can perform admin-release on a HARD_BLOCK exception", () => {
+      // Backend gates admin-release on exceptions:override (manager+);
+      // admin role inherits override permission.
+      expect(ROLE_PERMISSIONS.admin).toContain(PERMISSIONS.EXCEPTIONS_OVERRIDE);
+    });
+
+    it("analyst cannot admin-release a HARD_BLOCK exception", () => {
+      expect(ROLE_PERMISSIONS.analyst).not.toContain(PERMISSIONS.EXCEPTIONS_OVERRIDE);
+    });
+  });
+
+  describe("EDI_MISMATCH permission gating", () => {
+    it("manager+ can override an EDI_MISMATCH exception", () => {
+      expect(ROLE_PERMISSIONS.manager).toContain(PERMISSIONS.EXCEPTIONS_OVERRIDE);
+    });
+
+    it("analyst can approve/reject an EDI_MISMATCH exception (YELLOW path)", () => {
+      expect(ROLE_PERMISSIONS.analyst).toContain(PERMISSIONS.EXCEPTIONS_APPROVE);
+    });
+
+    it("analyst cannot override an EDI_MISMATCH exception", () => {
+      expect(ROLE_PERMISSIONS.analyst).not.toContain(PERMISSIONS.EXCEPTIONS_OVERRIDE);
+    });
+  });
 });

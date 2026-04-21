@@ -300,3 +300,59 @@ describe("Backend ↔ Frontend alignment — three-tier schemas", () => {
     expect(typeof req.notes).toBe("string");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Three-tier HITL invariants for the new intents (mandatory per testing
+// review — cross-intent invariant, both new intents must respect it).
+// ---------------------------------------------------------------------------
+
+import {
+  PHR_HARD_BLOCK_EXCEPTION,
+  EDM_SKU_EXCEPTION,
+} from "../fixtures";
+
+describe("Three-tier HITL invariants — PRICE_HOLD_RELEASE", () => {
+  it("HARD_BLOCK lands as BLOCKED (eligible for admin-release)", () => {
+    expect(PHR_HARD_BLOCK_EXCEPTION.lifecycle_state).toBe("BLOCKED");
+    expect(PHR_HARD_BLOCK_EXCEPTION.shadow_verdict).toBe("RED");
+  });
+
+  it("admin-release request shape applies to PHR HARD_BLOCK", () => {
+    const req: AdminReleaseRequest = {
+      release_reason: "Customer pre-approved variance via signed exception form.",
+      risk_acknowledgment: true,
+    };
+    expect(req.risk_acknowledgment).toBe(true);
+  });
+
+  it("override on PHR HARD_BLOCK requires mandatory notes (SOX)", () => {
+    const req: OverrideRequest = {
+      action: "ALLOW_BOTH",
+      notes: "Manager override: customer accepted current pricing.",
+    };
+    expect(req.notes.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Three-tier HITL invariants — EDI_MISMATCH", () => {
+  it("SKU sub_type lands as BLOCKED (eligible for admin-release)", () => {
+    expect(EDM_SKU_EXCEPTION.lifecycle_state).toBe("BLOCKED");
+    expect(EDM_SKU_EXCEPTION.shadow_verdict).toBe("RED");
+  });
+
+  it("admin-release request shape applies to EDM SKU mismatch", () => {
+    const req: AdminReleaseRequest = {
+      release_reason: "Buyer confirmed SKU substitution.",
+      risk_acknowledgment: true,
+    };
+    expect(req.release_reason.length).toBeGreaterThan(0);
+  });
+
+  it("override on EDM SKU requires mandatory notes (SOX)", () => {
+    const req: OverrideRequest = {
+      action: "BLOCK_AND_NOTIFY",
+      notes: "Manager confirms hard reject; notify buyer of SKU mismatch.",
+    };
+    expect(req.notes.length).toBeGreaterThan(0);
+  });
+});

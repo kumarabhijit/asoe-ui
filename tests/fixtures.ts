@@ -156,13 +156,20 @@ export const MOCK_HEALTH: HealthResponse = {
   version: "0.3.2",
   kill_switch: false,
   explain_mode: false,
-  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO"],
+  allowed_intents: [
+    "CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR",
+    "DUPLICATE_PO", "PRICE_HOLD_RELEASE", "EDI_MISMATCH",
+  ],
   lifecycle_states: [
     "INGESTED", "CLASSIFYING", "AUDITING", "PENDING_REVIEW",
     "ESCALATED", "PENDING_ADMIN_REVIEW", "EXECUTING", "RESOLVED",
     "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
-  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py"],
+  allowed_recipes: [
+    "PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py",
+    "DuplicatePORecipe.py", "PriceHoldReleaseRecipe.py",
+    "EdiMismatchRecipe.py",
+  ],
   allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION"],
   allowed_override_reason_tags: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
   allowed_override_reason_tags_by_intent: {
@@ -170,17 +177,22 @@ export const MOCK_HEALTH: HealthResponse = {
     CREDIT_BLOCK: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
     MASS_PRICING_ERROR: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
     DUPLICATE_PO: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
+    PRICE_HOLD_RELEASE: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
+    EDI_MISMATCH: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
   },
 };
 
 /* ── Stats fixture ─────────────────────────────────────────────────── */
 
 export const MOCK_STATS: StatsResponse = {
-  total_exceptions: 8,
-  open_exceptions: 4,
-  auto_resolved: 3,
-  manual_review: 2,
-  blocked: 1,
+  // Bumped from 8 → 12 to include 2 PHR + 2 EDM exceptions. Totals
+  // across by_intent, by_lifecycle_state, and by_shadow_verdict are
+  // kept consistent.
+  total_exceptions: 12,
+  open_exceptions: 6,
+  auto_resolved: 4,
+  manual_review: 4,
+  blocked: 2,
   failed: 0,
   avg_resolution_time_seconds: 480,
   by_intent: {
@@ -188,18 +200,242 @@ export const MOCK_STATS: StatsResponse = {
     DUPLICATE_PO: 2,
     CREDIT_BLOCK: 2,
     MASS_PRICING_ERROR: 1,
+    PRICE_HOLD_RELEASE: 2,
+    EDI_MISMATCH: 2,
   },
   by_lifecycle_state: {
-    RESOLVED: 2,
-    PENDING_REVIEW: 2,
-    BLOCKED: 1,
+    RESOLVED: 3,
+    PENDING_REVIEW: 4,
+    BLOCKED: 2,
     EXECUTING: 1,
     ESCALATED: 1,
     CLOSED: 1,
   },
   by_shadow_verdict: {
-    GREEN: 4,
-    YELLOW: 3,
-    RED: 1,
+    GREEN: 5,
+    YELLOW: 5,
+    RED: 2,
   },
 };
+
+/* ── PRICE_HOLD_RELEASE fixtures (3 — one per recipe action branch) ── */
+
+import type { OrderAnalysis, PriceHoldAnalysisData, EdiMismatchAnalysisData } from "@/types/exceptions";
+
+export const PHR_AUTO_RELEASE_EXCEPTION: ExceptionSummary = {
+  id: "exc-phr-auto-001",
+  tenant_id: "acme-corp",
+  order_id: "PO-PHR-001",
+  event_type: "EDI_850_PRICE_HOLD",
+  intent: "PRICE_HOLD_RELEASE",
+  lifecycle_state: "RESOLVED",
+  shadow_verdict: "GREEN",
+  selected_recipe: "PriceHoldReleaseRecipe.py",
+  final_status: "COMPLETE",
+  created_at: "2026-04-15T08:00:00Z",
+  updated_at: "2026-04-15T08:01:00Z",
+};
+
+export const PHR_ESCALATE_EXCEPTION: ExceptionSummary = {
+  id: "exc-phr-esc-001",
+  tenant_id: "acme-corp",
+  order_id: "PO-PHR-002",
+  event_type: "EDI_850_PRICE_HOLD",
+  intent: "PRICE_HOLD_RELEASE",
+  lifecycle_state: "PENDING_REVIEW",
+  shadow_verdict: "YELLOW",
+  selected_recipe: "PriceHoldReleaseRecipe.py",
+  final_status: "MANUAL_REVIEW_REQUIRED",
+  created_at: "2026-04-15T08:05:00Z",
+  updated_at: "2026-04-15T08:06:00Z",
+};
+
+export const PHR_HARD_BLOCK_EXCEPTION: ExceptionSummary = {
+  id: "exc-phr-hard-001",
+  tenant_id: "acme-corp",
+  order_id: "PO-PHR-003",
+  event_type: "EDI_850_PRICE_HOLD",
+  intent: "PRICE_HOLD_RELEASE",
+  lifecycle_state: "BLOCKED",
+  shadow_verdict: "RED",
+  selected_recipe: "PriceHoldReleaseRecipe.py",
+  final_status: "BLOCKED",
+  created_at: "2026-04-15T08:10:00Z",
+  updated_at: "2026-04-15T08:11:00Z",
+};
+
+/* ── EDI_MISMATCH fixtures (4 — one per accepted sub_type) ─────────── */
+
+export const EDM_SKU_EXCEPTION: ExceptionSummary = {
+  id: "exc-edm-sku-001",
+  tenant_id: "acme-corp",
+  order_id: "PO-EDM-SKU-001",
+  event_type: "EDI_850_LINE_MISMATCH",
+  intent: "EDI_MISMATCH",
+  lifecycle_state: "BLOCKED",
+  shadow_verdict: "RED",
+  selected_recipe: "EdiMismatchRecipe.py",
+  final_status: "BLOCKED",
+  created_at: "2026-04-15T09:00:00Z",
+  updated_at: "2026-04-15T09:01:00Z",
+};
+
+export const EDM_QTY_EXCEPTION: ExceptionSummary = {
+  id: "exc-edm-qty-001",
+  tenant_id: "acme-corp",
+  order_id: "PO-EDM-QTY-001",
+  event_type: "EDI_850_LINE_MISMATCH",
+  intent: "EDI_MISMATCH",
+  lifecycle_state: "PENDING_REVIEW",
+  shadow_verdict: "YELLOW",
+  selected_recipe: "EdiMismatchRecipe.py",
+  final_status: "MANUAL_REVIEW_REQUIRED",
+  created_at: "2026-04-15T09:05:00Z",
+  updated_at: "2026-04-15T09:06:00Z",
+};
+
+export const EDM_UOM_EXCEPTION: ExceptionSummary = {
+  id: "exc-edm-uom-001",
+  tenant_id: "acme-corp",
+  order_id: "PO-EDM-UOM-001",
+  event_type: "EDI_850_LINE_MISMATCH",
+  intent: "EDI_MISMATCH",
+  lifecycle_state: "PENDING_REVIEW",
+  shadow_verdict: "YELLOW",
+  selected_recipe: "EdiMismatchRecipe.py",
+  final_status: "MANUAL_REVIEW_REQUIRED",
+  created_at: "2026-04-15T09:10:00Z",
+  updated_at: "2026-04-15T09:11:00Z",
+};
+
+export const EDM_SHIP_TO_EXCEPTION: ExceptionSummary = {
+  id: "exc-edm-ship-001",
+  tenant_id: "acme-corp",
+  order_id: "PO-EDM-SHIP-001",
+  event_type: "EDI_850_LINE_MISMATCH",
+  intent: "EDI_MISMATCH",
+  lifecycle_state: "ESCALATED",
+  shadow_verdict: "YELLOW",
+  selected_recipe: "EdiMismatchRecipe.py",
+  final_status: "MANUAL_REVIEW_REQUIRED",
+  created_at: "2026-04-15T09:15:00Z",
+  updated_at: "2026-04-15T09:16:00Z",
+};
+
+/* ── PRICE_MISMATCH routing-fork fixture ───────────────────────────────
+ * EDI_850_LINE_MISMATCH event whose metadata.mismatch_sub_type is
+ * PRICE_MISMATCH lands as CONTRACTUAL_CORRECTION at backend classifier
+ * time (preserving PriceAdjustmentRecipe as the single source of truth
+ * for pricing). Use this fixture to prove the UI never double-renders
+ * an EDI mismatch panel for these events.
+ */
+export const PRICE_MISMATCH_CONTRACTUAL_EXCEPTION: ExceptionSummary = {
+  id: "exc-pm-routing-001",
+  tenant_id: "acme-corp",
+  order_id: "PO-PM-ROUTING-001",
+  event_type: "EDI_850_LINE_MISMATCH",
+  intent: "CONTRACTUAL_CORRECTION",
+  lifecycle_state: "RESOLVED",
+  shadow_verdict: "GREEN",
+  selected_recipe: "PriceAdjustmentRecipe.py",
+  final_status: "COMPLETE",
+  created_at: "2026-04-15T10:00:00Z",
+  updated_at: "2026-04-15T10:01:00Z",
+};
+
+/* ── Helper factories that populate the new analysis fields ─────────── */
+
+const _DEFAULT_PHR_ANALYSIS: PriceHoldAnalysisData = {
+  hold_status: "HELD",
+  po_price: 105,
+  sap_base_price: 100,
+  variance_pct: 0.05,
+  tolerance_pct: 0.02,
+  hard_block_pct: 0.10,
+  action: "ESCALATE",
+  reason: "Variance 0.0500 above tolerance 0.0200 but within hard-block 0.1000; manual review required.",
+};
+
+/**
+ * Build an OrderAnalysis for a PRICE_HOLD_RELEASE summary, populating
+ * `price_hold_analysis` with a shape consistent with the
+ * `summary.shadow_verdict` (GREEN→AUTO_RELEASE, YELLOW→ESCALATE,
+ * RED→HARD_BLOCK). Analysis is fetched separately from ExceptionDetail
+ * in the live UI (analysisApi), so the helper returns just the
+ * analysis payload — pair it with `makeExceptionDetail(summary)` when
+ * a test needs both surfaces.
+ */
+export function makePriceHoldAnalysis(
+  summary: ExceptionSummary,
+  overrides: Partial<PriceHoldAnalysisData> = {},
+): { detail: ExceptionDetail; analysis: OrderAnalysis } {
+  const action: PriceHoldAnalysisData["action"] =
+    summary.shadow_verdict === "GREEN" ? "AUTO_RELEASE" :
+    summary.shadow_verdict === "RED" ? "HARD_BLOCK" : "ESCALATE";
+  const variance =
+    action === "AUTO_RELEASE" ? 0.01 :
+    action === "HARD_BLOCK" ? 0.15 : 0.05;
+  const phr: PriceHoldAnalysisData = {
+    ..._DEFAULT_PHR_ANALYSIS,
+    variance_pct: variance,
+    po_price: 100 * (1 + variance),
+    action,
+    reason: `Variance ${variance.toFixed(4)} → ${action}.`,
+    ...overrides,
+  };
+  return {
+    detail: makeExceptionDetail(summary),
+    analysis: { price_hold_analysis: phr } as Partial<OrderAnalysis> as OrderAnalysis,
+  };
+}
+
+const _CLASSIFICATION_BY_SUB_TYPE: Record<string, EdiMismatchAnalysisData["classification"]> = {
+  SKU_MISMATCH: "HARD_REJECT",
+  QTY_MISMATCH: "REVIEW",
+  UOM_MISMATCH: "REVIEW",
+  SHIP_TO_MISMATCH: "ESCALATE",
+};
+
+const _ACTION_BY_CLASSIFICATION: Record<EdiMismatchAnalysisData["classification"], string> = {
+  HARD_REJECT: "BLOCK_AND_NOTIFY",
+  REVIEW: "REQUEST_BUYER_CONFIRMATION",
+  ESCALATE: "ESCALATE",
+};
+
+/**
+ * Build an OrderAnalysis for an EDI_MISMATCH summary, populating
+ * `edi_mismatch_analysis` keyed on the sub_type. Defaults cover the
+ * four accepted sub_types; pass `expected_value` / `received_value`
+ * overrides to exercise the `unknown` shape matrix (string / number /
+ * object).
+ */
+export function makeEdiMismatchAnalysis(
+  summary: ExceptionSummary,
+  opts: {
+    sub_type: string;
+    expected_value?: unknown;
+    received_value?: unknown;
+  },
+): { detail: ExceptionDetail; analysis: OrderAnalysis } {
+  const classification = _CLASSIFICATION_BY_SUB_TYPE[opts.sub_type] ?? "REVIEW";
+  const recommended_action = _ACTION_BY_CLASSIFICATION[classification];
+  const autonomy: EdiMismatchAnalysisData["autonomy_level"] =
+    opts.sub_type === "SKU_MISMATCH" ? "L3" :
+    opts.sub_type === "SHIP_TO_MISMATCH" ? "L1" : "L2";
+  const edm: EdiMismatchAnalysisData = {
+    sub_type: opts.sub_type,
+    classification,
+    recommended_action,
+    autonomy_level: autonomy,
+    expected_value: opts.expected_value ?? "expected-x",
+    received_value: opts.received_value ?? "received-y",
+    notification_template:
+      classification === "ESCALATE" ? null :
+      classification === "HARD_REJECT" ? "edi_line_mismatch_blocked" :
+      "edi_line_mismatch_inquiry",
+  };
+  return {
+    detail: makeExceptionDetail(summary),
+    analysis: { edi_mismatch_analysis: edm } as Partial<OrderAnalysis> as OrderAnalysis,
+  };
+}

@@ -60,16 +60,26 @@ describe("Exception type contracts", () => {
     expect(health.lifecycle_states.length).toBe(12); // 12 lifecycle states
   });
 
-  it("V1 intents are exactly 4", () => {
-    expect(MOCK_HEALTH.allowed_intents).toHaveLength(4);
+  it("intent vocabulary contains every shipped intent", () => {
+    // Length assertion replaced with toContain after the OM coverage
+    // expansion (asoe2 added PRICE_HOLD_RELEASE + EDI_MISMATCH). Keeps
+    // the fitness test green as the vocabulary grows without becoming
+    // a brittle golden.
     expect(MOCK_HEALTH.allowed_intents).toContain("CONTRACTUAL_CORRECTION");
     expect(MOCK_HEALTH.allowed_intents).toContain("CREDIT_BLOCK");
     expect(MOCK_HEALTH.allowed_intents).toContain("MASS_PRICING_ERROR");
     expect(MOCK_HEALTH.allowed_intents).toContain("DUPLICATE_PO");
+    expect(MOCK_HEALTH.allowed_intents).toContain("PRICE_HOLD_RELEASE");
+    expect(MOCK_HEALTH.allowed_intents).toContain("EDI_MISMATCH");
   });
 
-  it("V1 recipes are exactly 3", () => {
-    expect(MOCK_HEALTH.allowed_recipes).toHaveLength(3);
+  it("recipe vocabulary contains every registered recipe", () => {
+    // Same rationale as the intents assertion above — use toContain.
+    expect(MOCK_HEALTH.allowed_recipes).toContain("PriceAdjustmentRecipe.py");
+    expect(MOCK_HEALTH.allowed_recipes).toContain("CreditHoldReleaseRecipe.py");
+    expect(MOCK_HEALTH.allowed_recipes).toContain("DuplicatePORecipe.py");
+    expect(MOCK_HEALTH.allowed_recipes).toContain("PriceHoldReleaseRecipe.py");
+    expect(MOCK_HEALTH.allowed_recipes).toContain("EdiMismatchRecipe.py");
   });
 
   it("StatsResponse has breakdown fields", () => {
