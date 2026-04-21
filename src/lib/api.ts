@@ -403,10 +403,13 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     order_id: "SO-3100",
     event_type: "EDI_850_PRICE_MISMATCH",
     intent: "MASS_PRICING_ERROR",
-    lifecycle_state: "EXECUTING",
+    // Was "EXECUTING" before asoe2 Phase 19 retired that state.
+    // The disposition flow now resolves straight to RESOLVED on
+    // successful apply_effects, so mock records land here.
+    lifecycle_state: "RESOLVED",
     shadow_verdict: "GREEN",
     selected_recipe: "PriceAdjustmentRecipe.py",
-    final_status: undefined,
+    final_status: "COMPLETE",
     created_at: "2026-04-11T11:00:00Z",
     updated_at: "2026-04-11T11:02:00Z",
     account_id: "acct-costco", account_name: "Costco",
@@ -581,7 +584,7 @@ const MOCK_HEALTH: HealthResponse = {
   allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY", "PRICE_HOLD_RELEASE", "EDI_MISMATCH"],
   lifecycle_states: [
     "INGESTED", "CLASSIFYING", "AUDITING", "PENDING_REVIEW",
-    "ESCALATED", "PENDING_ADMIN_REVIEW", "EXECUTING", "RESOLVED",
+    "ESCALATED", "PENDING_ADMIN_REVIEW", "PENDING_COSIGN", "RESOLVED",
     "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
   allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py", "DeliveryDelayResolutionRecipe.py", "PriceHoldReleaseRecipe.py", "EdiMismatchRecipe.py"],
@@ -1088,10 +1091,11 @@ export const exceptionsApi = {
         MASS_PRICING_ERROR: 1,
       },
       by_lifecycle_state: {
-        RESOLVED: 3,
+        // Counts rebalanced after asoe2 retired EXECUTING —
+        // the previously-EXECUTING exception now lands RESOLVED.
+        RESOLVED: 4,
         PENDING_REVIEW: 2,
         BLOCKED: 1,
-        EXECUTING: 1,
         ESCALATED: 1,
         CLOSED: 1,
       },

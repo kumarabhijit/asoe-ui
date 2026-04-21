@@ -46,7 +46,10 @@ export function EdiMismatchSection({ data }: EdiMismatchSectionProps) {
   const classification = CLASSIFICATION_BADGE[data.classification];
 
   return (
-    <section className="bg-surface-primary rounded-md shadow-sm p-16">
+    <section
+      aria-label="EDI line mismatch analysis"
+      className="bg-surface-primary rounded-md shadow-sm p-16"
+    >
       {/* Section header */}
       <div className="flex items-center gap-8 mb-12">
         <AlertTriangle size={14} className="text-text-tertiary" />
@@ -71,8 +74,15 @@ export function EdiMismatchSection({ data }: EdiMismatchSectionProps) {
         <ValueCard label="Received" value={renderUnknown(data.received_value)} highlight />
       </div>
 
-      {/* Recommended action */}
-      <div className="mb-12">
+      {/* Recommended action. aria-live="polite" so re-classification
+          via a re-analysis announces the new recommended action to
+          screen-reader users (WCAG 4.1.3). */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="mb-12"
+      >
         <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
           Recommended Action
         </div>

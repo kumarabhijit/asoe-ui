@@ -41,7 +41,7 @@ const NAV_TABS = [
 ];
 
 const RECENT_ACTIVITY = [
-  { time: "11:02", orderId: "SO-3100", action: "Pipeline executing — PriceAdjustmentRecipe", status: "EXECUTING", badge: "info", color: "var(--color-info)" },
+  { time: "11:02", orderId: "SO-3100", action: "Resolved — PriceAdjustmentRecipe applied via YK07", status: "RESOLVED", badge: "success", color: "var(--color-success)" },
   { time: "10:31", orderId: "SO-2200", action: "Blocked by Compliance Shadow — PENALTY_MATRIX_VIOLATION", status: "BLOCKED", badge: "error", color: "var(--color-error)" },
   { time: "09:13", orderId: "SO-1042", action: "Pending human review — duplicate PO detected", status: "REVIEW", badge: "warning", color: "var(--color-warning)" },
   { time: "08:45", orderId: "SO-5010", action: "Escalated to manager — manual review required", status: "ESCALATED", badge: "warning", color: "var(--color-warning)" },

@@ -9,13 +9,18 @@
 
 /* ── Enums (fetched from GET /api/v1/health at runtime) ────────────── */
 
-/** Constrained intent values — AllowedIntent in constraints/specs.py */
-export type Intent =
-  | "CONTRACTUAL_CORRECTION"
-  | "CREDIT_BLOCK"
-  | "MASS_PRICING_ERROR"
-  | "DUPLICATE_PO"
-  | "UNKNOWN";
+/**
+ * Intent values are runtime data sourced from `useHealth().allowed_intents`
+ * per Guardrail #1 — the UI never branches on specific intent strings.
+ *
+ * A hand-written `Intent` union was removed in the parity-cleanup pass:
+ * it was drift-prone (fell out of sync with asoe2 every time a new
+ * intent landed) and wasn't used as a compile-time constraint anywhere
+ * (`ExceptionSummary.intent` and related fields type as `string`).
+ * If a component ever needs a union for exhaustive matching, derive
+ * it from the generated OpenAPI types in `src/types/generated.ts` or
+ * from the health response — don't reintroduce the hand-written list.
+ */
 
 /** Shadow verdict — ShadowStatus in contracts/models.py */
 export type ShadowVerdict = "GREEN" | "YELLOW" | "RED";
@@ -29,7 +34,14 @@ export type TerminalStatus =
   | "BLOCKED"
   | "REJECTED";
 
-/** Exception lifecycle state — persistence-level state machine (Section 7.1) */
+/**
+ * Exception lifecycle state — persistence-level state machine
+ * (Section 7.1). Mirrors `asoe2/contracts/models.py::LIFECYCLE_STATES`.
+ *
+ * Note: `EXECUTING` was retired in asoe2 Phase 19 when `/approve` was
+ * deleted and `/disposition` consolidated the disposition flow. The
+ * backend no longer emits it, so the UI union no longer lists it.
+ */
 export type LifecycleState =
   | "INGESTED"
   | "CLASSIFYING"
@@ -39,18 +51,19 @@ export type LifecycleState =
   | "PENDING_ADMIN_REVIEW"
   /** Phase 2 #5 — high-value override staged for second-reviewer cosign. */
   | "PENDING_COSIGN"
-  | "EXECUTING"
   | "RESOLVED"
   | "FAILED"
   | "BLOCKED"
   | "REJECTED"
   | "CLOSED";
 
-/** Constrained recipe names — AllowedRecipeName in constraints/specs.py */
-export type RecipeName =
-  | "PriceAdjustmentRecipe.py"
-  | "CreditHoldReleaseRecipe.py"
-  | "DuplicatePORecipe.py";
+/**
+ * Recipe name values are runtime data (source: `useHealth().allowed_recipes`).
+ * The hand-written `RecipeName` union was removed in the parity-cleanup
+ * pass — same rationale as the `Intent` union above. `ExceptionSummary`
+ * / `ExceptionDetail` field `selected_recipe` types as `string | undefined`
+ * so no compile-time constraint depended on the union.
+ */
 
 /** Resolution actions — AllowedResolutionAction in constraints/specs.py */
 export type ResolutionAction =

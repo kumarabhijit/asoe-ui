@@ -7,7 +7,8 @@
  */
 
 import type {
-  Intent,
+  // `Intent` was a hand-written union — deleted during the parity
+  // cleanup. Runtime vocabulary comes from `health.allowed_intents`.
   ShadowVerdict,
   TerminalStatus,
   LifecycleState,

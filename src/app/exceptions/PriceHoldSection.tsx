@@ -42,7 +42,10 @@ export function PriceHoldSection({ data }: PriceHoldSectionProps) {
   const HoldIcon = data.hold_status === "RELEASED" ? Unlock : Lock;
 
   return (
-    <section className="bg-surface-primary rounded-md shadow-sm p-16">
+    <section
+      aria-label="Price hold analysis"
+      className="bg-surface-primary rounded-md shadow-sm p-16"
+    >
       {/* Section header */}
       <div className="flex items-center gap-8 mb-12">
         <HoldIcon size={14} className="text-text-tertiary" />
@@ -73,8 +76,17 @@ export function PriceHoldSection({ data }: PriceHoldSectionProps) {
         <Threshold label="Hard Block" value={fmtVariance(data.hard_block_pct)} />
       </div>
 
-      {/* Recommended action / reason */}
-      <div className="mb-12">
+      {/* Recommended action / reason. aria-live="polite" because the
+          recipe decision is dynamic content — if it flips between
+          AUTO_RELEASE / ESCALATE / HARD_BLOCK during a re-analysis
+          a screen-reader user gets the update. role="status" pairs
+          with the polite region (WCAG 4.1.3). */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="mb-12"
+      >
         <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
           Recipe Decision
         </div>
