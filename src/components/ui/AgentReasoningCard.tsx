@@ -35,6 +35,7 @@ import { Zap, Check, AlertTriangle, ShieldX, MessageSquare, XCircle, RotateCcw }
 import { Badge, verdictVariant } from "./Badge";
 import { Button } from "./Button";
 import { cn } from "@/lib/utils";
+import { useIntentLabel } from "@/hooks/useErpProfile";
 import type { ShadowVerdict, PipelineNode } from "@/types/exceptions";
 
 /**
@@ -191,6 +192,7 @@ export function AgentReasoningCard({
 }: AgentReasoningCardProps) {
   const isErrored = executionError !== undefined;
   const config = VERDICT_CONFIG[verdict];
+  const intentLabel = useIntentLabel(intent);
   const [pendingAction, setPendingAction] = useState<"approve" | "reject" | "reanalyze" | null>(null);
   const [comment, setComment] = useState("");
 
@@ -308,7 +310,7 @@ export function AgentReasoningCard({
           {intent && (
             <div>
               <span className="text-label text-text-quaternary uppercase tracking-wider font-semibold">Intent</span>
-              <div className="text-body font-semibold text-text-primary mt-px">{intent.replace(/_/g, " ")}</div>
+              <div className="text-body font-semibold text-text-primary mt-px">{intentLabel}</div>
             </div>
           )}
           {recipeName && (

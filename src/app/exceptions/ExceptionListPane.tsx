@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/Select";
 import { cn } from "@/lib/utils";
+import { intentLabelFor } from "@/config/erp-label-map";
+import { useErpProfile } from "@/hooks/useErpProfile";
 import type { ExceptionSummary, HealthResponse } from "@/types/exceptions";
 import type { StatsResponse } from "@/types/api";
 
@@ -76,6 +78,7 @@ export default function ExceptionListPane({
   health,
   onRefresh,
 }: ExceptionListPaneProps) {
+  const erp = useErpProfile();
   return (
     <div className="h-full flex flex-col bg-surface-page min-w-0">
       {/* ── Pane Header ──────────────────────────────────────────────── */}
@@ -147,7 +150,7 @@ export default function ExceptionListPane({
               <SelectItem value="__all__">All Exceptions</SelectItem>
               {(health?.allowed_intents ?? []).map((i) => (
                 <SelectItem key={i} value={i}>
-                  {i.replace(/_/g, " ")}
+                  {intentLabelFor(i, erp)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -245,6 +248,7 @@ function ExceptionCard({
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const erp = useErpProfile();
   return (
     <div
       role="option"
@@ -277,7 +281,7 @@ function ExceptionCard({
       <div className="flex items-center gap-4 flex-wrap">
         {exc.intent && (
           <Badge variant="brand" size="sm" icon={null}>
-            {exc.intent.replace(/_/g, " ")}
+            {intentLabelFor(exc.intent, erp)}
           </Badge>
         )}
         <Badge variant={lifecycleVariant(exc.lifecycle_state)} size="sm">
