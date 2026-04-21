@@ -16,6 +16,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AgentReasoningCard } from "@/components/ui/AgentReasoningCard";
 import { exceptionsApi } from "@/lib/api";
+import { intentLabelFor } from "@/config/erp-label-map";
 
 describe("AgentReasoningCard", () => {
   describe("Layer 1 — always visible", () => {
@@ -31,9 +32,12 @@ describe("AgentReasoningCard", () => {
 
     it("renders intent when provided", () => {
       render(<AgentReasoningCard verdict="GREEN" intent="CONTRACTUAL_CORRECTION" />);
-      // Resolved via GENERIC vendor (test env has no NEXT_PUBLIC_ASOE_ERP_VENDOR
-      // configured). See src/config/erp-label-map.ts.
-      expect(screen.getByText("Contractual Correction")).toBeInTheDocument();
+      // The card resolves intent labels via useIntentLabel → intentLabelFor
+      // which reads NEXT_PUBLIC_ASOE_ERP_VENDOR. Compute the expected
+      // label from the same resolver so the test stays green whether the
+      // vendor is GENERIC (unset), SAP, ORACLE, or SALESFORCE.
+      const expected = intentLabelFor("CONTRACTUAL_CORRECTION");
+      expect(screen.getByText(expected)).toBeInTheDocument();
     });
 
     it("renders recipe name when provided", () => {
