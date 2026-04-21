@@ -80,6 +80,15 @@ interface ExceptionDetailPanelProps {
   } | null;
 }
 
+/* ── Lifecycle constants for the one business-rule gate in this file ─
+ * The cosign banner is triggered by a single specific state, so
+ * hardcoding the string here is the cleanest option (a Badge-variant-
+ * helper-style mapping is overkill for a one-to-one check). Keep it
+ * as a named constant so the intent is self-documenting and grep-able.
+ * Mirrors `contracts/models.py::COSIGN_ELIGIBLE_STATES`.
+ */
+const COSIGN_LIFECYCLE_STATE = "PENDING_COSIGN" as const;
+
 /* ── Pipeline node state builder ─────────────────────────────────────── */
 
 function buildNodeStates(exc: ExceptionDetail, trace?: TraceResponse): NodeState[] {
@@ -89,15 +98,23 @@ function buildNodeStates(exc: ExceptionDetail, trace?: TraceResponse): NodeState
     "resolve_dependencies", "execute_recipe", "apply_effects",
   ];
 
+  // Pipeline-node progress per lifecycle state. `EXECUTING` was
+  // retired in asoe2 Phase 19 when the disposition flow consolidated
+  // (backend never emits it anymore). `PENDING_COSIGN` and
+  // `PENDING_ADMIN_REVIEW` map to post-shadow-audit so the pipeline
+  // viz correctly shows those exceptions as past the
+  // classify/shadow/select/validate nodes rather than falling through
+  // to 0 (the old bug surfaced by cross-repo review C4).
   const stateProgress: Record<string, number> = {
     INGESTED: 0, CLASSIFYING: 1, AUDITING: 4, PENDING_REVIEW: 5,
-    ESCALATED: 5, EXECUTING: 8, RESOLVED: 10, CLOSED: 10,
+    ESCALATED: 5, PENDING_ADMIN_REVIEW: 5, PENDING_COSIGN: 5,
+    RESOLVED: 10, CLOSED: 10,
     FAILED: 8, BLOCKED: 5, REJECTED: 5,
   };
 
   const completedUpTo = stateProgress[exc.lifecycle_state] ?? 0;
   const isFailed = ["FAILED", "BLOCKED", "REJECTED"].includes(exc.lifecycle_state);
-  const isInProgress = ["CLASSIFYING", "AUDITING", "EXECUTING"].includes(exc.lifecycle_state);
+  const isInProgress = ["CLASSIFYING", "AUDITING"].includes(exc.lifecycle_state);
 
   return NODES.map((node, i): NodeState => {
     if (i < completedUpTo) {
@@ -506,7 +523,7 @@ export default function ExceptionDetailPanel({
               was initiated and is awaiting a second manager+ reviewer.
               Non-initiators with exceptions:override see Approve/Reject
               cosign buttons; the initiator sees a read-only status. */}
-          {detail.lifecycle_state === "PENDING_COSIGN" && (() => {
+          {detail.lifecycle_state === COSIGN_LIFECYCLE_STATE && (() => {
             const pending = (detail.resolution_data as Record<string, unknown> | undefined)?.pending_override as
               | { action?: string; reason_tag?: string; initiator?: string; initiated_at?: string; financial_impact_usd?: number }
               | undefined;

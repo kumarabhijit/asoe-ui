@@ -78,6 +78,11 @@ export const ERP_LABEL_MAPS: Record<ErpVendor, ErpLabelMap> = {
       DUPLICATE_PO:           "Duplicate Customer PO",          // VOV8 AUFABCHECK
       PRICE_HOLD_RELEASE:     "Pricing Block Release",          // VBKD pricing block
       EDI_MISMATCH:           "Inbound Order Validation Failure", // IDOC ORDERS05 (WE02/WE05)
+      BACK_ORDER:             "Stock Availability Shortfall",     // MD04 / ATP check
+      OVER_MAX:               "Contract Quantity Exceeded",       // VBKD / contract limit
+      MIN_ORDER_QTY:          "Minimum Order Quantity Violation", // KNMT-MINBM
+      PALLET_CONFIG:          "Delivery Unit Configuration Issue",
+      DELIVERY_DELAY:         "Delivery Schedule Miss",           // VBAK-LIFSK
     },
     sub_types: {
       SKU_MISMATCH:     "Material Master Mismatch",   // MARA
@@ -96,6 +101,11 @@ export const ERP_LABEL_MAPS: Record<ErpVendor, ErpLabelMap> = {
       DUPLICATE_PO:           "Duplicate Order",
       PRICE_HOLD_RELEASE:     "Price Hold Release",
       EDI_MISMATCH:           "Order Import Validation Error",
+      BACK_ORDER:             "Backorder",
+      OVER_MAX:               "Quantity Above Max",
+      MIN_ORDER_QTY:          "Minimum Order Quantity",
+      PALLET_CONFIG:          "Packing Configuration",
+      DELIVERY_DELAY:         "Shipment Delay",
     },
     sub_types: {
       SKU_MISMATCH:     "Invalid Item Number",
@@ -114,6 +124,11 @@ export const ERP_LABEL_MAPS: Record<ErpVendor, ErpLabelMap> = {
       DUPLICATE_PO:           "Duplicate Order",
       PRICE_HOLD_RELEASE:     "Order Hold Release",
       EDI_MISMATCH:           "Order Validation Error",
+      BACK_ORDER:             "Backorder",
+      OVER_MAX:               "Quantity Exceeded",
+      MIN_ORDER_QTY:          "Minimum Order",
+      PALLET_CONFIG:          "Pallet Configuration",
+      DELIVERY_DELAY:         "Delivery Delay",
     },
     sub_types: {
       SKU_MISMATCH:     "Invalid Product Code",
@@ -132,6 +147,11 @@ export const ERP_LABEL_MAPS: Record<ErpVendor, ErpLabelMap> = {
       DUPLICATE_PO:           "Duplicate PO",
       PRICE_HOLD_RELEASE:     "Price Hold Release",
       EDI_MISMATCH:           "EDI Mismatch",
+      BACK_ORDER:             "Back Order",
+      OVER_MAX:               "Over Max Quantity",
+      MIN_ORDER_QTY:          "Min Order Qty",
+      PALLET_CONFIG:          "Pallet Config",
+      DELIVERY_DELAY:         "Delivery Delay",
     },
     sub_types: {
       SKU_MISMATCH:     "SKU Mismatch",
