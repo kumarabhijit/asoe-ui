@@ -274,6 +274,14 @@ The orchestrator (`ExceptionDetailPanel.tsx`, ~357 lines) composes these sub-com
 - `OrderAnalysis` extended with `root_cause`, `recommendation`, `entity_profile`, `impact_metrics`
 - `DuplicateDetectionData` — original/duplicate order snapshots, detection method, confidence, recommended action, autonomy level
 - `OrderComparisonData` — side-by-side orders with matching/differing field indicators and line-item comparison
+- `PriceAnalysisData` — ERP vs PO price, variance, at-risk value, SAP doc context, rule_id, condition refs
+- `BackOrderAnalysisData` — gap qty/%, ATP date, alternate warehouses, substitutes, ranked resolution options
+- `OverMaxAnalysisData` — exceedance %, per-line trim plan (TRIM / SKIP / OK)
+- `MOQAnalysisData` — shortfall %, round-up plan (ROUND_UP / ACCEPT_BELOW / ESCALATE), SAP execution steps
+- `PalletAnalysisData` — per-line fill %, loose cases, suggested plan (round-down / accept-as-is)
+- `DeliveryDelayAnalysisData` — planned vs projected ETA, days-late, delay category, ranked alternate options
+- `PriceHoldAnalysisData` — PO vs SAP base price, signed variance, tolerance / hard-block thresholds, action
+- `EdiMismatchAnalysisData` — sub_type (verbatim), expected vs received values, classification, autonomy level
 
 **Intent-specific rendering: data-presence pattern (not component dispatch).**
 
