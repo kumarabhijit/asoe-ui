@@ -607,26 +607,93 @@ if the situation recurs.
 
 ### L2d (follow-up) — adapters for the remaining 8 enrichment fields
 
-Each adapter is a pure function in `asoe2/api/analysis_adapters.py` +
-a Pydantic model on `api/schemas.py` + a registry row. The UI picks
-them up automatically via the data-presence pattern (no UI changes
-per adapter). Order of adoption (suggested):
+**Why these didn't land alongside PHR + EDI:** PHR and EDI mapped
+cleanly because their UI types were co-designed with the recipe
+output shape — every UI field corresponded to something the recipe
+computed. The remaining 8 enrichment types were designed earlier for
+mock-layer fidelity and expect fields the current recipes do NOT
+produce: warehouse snapshots, contract refs, SAP block messages,
+primary/alternate DC data, order snapshots, `OrderSnapshot` pairs,
+`SAPStep[]` etc. An adapter alone cannot close the gap — the work
+per section is:
 
-1. `duplicate_detection` — DuplicatePORecipe → UI DuplicateDetectionData
-2. `price_analysis` — PriceAdjustmentRecipe → UI PriceAnalysisData
-3. `backorder_analysis` — BackOrderResolutionRecipe → UI BackOrderAnalysisData
-4. `overmax_analysis` — OverMaxTrimRecipe → UI OverMaxAnalysisData
-5. `moq_analysis` — MOQRoundUpRecipe → UI MOQAnalysisData
-6. `pallet_analysis` — PalletAlignmentRecipe → UI PalletAnalysisData
-7. `delivery_delay_analysis` — DeliveryDelayResolutionRecipe → UI DeliveryDelayAnalysisData
-8. `order_comparison` — synthesised from `duplicate_detection`
-   payload (no dedicated recipe); lands last.
+1. **Backend adapter** (like `adapt_price_hold`) — projects the
+   recipe output into the subset of UI fields it can populate.
+2. **UI type relaxation** (`src/types/exceptions.ts`) — mark
+   recipe-unavailable fields optional so the adapter's partial
+   projection compiles.
+3. **UI component update** — each `*Section.tsx` currently
+   dereferences `data.field` directly; fields that become optional
+   need `—` / "Not available" / hidden-row fallbacks.
+4. **Backend schema + OpenAPI regen** — same pattern as L2a/L2b.
+5. **TestAnalysis cases** — one per branch; regression on
+   `openapi/asoe2.openapi.json` stays enforced by the existing
+   fitness test.
 
-Per-adapter checklist: (a) add Pydantic model on `api/schemas.py`,
-(b) add optional field on `AnalysisResponse`, (c) add
-`adapt_<field>()` with GREEN / synthetic fallback, (d) register in
-`ANALYSIS_ADAPTERS` + (if shadow-gated path possible)
-`INTENT_TO_RECIPE_NAME`, (e) add TestAnalysis cases in
-`asoe2/tests/test_api.py`, (f) drop the `// preview-only` marker on
-the UI type, (g) regenerate `openapi/asoe2.openapi.json`, (h) update
-D18 and this list.
+Order of adoption (suggested, by complexity):
+
+- `delivery_delay_analysis` — DeliveryDelayResolutionRecipe. Recipe
+  output covers days_late / classification / delay_category /
+  alternate_options. Event supplies planned_date / projected_eta /
+  affected_lines. Missing: rule_id (policy-injected), delay_reason
+  (free text), at_risk (revenue calc), sla_deadline (contract). UI
+  type needs ~4 fields optional + fallback rendering.
+- `overmax_analysis` — OverMaxTrimRecipe. Recipe covers excess_qty /
+  exceedance_pct / trim_plan. Missing: contract_ref, block_status,
+  block_reason, per-line description. UI type needs ~5 fields
+  optional.
+- `moq_analysis` — MOQRoundUpRecipe. Recipe covers
+  shortfall_qty / shortfall_pct / uplift_* / round_up_plan. Missing:
+  moq_source, channel, block_message, contract_ref, unit_cost,
+  sap_steps. UI type needs ~6 fields optional.
+- `pallet_analysis` — PalletAlignmentRecipe. Recipe covers
+  classification / lines / suggested_plan. Missing: pallet specs
+  (tie, height, layer_cases), carrier, freight_delta, customer
+  preferences. UI type needs substantial relaxation.
+- `backorder_analysis` — BackOrderResolutionRecipe. Recipe covers
+  gap_qty / gap_pct / resolution_options. Missing: warehouse
+  snapshots (primary_dc, alternate_warehouses), substitute SKUs,
+  inbound PO/production — these are gateway-fetched today but not
+  persisted on the record. Requires persisting gateway payload in
+  resolution_data OR expanding recipe params → heaviest lift of
+  the set.
+- `price_analysis` — PriceAdjustmentRecipe. Recipe is minimal
+  (applied_condition / new_net_price only). The UI's ~15-field
+  PriceAnalysisData is almost entirely ERP metadata (sku,
+  material_desc, doc_type, doc_number, rule_id, root_cause_category,
+  contract_ref, promotion_ref). Recipe would need to carry ERP
+  context through to the output, OR UI type would need severe
+  relaxation. Likely the largest investment.
+- `duplicate_detection` — DuplicatePORecipe. Recipe computes
+  composite_score + classification only. UI wants full `OrderSnapshot`
+  pair + days_between + detection_method. Requires persisting
+  matched_po_details gateway payload on the record. Same
+  gateway-persistence pattern as backorder_analysis.
+- `order_comparison` — synthesised from `duplicate_detection`
+  payload (no dedicated recipe); lands last; blocked on
+  duplicate_detection.
+
+**Per-adapter checklist:**
+1. Relax the UI type in `src/types/exceptions.ts` — move
+   recipe-unavailable fields to `?:`.
+2. Update the matching `*Section.tsx` to render fallbacks for
+   now-optional fields (`data.foo ?? "—"` or conditional rows).
+3. Add a Pydantic model on `asoe2/api/schemas.py` mirroring the
+   relaxed UI type.
+4. Add `adapt_<field>()` to `asoe2/api/analysis_adapters.py` with
+   recipe-output path + synthetic fallback (if the recipe is called
+   via a shadow-gate-able intent) + `None` on degenerate inputs.
+5. Register in `ANALYSIS_ADAPTERS` and, if shadow-gated path exists,
+   `INTENT_TO_RECIPE_NAME`.
+6. Add an optional field on `AnalysisResponse` in `api/schemas.py`.
+7. Add `TestAnalysis` cases in `asoe2/tests/test_api.py` covering
+   each branch.
+8. `python scripts/export_openapi.py` to regenerate
+   `openapi/asoe2.openapi.json`.
+9. `npm run generate-types` on the UI side.
+10. Drop the `// preview-only` marker from the UI type.
+11. Update this list + D18 in `ui_architecture.md`.
+
+Each takes ~2–4 hours including tests; the gateway-persistence
+ones (backorder, duplicate_detection) need an upstream schema change
+to persist gateway-fetched data on the record.
