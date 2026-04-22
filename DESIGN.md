@@ -32,6 +32,7 @@ src/
 │   │   ├── OverMaxSection.tsx             # Data-presence enrichment: exceedance bar, order lines, AI trim plan
 │   │   ├── MOQSection.tsx                 # Data-presence enrichment: shortfall bar, SAP V4082 block, round-up plan
 │   │   ├── PalletConfigSection.tsx        # Data-presence enrichment: KPI strip, pallet fill bars, suggested plan
+│   │   ├── DeliveryDelaySection.tsx       # Data-presence enrichment: planned vs projected ETA, days-late, ranked alternate options
 │   │   ├── PriceHoldSection.tsx           # Data-presence enrichment: PO vs SAP price, signed variance, tolerance/hard-block strip, recipe action
 │   │   ├── EdiMismatchSection.tsx         # Data-presence enrichment: sub_type badge, expected vs received cards, classification, autonomy
 │   │   ├── shared.tsx            # CollapsibleHeader, fmtPrice helpers
@@ -170,6 +171,7 @@ NavBar (sticky top, 56px)
 | 3+ | `OverMaxSection` | `OverMaxSection.tsx` | Data-presence enrichment: exceedance bar (ordered vs max), order lines table, AI trim plan (TRIM/SKIP/OK actions) |
 | 3+ | `MOQSection` | `MOQSection.tsx` | Data-presence enrichment: shortfall bar (ordered vs MOQ), SAP V4082 block detail, AI round-up plan (ROUND_UP/ACCEPT_BELOW/ESCALATE), SAP execution steps |
 | 3+ | `PalletConfigSection` | `PalletConfigSection.tsx` | Data-presence enrichment: KPI strip (cases/loose/labor/freight), per-line pallet fill bars with violation badges, AI suggested plan table |
+| 3+ | `DeliveryDelaySection` | `DeliveryDelaySection.tsx` | Data-presence enrichment for `DELIVERY_DELAY`: planned vs projected ETA, days-late badge, delay category, ranked alternate options (EXPEDITE / SPLIT_SHIP / RESCHEDULE) with extra-cost / new-ETA metrics |
 | 3+ | `PriceHoldSection` | `PriceHoldSection.tsx` | Data-presence enrichment for `PRICE_HOLD_RELEASE`: PO vs SAP base price cards, signed `variance_pct`, hold_status / tolerance / hard_block thresholds, recipe `action` badge (AUTO_RELEASE / ESCALATE / HARD_BLOCK), reason text |
 | 3+ | `EdiMismatchSection` | `EdiMismatchSection.tsx` | Data-presence enrichment for `EDI_MISMATCH`: `sub_type` rendered verbatim, `expected_value` vs `received_value` (any shape — string / number / object), `classification` badge (HARD_REJECT / REVIEW / ESCALATE), `recommended_action`, `autonomy_level`. PRICE_MISMATCH is routed to `CONTRACTUAL_CORRECTION` at backend classifier time and never mounts this section. |
 | 4 | `EvidenceGrid` | `EvidenceGrid.tsx` | Collapsed by default; line-item table + pricing waterfall |
@@ -184,6 +186,7 @@ NavBar (sticky top, 56px)
 {analysis?.overmax_analysis && <OverMaxSection data={analysis.overmax_analysis} />}
 {analysis?.moq_analysis && <MOQSection data={analysis.moq_analysis} />}
 {analysis?.pallet_analysis && <PalletConfigSection data={analysis.pallet_analysis} />}
+{analysis?.delivery_delay_analysis && <DeliveryDelaySection data={analysis.delivery_delay_analysis} />}
 {analysis?.price_hold_analysis && <PriceHoldSection data={analysis.price_hold_analysis} />}
 {analysis?.edi_mismatch_analysis && <EdiMismatchSection data={analysis.edi_mismatch_analysis} />}
 ```

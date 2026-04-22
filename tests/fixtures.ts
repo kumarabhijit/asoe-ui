@@ -159,27 +159,36 @@ export const MOCK_HEALTH: HealthResponse = {
   allowed_intents: [
     "CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR",
     "DUPLICATE_PO", "PRICE_HOLD_RELEASE", "EDI_MISMATCH",
+    "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY",
+    "PALLET_CONFIG", "DELIVERY_DELAY",
   ],
   lifecycle_states: [
+    // `EXECUTING` retired in asoe2 Phase 19 — backend no longer emits it.
     "INGESTED", "CLASSIFYING", "AUDITING", "PENDING_REVIEW",
-    "ESCALATED", "PENDING_ADMIN_REVIEW", "EXECUTING", "RESOLVED",
+    "ESCALATED", "PENDING_ADMIN_REVIEW", "PENDING_COSIGN", "RESOLVED",
     "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
   allowed_recipes: [
     "PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py",
     "DuplicatePORecipe.py", "PriceHoldReleaseRecipe.py",
     "EdiMismatchRecipe.py",
+    "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py",
+    "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py",
+    "DeliveryDelayResolutionRecipe.py",
   ],
   allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION"],
   allowed_override_reason_tags: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
-  allowed_override_reason_tags_by_intent: {
-    CONTRACTUAL_CORRECTION: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
-    CREDIT_BLOCK: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
-    MASS_PRICING_ERROR: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
-    DUPLICATE_PO: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
-    PRICE_HOLD_RELEASE: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
-    EDI_MISMATCH: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
-  },
+  allowed_override_reason_tags_by_intent: Object.fromEntries(
+    [
+      "CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR",
+      "DUPLICATE_PO", "PRICE_HOLD_RELEASE", "EDI_MISMATCH",
+      "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY",
+      "PALLET_CONFIG", "DELIVERY_DELAY",
+    ].map((intent) => [
+      intent,
+      ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
+    ]),
+  ),
 };
 
 /* ── Stats fixture ─────────────────────────────────────────────────── */
