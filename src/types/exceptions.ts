@@ -281,27 +281,39 @@ export interface OrderAnalysis {
      is present, not on which intent string the exception carries.
      Adding a new field here + its section component is all that's
      needed to support a new enrichment — zero dispatch logic.
-     ──────────────────────────────────���───────────────────────────── */
 
-  /** Present when the DuplicatePO recipe has detected a duplicate */
+     PREVIEW-ONLY caveat (review H5): today the real backend
+     `AnalysisResponse` (asoe2/api/schemas.py) does not carry ANY
+     of the fields below. Every enrichment rendered below is
+     populated only by the mock `exceptionsApi.orderAnalysis()`
+     implementation in src/lib/api.ts. When the UI points at real
+     asoe2, all 10 sections collapse silently (data-presence
+     guard = `analysis?.foo &&` returns false). Tracked as the
+     `NEXT_PUBLIC_SHOW_PREVIEW_INTENTS` backlog item in tasks.md
+     and drift register entry D18 in ui_architecture.md §9. DO NOT
+     remove the `// preview-only` markers below until the backend
+     promotes these fields into AnalysisResponse.
+     ────────────────────────────────────────────────────────────── */
+
+  /** preview-only — Present when the DuplicatePO recipe has detected a duplicate */
   duplicate_detection?: DuplicateDetectionData;
-  /** Present when two orders need side-by-side comparison */
+  /** preview-only — Present when two orders need side-by-side comparison */
   order_comparison?: OrderComparisonData;
-  /** Present when a pricing exception produces price delta analysis */
+  /** preview-only — Present when a pricing exception produces price delta analysis */
   price_analysis?: PriceAnalysisData;
-  /** Present when a back-order/OOS exception produces inventory gap analysis */
+  /** preview-only — Present when a back-order/OOS exception produces inventory gap analysis */
   backorder_analysis?: BackOrderAnalysisData;
-  /** Present when an over-max exception produces a trim plan */
+  /** preview-only — Present when an over-max exception produces a trim plan */
   overmax_analysis?: OverMaxAnalysisData;
-  /** Present when a min-order-qty exception produces a round-up plan */
+  /** preview-only — Present when a min-order-qty exception produces a round-up plan */
   moq_analysis?: MOQAnalysisData;
-  /** Present when a pallet config exception produces alignment analysis */
+  /** preview-only — Present when a pallet config exception produces alignment analysis */
   pallet_analysis?: PalletAnalysisData;
-  /** Present when a delivery delay exception produces timing analysis */
+  /** preview-only — Present when a delivery delay exception produces timing analysis */
   delivery_delay_analysis?: DeliveryDelayAnalysisData;
-  /** Present when a price-hold release event produces variance + action analysis */
+  /** preview-only — Present when a price-hold release event produces variance + action analysis */
   price_hold_analysis?: PriceHoldAnalysisData;
-  /** Present when an EDI 850 line mismatch produces sub_type classification */
+  /** preview-only — Present when an EDI 850 line mismatch produces sub_type classification */
   edi_mismatch_analysis?: EdiMismatchAnalysisData;
 }
 

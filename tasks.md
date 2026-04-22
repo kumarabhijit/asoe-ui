@@ -571,8 +571,13 @@ With the flag set to `false`, fetch the real backend's `/api/v1/health`
 `MOCK_HEALTH.allowed_intents === realHealth.allowed_intents`. Catches
 the day a new intent is added to one side without the other.
 
-**Drift register:** entry D17 in `ui_architecture.md` §9 once the gate
-lands, documenting the bounded preview pattern.
+**Drift register:** entry D18 in `ui_architecture.md` §9 documents
+the same gap as "OrderAnalysis enrichment fields are mock-only"
+(cross-repo review H5). The gate pattern proposed here would close
+it once real curation lands. D17 (cross-repo review H4) covers the
+companion reason_tag drift, now verified as non-divergent (both
+sides seed global tags for every intent) until asoe2 Phase 5
+lands real per-intent curation (review L4).
 
 **Rationale for deferral:** the reason the gate was proposed — 5
 UI-only intents diverging from the backend — is about to be eliminated
@@ -580,3 +585,19 @@ by backend parity work in asoe2. Shipping the gate now would be
 defensive infrastructure for a problem the backlog is actively
 closing. Keep the design notes here so the pattern is ready to revive
 if the situation recurs.
+
+**Cross-repo review traceability (H4 / H5 / L2 / L4):**
+- H4 RESOLVED: mock `allowed_override_reason_tags_by_intent` matches
+  backend (both seed every intent with the global list). Drift
+  register D17. No code change needed; follow-up is L4.
+- H5 OPEN → tagged in code: all 10 `OrderAnalysis` enrichment fields
+  now carry `// preview-only` markers in
+  `src/types/exceptions.ts:286-305`; mock `orderAnalysis()` in
+  `src/lib/api.ts` has a PREVIEW-ONLY docstring. Drift register
+  D18. Resolution path is the gate pattern above plus asoe2
+  promoting the enrichment fields onto `AnalysisResponse`.
+- L2 OPEN: Playwright specs (`tests/browser/price-hold-detail.spec.ts`,
+  `edi-mismatch-detail.spec.ts`) skip the assertion paths until
+  asoe2 emits the enrichment fields — same backend gap as H5.
+- L4 OPEN: tracked in asoe2 Phase 5 ("Deferred — curated per-intent
+  reason_tag vocabularies"). Closes D17 when it lands.

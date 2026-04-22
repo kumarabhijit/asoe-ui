@@ -1112,6 +1112,24 @@ export const exceptionsApi = {
     return MOCK_LINE_ITEMS[id] ?? [];
   },
 
+  /**
+   * PREVIEW-ONLY (review H5): this mock populates every enrichment
+   * field on `OrderAnalysis` (`duplicate_detection`, `order_comparison`,
+   * `price_analysis`, `backorder_analysis`, `overmax_analysis`,
+   * `moq_analysis`, `pallet_analysis`, `delivery_delay_analysis`,
+   * `price_hold_analysis`, `edi_mismatch_analysis`). The real backend
+   * `AnalysisResponse` (asoe2/api/schemas.py:436) carries only
+   * `diagnosis / confidence / risk / resolution / lines[]` — none of
+   * the enrichment fields. When USE_REAL_API flips on, every
+   * enrichment section silently collapses because `analysis?.foo`
+   * is undefined.
+   *
+   * Tracked in the `NEXT_PUBLIC_SHOW_PREVIEW_INTENTS` backlog
+   * (tasks.md) and drift register D18 (ui_architecture.md §9).
+   * DO NOT remove this fixture until asoe2 promotes the enrichment
+   * fields onto AnalysisResponse and the UI types drop the
+   * `// preview-only` markers.
+   */
   async orderAnalysis(id: string): Promise<OrderAnalysis | null> {
     await delay(MOCK_DELAY);
     return MOCK_ORDER_ANALYSES[id] ?? null;
