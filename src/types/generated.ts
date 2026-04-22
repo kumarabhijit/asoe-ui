@@ -622,21 +622,52 @@ export interface components {
             type: string;
         };
         /**
+         * AlternateWarehouse
+         * @description Alternate-DC option with shipping economics. Conditional on
+         *     `resolved_action == ALT_DC` per the registry.
+         */
+        AlternateWarehouse: {
+            /** Eta Days */
+            eta_days: number;
+            /** Freight Delta Per Unit */
+            freight_delta_per_unit: number;
+            /** Freight Delta Total */
+            freight_delta_total: number;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Plant */
+            plant: string;
+            /** Qty */
+            qty: number;
+            /**
+             * Region
+             * @default
+             */
+            region: string;
+        };
+        /**
          * AnalysisResponse
          * @description GET /api/v1/exceptions/{id}/analysis
          */
         AnalysisResponse: {
+            backorder_analysis?: components["schemas"]["BackOrderAnalysisData"] | null;
             /** Confidence */
             confidence: number;
             delivery_delay_analysis?: components["schemas"]["DeliveryDelayAnalysisData"] | null;
             /** Diagnosis */
             diagnosis: string;
+            duplicate_detection?: components["schemas"]["DuplicateDetectionData"] | null;
             edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
             /** Lines */
             lines?: components["schemas"]["LineAnalysis"][];
             moq_analysis?: components["schemas"]["MOQAnalysisData"] | null;
+            order_comparison?: components["schemas"]["OrderComparisonData"] | null;
             overmax_analysis?: components["schemas"]["OverMaxAnalysisData"] | null;
             pallet_analysis?: components["schemas"]["PalletAnalysisData"] | null;
+            price_analysis?: components["schemas"]["PriceAnalysisData"] | null;
             price_hold_analysis?: components["schemas"]["PriceHoldAnalysisData"] | null;
             /** Resolution */
             resolution: string;
@@ -680,6 +711,59 @@ export interface components {
             user?: components["schemas"]["UserProfile"] | null;
         };
         /**
+         * BackOrderAnalysisData
+         * @description BackOrderResolutionRecipe → UI `backorder_analysis`.
+         *
+         *     Registry-classified fields (2026-04-22 workshop):
+         *       * audit-bearing: ordered_qty, available_qty, gap_qty, gap_pct,
+         *         unit_price, uom, at_risk, atp_date, resolution_options.
+         *       * audit-bearing (gateway): primary_dc.
+         *       * conditional (gateway, depends_on resolved_action):
+         *         alternate_warehouses (ALT_DC), substitutes (SUBSTITUTE),
+         *         production / inbound_po (RESCHEDULE).
+         *
+         *     No grandfather clause in this engagement. Gateway-dependent
+         *     audit-bearing fields (primary_dc, atp_date) MUST persist via
+         *     enrichment_context["inventory_snapshot"]; missing → composer
+         *     routes to AUDIT_CONTEXT_MISSING.
+         *
+         *     Sources:
+         *       * `record.original_event` — recipe input metadata (ordered_qty,
+         *         available_qty, unit_price, uom, sku).
+         *       * `record.enrichment_context["inventory_snapshot"]` — gateway
+         *         snapshot (primary_dc, atp_date, alternate_warehouses,
+         *         substitutes, production, inbound_po).
+         *       * `record.resolution_data` — recipe-computed fields (gap_qty,
+         *         gap_pct, at_risk, resolution_options, recommended_action).
+         */
+        BackOrderAnalysisData: {
+            /** Alternate Warehouses */
+            alternate_warehouses?: components["schemas"]["AlternateWarehouse"][];
+            /** At Risk */
+            at_risk: number;
+            /** Atp Date */
+            atp_date: string;
+            /** Available Qty */
+            available_qty: number;
+            /** Gap Pct */
+            gap_pct: number;
+            /** Gap Qty */
+            gap_qty: number;
+            inbound_po?: components["schemas"]["InboundOrder"] | null;
+            /** Ordered Qty */
+            ordered_qty: number;
+            primary_dc: components["schemas"]["WarehouseInfo"];
+            production?: components["schemas"]["InboundOrder"] | null;
+            /** Resolution Options */
+            resolution_options?: components["schemas"]["ResolutionOption"][];
+            /** Substitutes */
+            substitutes?: components["schemas"]["SubstituteSKU"][];
+            /** Unit Price */
+            unit_price: number;
+            /** Uom */
+            uom: string;
+        };
+        /**
          * ChallengeRequest
          * @description POST /api/v1/exceptions/{id}/challenge — post-execution challenge.
          *
@@ -689,6 +773,40 @@ export interface components {
         ChallengeRequest: {
             /** Challenge Reason */
             challenge_reason: string;
+        };
+        /** ComparisonLineItem */
+        ComparisonLineItem: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Qty */
+            qty: number;
+            /** Sku */
+            sku: string;
+            /** Unit Price */
+            unit_price: number;
+        };
+        /** ComparisonOrder */
+        ComparisonOrder: {
+            /** Created Date */
+            created_date: string;
+            /**
+             * Customer
+             * @default
+             */
+            customer: string;
+            /** Lines */
+            lines?: components["schemas"]["ComparisonLineItem"][];
+            /** Po Number */
+            po_number: string;
+            /** So Number */
+            so_number: string;
+            /** Status */
+            status: string;
+            /** Total Value */
+            total_value: number;
         };
         /**
          * CosignRequest
@@ -779,6 +897,46 @@ export interface components {
             notes: string;
             /** Reason Tag */
             reason_tag: string;
+        };
+        /**
+         * DuplicateDetectionData
+         * @description DuplicatePORecipe → UI `duplicate_detection`.
+         *
+         *     Registry-classified fields (2026-04-22 workshop):
+         *
+         *       * audit-bearing (gateway): original_order, duplicate_order
+         *         (OrderSnapshot pair from oms/get_matched_po_details).
+         *       * audit-bearing (control): days_between, cancellation_target,
+         *         autonomy_applied.
+         *       * audit-bearing (recipe-output): confidence, recommended_action.
+         *       * contextual: detection_method (regenerable from signal_scores).
+         *
+         *     No grandfather clause: every audit-bearing field must persist
+         *     end-to-end. Empty enrichment_context routes to
+         *     AUDIT_CONTEXT_MISSING via the build_analysis composer.
+         *
+         *     Sources:
+         *       * `record.enrichment_context["matched_po_details"]` — gateway
+         *         OrderSnapshot pair + days_between + detection_method +
+         *         cancellation_target.
+         *       * `record.resolution_data` — recipe composite_score (→
+         *         confidence), recommended_action, autonomy_level.
+         */
+        DuplicateDetectionData: {
+            /** Autonomy Applied */
+            autonomy_applied: string;
+            /** Cancellation Target */
+            cancellation_target: string;
+            /** Confidence */
+            confidence: number;
+            /** Days Between */
+            days_between: number;
+            /** Detection Method */
+            detection_method?: string | null;
+            duplicate_order: components["schemas"]["OrderSnapshot"];
+            original_order: components["schemas"]["OrderSnapshot"];
+            /** Recommended Action */
+            recommended_action: string;
         };
         /**
          * EdiMismatchAnalysisData
@@ -966,6 +1124,21 @@ export interface components {
             version: string;
         };
         /**
+         * InboundOrder
+         * @description Inbound production / PO entry. Conditional on
+         *     `resolved_action == RESCHEDULE` per the registry.
+         */
+        InboundOrder: {
+            /** Date */
+            date?: string | null;
+            /** Eta */
+            eta?: string | null;
+            /** Po Num */
+            po_num?: string | null;
+            /** Qty */
+            qty: number;
+        };
+        /**
          * LineAnalysis
          * @description Analysis details for a single line item.
          */
@@ -1087,6 +1260,47 @@ export interface components {
              * @default
              */
             uom: string;
+        };
+        /**
+         * OrderComparisonData
+         * @description Synthesised side-by-side comparison from the same
+         *     `matched_po_details` payload that drives DuplicateDetectionData.
+         *     No dedicated recipe or gateway — single source of truth (R5).
+         *
+         *     Per the registry (OrderComparisonData entry, "Synthesised from
+         *     DuplicateDetection; same attestation target"), enforcement of
+         *     audit-bearing coverage is delegated to DuplicateDetectionData.
+         *     This adapter is best-effort — projects what's present in
+         *     matched_po_details.
+         */
+        OrderComparisonData: {
+            /** Differing Fields */
+            differing_fields?: string[];
+            /** Matching Fields */
+            matching_fields?: string[];
+            /** Orders */
+            orders?: components["schemas"]["ComparisonOrder"][];
+        };
+        /**
+         * OrderSnapshot
+         * @description One side of a matched-PO pair from the OMS get_matched_po_details
+         *     gateway. All subfields are audit-bearing per the
+         *     DuplicateDetectionData.original_order / duplicate_order entries
+         *     in compliance/audit_bearing_registry.yaml.
+         */
+        OrderSnapshot: {
+            /** Created Date */
+            created_date: string;
+            /** Line Count */
+            line_count: number;
+            /** Po Number */
+            po_number: string;
+            /** So Number */
+            so_number: string;
+            /** Status */
+            status: string;
+            /** Total Value */
+            total_value: number;
         };
         /**
          * OverMaxAnalysisData
@@ -1309,6 +1523,65 @@ export interface components {
             value: unknown;
         };
         /**
+         * PriceAnalysisData
+         * @description PriceAdjustmentRecipe → UI `price_analysis`.
+         *
+         *     Registry-classified fields (2026-04-22 workshop, post-T4 retirement
+         *     of price_analysis_gateway_gap):
+         *       * audit-bearing (event/control): erp_unit_price, po_unit_price,
+         *         variance_amount, variance_pct, total_at_risk, total_quantity,
+         *         uom, sku.
+         *       * audit-bearing (gateway, sap_doc): doc_type, doc_number.
+         *       * audit-bearing (gateway, sap_contract): contract_ref, rule_id.
+         *       * audit-bearing (gateway, promotion): promotion_ref,
+         *         root_cause_category.
+         *       * contextual: material_desc, order_date.
+         *
+         *     Sources:
+         *       * `record.original_event` — po_price, sap_base_price, line_item,
+         *         retailer_id, sku, line_count, metadata.
+         *       * `record.enrichment_context["sap_doc_context"]` — SAP document
+         *         metadata (doc_type, doc_number, applied condition chain).
+         *       * `record.enrichment_context["contract_context"]` — KONA / custom
+         *         contract lookup (contract_ref, rule_id_hints).
+         *       * `record.enrichment_context["promotion_context"]` — promotion
+         *         master (promotion_ref, root_cause_category).
+         */
+        PriceAnalysisData: {
+            /** Contract Ref */
+            contract_ref?: string | null;
+            /** Doc Number */
+            doc_number: string;
+            /** Doc Type */
+            doc_type: string;
+            /** Erp Unit Price */
+            erp_unit_price: number;
+            /** Material Desc */
+            material_desc?: string | null;
+            /** Order Date */
+            order_date?: string | null;
+            /** Po Unit Price */
+            po_unit_price: number;
+            /** Promotion Ref */
+            promotion_ref?: string | null;
+            /** Root Cause Category */
+            root_cause_category: string;
+            /** Rule Id */
+            rule_id: string;
+            /** Sku */
+            sku: string;
+            /** Total At Risk */
+            total_at_risk: number;
+            /** Total Quantity */
+            total_quantity: number;
+            /** Uom */
+            uom: string;
+            /** Variance Amount */
+            variance_amount: number;
+            /** Variance Pct */
+            variance_pct: number;
+        };
+        /**
          * PriceHoldAnalysisData
          * @description PriceHoldReleaseRecipe → UI `price_hold_analysis`.
          *
@@ -1386,6 +1659,58 @@ export interface components {
         RefreshRequest: {
             /** Refresh Token */
             refresh_token: string;
+        };
+        /**
+         * ResolutionOption
+         * @description One ranked resolution option for a back-order. Audit-bearing per
+         *     registry::BackOrderAnalysisData.resolution_options.
+         */
+        ResolutionOption: {
+            /**
+             * Composite Score
+             * @default 0
+             */
+            composite_score: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Id */
+            id: string;
+            /** Sap Steps */
+            sap_steps?: string[];
+            scores?: components["schemas"]["ResolutionOptionScores"];
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Type */
+            type: string;
+        };
+        /** ResolutionOptionScores */
+        ResolutionOptionScores: {
+            /**
+             * Logistics
+             * @default 0
+             */
+            logistics: number;
+            /**
+             * Preference
+             * @default 0
+             */
+            preference: number;
+            /**
+             * Revenue
+             * @default 0
+             */
+            revenue: number;
+            /**
+             * Service
+             * @default 0
+             */
+            service: number;
         };
         /**
          * ResolveRequest
@@ -1561,6 +1886,36 @@ export interface components {
              */
             total_exceptions: number;
         };
+        /**
+         * SubstituteSKU
+         * @description Substitute SKU candidate. Conditional on
+         *     `resolved_action == SUBSTITUTE` per the registry.
+         */
+        SubstituteSKU: {
+            /** Acceptance Rate */
+            acceptance_rate: number;
+            /** Available Qty */
+            available_qty: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Price Delta Pct */
+            price_delta_pct: number;
+            /**
+             * Priority
+             * @default 0
+             */
+            priority: number;
+            /** Sku */
+            sku: string;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+        };
         /** TenantResetRequest */
         TenantResetRequest: {
             /** Tenant Id */
@@ -1684,6 +2039,28 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * WarehouseInfo
+         * @description Inventory snapshot for one DC. Audit-bearing per registry::
+         *     BackOrderAnalysisData.primary_dc — reviewer attests against the
+         *     plant + qty before approving an ALT_DC or SUBSTITUTE action.
+         */
+        WarehouseInfo: {
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Plant */
+            plant: string;
+            /** Qty */
+            qty: number;
+            /**
+             * Region
+             * @default
+             */
+            region: string;
         };
         /**
          * WorkflowRequest
