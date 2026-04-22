@@ -590,18 +590,33 @@ if the situation recurs.
 - H4 RESOLVED: mock `allowed_override_reason_tags_by_intent` matches
   backend (both seed every intent with the global list). Drift
   register D17. No code change needed; follow-up is L4.
-- H5 / L2 PARTIAL: two of ten enrichment fields are now backend-backed
+- H5 / L2 PARTIAL: SIX of ten enrichment fields are now backend-backed
   via the `asoe2/api/analysis_adapters.py::ANALYSIS_ADAPTERS`
-  registry — `price_hold_analysis` (adapt_price_hold) and
-  `edi_mismatch_analysis` (adapt_edi_mismatch). Those two
-  `// preview-only` markers have been dropped from
-  `src/types/exceptions.ts`. The corresponding Playwright specs
-  (`tests/browser/price-hold-detail.spec.ts`,
-  `edi-mismatch-detail.spec.ts`) are no longer `test.skip`. Drift
-  register D18 updated to **PARTIAL**. The remaining 8 fields
-  (duplicate / order_comparison / price / backorder / overmax / moq /
-  pallet / delivery_delay) keep their `// preview-only` markers
-  until their adapters land (tracked as L2d follow-up below).
+  registry, plus the full Verdict three-pillar architecture is in
+  place (Pillar 1 `enrichment_context` persistence, Pillar 2
+  `build_analysis` graph node + composer-backed read path + structured
+  trace surface, Pillar 3 `EvidenceBlock` UI primitive +
+  `useConditionalField` hook):
+    * `price_hold_analysis` (adapt_price_hold)
+    * `edi_mismatch_analysis` (adapt_edi_mismatch)
+    * `delivery_delay_analysis` (adapt_delivery_delay) — first
+      EvidenceBlock consumer + "Context Not Required for Resolution"
+      placeholder for grandfathered at_risk
+    * `overmax_analysis` (adapt_overmax) — `overmax_gateway_gap`
+      grandfather covers contract_ref + block_status + block_reason +
+      order_lines + trim_plan + uom
+    * `moq_analysis` (adapt_moq) — `moq_gateway_gap` grandfather
+      covers moq_source + channel + contract_ref + block_status
+    * `pallet_analysis` (adapt_pallet) — recipe + UI shapes 1:1, no
+      grandfather needed
+  The six matching `// preview-only` markers dropped from
+  `src/types/exceptions.ts`. Drift register D18 updated to PARTIAL
+  (6/10). The remaining four (`duplicate_detection`,
+  `order_comparison`, `price_analysis`, `backorder_analysis`) are
+  gated on gateway-persistence work (C1-C7 in the consolidated
+  backlog) — adapter-alone can't close them; they need upstream
+  schema changes to persist matched_po_details / warehouse snapshots /
+  contract refs onto the record.
 - L4 OPEN: tracked in asoe2 Phase 5 ("Deferred — curated per-intent
   reason_tag vocabularies"). Closes D17 when it lands.
 
