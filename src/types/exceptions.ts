@@ -305,7 +305,7 @@ export interface OrderAnalysis {
   overmax_analysis?: OverMaxAnalysisData;
   /** Present when a min-order-qty exception produces a round-up plan (asoe2 adapt_moq). */
   moq_analysis?: MOQAnalysisData;
-  /** preview-only — Present when a pallet config exception produces alignment analysis */
+  /** Present when a pallet config exception produces alignment analysis (asoe2 adapt_pallet). */
   pallet_analysis?: PalletAnalysisData;
   /** Present when a delivery delay exception produces timing analysis (asoe2 adapt_delivery_delay). */
   delivery_delay_analysis?: DeliveryDelayAnalysisData;
@@ -671,23 +671,37 @@ export interface SAPStep {
 /* ── Pallet Config enrichment types ─────────────────────────────────── */
 
 /** Pallet analysis — present when the Pallet Config skill/recipe produces it */
+/**
+ * Pallet analysis — present when the Pallet Config skill/recipe produces it.
+ *
+ * Tiers (per `asoe2/compliance/audit_bearing_registry.yaml`):
+ *   - audit-bearing (required): total_ordered_cases, loose_cases_total,
+ *     order_line_count, classification, lines, suggested_plan.
+ *
+ * Fields below classification are UI-only legacy mock fields with no
+ * backend producer — kept optional for backwards compat with mock
+ * fixtures; real-backend mode they will be undefined and the section
+ * structurally omits via EvidenceBlock.
+ */
 export interface PalletAnalysisData {
-  /** Total cases ordered across all lines */
+  /** Total cases ordered across all lines — audit-bearing. */
   total_ordered_cases: number;
-  /** Total loose (non-full-layer) cases */
+  /** Total loose (non-full-layer) cases — audit-bearing. */
   loose_cases_total: number;
-  /** Total at-risk value */
-  at_risk_total: number;
-  /** Estimated extra labor hours for manual handling */
-  extra_labor_est_hrs: number;
-  /** Freight waste percentage from partial pallets */
-  freight_waste_pct: number;
-  /** Number of order lines */
+  /** Number of order lines — audit-bearing. */
   order_line_count: number;
-  /** Per-line pallet alignment details */
+  /** Recipe classification (BROKEN_LAYER / PARTIAL_PALLET / MIXED_VIOLATION) — audit-bearing. */
+  classification?: string;
+  /** Per-line pallet alignment details — audit-bearing. */
   lines: PalletLine[];
-  /** AI-suggested plan for pallet alignment */
+  /** AI-suggested plan for pallet alignment — audit-bearing. */
   suggested_plan: PalletSuggestion[];
+  /** Total at-risk value — UI-only legacy; no backend producer. */
+  at_risk_total?: number;
+  /** Estimated extra labor hours — UI-only legacy. */
+  extra_labor_est_hrs?: number;
+  /** Freight waste percentage — UI-only legacy. */
+  freight_waste_pct?: number;
 }
 
 /** Per-line pallet alignment detail */

@@ -636,6 +636,7 @@ export interface components {
             lines?: components["schemas"]["LineAnalysis"][];
             moq_analysis?: components["schemas"]["MOQAnalysisData"] | null;
             overmax_analysis?: components["schemas"]["OverMaxAnalysisData"] | null;
+            pallet_analysis?: components["schemas"]["PalletAnalysisData"] | null;
             price_hold_analysis?: components["schemas"]["PriceHoldAnalysisData"] | null;
             /** Resolution */
             resolution: string;
@@ -1158,6 +1159,124 @@ export interface components {
             qty: number;
             /** Sku */
             sku: string;
+        };
+        /**
+         * PalletAnalysisData
+         * @description PalletAlignmentRecipe → UI `pallet_analysis`.
+         *
+         *     Registry-classified fields (2026-04-22 workshop):
+         *       * audit-bearing: total_ordered_cases, loose_cases_total,
+         *         order_line_count, classification, suggested_plan, lines.
+         *
+         *     Recipe + UI line/plan shapes are 1:1, so the adapter is purely
+         *     coercion. The UI's mock-only legacy top-level fields
+         *     (at_risk_total, extra_labor_est_hrs, freight_waste_pct) are not
+         *     in this contract — they're not classified in the registry and
+         *     no recipe currently produces them. Those are kept optional on
+         *     the UI type and remain mock-only.
+         */
+        PalletAnalysisData: {
+            /** Classification */
+            classification: string;
+            /** Lines */
+            lines?: components["schemas"]["PalletLine"][];
+            /** Loose Cases Total */
+            loose_cases_total: number;
+            /** Order Line Count */
+            order_line_count: number;
+            /** Suggested Plan */
+            suggested_plan?: components["schemas"]["PalletSuggestion"][];
+            /** Total Ordered Cases */
+            total_ordered_cases: number;
+        };
+        /**
+         * PalletLine
+         * @description One per-line pallet alignment row from PalletAlignmentRecipe.
+         */
+        PalletLine: {
+            /**
+             * Complete Layers
+             * @default 0
+             */
+            complete_layers: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Full Pallets
+             * @default 0
+             */
+            full_pallets: number;
+            /**
+             * Layer Qty
+             * @default 0
+             */
+            layer_qty: number;
+            /**
+             * Loose Qty
+             * @default 0
+             */
+            loose_qty: number;
+            /** Ordered Qty */
+            ordered_qty: number;
+            /**
+             * Pallet Fill Pct
+             * @default 0
+             */
+            pallet_fill_pct: number;
+            /**
+             * Pallet Qty
+             * @default 0
+             */
+            pallet_qty: number;
+            /** Sku */
+            sku: string;
+            /**
+             * Uom
+             * @default
+             */
+            uom: string;
+            /** Violation Type */
+            violation_type?: string | null;
+        };
+        /**
+         * PalletSuggestion
+         * @description One AI suggestion row from PalletAlignmentRecipe.
+         */
+        PalletSuggestion: {
+            /** Current */
+            current: number;
+            /**
+             * Delta
+             * @default 0
+             */
+            delta: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Full Pallets
+             * @default 0
+             */
+            full_pallets: number;
+            /**
+             * Layers
+             * @default 0
+             */
+            layers: number;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Sku */
+            sku: string;
+            /** Suggested */
+            suggested: number;
         };
         /**
          * PolicyOverrideResponse
