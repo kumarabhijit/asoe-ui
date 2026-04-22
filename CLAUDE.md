@@ -83,6 +83,55 @@ Every exception detail surface must implement the two-layer pattern (Section 11.
 
 The `AgentReasoningCard` implements this. Use it — do not reinvent a different pattern.
 
+### 6) No frontend composition of enrichment payloads (Verdict 2026-04-22)
+
+The backend's `build_analysis` graph node
+(`asoe2/orchestration/nodes.py`) is the sole assembler of the
+analysis payload the UI consumes. Enrichment sections
+(`PriceHoldSection`, `EdiMismatchSection`, etc.) are **dumb
+projectors** — they render `analysis.foo` as given, they do not
+combine data from multiple sources to synthesise a view.
+
+Forbidden patterns (rejected Perspective 3 from the workshop):
+
+- `const display = { ...analysis.price_hold, po: event.po_price }` —
+  blending backend-authoritative data with event fields client-side.
+- Fetching gateway caches in a section component.
+- "Smart" adapters in `src/hooks/` that assemble three API payloads
+  into one section prop.
+- Fallback chains like `analysis?.foo ?? event.meta?.foo ?? "—"` —
+  this conceals where the data came from, which is an audit problem
+  in a SOX-relevant surface.
+
+Use `<EvidenceBlock>` (`src/components/ui/EvidenceBlock.tsx`) for
+every Layer-2 row. The three legal presence states are enforced by
+that component:
+  - **Present** → render normally.
+  - **Structurally omitted** (contextual field absent) → render nothing.
+  - **Context Not Required for Resolution** (conditional field whose
+    predicate doesn't hold) → render the labelled placeholder.
+
+Ad-hoc `"—"` / `"N/A"` / `data.field ?? fallback` patterns violate
+the compliance engineer's veto on partial-truth states. They are
+code-review anti-patterns.
+
+### 7) Rich UI types are a product commitment (Verdict 2026-04-22)
+
+The `*AnalysisData` interfaces in `src/types/exceptions.ts` are the
+evidence contract the operator consumes to authorise
+financially-binding, SOX-relevant decisions. **Do not prune these
+types to match current recipe output.** If the real backend can't
+populate a field today:
+
+1. Drop the `// preview-only` marker only when the matching
+   adapter + registry row land upstream.
+2. For missing audit-bearing fields, track the gap against the
+   asoe2 registry grandfather clauses — don't remove the field.
+3. If the UI type genuinely needs relaxation, coordinate with
+   Compliance (CODEOWNERS gate on
+   `asoe2/compliance/audit_bearing_registry.yaml`) — not a
+   unilateral UI-side change.
+
 ---
 
 ## Engineering Rules
