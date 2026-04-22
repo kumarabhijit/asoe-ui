@@ -195,6 +195,38 @@ In all halt cases, output:
 
 ---
 
+## WORKING-STYLE CONSTRAINTS (operational hygiene)
+
+Non-negotiable for any session that writes or reads files in this
+repo. Mirrors the same rules in asoe2/prompts/pre_code_session.md so
+cross-repo sessions behave identically.
+
+1. **Write and read in small, section-wise chunks.** Long single
+   writes (>200 lines in one operation) and long single reads
+   (>300 lines) have historically timed out mid-edit and corrupted
+   intermediate state. Prefer multiple focused `Edit` operations
+   over one monolithic `Write`; prefer targeted reads with line
+   ranges over dumping whole files. If a file legitimately needs
+   to grow large, build it up in successive edits with build/test
+   verification between them.
+
+2. **Respect the audit-bearing field registry on the backend side.**
+   When adding or renaming a field on any UI `*AnalysisData` type in
+   `src/types/exceptions.ts`, the corresponding change on the backend
+   side (`asoe2/api/schemas.py` + `asoe2/compliance/audit_bearing_registry.yaml`)
+   must land in the same PR chain. The asoe2 fitness test
+   (`tests/test_audit_registry_coverage.py`) will fail otherwise.
+   The compliance team is CODEOWNERS of the registry — plan a
+   review cycle with them for any change that touches an enrichment
+   field classification.
+
+3. **`// preview-only` markers are contracts.** Fields in
+   `OrderAnalysis` carrying `// preview-only` are mock-backed; the
+   real backend does NOT yet populate them. Do not hide the marker
+   by refactor; drop it only when the matching adapter + registry
+   classification land in asoe2. See drift register D18 in
+   `ui_architecture.md` §9.
+
 ## POST-CHANGE VERIFICATION
 
 After completing the change:
@@ -208,6 +240,9 @@ After completing the change:
 6. Confirm the change is small and reviewable.
 7. Confirm docs are updated if the change affects user-facing behaviour
    (use prompts/update_docs.md).
+8. If any `*AnalysisData` field was added / renamed / removed, confirm
+   the corresponding asoe2 registry row exists and the asoe2 CI is
+   green on that cross-repo PR.
 
 Return: a concise summary of what was changed, files touched, tests
 added/modified, and confirmation that build + tests pass.
