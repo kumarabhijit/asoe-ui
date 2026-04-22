@@ -634,6 +634,7 @@ export interface components {
             edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
             /** Lines */
             lines?: components["schemas"]["LineAnalysis"][];
+            moq_analysis?: components["schemas"]["MOQAnalysisData"] | null;
             overmax_analysis?: components["schemas"]["OverMaxAnalysisData"] | null;
             price_hold_analysis?: components["schemas"]["PriceHoldAnalysisData"] | null;
             /** Resolution */
@@ -1030,6 +1031,63 @@ export interface components {
             mfa_token: string;
         };
         /**
+         * MOQAnalysisData
+         * @description MOQRoundUpRecipe → UI `moq_analysis`.
+         *
+         *     Registry-classified fields (2026-04-22 workshop):
+         *       * audit-bearing: ordered_qty, moq_qty, shortfall_qty,
+         *         shortfall_pct, sku, unit_cost, uom, at_risk, round_up_plan.
+         *       * grandfathered audit-bearing (until 2026-07-21 — gateway gap):
+         *         moq_source, channel, contract_ref, block_status.
+         *       * contextual: description, block_message.
+         *
+         *     `at_risk` is sourced from the recipe's `uplift_value`
+         *     (uplift_qty × unit_cost). The `sap_steps` UI field is omitted
+         *     here — it's contextual / not produced by the recipe and the
+         *     UI can render whatever's present in `round_up_plan`.
+         */
+        MOQAnalysisData: {
+            /**
+             * At Risk
+             * @default 0
+             */
+            at_risk: number;
+            /** Block Message */
+            block_message?: string | null;
+            /** Block Status */
+            block_status?: string | null;
+            /** Channel */
+            channel?: string | null;
+            /** Contract Ref */
+            contract_ref?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Moq Qty */
+            moq_qty: number;
+            /** Moq Source */
+            moq_source?: string | null;
+            /** Ordered Qty */
+            ordered_qty: number;
+            /** Round Up Plan */
+            round_up_plan?: components["schemas"]["RoundUpPlanLine"][];
+            /** Shortfall Pct */
+            shortfall_pct: number;
+            /** Shortfall Qty */
+            shortfall_qty: number;
+            /** Sku */
+            sku: string;
+            /**
+             * Unit Cost
+             * @default 0
+             */
+            unit_cost: number;
+            /**
+             * Uom
+             * @default
+             */
+            uom: string;
+        };
+        /**
          * OverMaxAnalysisData
          * @description OverMaxTrimRecipe → UI `overmax_analysis`.
          *
@@ -1280,6 +1338,34 @@ export interface components {
             shadow_verdict?: string | null;
             /** Trace Id */
             trace_id?: string | null;
+        };
+        /**
+         * RoundUpPlanLine
+         * @description One row in MOQRoundUpRecipe's round-up plan.
+         */
+        RoundUpPlanLine: {
+            /**
+             * Action
+             * @default ROUND_UP
+             * @enum {string}
+             */
+            action: "ROUND_UP" | "ACCEPT_BELOW" | "ESCALATE";
+            /**
+             * Delta
+             * @default 0
+             */
+            delta: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Ordered */
+            ordered: number;
+            /** Round Up To */
+            round_up_to: number;
+            /** Sku */
+            sku: string;
         };
         /**
          * SAPActionStep

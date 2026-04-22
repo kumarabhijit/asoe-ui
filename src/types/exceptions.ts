@@ -303,7 +303,7 @@ export interface OrderAnalysis {
   backorder_analysis?: BackOrderAnalysisData;
   /** Present when an over-max exception produces a trim plan (asoe2 adapt_overmax). */
   overmax_analysis?: OverMaxAnalysisData;
-  /** preview-only — Present when a min-order-qty exception produces a round-up plan */
+  /** Present when a min-order-qty exception produces a round-up plan (asoe2 adapt_moq). */
   moq_analysis?: MOQAnalysisData;
   /** preview-only — Present when a pallet config exception produces alignment analysis */
   pallet_analysis?: PalletAnalysisData;
@@ -602,40 +602,51 @@ export interface TrimPlanLine {
 /* ── Min Order Qty (MOQ) enrichment types ───────────────────────────── */
 /* ── Min Order Qty (MOQ) enrichment types ───────────────────────────── */
 
-/** MOQ analysis — present when the MOQ skill/recipe produces it */
+/**
+ * MOQ analysis — present when the MOQ skill/recipe produces it.
+ *
+ * Tiers (per `asoe2/compliance/audit_bearing_registry.yaml`):
+ *   - audit-bearing (required): ordered_qty, moq_qty, shortfall_qty,
+ *     shortfall_pct, sku, unit_cost, uom, at_risk, round_up_plan.
+ *   - grandfathered audit-bearing → optional (moq_gateway_gap, deadline
+ *     2026-07-21): moq_source, channel, contract_ref, block_status.
+ *   - contextual → optional: description, block_message.
+ *   - sap_steps: legacy mock-only field; no backend producer. Kept for
+ *     pre-existing consumers; treat as contextual.
+ */
 export interface MOQAnalysisData {
-  /** Quantity ordered */
+  /** Quantity ordered — audit-bearing. */
   ordered_qty: number;
-  /** Minimum order quantity required */
+  /** Minimum order quantity required — audit-bearing. */
   moq_qty: number;
-  /** Shortfall (MOQ - ordered) */
+  /** Shortfall (MOQ - ordered) — audit-bearing. */
   shortfall_qty: number;
-  /** Shortfall as percentage of MOQ */
+  /** Shortfall as percentage of MOQ — audit-bearing. */
   shortfall_pct: number;
-  /** Primary SKU */
+  /** Primary SKU — audit-bearing. */
   sku: string;
-  /** Material description */
-  description: string;
-  /** Unit cost */
+  /** Unit cost — audit-bearing. */
   unit_cost: number;
-  /** Unit of measure */
+  /** Unit of measure — audit-bearing. */
   uom: string;
-  /** Revenue at risk */
+  /** Revenue at risk (uplift_value) — audit-bearing. */
   at_risk: number;
-  /** MOQ source (e.g., "KNMT-MINBM" or "MARC-MINBE") */
-  moq_source: string;
-  /** Distribution channel */
-  channel: string;
-  /** SAP V4082 block message */
-  block_message: string;
-  /** Contract reference */
-  contract_ref: string;
-  /** Block status */
-  block_status: string;
-  /** AI round-up plan */
+  /** AI round-up plan — audit-bearing. */
   round_up_plan: RoundUpPlanLine[];
-  /** SAP execution steps */
-  sap_steps: SAPStep[];
+  /** Material description — contextual. */
+  description?: string;
+  /** MOQ source (KNMT-MINBM / MARC-MINBE) — grandfathered. */
+  moq_source?: string;
+  /** Distribution channel — grandfathered. */
+  channel?: string;
+  /** SAP V4082 block message — contextual. */
+  block_message?: string;
+  /** Contract reference — grandfathered. */
+  contract_ref?: string;
+  /** Block status — grandfathered. */
+  block_status?: string;
+  /** SAP execution steps — UI-only legacy field; no backend producer. */
+  sap_steps?: SAPStep[];
 }
 
 /** Round-up plan line */

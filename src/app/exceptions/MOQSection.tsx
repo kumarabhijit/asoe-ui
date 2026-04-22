@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { ArrowDownRight, ArrowUp, AlertTriangle, ChevronDown, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import type { MOQAnalysisData, RoundUpPlanLine } from "@/types/exceptions";
 import { fmtPrice } from "./shared";
 
@@ -94,29 +95,58 @@ export function MOQSection({ data }: MOQSectionProps) {
           </div>
         </div>
 
-        {/* ── SAP V4082 Block Detail ───────────────────────────────────── */}
-        <div className="p-12 rounded-md border border-error bg-error-subtle">
-          <div className="flex items-center gap-6 mb-6">
-            <AlertTriangle size={14} className="text-error shrink-0" />
-            <span className="text-caption font-bold text-error">SAP Block: {data.block_status}</span>
+        {/* ── SAP V4082 Block Detail ─────────────────────────────────────
+            Block detail is the SAP / contract gateway view —
+            grandfathered audit-bearing per moq_gateway_gap clause
+            (deadline 2026-07-21). Each row uses EvidenceBlock so it
+            structurally omits when the gateway hasn't populated it.
+            We only render the outer card if AT LEAST ONE of the
+            block-detail fields is present. */}
+        {(data.block_status || data.block_message || data.moq_source ||
+          data.channel || data.contract_ref) && (
+          <div className="p-12 rounded-md border border-error bg-error-subtle">
+            <EvidenceBlock tier="contextual" value={data.block_status}>
+              {(v) => (
+                <div className="flex items-center gap-6 mb-6">
+                  <AlertTriangle size={14} className="text-error shrink-0" />
+                  <span className="text-caption font-bold text-error">
+                    SAP Block: {String(v)}
+                  </span>
+                </div>
+              )}
+            </EvidenceBlock>
+            <EvidenceBlock tier="contextual" value={data.block_message}>
+              {(v) => (
+                <p className="text-caption text-text-secondary leading-relaxed m-0 mb-6">
+                  {String(v)}
+                </p>
+              )}
+            </EvidenceBlock>
+            <div className="flex flex-wrap gap-6 text-label">
+              <EvidenceBlock tier="contextual" value={data.moq_source}>
+                {(v) => (
+                  <span className="font-mono px-4 py-px rounded bg-surface-primary text-text-secondary">
+                    MOQ Source: {String(v)}
+                  </span>
+                )}
+              </EvidenceBlock>
+              <EvidenceBlock tier="contextual" value={data.channel}>
+                {(v) => (
+                  <span className="font-mono px-4 py-px rounded bg-surface-primary text-text-secondary">
+                    Channel: {String(v)}
+                  </span>
+                )}
+              </EvidenceBlock>
+              <EvidenceBlock tier="contextual" value={data.contract_ref}>
+                {(v) => (
+                  <span className="font-mono px-4 py-px rounded bg-surface-primary text-text-secondary">
+                    Contract: {String(v)}
+                  </span>
+                )}
+              </EvidenceBlock>
+            </div>
           </div>
-          <p className="text-caption text-text-secondary leading-relaxed m-0 mb-6">
-            {data.block_message}
-          </p>
-          <div className="flex flex-wrap gap-6 text-label">
-            <span className="font-mono px-4 py-px rounded bg-surface-primary text-text-secondary">
-              MOQ Source: {data.moq_source}
-            </span>
-            <span className="font-mono px-4 py-px rounded bg-surface-primary text-text-secondary">
-              Channel: {data.channel}
-            </span>
-            {data.contract_ref && (
-              <span className="font-mono px-4 py-px rounded bg-surface-primary text-text-secondary">
-                Contract: {data.contract_ref}
-              </span>
-            )}
-          </div>
-        </div>
+        )}
 
         {/* ── AI Round-Up Plan ─────────────────────────────────────────── */}
         <div>
@@ -158,8 +188,12 @@ export function MOQSection({ data }: MOQSectionProps) {
           </div>
         </div>
 
-        {/* ── SAP Execution Steps (collapsible) ────────────────────────── */}
-        {data.sap_steps.length > 0 && (
+        {/* ── SAP Execution Steps (collapsible) ──────────────────────────
+            sap_steps is a UI-only legacy field; the backend doesn't
+            currently produce it. Render only when present (mock fixtures
+            still supply it for demo). Per CLAUDE.md Guardrail 6, do not
+            synthesise these in the UI. */}
+        {(data.sap_steps?.length ?? 0) > 0 && (
           <div>
             <button
               onClick={() => setShowSteps((v) => !v)}
@@ -167,7 +201,7 @@ export function MOQSection({ data }: MOQSectionProps) {
             >
               <Database size={14} className="text-text-tertiary" />
               <span className="text-caption font-semibold text-text-secondary flex-1">
-                SAP Execution Steps ({data.sap_steps.length})
+                SAP Execution Steps ({(data.sap_steps ?? []).length})
               </span>
               <ChevronDown
                 size={12}
@@ -180,7 +214,7 @@ export function MOQSection({ data }: MOQSectionProps) {
 
             {showSteps && (
               <div className="mt-8 rounded-md border border-border overflow-hidden">
-                {data.sap_steps.map((step) => (
+                {(data.sap_steps ?? []).map((step) => (
                   <div
                     key={step.step}
                     className="flex items-center gap-8 px-10 py-6 border-b border-border last:border-b-0 text-caption hover:bg-surface-row-hover transition-colors"
