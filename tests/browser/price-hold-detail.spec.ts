@@ -14,12 +14,14 @@
  *     PRICE_HOLD_RELEASE without crashing (regression net for the
  *     hardcoded-union work).
  *
- * The PriceHoldSection-renders assertion is gated on the asoe2
- * backend populating OrderAnalysis.price_hold_analysis (a separate
- * follow-up — see plan §What's explicitly out of scope). Until that
- * lands, the section is exercised by the vitest component / contract
- * tests via the in-process mock. The Playwright `test.skip` below
- * documents the invariant for the day backend wiring lands.
+ * Review L2 landed `api.analysis_adapters.adapt_price_hold` on the
+ * asoe2 side (commit ea088… on claude/asoe-hub-implementation-8ds5T).
+ * The adapter projects the recipe output into
+ * AnalysisResponse.price_hold_analysis for GREEN records and
+ * synthesises the projection by invoking the pure recipe for
+ * YELLOW/RED-gated records. The second spec below is no longer
+ * skipped — it exercises the adapter end-to-end on a 5% variance
+ * (ESCALATE band, YELLOW shadow).
  */
 import { test, expect } from "@playwright/test";
 import {
@@ -84,14 +86,17 @@ test("PRICE_HOLD_RELEASE detail page renders with the correct intent + recipe", 
   await expect(page.getByRole("button", { name: /override/i }).first()).toBeVisible();
 });
 
-test.skip("PriceHoldSection renders variance + action when backend populates price_hold_analysis", async ({
+test("PriceHoldSection renders variance + action when backend populates price_hold_analysis", async ({
   page,
   request,
 }) => {
-  // Enable this spec once asoe2 promotes price_hold_analysis onto the
-  // OrderAnalysis response. Currently the backend returns recipe
-  // output in execution_log, not in the dedicated analysis field —
-  // the UI component will not mount against a live record.
+  // Enabled by asoe2 review L2. 5% variance → YELLOW shadow →
+  // MANUAL_REVIEW_REQUIRED. The adapter synthesises
+  // price_hold_analysis by invoking the pure PriceHoldReleaseRecipe
+  // with event-sourced params; the UI section mounts on the
+  // data-presence guard. This also exercises the fallback path (no
+  // recipe output on the record because shadow gated before
+  // execute_recipe).
   const managerToken = await backendToken(request, USERS.MANAGER);
   const exceptionId = await createPriceHoldException(request, managerToken, 0.05);
   await loginAs(page, USERS.MANAGER);

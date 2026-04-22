@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { Layers, Package, Clock, Truck, ChevronDown, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import type { PalletAnalysisData, PalletLine } from "@/types/exceptions";
 import { fmtPrice } from "./shared";
 
@@ -36,12 +37,35 @@ export function PalletConfigSection({ data }: PalletConfigSectionProps) {
       </div>
 
       <div className="p-16 flex flex-col gap-16">
-        {/* ── KPI Strip ────────────────────────────────────────────────── */}
+        {/* ── KPI Strip ──────────────────────────────────────────────────
+            Total Cases + Loose Cases are audit-bearing (always
+            present). Extra Labor + Freight Waste are UI-only legacy
+            mock fields with no backend producer — wrapped in
+            EvidenceBlock so they structurally omit in real-backend
+            mode. */}
         <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-8">
           <KPITile icon={<Package size={14} />} label="Total Cases" value={data.total_ordered_cases.toLocaleString()} />
           <KPITile icon={<Layers size={14} />} label="Loose Cases" value={data.loose_cases_total.toLocaleString()} highlight />
-          <KPITile icon={<Clock size={14} />} label="Extra Labor" value={`${data.extra_labor_est_hrs.toFixed(1)} hrs`} highlight={data.extra_labor_est_hrs > 1} />
-          <KPITile icon={<Truck size={14} />} label="Freight Waste" value={`${data.freight_waste_pct.toFixed(1)}%`} highlight={data.freight_waste_pct > 5} />
+          <EvidenceBlock tier="contextual" value={data.extra_labor_est_hrs}>
+            {(v) => (
+              <KPITile
+                icon={<Clock size={14} />}
+                label="Extra Labor"
+                value={`${(v as number).toFixed(1)} hrs`}
+                highlight={(v as number) > 1}
+              />
+            )}
+          </EvidenceBlock>
+          <EvidenceBlock tier="contextual" value={data.freight_waste_pct}>
+            {(v) => (
+              <KPITile
+                icon={<Truck size={14} />}
+                label="Freight Waste"
+                value={`${(v as number).toFixed(1)}%`}
+                highlight={(v as number) > 5}
+              />
+            )}
+          </EvidenceBlock>
         </div>
 
         {/* ── Per-Line Pallet Fill ─────────────────────────────────────── */}

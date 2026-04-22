@@ -1112,6 +1112,27 @@ export const exceptionsApi = {
     return MOCK_LINE_ITEMS[id] ?? [];
   },
 
+  /**
+   * Enrichment sources (review L2 / H5):
+   *   * Backend-backed (real asoe2 populates these via
+   *     `api.analysis_adapters`):
+   *       - price_hold_analysis (adapt_price_hold)
+   *       - edi_mismatch_analysis (adapt_edi_mismatch)
+   *   * Mock-only until their adapter lands:
+   *       - duplicate_detection, order_comparison, price_analysis,
+   *         backorder_analysis, overmax_analysis, moq_analysis,
+   *         pallet_analysis, delivery_delay_analysis
+   *
+   * The mock below populates every enrichment field for demo
+   * fidelity. When the UI points at real asoe2, the backend-backed
+   * fields flow through AnalysisResponse; the mock-only fields
+   * silently collapse because `analysis?.foo` is undefined. Each new
+   * adapter unlocks one more section — see asoe2
+   * `api/analysis_adapters.py::ANALYSIS_ADAPTERS` for the registry.
+   *
+   * Tracked in the `NEXT_PUBLIC_SHOW_PREVIEW_INTENTS` backlog
+   * (tasks.md) and drift register D18 (ui_architecture.md §9).
+   */
   async orderAnalysis(id: string): Promise<OrderAnalysis | null> {
     await delay(MOCK_DELAY);
     return MOCK_ORDER_ANALYSES[id] ?? null;

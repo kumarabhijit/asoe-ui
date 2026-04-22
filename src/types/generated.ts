@@ -589,16 +589,55 @@ export interface components {
             risk_acknowledgment: boolean;
         };
         /**
+         * AlternateDeliveryOption
+         * @description One ranked alternate delivery option from
+         *     DeliveryDelayResolutionRecipe._rank_options.
+         */
+        AlternateDeliveryOption: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Extra Cost
+             * @default 0
+             */
+            extra_cost: number;
+            /** Id */
+            id: string;
+            /** New Eta */
+            new_eta?: string | null;
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Type */
+            type: string;
+        };
+        /**
          * AnalysisResponse
          * @description GET /api/v1/exceptions/{id}/analysis
          */
         AnalysisResponse: {
             /** Confidence */
             confidence: number;
+            delivery_delay_analysis?: components["schemas"]["DeliveryDelayAnalysisData"] | null;
             /** Diagnosis */
             diagnosis: string;
+            edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
             /** Lines */
             lines?: components["schemas"]["LineAnalysis"][];
+            moq_analysis?: components["schemas"]["MOQAnalysisData"] | null;
+            overmax_analysis?: components["schemas"]["OverMaxAnalysisData"] | null;
+            pallet_analysis?: components["schemas"]["PalletAnalysisData"] | null;
+            price_hold_analysis?: components["schemas"]["PriceHoldAnalysisData"] | null;
             /** Resolution */
             resolution: string;
             /** Risk */
@@ -670,6 +709,52 @@ export interface components {
             notes: string;
         };
         /**
+         * DeliveryDelayAnalysisData
+         * @description DeliveryDelayResolutionRecipe → UI `delivery_delay_analysis`.
+         *
+         *     Registry-classified fields (2026-04-22 workshop):
+         *
+         *       * audit-bearing:
+         *           planned_date, projected_eta, days_late, delay_category,
+         *           affected_lines, at_risk, sla_deadline (when present)
+         *       * conditional:
+         *           alternate_options (depends_on resolved_action ∈
+         *           {EXPEDITE, SPLIT_SHIP, PARTIAL, RESCHEDULE})
+         *       * contextual:
+         *           delay_reason, carrier, route, rule_id
+         *
+         *     `at_risk` and `sla_deadline` are currently covered by the
+         *     `delivery_delay_financial_gap` grandfather clause — the contract
+         *     gateway that would produce them isn't wired yet. The composer
+         *     treats them as contextual until the 2026-07-21 deadline.
+         */
+        DeliveryDelayAnalysisData: {
+            /** Affected Lines */
+            affected_lines: number;
+            /** Alternate Options */
+            alternate_options?: components["schemas"]["AlternateDeliveryOption"][];
+            /** At Risk */
+            at_risk?: number | null;
+            /** Carrier */
+            carrier?: string | null;
+            /** Days Late */
+            days_late: number;
+            /** Delay Category */
+            delay_category: string;
+            /** Delay Reason */
+            delay_reason?: string | null;
+            /** Planned Date */
+            planned_date: string;
+            /** Projected Eta */
+            projected_eta: string;
+            /** Route */
+            route?: string | null;
+            /** Rule Id */
+            rule_id?: string | null;
+            /** Sla Deadline */
+            sla_deadline?: string | null;
+        };
+        /**
          * DispositionRequest
          * @description PATCH /api/v1/exceptions/{id}/disposition — unified HITL primitive
          *     (v2 consolidation).
@@ -694,6 +779,44 @@ export interface components {
             notes: string;
             /** Reason Tag */
             reason_tag: string;
+        };
+        /**
+         * EdiMismatchAnalysisData
+         * @description EdiMismatchRecipe → UI `edi_mismatch_analysis`.
+         *
+         *     `sub_type` is intentionally untyped-string (not a Literal) so the UI
+         *     can render new sub_types added in the recipe without a contract
+         *     bump. `expected_value` / `received_value` are `Any` because EDI 850
+         *     line fields are heterogeneous (SKU strings, qty integers, ship-to
+         *     dicts).
+         *
+         *     Note: PRICE_MISMATCH never reaches this recipe — the classifier
+         *     routes it to CONTRACTUAL_CORRECTION / PriceAdjustmentRecipe.py to
+         *     preserve the single-source-of-truth invariant. The adapter returns
+         *     None for FAILED recipe outputs, so PRICE_MISMATCH routing-error
+         *     records never surface this field.
+         */
+        EdiMismatchAnalysisData: {
+            /**
+             * Autonomy Level
+             * @enum {string}
+             */
+            autonomy_level: "L1" | "L2" | "L3";
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "HARD_REJECT" | "REVIEW" | "ESCALATE";
+            /** Expected Value */
+            expected_value?: unknown;
+            /** Notification Template */
+            notification_template?: string | null;
+            /** Received Value */
+            received_value?: unknown;
+            /** Recommended Action */
+            recommended_action: string;
+            /** Sub Type */
+            sub_type: string;
         };
         /**
          * EscalateRequest
@@ -909,6 +1032,253 @@ export interface components {
             mfa_token: string;
         };
         /**
+         * MOQAnalysisData
+         * @description MOQRoundUpRecipe → UI `moq_analysis`.
+         *
+         *     Registry-classified fields (2026-04-22 workshop):
+         *       * audit-bearing: ordered_qty, moq_qty, shortfall_qty,
+         *         shortfall_pct, sku, unit_cost, uom, at_risk, round_up_plan.
+         *       * grandfathered audit-bearing (until 2026-07-21 — gateway gap):
+         *         moq_source, channel, contract_ref, block_status.
+         *       * contextual: description, block_message.
+         *
+         *     `at_risk` is sourced from the recipe's `uplift_value`
+         *     (uplift_qty × unit_cost). The `sap_steps` UI field is omitted
+         *     here — it's contextual / not produced by the recipe and the
+         *     UI can render whatever's present in `round_up_plan`.
+         */
+        MOQAnalysisData: {
+            /**
+             * At Risk
+             * @default 0
+             */
+            at_risk: number;
+            /** Block Message */
+            block_message?: string | null;
+            /** Block Status */
+            block_status?: string | null;
+            /** Channel */
+            channel?: string | null;
+            /** Contract Ref */
+            contract_ref?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Moq Qty */
+            moq_qty: number;
+            /** Moq Source */
+            moq_source?: string | null;
+            /** Ordered Qty */
+            ordered_qty: number;
+            /** Round Up Plan */
+            round_up_plan?: components["schemas"]["RoundUpPlanLine"][];
+            /** Shortfall Pct */
+            shortfall_pct: number;
+            /** Shortfall Qty */
+            shortfall_qty: number;
+            /** Sku */
+            sku: string;
+            /**
+             * Unit Cost
+             * @default 0
+             */
+            unit_cost: number;
+            /**
+             * Uom
+             * @default
+             */
+            uom: string;
+        };
+        /**
+         * OverMaxAnalysisData
+         * @description OverMaxTrimRecipe → UI `overmax_analysis`.
+         *
+         *     Registry-classified fields (2026-04-22 workshop):
+         *       * audit-bearing: total_ordered, max_qty, excess_qty,
+         *         exceedance_pct, uom, at_risk, order_lines, trim_plan.
+         *       * audit-bearing (grandfathered until 2026-07-21 — gateway gap):
+         *         contract_ref, block_status, block_reason.
+         *
+         *     The recipe computes excess_qty / exceedance_pct / trim_plan /
+         *     at_risk from event metadata; the SAP block + contract gateway
+         *     that would supply contract_ref / block_status / block_reason
+         *     is not yet wired (overmax_gateway_gap clause).
+         */
+        OverMaxAnalysisData: {
+            /**
+             * At Risk
+             * @default 0
+             */
+            at_risk: number;
+            /** Block Reason */
+            block_reason?: string | null;
+            /** Block Status */
+            block_status?: string | null;
+            /** Contract Ref */
+            contract_ref?: string | null;
+            /** Exceedance Pct */
+            exceedance_pct: number;
+            /** Excess Qty */
+            excess_qty: number;
+            /** Max Qty */
+            max_qty: number;
+            /** Order Lines */
+            order_lines?: components["schemas"]["OverMaxLine"][];
+            /** Total Ordered */
+            total_ordered: number;
+            /** Trim Plan */
+            trim_plan?: components["schemas"]["TrimPlanLine"][];
+            /**
+             * Uom
+             * @default
+             */
+            uom: string;
+        };
+        /**
+         * OverMaxLine
+         * @description One affected order line in an OVER_MAX exception.
+         */
+        OverMaxLine: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Excess
+             * @default 0
+             */
+            excess: number;
+            /**
+             * Is Even Layer Item
+             * @default false
+             */
+            is_even_layer_item: boolean;
+            /** Max Line Qty */
+            max_line_qty?: number | null;
+            /** Qty */
+            qty: number;
+            /** Sku */
+            sku: string;
+        };
+        /**
+         * PalletAnalysisData
+         * @description PalletAlignmentRecipe → UI `pallet_analysis`.
+         *
+         *     Registry-classified fields (2026-04-22 workshop):
+         *       * audit-bearing: total_ordered_cases, loose_cases_total,
+         *         order_line_count, classification, suggested_plan, lines.
+         *
+         *     Recipe + UI line/plan shapes are 1:1, so the adapter is purely
+         *     coercion. The UI's mock-only legacy top-level fields
+         *     (at_risk_total, extra_labor_est_hrs, freight_waste_pct) are not
+         *     in this contract — they're not classified in the registry and
+         *     no recipe currently produces them. Those are kept optional on
+         *     the UI type and remain mock-only.
+         */
+        PalletAnalysisData: {
+            /** Classification */
+            classification: string;
+            /** Lines */
+            lines?: components["schemas"]["PalletLine"][];
+            /** Loose Cases Total */
+            loose_cases_total: number;
+            /** Order Line Count */
+            order_line_count: number;
+            /** Suggested Plan */
+            suggested_plan?: components["schemas"]["PalletSuggestion"][];
+            /** Total Ordered Cases */
+            total_ordered_cases: number;
+        };
+        /**
+         * PalletLine
+         * @description One per-line pallet alignment row from PalletAlignmentRecipe.
+         */
+        PalletLine: {
+            /**
+             * Complete Layers
+             * @default 0
+             */
+            complete_layers: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Full Pallets
+             * @default 0
+             */
+            full_pallets: number;
+            /**
+             * Layer Qty
+             * @default 0
+             */
+            layer_qty: number;
+            /**
+             * Loose Qty
+             * @default 0
+             */
+            loose_qty: number;
+            /** Ordered Qty */
+            ordered_qty: number;
+            /**
+             * Pallet Fill Pct
+             * @default 0
+             */
+            pallet_fill_pct: number;
+            /**
+             * Pallet Qty
+             * @default 0
+             */
+            pallet_qty: number;
+            /** Sku */
+            sku: string;
+            /**
+             * Uom
+             * @default
+             */
+            uom: string;
+            /** Violation Type */
+            violation_type?: string | null;
+        };
+        /**
+         * PalletSuggestion
+         * @description One AI suggestion row from PalletAlignmentRecipe.
+         */
+        PalletSuggestion: {
+            /** Current */
+            current: number;
+            /**
+             * Delta
+             * @default 0
+             */
+            delta: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Full Pallets
+             * @default 0
+             */
+            full_pallets: number;
+            /**
+             * Layers
+             * @default 0
+             */
+            layers: number;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Sku */
+            sku: string;
+            /** Suggested */
+            suggested: number;
+        };
+        /**
          * PolicyOverrideResponse
          * @description Response for policy update.
          */
@@ -937,6 +1307,41 @@ export interface components {
             policy_key: string;
             /** Value */
             value: unknown;
+        };
+        /**
+         * PriceHoldAnalysisData
+         * @description PriceHoldReleaseRecipe → UI `price_hold_analysis`.
+         *
+         *     `hold_status` is a two-valued projection of the recipe's four-valued
+         *     `status`: "RELEASED" when the hold was lifted, "HELD" otherwise (the
+         *     recipe's REVIEW_REQUIRED, REJECTED, and FAILED outcomes all leave the
+         *     hold in place). Other fields mirror the recipe output or the event
+         *     inputs (po_price / sap_base_price) / policy constants
+         *     (tolerance_pct / hard_block_pct).
+         */
+        PriceHoldAnalysisData: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "AUTO_RELEASE" | "ESCALATE" | "HARD_BLOCK";
+            /** Hard Block Pct */
+            hard_block_pct: number;
+            /**
+             * Hold Status
+             * @enum {string}
+             */
+            hold_status: "HELD" | "RELEASED";
+            /** Po Price */
+            po_price: number;
+            /** Reason */
+            reason: string;
+            /** Sap Base Price */
+            sap_base_price: number;
+            /** Tolerance Pct */
+            tolerance_pct: number;
+            /** Variance Pct */
+            variance_pct: number;
         };
         /**
          * PricingWaterfallStep
@@ -1054,6 +1459,34 @@ export interface components {
             trace_id?: string | null;
         };
         /**
+         * RoundUpPlanLine
+         * @description One row in MOQRoundUpRecipe's round-up plan.
+         */
+        RoundUpPlanLine: {
+            /**
+             * Action
+             * @default ROUND_UP
+             * @enum {string}
+             */
+            action: "ROUND_UP" | "ACCEPT_BELOW" | "ESCALATE";
+            /**
+             * Delta
+             * @default 0
+             */
+            delta: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Ordered */
+            ordered: number;
+            /** Round Up To */
+            round_up_to: number;
+            /** Sku */
+            sku: string;
+        };
+        /**
          * SAPActionStep
          * @description A recommended SAP action step.
          *
@@ -1138,6 +1571,10 @@ export interface components {
          * @description GET /api/v1/exceptions/{id}/trace — full TraceRecord JSON.
          */
         TraceResponse: {
+            /** Audit Context Missing Class */
+            audit_context_missing_class?: string | null;
+            /** Audit Context Missing Fields */
+            audit_context_missing_fields?: string[];
             /** Backend Fallback */
             backend_fallback?: string | null;
             /** Constrained Output Schemas */
@@ -1177,6 +1614,34 @@ export interface components {
             skill_name?: string | null;
             /** Trace Id */
             trace_id: string;
+        };
+        /**
+         * TrimPlanLine
+         * @description One row in OverMaxTrimRecipe's trim plan.
+         */
+        TrimPlanLine: {
+            /**
+             * Action
+             * @default TRIM
+             * @enum {string}
+             */
+            action: "TRIM" | "SKIP" | "OK";
+            /**
+             * Delta
+             * @default 0
+             */
+            delta: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Ordered */
+            ordered: number;
+            /** Sku */
+            sku: string;
+            /** Trimmed To */
+            trimmed_to: number;
         };
         /**
          * UserProfile

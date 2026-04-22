@@ -571,8 +571,13 @@ With the flag set to `false`, fetch the real backend's `/api/v1/health`
 `MOCK_HEALTH.allowed_intents === realHealth.allowed_intents`. Catches
 the day a new intent is added to one side without the other.
 
-**Drift register:** entry D17 in `ui_architecture.md` §9 once the gate
-lands, documenting the bounded preview pattern.
+**Drift register:** entry D18 in `ui_architecture.md` §9 documents
+the same gap as "OrderAnalysis enrichment fields are mock-only"
+(cross-repo review H5). The gate pattern proposed here would close
+it once real curation lands. D17 (cross-repo review H4) covers the
+companion reason_tag drift, now verified as non-divergent (both
+sides seed global tags for every intent) until asoe2 Phase 5
+lands real per-intent curation (review L4).
 
 **Rationale for deferral:** the reason the gate was proposed — 5
 UI-only intents diverging from the backend — is about to be eliminated
@@ -580,3 +585,130 @@ by backend parity work in asoe2. Shipping the gate now would be
 defensive infrastructure for a problem the backlog is actively
 closing. Keep the design notes here so the pattern is ready to revive
 if the situation recurs.
+
+**Cross-repo review traceability (H4 / H5 / L2 / L4):**
+- H4 RESOLVED: mock `allowed_override_reason_tags_by_intent` matches
+  backend (both seed every intent with the global list). Drift
+  register D17. No code change needed; follow-up is L4.
+- H5 / L2 PARTIAL: SIX of ten enrichment fields are now backend-backed
+  via the `asoe2/api/analysis_adapters.py::ANALYSIS_ADAPTERS`
+  registry, plus the full Verdict three-pillar architecture is in
+  place (Pillar 1 `enrichment_context` persistence, Pillar 2
+  `build_analysis` graph node + composer-backed read path + structured
+  trace surface, Pillar 3 `EvidenceBlock` UI primitive +
+  `useConditionalField` hook):
+    * `price_hold_analysis` (adapt_price_hold)
+    * `edi_mismatch_analysis` (adapt_edi_mismatch)
+    * `delivery_delay_analysis` (adapt_delivery_delay) — first
+      EvidenceBlock consumer + "Context Not Required for Resolution"
+      placeholder for grandfathered at_risk
+    * `overmax_analysis` (adapt_overmax) — `overmax_gateway_gap`
+      grandfather covers contract_ref + block_status + block_reason +
+      order_lines + trim_plan + uom
+    * `moq_analysis` (adapt_moq) — `moq_gateway_gap` grandfather
+      covers moq_source + channel + contract_ref + block_status
+    * `pallet_analysis` (adapt_pallet) — recipe + UI shapes 1:1, no
+      grandfather needed
+  The six matching `// preview-only` markers dropped from
+  `src/types/exceptions.ts`. Drift register D18 updated to PARTIAL
+  (6/10). The remaining four (`duplicate_detection`,
+  `order_comparison`, `price_analysis`, `backorder_analysis`) are
+  gated on gateway-persistence work (C1-C7 in the consolidated
+  backlog) — adapter-alone can't close them; they need upstream
+  schema changes to persist matched_po_details / warehouse snapshots /
+  contract refs onto the record.
+- L4 OPEN: tracked in asoe2 Phase 5 ("Deferred — curated per-intent
+  reason_tag vocabularies"). Closes D17 when it lands.
+
+### L2d (follow-up) — adapters for the remaining 8 enrichment fields
+
+**Why these didn't land alongside PHR + EDI:** PHR and EDI mapped
+cleanly because their UI types were co-designed with the recipe
+output shape — every UI field corresponded to something the recipe
+computed. The remaining 8 enrichment types were designed earlier for
+mock-layer fidelity and expect fields the current recipes do NOT
+produce: warehouse snapshots, contract refs, SAP block messages,
+primary/alternate DC data, order snapshots, `OrderSnapshot` pairs,
+`SAPStep[]` etc. An adapter alone cannot close the gap — the work
+per section is:
+
+1. **Backend adapter** (like `adapt_price_hold`) — projects the
+   recipe output into the subset of UI fields it can populate.
+2. **UI type relaxation** (`src/types/exceptions.ts`) — mark
+   recipe-unavailable fields optional so the adapter's partial
+   projection compiles.
+3. **UI component update** — each `*Section.tsx` currently
+   dereferences `data.field` directly; fields that become optional
+   need `—` / "Not available" / hidden-row fallbacks.
+4. **Backend schema + OpenAPI regen** — same pattern as L2a/L2b.
+5. **TestAnalysis cases** — one per branch; regression on
+   `openapi/asoe2.openapi.json` stays enforced by the existing
+   fitness test.
+
+Order of adoption (suggested, by complexity):
+
+- `delivery_delay_analysis` — DeliveryDelayResolutionRecipe. Recipe
+  output covers days_late / classification / delay_category /
+  alternate_options. Event supplies planned_date / projected_eta /
+  affected_lines. Missing: rule_id (policy-injected), delay_reason
+  (free text), at_risk (revenue calc), sla_deadline (contract). UI
+  type needs ~4 fields optional + fallback rendering.
+- `overmax_analysis` — OverMaxTrimRecipe. Recipe covers excess_qty /
+  exceedance_pct / trim_plan. Missing: contract_ref, block_status,
+  block_reason, per-line description. UI type needs ~5 fields
+  optional.
+- `moq_analysis` — MOQRoundUpRecipe. Recipe covers
+  shortfall_qty / shortfall_pct / uplift_* / round_up_plan. Missing:
+  moq_source, channel, block_message, contract_ref, unit_cost,
+  sap_steps. UI type needs ~6 fields optional.
+- `pallet_analysis` — PalletAlignmentRecipe. Recipe covers
+  classification / lines / suggested_plan. Missing: pallet specs
+  (tie, height, layer_cases), carrier, freight_delta, customer
+  preferences. UI type needs substantial relaxation.
+- `backorder_analysis` — BackOrderResolutionRecipe. Recipe covers
+  gap_qty / gap_pct / resolution_options. Missing: warehouse
+  snapshots (primary_dc, alternate_warehouses), substitute SKUs,
+  inbound PO/production — these are gateway-fetched today but not
+  persisted on the record. Requires persisting gateway payload in
+  resolution_data OR expanding recipe params → heaviest lift of
+  the set.
+- `price_analysis` — PriceAdjustmentRecipe. Recipe is minimal
+  (applied_condition / new_net_price only). The UI's ~15-field
+  PriceAnalysisData is almost entirely ERP metadata (sku,
+  material_desc, doc_type, doc_number, rule_id, root_cause_category,
+  contract_ref, promotion_ref). Recipe would need to carry ERP
+  context through to the output, OR UI type would need severe
+  relaxation. Likely the largest investment.
+- `duplicate_detection` — DuplicatePORecipe. Recipe computes
+  composite_score + classification only. UI wants full `OrderSnapshot`
+  pair + days_between + detection_method. Requires persisting
+  matched_po_details gateway payload on the record. Same
+  gateway-persistence pattern as backorder_analysis.
+- `order_comparison` — synthesised from `duplicate_detection`
+  payload (no dedicated recipe); lands last; blocked on
+  duplicate_detection.
+
+**Per-adapter checklist:**
+1. Relax the UI type in `src/types/exceptions.ts` — move
+   recipe-unavailable fields to `?:`.
+2. Update the matching `*Section.tsx` to render fallbacks for
+   now-optional fields (`data.foo ?? "—"` or conditional rows).
+3. Add a Pydantic model on `asoe2/api/schemas.py` mirroring the
+   relaxed UI type.
+4. Add `adapt_<field>()` to `asoe2/api/analysis_adapters.py` with
+   recipe-output path + synthetic fallback (if the recipe is called
+   via a shadow-gate-able intent) + `None` on degenerate inputs.
+5. Register in `ANALYSIS_ADAPTERS` and, if shadow-gated path exists,
+   `INTENT_TO_RECIPE_NAME`.
+6. Add an optional field on `AnalysisResponse` in `api/schemas.py`.
+7. Add `TestAnalysis` cases in `asoe2/tests/test_api.py` covering
+   each branch.
+8. `python scripts/export_openapi.py` to regenerate
+   `openapi/asoe2.openapi.json`.
+9. `npm run generate-types` on the UI side.
+10. Drop the `// preview-only` marker from the UI type.
+11. Update this list + D18 in `ui_architecture.md`.
+
+Each takes ~2–4 hours including tests; the gateway-persistence
+ones (backorder, duplicate_detection) need an upstream schema change
+to persist gateway-fetched data on the record.

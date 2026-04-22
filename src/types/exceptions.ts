@@ -281,27 +281,37 @@ export interface OrderAnalysis {
      is present, not on which intent string the exception carries.
      Adding a new field here + its section component is all that's
      needed to support a new enrichment — zero dispatch logic.
-     ──────────────────────────────────���───────────────────────────── */
 
-  /** Present when the DuplicatePO recipe has detected a duplicate */
+     Review L2 / H5 status (2026-04-22): `price_hold_analysis` and
+     `edi_mismatch_analysis` are now backend-backed by
+     `asoe2/api/analysis_adapters.py` — real asoe2 populates them for
+     GREEN records and synthesises them for YELLOW/RED shadow-gated
+     records. The remaining 8 fields are still mock-only until their
+     own adapters land (tracked as D18 in ui_architecture.md §9 +
+     NEXT_PUBLIC_SHOW_PREVIEW_INTENTS backlog in tasks.md). Drop the
+     `// preview-only` marker from a field only once the matching
+     adapter is wired on the asoe2 side.
+     ────────────────────────────────────────────────────────────── */
+
+  /** preview-only — Present when the DuplicatePO recipe has detected a duplicate */
   duplicate_detection?: DuplicateDetectionData;
-  /** Present when two orders need side-by-side comparison */
+  /** preview-only — Present when two orders need side-by-side comparison */
   order_comparison?: OrderComparisonData;
-  /** Present when a pricing exception produces price delta analysis */
+  /** preview-only — Present when a pricing exception produces price delta analysis */
   price_analysis?: PriceAnalysisData;
-  /** Present when a back-order/OOS exception produces inventory gap analysis */
+  /** preview-only — Present when a back-order/OOS exception produces inventory gap analysis */
   backorder_analysis?: BackOrderAnalysisData;
-  /** Present when an over-max exception produces a trim plan */
+  /** Present when an over-max exception produces a trim plan (asoe2 adapt_overmax). */
   overmax_analysis?: OverMaxAnalysisData;
-  /** Present when a min-order-qty exception produces a round-up plan */
+  /** Present when a min-order-qty exception produces a round-up plan (asoe2 adapt_moq). */
   moq_analysis?: MOQAnalysisData;
-  /** Present when a pallet config exception produces alignment analysis */
+  /** Present when a pallet config exception produces alignment analysis (asoe2 adapt_pallet). */
   pallet_analysis?: PalletAnalysisData;
-  /** Present when a delivery delay exception produces timing analysis */
+  /** Present when a delivery delay exception produces timing analysis (asoe2 adapt_delivery_delay). */
   delivery_delay_analysis?: DeliveryDelayAnalysisData;
-  /** Present when a price-hold release event produces variance + action analysis */
+  /** Present when a price-hold release event produces variance + action analysis (asoe2 adapt_price_hold). */
   price_hold_analysis?: PriceHoldAnalysisData;
-  /** Present when an EDI 850 line mismatch produces sub_type classification */
+  /** Present when an EDI 850 line mismatch produces sub_type classification (asoe2 adapt_edi_mismatch). */
   edi_mismatch_analysis?: EdiMismatchAnalysisData;
 }
 
@@ -534,30 +544,39 @@ export interface ResolutionOption {
 
 /* ── Over Max enrichment types ───────────────────────────────────────── */
 
-/** Over Max analysis — present when the Over Max skill/recipe produces it */
+/**
+ * Over Max analysis — present when the Over Max skill/recipe produces it.
+ *
+ * Field tiers (per `asoe2/compliance/audit_bearing_registry.yaml`):
+ *   - audit-bearing (required): total_ordered, max_qty, excess_qty,
+ *     exceedance_pct, uom, at_risk, order_lines, trim_plan.
+ *   - grandfathered audit-bearing → optional (gateway gap, deadline
+ *     2026-07-21 under overmax_gateway_gap clause): contract_ref,
+ *     block_status, block_reason.
+ */
 export interface OverMaxAnalysisData {
-  /** Total quantity ordered across all lines */
+  /** Total quantity ordered across all lines — audit-bearing. */
   total_ordered: number;
-  /** Maximum allowed quantity (contract or policy) */
+  /** Maximum allowed quantity (contract or policy) — audit-bearing. */
   max_qty: number;
-  /** Excess quantity (ordered - max) */
+  /** Excess quantity (ordered - max) — audit-bearing. */
   excess_qty: number;
-  /** Exceedance percentage */
+  /** Exceedance percentage — audit-bearing. */
   exceedance_pct: number;
-  /** Unit of measure */
+  /** Unit of measure — audit-bearing. */
   uom: string;
-  /** Revenue at risk from excess */
+  /** Revenue at risk from excess — audit-bearing. */
   at_risk: number;
-  /** Contract reference */
-  contract_ref: string;
-  /** SAP block status */
-  block_status: string;
-  /** Block reason */
-  block_reason: string;
-  /** Per-line details */
+  /** Per-line details — audit-bearing. */
   order_lines: OverMaxLine[];
-  /** AI-generated trim plan */
+  /** AI-generated trim plan — audit-bearing. */
   trim_plan: TrimPlanLine[];
+  /** Contract reference — grandfathered until 2026-07-21 (gateway gap). */
+  contract_ref?: string;
+  /** SAP block status — grandfathered until 2026-07-21 (gateway gap). */
+  block_status?: string;
+  /** Block reason — grandfathered until 2026-07-21 (gateway gap). */
+  block_reason?: string;
 }
 
 /** Over Max per-line detail */
@@ -583,40 +602,51 @@ export interface TrimPlanLine {
 /* ── Min Order Qty (MOQ) enrichment types ───────────────────────────── */
 /* ── Min Order Qty (MOQ) enrichment types ───────────────────────────── */
 
-/** MOQ analysis — present when the MOQ skill/recipe produces it */
+/**
+ * MOQ analysis — present when the MOQ skill/recipe produces it.
+ *
+ * Tiers (per `asoe2/compliance/audit_bearing_registry.yaml`):
+ *   - audit-bearing (required): ordered_qty, moq_qty, shortfall_qty,
+ *     shortfall_pct, sku, unit_cost, uom, at_risk, round_up_plan.
+ *   - grandfathered audit-bearing → optional (moq_gateway_gap, deadline
+ *     2026-07-21): moq_source, channel, contract_ref, block_status.
+ *   - contextual → optional: description, block_message.
+ *   - sap_steps: legacy mock-only field; no backend producer. Kept for
+ *     pre-existing consumers; treat as contextual.
+ */
 export interface MOQAnalysisData {
-  /** Quantity ordered */
+  /** Quantity ordered — audit-bearing. */
   ordered_qty: number;
-  /** Minimum order quantity required */
+  /** Minimum order quantity required — audit-bearing. */
   moq_qty: number;
-  /** Shortfall (MOQ - ordered) */
+  /** Shortfall (MOQ - ordered) — audit-bearing. */
   shortfall_qty: number;
-  /** Shortfall as percentage of MOQ */
+  /** Shortfall as percentage of MOQ — audit-bearing. */
   shortfall_pct: number;
-  /** Primary SKU */
+  /** Primary SKU — audit-bearing. */
   sku: string;
-  /** Material description */
-  description: string;
-  /** Unit cost */
+  /** Unit cost — audit-bearing. */
   unit_cost: number;
-  /** Unit of measure */
+  /** Unit of measure — audit-bearing. */
   uom: string;
-  /** Revenue at risk */
+  /** Revenue at risk (uplift_value) — audit-bearing. */
   at_risk: number;
-  /** MOQ source (e.g., "KNMT-MINBM" or "MARC-MINBE") */
-  moq_source: string;
-  /** Distribution channel */
-  channel: string;
-  /** SAP V4082 block message */
-  block_message: string;
-  /** Contract reference */
-  contract_ref: string;
-  /** Block status */
-  block_status: string;
-  /** AI round-up plan */
+  /** AI round-up plan — audit-bearing. */
   round_up_plan: RoundUpPlanLine[];
-  /** SAP execution steps */
-  sap_steps: SAPStep[];
+  /** Material description — contextual. */
+  description?: string;
+  /** MOQ source (KNMT-MINBM / MARC-MINBE) — grandfathered. */
+  moq_source?: string;
+  /** Distribution channel — grandfathered. */
+  channel?: string;
+  /** SAP V4082 block message — contextual. */
+  block_message?: string;
+  /** Contract reference — grandfathered. */
+  contract_ref?: string;
+  /** Block status — grandfathered. */
+  block_status?: string;
+  /** SAP execution steps — UI-only legacy field; no backend producer. */
+  sap_steps?: SAPStep[];
 }
 
 /** Round-up plan line */
@@ -641,23 +671,37 @@ export interface SAPStep {
 /* ── Pallet Config enrichment types ─────────────────────────────────── */
 
 /** Pallet analysis — present when the Pallet Config skill/recipe produces it */
+/**
+ * Pallet analysis — present when the Pallet Config skill/recipe produces it.
+ *
+ * Tiers (per `asoe2/compliance/audit_bearing_registry.yaml`):
+ *   - audit-bearing (required): total_ordered_cases, loose_cases_total,
+ *     order_line_count, classification, lines, suggested_plan.
+ *
+ * Fields below classification are UI-only legacy mock fields with no
+ * backend producer — kept optional for backwards compat with mock
+ * fixtures; real-backend mode they will be undefined and the section
+ * structurally omits via EvidenceBlock.
+ */
 export interface PalletAnalysisData {
-  /** Total cases ordered across all lines */
+  /** Total cases ordered across all lines — audit-bearing. */
   total_ordered_cases: number;
-  /** Total loose (non-full-layer) cases */
+  /** Total loose (non-full-layer) cases — audit-bearing. */
   loose_cases_total: number;
-  /** Total at-risk value */
-  at_risk_total: number;
-  /** Estimated extra labor hours for manual handling */
-  extra_labor_est_hrs: number;
-  /** Freight waste percentage from partial pallets */
-  freight_waste_pct: number;
-  /** Number of order lines */
+  /** Number of order lines — audit-bearing. */
   order_line_count: number;
-  /** Per-line pallet alignment details */
+  /** Recipe classification (BROKEN_LAYER / PARTIAL_PALLET / MIXED_VIOLATION) — audit-bearing. */
+  classification?: string;
+  /** Per-line pallet alignment details — audit-bearing. */
   lines: PalletLine[];
-  /** AI-suggested plan for pallet alignment */
+  /** AI-suggested plan for pallet alignment — audit-bearing. */
   suggested_plan: PalletSuggestion[];
+  /** Total at-risk value — UI-only legacy; no backend producer. */
+  at_risk_total?: number;
+  /** Estimated extra labor hours — UI-only legacy. */
+  extra_labor_est_hrs?: number;
+  /** Freight waste percentage — UI-only legacy. */
+  freight_waste_pct?: number;
 }
 
 /** Per-line pallet alignment detail */
@@ -689,34 +733,55 @@ export interface PalletSuggestion {
 
 /* ── Delivery Delay enrichment types ─────────────────────────────────── */
 
-/** Delivery delay analysis — present when the DeliveryDelay skill/recipe produces it */
+/**
+ * Delivery delay analysis — present when the DeliveryDelay skill/recipe produces it.
+ *
+ * Field tiers (per `asoe2/compliance/audit_bearing_registry.yaml`):
+ *   - audit-bearing (always populated by the backend or absent
+ *     records → AUDIT_CONTEXT_MISSING): planned_date, projected_eta,
+ *     days_late, delay_category, affected_lines.
+ *   - grandfathered audit-bearing (will be populated post-2026-07-21
+ *     when the contract gateway lands): at_risk, sla_deadline.
+ *   - conditional (rendered iff resolved_action ∈
+ *     {EXPEDITE, SPLIT_SHIP, PARTIAL, RESCHEDULE}):
+ *     alternate_options.
+ *   - contextual (UI uses EvidenceBlock structural omission when absent):
+ *     delay_reason, carrier, route, rule_id.
+ *
+ * Optional vs required reflects the BACKEND'S guarantee, not a UI
+ * preference. CLAUDE.md Guardrail 7: do not promote optional fields
+ * back to required without coordinating with compliance.
+ */
 export interface DeliveryDelayAnalysisData {
-  /** Originally promised delivery date */
+  /** Originally promised delivery date — audit-bearing. */
   planned_date: string;
-  /** Current projected ETA after the delay */
+  /** Current projected ETA after the delay — audit-bearing. */
   projected_eta: string;
-  /** Days late = projected_eta − planned_date */
+  /** Days late = projected_eta − planned_date — audit-bearing. */
   days_late: number;
-  /** Prototype rule band for visual grouping (e.g., "SD-DELAY-001"). Rendered
-   *  verbatim — not branched on in UI logic (Guardrail #2). */
-  rule_id: string;
   /** Deterministic delay category (e.g., "CARRIER_DELAY", "PRODUCTION_DELAY",
-   *  "LOGISTICS", "WEATHER", "CUSTOMS"). Rendered verbatim. */
+   *  "LOGISTICS", "WEATHER", "CUSTOMS") — audit-bearing. Rendered verbatim. */
   delay_category: string;
-  /** One-line human-readable delay reason */
-  delay_reason: string;
-  /** Number of affected lines on the order */
+  /** Number of affected lines on the order — audit-bearing. */
   affected_lines: number;
-  /** Revenue at risk from the delay (SLA penalties + downstream) */
-  at_risk: number;
-  /** Carrier name */
-  carrier: string;
-  /** Route or lane identifier */
-  route: string;
-  /** SLA deadline (if contractually defined) */
+  /** Revenue at risk from the delay (SLA penalties + downstream) —
+   *  audit-bearing, grandfathered until 2026-07-21 (gateway gap). */
+  at_risk?: number;
+  /** SLA deadline (when contractually defined) — audit-bearing,
+   *  grandfathered until 2026-07-21 (gateway gap). */
   sla_deadline?: string;
-  /** Ranked alternate delivery options */
-  alternate_options: AlternateDeliveryOption[];
+  /** Ranked alternate delivery options — conditional on
+   *  resolved_action; render with EvidenceBlock + useConditionalField. */
+  alternate_options?: AlternateDeliveryOption[];
+  /** One-line human-readable delay reason — contextual. */
+  delay_reason?: string;
+  /** Carrier name — contextual. */
+  carrier?: string;
+  /** Route or lane identifier — contextual. */
+  route?: string;
+  /** Prototype rule band for visual grouping (e.g., "SD-DELAY-001") —
+   *  contextual. Rendered verbatim — not branched on in UI logic. */
+  rule_id?: string;
 }
 
 /** Alternate delivery option with cost/benefit trade-off */

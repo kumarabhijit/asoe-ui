@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { ArrowUpRight, Scissors, ChevronDown, Check, SkipForward, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import type { OverMaxAnalysisData, TrimPlanLine } from "@/types/exceptions";
 import { fmtPrice } from "./shared";
 
@@ -92,17 +93,33 @@ export function OverMaxSection({ data }: OverMaxSectionProps) {
             </div>
           </div>
 
-          {/* Block info */}
+          {/* Block info — all three fields are grandfathered audit-bearing
+              (overmax_gateway_gap clause, deadline 2026-07-21). Render
+              with EvidenceBlock so the row collapses cleanly when the
+              SAP block / contract gateway hasn't populated them, rather
+              than rendering empty pills. */}
           <div className="flex items-center gap-8 mt-8">
             <span className="w-[60px]" />
             <div className="flex items-center gap-4 text-caption">
-              <span className="text-label font-mono px-4 py-px rounded bg-error-subtle text-error">{data.block_status}</span>
-              <span className="text-text-tertiary">{data.block_reason}</span>
-              {data.contract_ref && (
-                <span className="text-label font-mono px-4 py-px rounded bg-surface-secondary text-text-secondary">
-                  {data.contract_ref}
-                </span>
-              )}
+              <EvidenceBlock tier="contextual" value={data.block_status}>
+                {(v) => (
+                  <span className="text-label font-mono px-4 py-px rounded bg-error-subtle text-error">
+                    {String(v)}
+                  </span>
+                )}
+              </EvidenceBlock>
+              <EvidenceBlock tier="contextual" value={data.block_reason}>
+                {(v) => (
+                  <span className="text-text-tertiary">{String(v)}</span>
+                )}
+              </EvidenceBlock>
+              <EvidenceBlock tier="contextual" value={data.contract_ref}>
+                {(v) => (
+                  <span className="text-label font-mono px-4 py-px rounded bg-surface-secondary text-text-secondary">
+                    {String(v)}
+                  </span>
+                )}
+              </EvidenceBlock>
             </div>
           </div>
         </div>

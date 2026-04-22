@@ -12,6 +12,7 @@
 import { useState } from "react";
 import { Clock, Truck, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import type { DeliveryDelayAnalysisData, AlternateDeliveryOption } from "@/types/exceptions";
 import { fmtPrice } from "./shared";
 
@@ -121,8 +122,9 @@ function OptionCard({ option, selected, onSelect }: {
 /* ── Main section ──────────────────────────────────────────────────────── */
 
 export function DeliveryDelaySection({ data }: DeliveryDelaySectionProps) {
+  const altOptions = data.alternate_options ?? [];
   const [selectedOption, setSelectedOption] = useState<string | null>(
-    data.alternate_options.find((o) => o.recommended)?.id ?? null,
+    altOptions.find((o) => o.recommended)?.id ?? null,
   );
 
   return (
@@ -141,14 +143,19 @@ export function DeliveryDelaySection({ data }: DeliveryDelaySectionProps) {
       </div>
 
       <div className="p-16 flex flex-col gap-16">
-        {/* Timeline visualisation */}
+        {/* Timeline visualisation — audit-bearing inputs guaranteed
+            present by composer registry coverage. */}
         <DelayTimeline
           plannedIso={data.planned_date}
           projectedIso={data.projected_eta}
           daysLate={data.days_late}
         />
 
-        {/* Context row */}
+        {/* Context row — mix of audit-bearing (Category, At Risk +
+            affected_lines) and contextual (Rule, Carrier+Route). The
+            contextual rows use EvidenceBlock so they STRUCTURALLY OMIT
+            when the backend didn't emit them, never render a dash
+            (Verdict Pillar 3). */}
         <div className="grid grid-cols-2 gap-12 text-label">
           <div>
             <span className="text-text-quaternary uppercase tracking-wider">Category</span>
@@ -156,57 +163,95 @@ export function DeliveryDelaySection({ data }: DeliveryDelaySectionProps) {
               {data.delay_category}
             </div>
           </div>
-          <div>
-            <span className="text-text-quaternary uppercase tracking-wider">Rule</span>
-            <div className="text-caption font-mono text-text-primary mt-px">
-              {data.rule_id}
+          <EvidenceBlock tier="contextual" value={data.rule_id}>
+            {(v) => (
+              <div>
+                <span className="text-text-quaternary uppercase tracking-wider">Rule</span>
+                <div className="text-caption font-mono text-text-primary mt-px">
+                  {String(v)}
+                </div>
+              </div>
+            )}
+          </EvidenceBlock>
+          <EvidenceBlock tier="contextual" value={data.carrier}>
+            {(carrier) => (
+              <div>
+                <span className="text-text-quaternary uppercase tracking-wider">Carrier</span>
+                <div className="text-caption text-text-primary mt-px">
+                  {String(carrier)}
+                  {data.route ? (
+                    <span className="text-text-tertiary"> ({data.route})</span>
+                  ) : null}
+                </div>
+              </div>
+            )}
+          </EvidenceBlock>
+          {/* At Risk is grandfathered audit-bearing — render the
+              row only when the gateway has produced it; otherwise
+              show "Context Not Required for Resolution" so the
+              operator knows the system deliberately didn't fetch
+              the value (vs crashed). */}
+          <EvidenceBlock
+            tier="conditional"
+            value={data.at_risk}
+            predicateHolds={typeof data.at_risk === "number"}
+            notRequiredLabel="At-risk context not yet wired (gateway gap, deadline 2026-07-21)"
+          >
+            {(v) => (
+              <div>
+                <span className="text-text-quaternary uppercase tracking-wider">At Risk</span>
+                <div className="text-caption font-mono font-semibold text-error mt-px">
+                  {fmtPrice(v as number)}
+                  <span className="ml-4 text-text-tertiary font-sans font-normal">
+                    ({data.affected_lines} line{data.affected_lines === 1 ? "" : "s"})
+                  </span>
+                </div>
+              </div>
+            )}
+          </EvidenceBlock>
+        </div>
+
+        {/* Delay reason narrative — contextual; structurally omit
+            the entire callout block when absent rather than rendering
+            an empty box. */}
+        <EvidenceBlock tier="contextual" value={data.delay_reason}>
+          {(v) => (
+            <div className="flex items-start gap-8 p-10 rounded-md border-l-[3px] border-warning bg-warning-subtle">
+              <Clock size={14} className="text-warning shrink-0 mt-1" />
+              <p className="text-caption text-text-secondary m-0 leading-normal">
+                {String(v)}
+              </p>
             </div>
-          </div>
-          <div>
-            <span className="text-text-quaternary uppercase tracking-wider">Carrier</span>
-            <div className="text-caption text-text-primary mt-px">
-              {data.carrier} <span className="text-text-tertiary">({data.route})</span>
-            </div>
-          </div>
-          <div>
-            <span className="text-text-quaternary uppercase tracking-wider">At Risk</span>
-            <div className="text-caption font-mono font-semibold text-error mt-px">
-              {fmtPrice(data.at_risk)}
-              <span className="ml-4 text-text-tertiary font-sans font-normal">
-                ({data.affected_lines} line{data.affected_lines === 1 ? "" : "s"})
+          )}
+        </EvidenceBlock>
+
+        {/* SLA deadline — grandfathered audit-bearing (gateway gap). */}
+        <EvidenceBlock tier="contextual" value={data.sla_deadline}>
+          {(v) => (
+            <div className="text-label text-text-tertiary">
+              <span className="uppercase tracking-wider text-text-quaternary mr-4">
+                SLA deadline
+              </span>
+              <span className="font-mono text-text-primary">
+                {fmtDate(String(v))}
               </span>
             </div>
-          </div>
-        </div>
+          )}
+        </EvidenceBlock>
 
-        {/* Delay reason narrative */}
-        <div className="flex items-start gap-8 p-10 rounded-md border-l-[3px] border-warning bg-warning-subtle">
-          <Clock size={14} className="text-warning shrink-0 mt-1" />
-          <p className="text-caption text-text-secondary m-0 leading-normal">
-            {data.delay_reason}
-          </p>
-        </div>
-
-        {/* SLA deadline (if provided) */}
-        {data.sla_deadline && (
-          <div className="text-label text-text-tertiary">
-            <span className="uppercase tracking-wider text-text-quaternary mr-4">
-              SLA deadline
-            </span>
-            <span className="font-mono text-text-primary">
-              {fmtDate(data.sla_deadline)}
-            </span>
-          </div>
-        )}
-
-        {/* Alternate delivery options */}
-        {data.alternate_options.length > 0 && (
+        {/* Alternate delivery options — registry-conditional on
+            resolved_action ∈ {EXPEDITE, SPLIT_SHIP, PARTIAL,
+            RESCHEDULE}. Read-only HITL detail panel doesn't have a
+            resolved action yet, so we render the list whenever the
+            backend produced it (predicate effectively true) and
+            omit when empty. */}
+        {altOptions.length > 0 && (
           <div>
             <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-8">
-              Alternate delivery options ({data.alternate_options.length})
+              Alternate delivery options ({altOptions.length})
             </div>
             <div className="flex flex-col gap-8">
-              {data.alternate_options.map((opt) => (
+              {altOptions.map((opt) => (
                 <OptionCard
                   key={opt.id}
                   option={opt}
