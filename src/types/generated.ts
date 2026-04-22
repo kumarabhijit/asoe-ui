@@ -589,12 +589,46 @@ export interface components {
             risk_acknowledgment: boolean;
         };
         /**
+         * AlternateDeliveryOption
+         * @description One ranked alternate delivery option from
+         *     DeliveryDelayResolutionRecipe._rank_options.
+         */
+        AlternateDeliveryOption: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Extra Cost
+             * @default 0
+             */
+            extra_cost: number;
+            /** Id */
+            id: string;
+            /** New Eta */
+            new_eta?: string | null;
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Type */
+            type: string;
+        };
+        /**
          * AnalysisResponse
          * @description GET /api/v1/exceptions/{id}/analysis
          */
         AnalysisResponse: {
             /** Confidence */
             confidence: number;
+            delivery_delay_analysis?: components["schemas"]["DeliveryDelayAnalysisData"] | null;
             /** Diagnosis */
             diagnosis: string;
             edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
@@ -670,6 +704,52 @@ export interface components {
             approve: boolean;
             /** Notes */
             notes: string;
+        };
+        /**
+         * DeliveryDelayAnalysisData
+         * @description DeliveryDelayResolutionRecipe → UI `delivery_delay_analysis`.
+         *
+         *     Registry-classified fields (2026-04-22 workshop):
+         *
+         *       * audit-bearing:
+         *           planned_date, projected_eta, days_late, delay_category,
+         *           affected_lines, at_risk, sla_deadline (when present)
+         *       * conditional:
+         *           alternate_options (depends_on resolved_action ∈
+         *           {EXPEDITE, SPLIT_SHIP, PARTIAL, RESCHEDULE})
+         *       * contextual:
+         *           delay_reason, carrier, route, rule_id
+         *
+         *     `at_risk` and `sla_deadline` are currently covered by the
+         *     `delivery_delay_financial_gap` grandfather clause — the contract
+         *     gateway that would produce them isn't wired yet. The composer
+         *     treats them as contextual until the 2026-07-21 deadline.
+         */
+        DeliveryDelayAnalysisData: {
+            /** Affected Lines */
+            affected_lines: number;
+            /** Alternate Options */
+            alternate_options?: components["schemas"]["AlternateDeliveryOption"][];
+            /** At Risk */
+            at_risk?: number | null;
+            /** Carrier */
+            carrier?: string | null;
+            /** Days Late */
+            days_late: number;
+            /** Delay Category */
+            delay_category: string;
+            /** Delay Reason */
+            delay_reason?: string | null;
+            /** Planned Date */
+            planned_date: string;
+            /** Projected Eta */
+            projected_eta: string;
+            /** Route */
+            route?: string | null;
+            /** Rule Id */
+            rule_id?: string | null;
+            /** Sla Deadline */
+            sla_deadline?: string | null;
         };
         /**
          * DispositionRequest

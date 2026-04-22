@@ -307,7 +307,7 @@ export interface OrderAnalysis {
   moq_analysis?: MOQAnalysisData;
   /** preview-only — Present when a pallet config exception produces alignment analysis */
   pallet_analysis?: PalletAnalysisData;
-  /** preview-only — Present when a delivery delay exception produces timing analysis */
+  /** Present when a delivery delay exception produces timing analysis (asoe2 adapt_delivery_delay). */
   delivery_delay_analysis?: DeliveryDelayAnalysisData;
   /** Present when a price-hold release event produces variance + action analysis (asoe2 adapt_price_hold). */
   price_hold_analysis?: PriceHoldAnalysisData;
@@ -699,34 +699,55 @@ export interface PalletSuggestion {
 
 /* ── Delivery Delay enrichment types ─────────────────────────────────── */
 
-/** Delivery delay analysis — present when the DeliveryDelay skill/recipe produces it */
+/**
+ * Delivery delay analysis — present when the DeliveryDelay skill/recipe produces it.
+ *
+ * Field tiers (per `asoe2/compliance/audit_bearing_registry.yaml`):
+ *   - audit-bearing (always populated by the backend or absent
+ *     records → AUDIT_CONTEXT_MISSING): planned_date, projected_eta,
+ *     days_late, delay_category, affected_lines.
+ *   - grandfathered audit-bearing (will be populated post-2026-07-21
+ *     when the contract gateway lands): at_risk, sla_deadline.
+ *   - conditional (rendered iff resolved_action ∈
+ *     {EXPEDITE, SPLIT_SHIP, PARTIAL, RESCHEDULE}):
+ *     alternate_options.
+ *   - contextual (UI uses EvidenceBlock structural omission when absent):
+ *     delay_reason, carrier, route, rule_id.
+ *
+ * Optional vs required reflects the BACKEND'S guarantee, not a UI
+ * preference. CLAUDE.md Guardrail 7: do not promote optional fields
+ * back to required without coordinating with compliance.
+ */
 export interface DeliveryDelayAnalysisData {
-  /** Originally promised delivery date */
+  /** Originally promised delivery date — audit-bearing. */
   planned_date: string;
-  /** Current projected ETA after the delay */
+  /** Current projected ETA after the delay — audit-bearing. */
   projected_eta: string;
-  /** Days late = projected_eta − planned_date */
+  /** Days late = projected_eta − planned_date — audit-bearing. */
   days_late: number;
-  /** Prototype rule band for visual grouping (e.g., "SD-DELAY-001"). Rendered
-   *  verbatim — not branched on in UI logic (Guardrail #2). */
-  rule_id: string;
   /** Deterministic delay category (e.g., "CARRIER_DELAY", "PRODUCTION_DELAY",
-   *  "LOGISTICS", "WEATHER", "CUSTOMS"). Rendered verbatim. */
+   *  "LOGISTICS", "WEATHER", "CUSTOMS") — audit-bearing. Rendered verbatim. */
   delay_category: string;
-  /** One-line human-readable delay reason */
-  delay_reason: string;
-  /** Number of affected lines on the order */
+  /** Number of affected lines on the order — audit-bearing. */
   affected_lines: number;
-  /** Revenue at risk from the delay (SLA penalties + downstream) */
-  at_risk: number;
-  /** Carrier name */
-  carrier: string;
-  /** Route or lane identifier */
-  route: string;
-  /** SLA deadline (if contractually defined) */
+  /** Revenue at risk from the delay (SLA penalties + downstream) —
+   *  audit-bearing, grandfathered until 2026-07-21 (gateway gap). */
+  at_risk?: number;
+  /** SLA deadline (when contractually defined) — audit-bearing,
+   *  grandfathered until 2026-07-21 (gateway gap). */
   sla_deadline?: string;
-  /** Ranked alternate delivery options */
-  alternate_options: AlternateDeliveryOption[];
+  /** Ranked alternate delivery options — conditional on
+   *  resolved_action; render with EvidenceBlock + useConditionalField. */
+  alternate_options?: AlternateDeliveryOption[];
+  /** One-line human-readable delay reason — contextual. */
+  delay_reason?: string;
+  /** Carrier name — contextual. */
+  carrier?: string;
+  /** Route or lane identifier — contextual. */
+  route?: string;
+  /** Prototype rule band for visual grouping (e.g., "SD-DELAY-001") —
+   *  contextual. Rendered verbatim — not branched on in UI logic. */
+  rule_id?: string;
 }
 
 /** Alternate delivery option with cost/benefit trade-off */
