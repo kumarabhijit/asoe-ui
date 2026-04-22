@@ -634,6 +634,7 @@ export interface components {
             edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
             /** Lines */
             lines?: components["schemas"]["LineAnalysis"][];
+            overmax_analysis?: components["schemas"]["OverMaxAnalysisData"] | null;
             price_hold_analysis?: components["schemas"]["PriceHoldAnalysisData"] | null;
             /** Resolution */
             resolution: string;
@@ -1029,6 +1030,78 @@ export interface components {
             mfa_token: string;
         };
         /**
+         * OverMaxAnalysisData
+         * @description OverMaxTrimRecipe → UI `overmax_analysis`.
+         *
+         *     Registry-classified fields (2026-04-22 workshop):
+         *       * audit-bearing: total_ordered, max_qty, excess_qty,
+         *         exceedance_pct, uom, at_risk, order_lines, trim_plan.
+         *       * audit-bearing (grandfathered until 2026-07-21 — gateway gap):
+         *         contract_ref, block_status, block_reason.
+         *
+         *     The recipe computes excess_qty / exceedance_pct / trim_plan /
+         *     at_risk from event metadata; the SAP block + contract gateway
+         *     that would supply contract_ref / block_status / block_reason
+         *     is not yet wired (overmax_gateway_gap clause).
+         */
+        OverMaxAnalysisData: {
+            /**
+             * At Risk
+             * @default 0
+             */
+            at_risk: number;
+            /** Block Reason */
+            block_reason?: string | null;
+            /** Block Status */
+            block_status?: string | null;
+            /** Contract Ref */
+            contract_ref?: string | null;
+            /** Exceedance Pct */
+            exceedance_pct: number;
+            /** Excess Qty */
+            excess_qty: number;
+            /** Max Qty */
+            max_qty: number;
+            /** Order Lines */
+            order_lines?: components["schemas"]["OverMaxLine"][];
+            /** Total Ordered */
+            total_ordered: number;
+            /** Trim Plan */
+            trim_plan?: components["schemas"]["TrimPlanLine"][];
+            /**
+             * Uom
+             * @default
+             */
+            uom: string;
+        };
+        /**
+         * OverMaxLine
+         * @description One affected order line in an OVER_MAX exception.
+         */
+        OverMaxLine: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Excess
+             * @default 0
+             */
+            excess: number;
+            /**
+             * Is Even Layer Item
+             * @default false
+             */
+            is_even_layer_item: boolean;
+            /** Max Line Qty */
+            max_line_qty?: number | null;
+            /** Qty */
+            qty: number;
+            /** Sku */
+            sku: string;
+        };
+        /**
          * PolicyOverrideResponse
          * @description Response for policy update.
          */
@@ -1336,6 +1409,34 @@ export interface components {
             skill_name?: string | null;
             /** Trace Id */
             trace_id: string;
+        };
+        /**
+         * TrimPlanLine
+         * @description One row in OverMaxTrimRecipe's trim plan.
+         */
+        TrimPlanLine: {
+            /**
+             * Action
+             * @default TRIM
+             * @enum {string}
+             */
+            action: "TRIM" | "SKIP" | "OK";
+            /**
+             * Delta
+             * @default 0
+             */
+            delta: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Ordered */
+            ordered: number;
+            /** Sku */
+            sku: string;
+            /** Trimmed To */
+            trimmed_to: number;
         };
         /**
          * UserProfile

@@ -301,7 +301,7 @@ export interface OrderAnalysis {
   price_analysis?: PriceAnalysisData;
   /** preview-only — Present when a back-order/OOS exception produces inventory gap analysis */
   backorder_analysis?: BackOrderAnalysisData;
-  /** preview-only — Present when an over-max exception produces a trim plan */
+  /** Present when an over-max exception produces a trim plan (asoe2 adapt_overmax). */
   overmax_analysis?: OverMaxAnalysisData;
   /** preview-only — Present when a min-order-qty exception produces a round-up plan */
   moq_analysis?: MOQAnalysisData;
@@ -544,30 +544,39 @@ export interface ResolutionOption {
 
 /* ── Over Max enrichment types ───────────────────────────────────────── */
 
-/** Over Max analysis — present when the Over Max skill/recipe produces it */
+/**
+ * Over Max analysis — present when the Over Max skill/recipe produces it.
+ *
+ * Field tiers (per `asoe2/compliance/audit_bearing_registry.yaml`):
+ *   - audit-bearing (required): total_ordered, max_qty, excess_qty,
+ *     exceedance_pct, uom, at_risk, order_lines, trim_plan.
+ *   - grandfathered audit-bearing → optional (gateway gap, deadline
+ *     2026-07-21 under overmax_gateway_gap clause): contract_ref,
+ *     block_status, block_reason.
+ */
 export interface OverMaxAnalysisData {
-  /** Total quantity ordered across all lines */
+  /** Total quantity ordered across all lines — audit-bearing. */
   total_ordered: number;
-  /** Maximum allowed quantity (contract or policy) */
+  /** Maximum allowed quantity (contract or policy) — audit-bearing. */
   max_qty: number;
-  /** Excess quantity (ordered - max) */
+  /** Excess quantity (ordered - max) — audit-bearing. */
   excess_qty: number;
-  /** Exceedance percentage */
+  /** Exceedance percentage — audit-bearing. */
   exceedance_pct: number;
-  /** Unit of measure */
+  /** Unit of measure — audit-bearing. */
   uom: string;
-  /** Revenue at risk from excess */
+  /** Revenue at risk from excess — audit-bearing. */
   at_risk: number;
-  /** Contract reference */
-  contract_ref: string;
-  /** SAP block status */
-  block_status: string;
-  /** Block reason */
-  block_reason: string;
-  /** Per-line details */
+  /** Per-line details — audit-bearing. */
   order_lines: OverMaxLine[];
-  /** AI-generated trim plan */
+  /** AI-generated trim plan — audit-bearing. */
   trim_plan: TrimPlanLine[];
+  /** Contract reference — grandfathered until 2026-07-21 (gateway gap). */
+  contract_ref?: string;
+  /** SAP block status — grandfathered until 2026-07-21 (gateway gap). */
+  block_status?: string;
+  /** Block reason — grandfathered until 2026-07-21 (gateway gap). */
+  block_reason?: string;
 }
 
 /** Over Max per-line detail */
