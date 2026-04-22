@@ -1213,6 +1213,10 @@ export interface components {
          * @description GET /api/v1/exceptions/{id}/trace — full TraceRecord JSON.
          */
         TraceResponse: {
+            /** Audit Context Missing Class */
+            audit_context_missing_class?: string | null;
+            /** Audit Context Missing Fields */
+            audit_context_missing_fields?: string[];
             /** Backend Fallback */
             backend_fallback?: string | null;
             /** Constrained Output Schemas */
