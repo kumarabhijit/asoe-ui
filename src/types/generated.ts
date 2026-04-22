@@ -597,8 +597,10 @@ export interface components {
             confidence: number;
             /** Diagnosis */
             diagnosis: string;
+            edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
             /** Lines */
             lines?: components["schemas"]["LineAnalysis"][];
+            price_hold_analysis?: components["schemas"]["PriceHoldAnalysisData"] | null;
             /** Resolution */
             resolution: string;
             /** Risk */
@@ -694,6 +696,44 @@ export interface components {
             notes: string;
             /** Reason Tag */
             reason_tag: string;
+        };
+        /**
+         * EdiMismatchAnalysisData
+         * @description EdiMismatchRecipe → UI `edi_mismatch_analysis`.
+         *
+         *     `sub_type` is intentionally untyped-string (not a Literal) so the UI
+         *     can render new sub_types added in the recipe without a contract
+         *     bump. `expected_value` / `received_value` are `Any` because EDI 850
+         *     line fields are heterogeneous (SKU strings, qty integers, ship-to
+         *     dicts).
+         *
+         *     Note: PRICE_MISMATCH never reaches this recipe — the classifier
+         *     routes it to CONTRACTUAL_CORRECTION / PriceAdjustmentRecipe.py to
+         *     preserve the single-source-of-truth invariant. The adapter returns
+         *     None for FAILED recipe outputs, so PRICE_MISMATCH routing-error
+         *     records never surface this field.
+         */
+        EdiMismatchAnalysisData: {
+            /**
+             * Autonomy Level
+             * @enum {string}
+             */
+            autonomy_level: "L1" | "L2" | "L3";
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "HARD_REJECT" | "REVIEW" | "ESCALATE";
+            /** Expected Value */
+            expected_value?: unknown;
+            /** Notification Template */
+            notification_template?: string | null;
+            /** Received Value */
+            received_value?: unknown;
+            /** Recommended Action */
+            recommended_action: string;
+            /** Sub Type */
+            sub_type: string;
         };
         /**
          * EscalateRequest
@@ -937,6 +977,41 @@ export interface components {
             policy_key: string;
             /** Value */
             value: unknown;
+        };
+        /**
+         * PriceHoldAnalysisData
+         * @description PriceHoldReleaseRecipe → UI `price_hold_analysis`.
+         *
+         *     `hold_status` is a two-valued projection of the recipe's four-valued
+         *     `status`: "RELEASED" when the hold was lifted, "HELD" otherwise (the
+         *     recipe's REVIEW_REQUIRED, REJECTED, and FAILED outcomes all leave the
+         *     hold in place). Other fields mirror the recipe output or the event
+         *     inputs (po_price / sap_base_price) / policy constants
+         *     (tolerance_pct / hard_block_pct).
+         */
+        PriceHoldAnalysisData: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "AUTO_RELEASE" | "ESCALATE" | "HARD_BLOCK";
+            /** Hard Block Pct */
+            hard_block_pct: number;
+            /**
+             * Hold Status
+             * @enum {string}
+             */
+            hold_status: "HELD" | "RELEASED";
+            /** Po Price */
+            po_price: number;
+            /** Reason */
+            reason: string;
+            /** Sap Base Price */
+            sap_base_price: number;
+            /** Tolerance Pct */
+            tolerance_pct: number;
+            /** Variance Pct */
+            variance_pct: number;
         };
         /**
          * PricingWaterfallStep

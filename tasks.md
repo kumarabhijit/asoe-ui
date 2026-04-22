@@ -590,14 +590,43 @@ if the situation recurs.
 - H4 RESOLVED: mock `allowed_override_reason_tags_by_intent` matches
   backend (both seed every intent with the global list). Drift
   register D17. No code change needed; follow-up is L4.
-- H5 OPEN → tagged in code: all 10 `OrderAnalysis` enrichment fields
-  now carry `// preview-only` markers in
-  `src/types/exceptions.ts:286-305`; mock `orderAnalysis()` in
-  `src/lib/api.ts` has a PREVIEW-ONLY docstring. Drift register
-  D18. Resolution path is the gate pattern above plus asoe2
-  promoting the enrichment fields onto `AnalysisResponse`.
-- L2 OPEN: Playwright specs (`tests/browser/price-hold-detail.spec.ts`,
-  `edi-mismatch-detail.spec.ts`) skip the assertion paths until
-  asoe2 emits the enrichment fields — same backend gap as H5.
+- H5 / L2 PARTIAL: two of ten enrichment fields are now backend-backed
+  via the `asoe2/api/analysis_adapters.py::ANALYSIS_ADAPTERS`
+  registry — `price_hold_analysis` (adapt_price_hold) and
+  `edi_mismatch_analysis` (adapt_edi_mismatch). Those two
+  `// preview-only` markers have been dropped from
+  `src/types/exceptions.ts`. The corresponding Playwright specs
+  (`tests/browser/price-hold-detail.spec.ts`,
+  `edi-mismatch-detail.spec.ts`) are no longer `test.skip`. Drift
+  register D18 updated to **PARTIAL**. The remaining 8 fields
+  (duplicate / order_comparison / price / backorder / overmax / moq /
+  pallet / delivery_delay) keep their `// preview-only` markers
+  until their adapters land (tracked as L2d follow-up below).
 - L4 OPEN: tracked in asoe2 Phase 5 ("Deferred — curated per-intent
   reason_tag vocabularies"). Closes D17 when it lands.
+
+### L2d (follow-up) — adapters for the remaining 8 enrichment fields
+
+Each adapter is a pure function in `asoe2/api/analysis_adapters.py` +
+a Pydantic model on `api/schemas.py` + a registry row. The UI picks
+them up automatically via the data-presence pattern (no UI changes
+per adapter). Order of adoption (suggested):
+
+1. `duplicate_detection` — DuplicatePORecipe → UI DuplicateDetectionData
+2. `price_analysis` — PriceAdjustmentRecipe → UI PriceAnalysisData
+3. `backorder_analysis` — BackOrderResolutionRecipe → UI BackOrderAnalysisData
+4. `overmax_analysis` — OverMaxTrimRecipe → UI OverMaxAnalysisData
+5. `moq_analysis` — MOQRoundUpRecipe → UI MOQAnalysisData
+6. `pallet_analysis` — PalletAlignmentRecipe → UI PalletAnalysisData
+7. `delivery_delay_analysis` — DeliveryDelayResolutionRecipe → UI DeliveryDelayAnalysisData
+8. `order_comparison` — synthesised from `duplicate_detection`
+   payload (no dedicated recipe); lands last.
+
+Per-adapter checklist: (a) add Pydantic model on `api/schemas.py`,
+(b) add optional field on `AnalysisResponse`, (c) add
+`adapt_<field>()` with GREEN / synthetic fallback, (d) register in
+`ANALYSIS_ADAPTERS` + (if shadow-gated path possible)
+`INTENT_TO_RECIPE_NAME`, (e) add TestAnalysis cases in
+`asoe2/tests/test_api.py`, (f) drop the `// preview-only` marker on
+the UI type, (g) regenerate `openapi/asoe2.openapi.json`, (h) update
+D18 and this list.

@@ -21,9 +21,12 @@
  *   - The UI renders the correct intent badge in both cases — never
  *     double-renders an EDI mismatch panel for the routed-out case.
  *
- * EdiMismatchSection-renders is gated on backend populating
- * OrderAnalysis.edi_mismatch_analysis (an asoe2 follow-up); see the
- * test.skip block at the bottom for the day that wiring lands.
+ * Review L2 landed `api.analysis_adapters.adapt_edi_mismatch` on the
+ * asoe2 side. The adapter projects recipe output into
+ * AnalysisResponse.edi_mismatch_analysis for GREEN records and
+ * synthesises the projection by invoking the pure recipe for
+ * YELLOW/RED-gated records (SKU / SHIP_TO mismatches). The
+ * EdiMismatchSection-renders spec below is no longer skipped.
  */
 import { test, expect } from "@playwright/test";
 import {
@@ -109,14 +112,14 @@ test("PRICE_MISMATCH event lands as CONTRACTUAL_CORRECTION (classifier fork)", a
   await expect(page.getByText(/EDI Line Mismatch/i)).toHaveCount(0);
 });
 
-test.skip("EdiMismatchSection renders sub_type + classification when backend populates edi_mismatch_analysis", async ({
+test("EdiMismatchSection renders sub_type + classification when backend populates edi_mismatch_analysis", async ({
   page,
   request,
 }) => {
-  // Enable once asoe2 promotes edi_mismatch_analysis onto the
-  // OrderAnalysis response. Currently the backend returns recipe
-  // output in execution_log, not in the dedicated analysis field —
-  // the UI section will not mount against a live record.
+  // Enabled by asoe2 review L2. QTY_MISMATCH → REVIEW classification →
+  // GREEN shadow → recipe runs → adapter projects resolution_data
+  // directly (not the synthetic path). The UI mounts the
+  // EdiMismatchSection via the data-presence guard.
   const managerToken = await backendToken(request, USERS.MANAGER);
   const exceptionId = await createLineMismatchException(request, managerToken, "QTY_MISMATCH");
   await loginAs(page, USERS.MANAGER);

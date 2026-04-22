@@ -282,17 +282,15 @@ export interface OrderAnalysis {
      Adding a new field here + its section component is all that's
      needed to support a new enrichment — zero dispatch logic.
 
-     PREVIEW-ONLY caveat (review H5): today the real backend
-     `AnalysisResponse` (asoe2/api/schemas.py) does not carry ANY
-     of the fields below. Every enrichment rendered below is
-     populated only by the mock `exceptionsApi.orderAnalysis()`
-     implementation in src/lib/api.ts. When the UI points at real
-     asoe2, all 10 sections collapse silently (data-presence
-     guard = `analysis?.foo &&` returns false). Tracked as the
-     `NEXT_PUBLIC_SHOW_PREVIEW_INTENTS` backlog item in tasks.md
-     and drift register entry D18 in ui_architecture.md §9. DO NOT
-     remove the `// preview-only` markers below until the backend
-     promotes these fields into AnalysisResponse.
+     Review L2 / H5 status (2026-04-22): `price_hold_analysis` and
+     `edi_mismatch_analysis` are now backend-backed by
+     `asoe2/api/analysis_adapters.py` — real asoe2 populates them for
+     GREEN records and synthesises them for YELLOW/RED shadow-gated
+     records. The remaining 8 fields are still mock-only until their
+     own adapters land (tracked as D18 in ui_architecture.md §9 +
+     NEXT_PUBLIC_SHOW_PREVIEW_INTENTS backlog in tasks.md). Drop the
+     `// preview-only` marker from a field only once the matching
+     adapter is wired on the asoe2 side.
      ────────────────────────────────────────────────────────────── */
 
   /** preview-only — Present when the DuplicatePO recipe has detected a duplicate */
@@ -311,9 +309,9 @@ export interface OrderAnalysis {
   pallet_analysis?: PalletAnalysisData;
   /** preview-only — Present when a delivery delay exception produces timing analysis */
   delivery_delay_analysis?: DeliveryDelayAnalysisData;
-  /** preview-only — Present when a price-hold release event produces variance + action analysis */
+  /** Present when a price-hold release event produces variance + action analysis (asoe2 adapt_price_hold). */
   price_hold_analysis?: PriceHoldAnalysisData;
-  /** preview-only — Present when an EDI 850 line mismatch produces sub_type classification */
+  /** Present when an EDI 850 line mismatch produces sub_type classification (asoe2 adapt_edi_mismatch). */
   edi_mismatch_analysis?: EdiMismatchAnalysisData;
 }
 

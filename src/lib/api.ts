@@ -1113,22 +1113,25 @@ export const exceptionsApi = {
   },
 
   /**
-   * PREVIEW-ONLY (review H5): this mock populates every enrichment
-   * field on `OrderAnalysis` (`duplicate_detection`, `order_comparison`,
-   * `price_analysis`, `backorder_analysis`, `overmax_analysis`,
-   * `moq_analysis`, `pallet_analysis`, `delivery_delay_analysis`,
-   * `price_hold_analysis`, `edi_mismatch_analysis`). The real backend
-   * `AnalysisResponse` (asoe2/api/schemas.py:436) carries only
-   * `diagnosis / confidence / risk / resolution / lines[]` — none of
-   * the enrichment fields. When USE_REAL_API flips on, every
-   * enrichment section silently collapses because `analysis?.foo`
-   * is undefined.
+   * Enrichment sources (review L2 / H5):
+   *   * Backend-backed (real asoe2 populates these via
+   *     `api.analysis_adapters`):
+   *       - price_hold_analysis (adapt_price_hold)
+   *       - edi_mismatch_analysis (adapt_edi_mismatch)
+   *   * Mock-only until their adapter lands:
+   *       - duplicate_detection, order_comparison, price_analysis,
+   *         backorder_analysis, overmax_analysis, moq_analysis,
+   *         pallet_analysis, delivery_delay_analysis
+   *
+   * The mock below populates every enrichment field for demo
+   * fidelity. When the UI points at real asoe2, the backend-backed
+   * fields flow through AnalysisResponse; the mock-only fields
+   * silently collapse because `analysis?.foo` is undefined. Each new
+   * adapter unlocks one more section — see asoe2
+   * `api/analysis_adapters.py::ANALYSIS_ADAPTERS` for the registry.
    *
    * Tracked in the `NEXT_PUBLIC_SHOW_PREVIEW_INTENTS` backlog
    * (tasks.md) and drift register D18 (ui_architecture.md §9).
-   * DO NOT remove this fixture until asoe2 promotes the enrichment
-   * fields onto AnalysisResponse and the UI types drop the
-   * `// preview-only` markers.
    */
   async orderAnalysis(id: string): Promise<OrderAnalysis | null> {
     await delay(MOCK_DELAY);
