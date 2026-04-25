@@ -28,7 +28,6 @@ import type {
   WorkflowResult,
   PolicyOverrideRequest,
   PolicyOverrideResponse,
-  APIError,
 } from "@/types/api";
 import type { HealthResponse, ExceptionSummary, LifecycleState, LineItem, OrderAnalysis, ReanalysisEntry } from "@/types/exceptions";
 import { ROLE_PERMISSIONS } from "./roles";
@@ -1138,16 +1137,24 @@ export const exceptionsApi = {
       // Real backend returns AnalysisResponse, which is a superset of
       // OrderAnalysis (extra diagnosis/confidence/risk/lines metadata
       // that the section components ignore — they project from the
-      // *_analysis enrichment fields). 404 → exception lacks an
-      // analysis projection (e.g. CREDIT_BLOCK has no adapter wired);
-      // surface as null so the UI keeps Layer 1 + skips enrichment.
+      // *_analysis enrichment fields). 404 → exception ID not found;
+      // surface as null so the caller can render an empty state.
+      //
+      // The `http()` helper throws a plain Error with message format
+      // "<CODE>: <human message>" (see http() body); the backend
+      // 404 envelope uses code "NOT_FOUND", and a fallback
+      // unstructured response surfaces as "HTTP_404". Match either.
       try {
         return await http<OrderAnalysis>(
           `/api/v1/exceptions/${encodeURIComponent(id)}/analysis`,
         );
       } catch (err) {
-        const apiErr = err as APIError;
-        if (apiErr?.status === 404) return null;
+        if (
+          err instanceof Error &&
+          /^(NOT_FOUND|HTTP_404):/.test(err.message)
+        ) {
+          return null;
+        }
         throw err;
       }
     }
