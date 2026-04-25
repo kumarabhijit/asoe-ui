@@ -12,8 +12,9 @@
  * Why YELLOW specifically: on GREEN the analyst-tier button row is
  * empty by design (auto-resolved exceptions need no review). YELLOW is
  * the canonical "needs human decision" verdict where Escalate renders.
- * Uses createYellowException() which seeds a medium-confidence
- * DUPLICATE_PO event — deterministic YELLOW routing.
+ * Uses createYellowException() which seeds a BACK_ORDER 25%-gap
+ * event — deterministic YELLOW routing under current policy
+ * thresholds.
  */
 import { test, expect } from "@playwright/test";
 import {

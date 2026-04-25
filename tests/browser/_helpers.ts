@@ -84,18 +84,23 @@ export async function createPendingReviewException(
 }
 
 /**
- * Create a YELLOW-or-RED exception where the analyst-tier button row
- * is non-empty. Under current thresholds the medium-confidence
- * DUPLICATE_PO event is evaluated GREEN by compliance shadow (no
- * review needed), so this helper uses a high-confidence duplicate
- * which routes RED → BLOCKED — analyst still gets an Escalate button
- * on RED per the AgentReasoningCard verdict matrix.
+ * Create a YELLOW-shadow PENDING_REVIEW exception so the analyst-tier
+ * action row (Approve / Reject / Escalate) renders.
  *
- * The name is kept as createYellowException for historical/semantic
- * clarity: the caller's intent is "a record the analyst can
- * escalate from," not literally YELLOW. If Phase-5 threshold tuning
- * lowers review_required we can swap back to medium-confidence
- * signals without changing this helper's callers.
+ * Implementation: a BACK_ORDER event with a ~25% gap. Under current
+ * policy (BACK_ORDER_SEVERE_GAP_PCT = 0.50), this lands as MINOR_GAP
+ * → shadow YELLOW → MANUAL_REVIEW_REQUIRED — exactly the lifecycle
+ * the analyst is supposed to escalate. The post-2026-04-22 graph
+ * reorder (ADR-025) runs gateway READS pre-shadow so the
+ * audit-bearing fields populate even on YELLOW, keeping the record
+ * out of AUDIT_CONTEXT_MISSING.
+ *
+ * Note on the previous implementation: it seeded a high-confidence
+ * DUPLICATE_PO which actually evaluated GREEN-shadow + AUTO_BLOCK
+ * lifecycle — no analyst-tier buttons rendered. The test name was
+ * misleading and the spec failed once the deterministic-fallback
+ * backend shipped. BACK_ORDER 25% produces the intended YELLOW state
+ * deterministically end-to-end against the live backend.
  */
 export async function createYellowException(
   request: APIRequestContext,
@@ -103,33 +108,23 @@ export async function createYellowException(
   orderId = `PO-E2E-${Date.now()}`,
 ): Promise<string> {
   const res = await request.post(
-    // /resolve (not /resolve/explain) so the shadow verdict actually
-    // gates execution — explain mode short-circuits the recipe and
-    // leaves lifecycle stuck at PENDING_REVIEW/GREEN regardless of
-    // signal strength.
     `${BACKEND_URL}/api/v1/exceptions/resolve`,
     {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         order_id: orderId,
         line_item: 1,
-        po_price: 100.0,
-        sap_base_price: 100.0,
-        event_type: "EDI_850_DUPLICATE_PO",
-        retailer_id: "R-10",
+        po_price: 10.0,
+        sap_base_price: 10.0,
+        event_type: "BACK_ORDER_OOS",
+        retailer_id: "R-70",
         line_count: 1,
+        sku: "SKU-BO-1",
         metadata: {
-          signal_scores: {
-            po_number: 1.0,
-            customer_id: 1.0,
-            line_items: 0.95,
-            amount: 0.90,
-            timestamp: 0.80,
-            ship_to: 0.80,
-            channel: 1.0,
-            delivery_date: 0.80,
-          },
-          matched_po_id: `${orderId}-prior`,
+          ordered_qty: 100,
+          available_qty: 75,
+          unit_price: 10.0,
+          uom: "CS",
         },
       },
     },

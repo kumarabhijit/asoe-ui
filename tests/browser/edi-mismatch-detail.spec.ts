@@ -84,7 +84,13 @@ test("EDI_MISMATCH (SKU sub_type) detail page renders with the correct intent", 
   await page.goto(`/exceptions/${exceptionId}`);
 
   await expect(page.getByText(/EDI[_ -]?MISMATCH/i).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: /override/i }).first()).toBeVisible();
+  // The Override button is rendered with display text "Override…"
+  // (SOX/audit vocabulary) but aria-label "Choose different action"
+  // (a11y descriptive). Match the visible text — that's what users
+  // see, and it's the contract we ship.
+  await expect(
+    page.getByRole("button", { name: /choose different action/i }).first(),
+  ).toBeVisible();
 });
 
 test("PRICE_MISMATCH event lands as CONTRACTUAL_CORRECTION (classifier fork)", async ({
@@ -124,7 +130,12 @@ test("EdiMismatchSection renders sub_type + classification when backend populate
   const exceptionId = await createLineMismatchException(request, managerToken, "QTY_MISMATCH");
   await loginAs(page, USERS.MANAGER);
   await page.goto(`/exceptions/${exceptionId}`);
-  await expect(page.getByText(/EDI Line Mismatch/i)).toBeVisible();
-  await expect(page.getByText(/QTY_MISMATCH/)).toBeVisible();
-  await expect(page.getByText(/Review required/i)).toBeVisible();
+  // Scope assertions to the EdiMismatchSection region so the
+  // Layer-1 "Review Required" status badge doesn't collide with the
+  // section's own "Review required" classification label under
+  // strict-mode multi-match.
+  const section = page.getByRole("region", { name: /edi line mismatch analysis/i });
+  await expect(section.getByText(/EDI Line Mismatch/i).first()).toBeVisible();
+  await expect(section.getByText(/QTY_MISMATCH/)).toBeVisible();
+  await expect(section.getByText(/Review required/i)).toBeVisible();
 });
