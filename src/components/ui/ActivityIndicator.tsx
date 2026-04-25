@@ -42,6 +42,7 @@ const NODE_MESSAGES: Record<PipelineNode, string | Record<string, string>> = {
     _default: "Executing recipe...",
   },
   apply_effects: "Applying effects to external systems...",
+  build_analysis: "Enforcing audit-bearing field coverage...",
 };
 
 function getMessage(node: PipelineNode, intent?: string): string {

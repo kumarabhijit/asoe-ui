@@ -126,12 +126,13 @@ const NODE_LABELS: Partial<Record<PipelineNode, string>> = {
   classify: "Classify Intent",
   load_skill: "Load Skill",
   validate_circuit_breaker: "Circuit Breaker",
-  shadow_audit: "Compliance Shadow",
   select_recipe: "Select Recipe",
-  validate_types: "Validate Types",
   resolve_dependencies: "Resolve Dependencies",
+  validate_types: "Validate Types",
+  shadow_audit: "Compliance Shadow",
   execute_recipe: "Execute Recipe",
   apply_effects: "Apply Effects",
+  build_analysis: "Build Analysis",
 };
 
 /** Human-friendly rendering of an AllowedResolutionAction code for the

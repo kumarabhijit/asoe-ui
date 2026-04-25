@@ -74,19 +74,27 @@ export type ResolutionAction =
   | "ESCALATE"
   | "REQUEST_BUYER_CONFIRMATION";
 
-/* ── Pipeline node names (10-node LangGraph state machine) ─────────── */
+/* ── Pipeline node names (11-node LangGraph state machine) ─────────────
+ *
+ * Order matches the post-2026-04-22 graph (ADR-025): the proposal is
+ * fully materialised — recipe selected, gateway evidence resolved into
+ * enrichment_context, invocation params validated — BEFORE shadow
+ * audits it. `build_analysis` (Pillar 2) sits on every terminal edge
+ * so audit-bearing field coverage is enforced on every record.
+ */
 
 export type PipelineNode =
   | "ingest"
   | "classify"
   | "load_skill"
   | "validate_circuit_breaker"
-  | "shadow_audit"
   | "select_recipe"
-  | "validate_types"
   | "resolve_dependencies"
+  | "validate_types"
+  | "shadow_audit"
   | "execute_recipe"
-  | "apply_effects";
+  | "apply_effects"
+  | "build_analysis";
 
 export type NodeStatus = "started" | "completed" | "failed";
 

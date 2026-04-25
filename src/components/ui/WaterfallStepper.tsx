@@ -43,12 +43,13 @@ const NODE_LABELS: Record<PipelineNode, string> = {
   classify: "Classify Intent",
   load_skill: "Load Skill",
   validate_circuit_breaker: "Circuit Breaker",
-  shadow_audit: "Compliance Shadow",
   select_recipe: "Select Recipe",
-  validate_types: "Validate Types",
   resolve_dependencies: "Resolve Dependencies",
+  validate_types: "Validate Types",
+  shadow_audit: "Compliance Shadow",
   execute_recipe: "Execute Recipe",
   apply_effects: "Apply Effects",
+  build_analysis: "Build Analysis",
 };
 
 const indicatorBase = "w-[20px] h-[20px] rounded-full flex items-center justify-center shrink-0 transition-all duration-fast ease-out";
@@ -97,6 +98,21 @@ function dataSummary(node: PipelineNode, data?: Record<string, unknown>): string
     case "apply_effects":
       if (data.final_status) return `Status: ${data.final_status}`;
       return null;
+    case "resolve_dependencies":
+      if (data.gateway_count) return `Gateways: ${data.gateway_count}`;
+      return null;
+    case "build_analysis": {
+      // Pillar 2: surface AUDIT_CONTEXT_MISSING and the missing field
+      // count when coverage failed; otherwise show "Coverage complete".
+      const missing = data.audit_context_missing_fields;
+      if (Array.isArray(missing) && missing.length > 0) {
+        return `Audit gap: ${missing.length} field${missing.length === 1 ? "" : "s"}`;
+      }
+      if (data.final_status === "AUDIT_CONTEXT_MISSING") {
+        return "Audit context missing";
+      }
+      return "Coverage complete";
+    }
     default:
       return null;
   }
