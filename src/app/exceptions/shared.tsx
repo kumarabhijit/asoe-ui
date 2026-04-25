@@ -21,26 +21,49 @@ export const COSIGN_LIFECYCLE_STATE = "PENDING_COSIGN" as const;
 /**
  * Pipeline-node progress per lifecycle state. `EXECUTING` was retired
  * in asoe2 Phase 19 when the disposition flow consolidated (backend
- * never emits it anymore). `PENDING_COSIGN` and `PENDING_ADMIN_REVIEW`
- * map to post-shadow-audit so the pipeline viz correctly shows those
- * exceptions as past the classify/shadow/select/validate nodes rather
- * than falling through to 0 (the bug surfaced by cross-repo review C4).
+ * never emits it anymore).
+ *
+ * Indices align with PIPELINE_NODES below; numbers updated for the
+ * post-2026-04-22 graph reorder (ADR-025) which moved
+ * select_recipe / resolve_dependencies / validate_types BEFORE
+ * shadow_audit (so audit-bearing evidence is captured for every
+ * record), and added `build_analysis` (Pillar 2) at the end. The
+ * sequence is now 11 nodes; AUDITING (shadow_audit in progress) is
+ * at index 7 (was 4); RESOLVED / terminal states map to 11 (every
+ * node done, including build_analysis).
+ *
+ * Shadow-gated paths (BLOCKED, REJECTED, MANUAL_REVIEW_REQUIRED →
+ * PENDING_REVIEW / ESCALATED / cosign states) skip execute_recipe
+ * (8) and apply_effects (9) but still run build_analysis (10) on the
+ * terminal route. The renderer below handles that by marking those
+ * two middle nodes as "skipped" while keeping build_analysis
+ * "completed".
  */
 const STATE_PROGRESS: Record<string, number> = {
-  INGESTED: 0, CLASSIFYING: 1, AUDITING: 4, PENDING_REVIEW: 5,
-  ESCALATED: 5, PENDING_ADMIN_REVIEW: 5, PENDING_COSIGN: 5,
-  RESOLVED: 10, CLOSED: 10,
-  FAILED: 8, BLOCKED: 5, REJECTED: 5,
+  INGESTED: 0, CLASSIFYING: 1, AUDITING: 7,
+  PENDING_REVIEW: 11, ESCALATED: 11,
+  PENDING_ADMIN_REVIEW: 11, PENDING_COSIGN: 11,
+  RESOLVED: 11, CLOSED: 11,
+  FAILED: 9, BLOCKED: 11, REJECTED: 11,
 };
 
 const PIPELINE_NODES: PipelineNode[] = [
   "ingest", "classify", "load_skill", "validate_circuit_breaker",
-  "shadow_audit", "select_recipe", "validate_types",
-  "resolve_dependencies", "execute_recipe", "apply_effects",
+  "select_recipe", "resolve_dependencies", "validate_types",
+  "shadow_audit", "execute_recipe", "apply_effects",
+  "build_analysis",
 ];
 
-const FAILED_STATES = new Set(["FAILED", "BLOCKED", "REJECTED"]);
+const FAILED_STATES = new Set(["FAILED"]);
 const IN_PROGRESS_STATES = new Set(["CLASSIFYING", "AUDITING"]);
+// Lifecycles where shadow blocks execution: shadow_audit ran, but
+// execute_recipe + apply_effects were skipped. build_analysis still
+// runs on the terminal route.
+const SHADOW_GATED_TERMINAL_STATES = new Set([
+  "BLOCKED", "REJECTED",
+  "PENDING_REVIEW", "ESCALATED",
+  "PENDING_ADMIN_REVIEW", "PENDING_COSIGN",
+]);
 
 /**
  * Compact demo payload per pipeline node. Real runs populate these
@@ -57,6 +80,7 @@ function buildNodeData(
     case "shadow_audit": return exc.shadow_verdict ? { shadow_verdict: exc.shadow_verdict } : undefined;
     case "select_recipe": return exc.selected_recipe ? { selected_recipe: exc.selected_recipe } : undefined;
     case "apply_effects": return exc.final_status ? { final_status: exc.final_status } : undefined;
+    case "build_analysis": return exc.final_status ? { final_status: exc.final_status } : undefined;
     default: return undefined;
   }
 }
@@ -75,8 +99,16 @@ export function buildNodeStates(
   const completedUpTo = STATE_PROGRESS[exc.lifecycle_state] ?? 0;
   const isFailed = FAILED_STATES.has(exc.lifecycle_state);
   const isInProgress = IN_PROGRESS_STATES.has(exc.lifecycle_state);
+  const isShadowGated = SHADOW_GATED_TERMINAL_STATES.has(exc.lifecycle_state);
+  // Indices in PIPELINE_NODES that shadow-gated paths skip.
+  const SKIPPED_ON_SHADOW_GATE = new Set([8, 9]); // execute_recipe, apply_effects
 
   return PIPELINE_NODES.map((node, i): NodeState => {
+    // Shadow-gated terminal lifecycles: execute_recipe + apply_effects
+    // are skipped but build_analysis still ran on the terminal route.
+    if (isShadowGated && SKIPPED_ON_SHADOW_GATE.has(i)) {
+      return { node, status: "skipped" };
+    }
     if (i < completedUpTo) {
       return {
         node,
