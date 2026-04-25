@@ -1134,6 +1134,23 @@ export const exceptionsApi = {
    * (tasks.md) and drift register D18 (ui_architecture.md §9).
    */
   async orderAnalysis(id: string): Promise<OrderAnalysis | null> {
+    if (USE_REAL_API) {
+      // Real backend returns AnalysisResponse, which is a superset of
+      // OrderAnalysis (extra diagnosis/confidence/risk/lines metadata
+      // that the section components ignore — they project from the
+      // *_analysis enrichment fields). 404 → exception lacks an
+      // analysis projection (e.g. CREDIT_BLOCK has no adapter wired);
+      // surface as null so the UI keeps Layer 1 + skips enrichment.
+      try {
+        return await http<OrderAnalysis>(
+          `/api/v1/exceptions/${encodeURIComponent(id)}/analysis`,
+        );
+      } catch (err) {
+        const apiErr = err as APIError;
+        if (apiErr?.status === 404) return null;
+        throw err;
+      }
+    }
     await delay(MOCK_DELAY);
     return MOCK_ORDER_ANALYSES[id] ?? null;
   },
