@@ -776,8 +776,13 @@ section gets refactored.
 **Action when picked up:** track per-section in this section as
 checklist items as they land:
 - [ ] AgentAnalysisSection
-- [ ] BackOrderSection  (also closes N4 for its conditional
-  alternate_warehouses / substitutes / production / inbound_po)
+- [x] BackOrderSection (also closed N4 for `alternate_warehouses`,
+  `substitutes`, `production`, `inbound_po` — landed 2026-04-25 via
+  EvidenceBlock + `predicateHolds` from `useConditionalField`).
+  ExceptionDetailPanel passes `detail.resolved_action`. 6 new
+  vitest cases pin pre- and post-disposition rendering matrix
+  (resolved_action ∈ {null, ALT_DC, SUBSTITUTE, RESCHEDULE,
+  SPLIT_SHIPMENT}).
 - [ ] DuplicateDetectionSection
 - [ ] EdiMismatchSection
 - [ ] OrderComparisonSection
