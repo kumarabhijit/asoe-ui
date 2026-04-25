@@ -836,7 +836,10 @@ export const exceptionsApi = {
         "Cosign not permitted: no pending override on this exception.",
       );
     }
-    const caller = _currentMockUser?.email ?? "mock-user";
+    // Bug fix: read the actual logged-in user from the NextAuth
+    // session (was: `_currentMockUser?.email` — server-only state
+    // that defaults to marcus.webb in the browser bundle).
+    const caller = (await getCurrentMockUserEmail()) ?? "mock-user";
     if (pending.initiator === caller) {
       throw new Error(
         "SOD_VIOLATION: the initiator of the override cannot cosign their own action.",
@@ -845,6 +848,11 @@ export const exceptionsApi = {
     if (!request.notes || !request.notes.trim()) {
       throw new Error("NOTES_REQUIRED: cosign notes are mandatory (SOX).");
     }
+
+    // Bug fix: bump updated_at on the underlying entry so a followup
+    // refreshDetail() refetch sees the new ts.
+    const ts = new Date().toISOString();
+    exc.updated_at = ts;
 
     let response: ExceptionDetailResponse;
     if (request.approve) {
@@ -859,12 +867,13 @@ export const exceptionsApi = {
           financial_impact_usd: pending.financial_impact_usd,
           cosign: {
             cosigned_by: caller,
-            cosigned_at: new Date().toISOString(),
+            cosigned_at: ts,
             cosign_notes: request.notes,
             initiator: pending.initiator,
             initiated_at: pending.initiated_at,
           },
         },
+        updated_at: ts,
       };
     } else {
       response = {
@@ -874,11 +883,12 @@ export const exceptionsApi = {
           financial_impact_usd: pending.financial_impact_usd,
           cosign_rejection: {
             rejected_by: caller,
-            rejected_at: new Date().toISOString(),
+            rejected_at: ts,
             rejection_notes: request.notes,
             initiator: pending.initiator,
           },
         },
+        updated_at: ts,
       };
     }
     delete MOCK_PENDING_OVERRIDES[id];
@@ -984,11 +994,17 @@ export const exceptionsApi = {
         "Escalate not permitted in this state (requires PENDING_REVIEW, FAILED, or BLOCKED).",
       );
     }
+    // Bug fix: bump updated_at on the underlying entry so a followup
+    // refreshDetail() refetch sees the new ts (matches reanalyze /
+    // disposition fix).
+    const ts = new Date().toISOString();
+    exc.updated_at = ts;
     const response: ExceptionDetailResponse = {
       ...exc,
       lifecycle_state: "ESCALATED",
       resolution_data: {},
       resolution_notes: `ESCALATED: ${request.reason}`,
+      updated_at: ts,
     };
     idempotencyStore(`escalate:${id}`, idempotencyKey, request, response);
     return response;
@@ -1069,6 +1085,10 @@ export const exceptionsApi = {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
+    // Bug fix: bump updated_at on the underlying entry so a followup
+    // refreshDetail() refetch sees the new ts.
+    const ts = new Date().toISOString();
+    exc.updated_at = ts;
     return {
       ...exc,
       lifecycle_state: "ESCALATED",
@@ -1076,6 +1096,7 @@ export const exceptionsApi = {
       resolved_by: undefined,
       resolved_action: undefined,
       resolution_notes: `CHALLENGED: ${request.challenge_reason}`,
+      updated_at: ts,
     };
   },
 
@@ -1083,6 +1104,10 @@ export const exceptionsApi = {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
+    // Bug fix: bump updated_at on the underlying entry so a followup
+    // refreshDetail() refetch sees the new ts.
+    const ts = new Date().toISOString();
+    exc.updated_at = ts;
     return {
       ...exc,
       lifecycle_state: "PENDING_ADMIN_REVIEW",
@@ -1090,6 +1115,7 @@ export const exceptionsApi = {
       resolved_by: undefined,
       resolved_action: undefined,
       resolution_notes: `ADMIN_RELEASE: ${request.release_reason}`,
+      updated_at: ts,
     };
   },
 

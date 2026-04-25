@@ -57,27 +57,85 @@ describe("Mock reanalyze attribution (Bug #1)", () => {
   });
 });
 
-describe("Mock reanalyze updated_at persistence (Bug #2)", () => {
-  it("bumps updated_at on the response AND on the underlying MOCK_EXCEPTIONS entry, so refreshDetail() reads the new ts", async () => {
-    const before = await exceptionsApi.get(SAMPLE_EXCEPTION_ID);
+describe("Mock write updated_at persistence (Bug #2 — covers every action)", () => {
+  /**
+   * Each write path (reanalyze / disposition / escalate / challenge /
+   * adminRelease / cosign) must:
+   *   1. return a response with updated_at strictly greater than before;
+   *   2. mutate the underlying MOCK_EXCEPTIONS entry so the followup
+   *      refreshDetail() refetch reads back the SAME fresh ts. Without
+   *      (2) the immediate detail reload after a write reverts to the
+   *      stale ts and the "Last Updated" label appears frozen.
+   *
+   * Each test runs against a different exc-id so cross-test mutation
+   * doesn't taint other cases.
+   */
+
+  async function assertUpdatedAtAdvances(
+    excId: string,
+    write: () => Promise<{ updated_at: string }>,
+  ): Promise<void> {
+    const before = await exceptionsApi.get(excId);
     const beforeTs = before.updated_at;
-
     // Tiny delay so the new ISO ts is strictly greater (test would
-    // otherwise be racy on very fast machines where ms tick is the same).
+    // otherwise be racy on very fast machines where the ms tick is the same).
     await new Promise((r) => setTimeout(r, 5));
-
-    const reanalyzed = await exceptionsApi.reanalyze(SAMPLE_EXCEPTION_ID, {
-      reason: "test reason",
-    });
-    expect(reanalyzed.updated_at).not.toBe(beforeTs);
-    expect(new Date(reanalyzed.updated_at).getTime())
+    const after = await write();
+    expect(after.updated_at).not.toBe(beforeTs);
+    expect(new Date(after.updated_at).getTime())
       .toBeGreaterThan(new Date(beforeTs).getTime());
+    // refreshDetail() refetch must see the same fresh ts — proves
+    // the underlying MOCK_EXCEPTIONS entry was mutated.
+    const refetched = await exceptionsApi.get(excId);
+    expect(refetched.updated_at).toBe(after.updated_at);
+  }
 
-    // The followup re-fetch (what useExceptionActions::handleReanalyze
-    // does via refreshDetail) must see the SAME fresh ts — was stale
-    // before the fix because exceptionsApi.get() reads from
-    // MOCK_EXCEPTIONS which never got mutated.
-    const after = await exceptionsApi.get(SAMPLE_EXCEPTION_ID);
-    expect(after.updated_at).toBe(reanalyzed.updated_at);
+  it("reanalyze advances updated_at and persists to refetch", async () => {
+    await assertUpdatedAtAdvances(SAMPLE_EXCEPTION_ID, () =>
+      exceptionsApi.reanalyze(SAMPLE_EXCEPTION_ID, { reason: "test" }),
+    );
+  });
+
+  it("disposition (approve) advances updated_at and persists to refetch", async () => {
+    // exc-009 is a YELLOW DUPLICATE_PO PENDING_REVIEW — eligible for
+    // disposition without prior cosign infrastructure.
+    await assertUpdatedAtAdvances("exc-009", () =>
+      exceptionsApi.disposition(
+        "exc-009",
+        { action: "BLOCK_AND_NOTIFY", notes: "approving" },
+      ),
+    );
+  });
+
+  it("disposition (reject / NO_ACTION) advances updated_at and persists to refetch", async () => {
+    // exc-014 is YELLOW PALLET_CONFIG PENDING_REVIEW.
+    await assertUpdatedAtAdvances("exc-014", () =>
+      exceptionsApi.disposition(
+        "exc-014",
+        { action: "NO_ACTION", notes: "rejecting" },
+      ),
+    );
+  });
+
+  it("escalate advances updated_at and persists to refetch", async () => {
+    // exc-010 is YELLOW BACK_ORDER PENDING_REVIEW — escalate-eligible.
+    await assertUpdatedAtAdvances("exc-010", () =>
+      exceptionsApi.escalate("exc-010", { reason: "needs senior review" }),
+    );
+  });
+
+  it("challenge advances updated_at and persists to refetch", async () => {
+    // exc-016 is YELLOW DELIVERY_DELAY PENDING_REVIEW — challenge has
+    // no eligibility gate in the mock, but use a fresh id for hygiene.
+    await assertUpdatedAtAdvances("exc-016", () =>
+      exceptionsApi.challenge("exc-016", { challenge_reason: "evidence in dispute" }),
+    );
+  });
+
+  it("adminRelease advances updated_at and persists to refetch", async () => {
+    // exc-019 is RED EDI_MISMATCH BLOCKED — admin-release-eligible.
+    await assertUpdatedAtAdvances("exc-019", () =>
+      exceptionsApi.adminRelease("exc-019", { release_reason: "false positive" }),
+    );
   });
 });
