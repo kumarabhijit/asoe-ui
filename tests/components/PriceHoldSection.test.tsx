@@ -82,5 +82,18 @@ describe("PriceHoldSection", () => {
       render(<PriceHoldSection data={baseData} />);
       expect(screen.getByText("PriceHoldReleaseRecipe.py")).toBeInTheDocument();
     });
+
+    it("renders an unknown action with the neutral fallback rather than crashing (CLAUDE.md Guardrail #1)", () => {
+      // Simulate a forward-compat scenario where asoe2 shipped a new
+      // PriceHoldAction literal (e.g. MANUAL_RELEASE) that the UI
+      // bundle doesn't know about yet. The render must not throw —
+      // mirrors the Badge.tsx::verdictVariant() default-fallback
+      // pattern.
+      const newAction = "MANUAL_RELEASE" as PriceHoldAnalysisData["action"];
+      expect(() =>
+        render(<PriceHoldSection data={{ ...baseData, action: newAction }} />),
+      ).not.toThrow();
+      expect(screen.getAllByText("MANUAL_RELEASE").length).toBeGreaterThan(0);
+    });
   });
 });

@@ -31,8 +31,15 @@ export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, total
         <span className="font-medium text-text-secondary">
           {ep?.customer_name ?? detail.tenant_id}
         </span>
-        <ChevronRight size={10} />
-        <span>{ep?.location ?? "—"}</span>
+        {/* Structural omission for the contextual entity-profile
+            location: drop the chevron + slot when absent rather than
+            rendering "—" (CLAUDE.md Guardrail #6). */}
+        {ep?.location && (
+          <>
+            <ChevronRight size={10} />
+            <span>{ep.location}</span>
+          </>
+        )}
         <ChevronRight size={10} />
         <span>{primarySkuLabel}</span>
       </div>

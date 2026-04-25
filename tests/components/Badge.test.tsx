@@ -77,9 +77,15 @@ describe("lifecycleVariant — Guardrail #2 fallback", () => {
     expect(lifecycleVariant("FAILED")).toBe("error");
   });
 
-  it("maps EXECUTING, CLASSIFYING to info", () => {
-    expect(lifecycleVariant("EXECUTING")).toBe("info");
+  it("maps CLASSIFYING to info", () => {
     expect(lifecycleVariant("CLASSIFYING")).toBe("info");
+  });
+
+  it("maps the retired EXECUTING lifecycle to neutral (forward-compat fallback)", () => {
+    // EXECUTING was retired in asoe2 Phase 19 — backend never emits
+    // it. The case was deleted from lifecycleVariant; an old record
+    // surfacing the value falls through to the neutral default.
+    expect(lifecycleVariant("EXECUTING")).toBe("neutral");
   });
 
   it("returns neutral for unknown state (Guardrail #2)", () => {

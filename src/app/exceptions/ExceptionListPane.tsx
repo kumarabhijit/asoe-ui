@@ -104,15 +104,18 @@ export default function ExceptionListPane({
           <div className="flex gap-12 mb-10 text-caption">
             <CompactMetric label="Open" value={stats.open_exceptions} color="var(--color-warning)" />
             <CompactMetric label="Resolved" value={stats.auto_resolved} color="var(--color-success)" />
-            <CompactMetric
-              label="Avg"
-              value={
-                stats.avg_resolution_time_seconds
-                  ? `${Math.round(stats.avg_resolution_time_seconds / 60)}m`
-                  : "—"
-              }
-              color="var(--color-cat-teal)"
-            />
+            {/* Structural omission (CLAUDE.md Guardrail #6): suppress
+                the Avg tile entirely when the backend has no
+                resolution-time data, rather than rendering a "—"
+                placeholder that conceals where the missing value
+                came from. */}
+            {stats.avg_resolution_time_seconds ? (
+              <CompactMetric
+                label="Avg"
+                value={`${Math.round(stats.avg_resolution_time_seconds / 60)}m`}
+                color="var(--color-cat-teal)"
+              />
+            ) : null}
           </div>
         )}
 

@@ -38,7 +38,14 @@ const ACTION_BADGE: Record<PriceHoldAction, { variant: "success" | "warning" | "
 };
 
 export function PriceHoldSection({ data }: PriceHoldSectionProps) {
-  const action = ACTION_BADGE[data.action];
+  // Forward-compatibility fallback (CLAUDE.md Guardrail #1). If asoe2
+  // ships a new PriceHoldAction literal (e.g. MANUAL_RELEASE), the
+  // UI keeps rendering with a neutral badge rather than crashing on
+  // `action.variant` of undefined.
+  const action = ACTION_BADGE[data.action] ?? {
+    variant: "neutral" as const,
+    label: String(data.action),
+  };
   const HoldIcon = data.hold_status === "RELEASED" ? Unlock : Lock;
 
   return (
