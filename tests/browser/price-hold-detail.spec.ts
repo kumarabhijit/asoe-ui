@@ -83,7 +83,12 @@ test("PRICE_HOLD_RELEASE detail page renders with the correct intent + recipe", 
   await expect(page.getByText(/PRICE[_ -]?HOLD[_ -]?RELEASE/i).first()).toBeVisible();
 
   // The verdict-aware action row is rendered (manager sees Override…).
-  await expect(page.getByRole("button", { name: /override/i }).first()).toBeVisible();
+  // The button's aria-label is "Choose different action" (a11y
+  // descriptive); display text is "Override…" (SOX vocabulary).
+  // Match by accessible name to stay role-locator-safe.
+  await expect(
+    page.getByRole("button", { name: /choose different action/i }).first(),
+  ).toBeVisible();
 });
 
 test("PriceHoldSection renders variance + action when backend populates price_hold_analysis", async ({
