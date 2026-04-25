@@ -43,7 +43,16 @@ function renderUnknown(value: unknown): string {
 }
 
 export function EdiMismatchSection({ data }: EdiMismatchSectionProps) {
-  const classification = CLASSIFICATION_BADGE[data.classification];
+  // Forward-compatibility fallback (CLAUDE.md Guardrail #1). If asoe2
+  // ships a new EdiMismatchClassification literal (e.g. WARN), the
+  // UI keeps rendering the record with a neutral badge rather than
+  // crashing on `classification.variant` of undefined. Mirrors
+  // Badge.tsx::verdictVariant() / lifecycleVariant() `default:
+  // "neutral"` pattern.
+  const classification = CLASSIFICATION_BADGE[data.classification] ?? {
+    variant: "neutral" as const,
+    label: String(data.classification),
+  };
 
   return (
     <section

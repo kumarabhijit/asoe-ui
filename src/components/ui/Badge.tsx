@@ -73,7 +73,6 @@ export function lifecycleVariant(state?: string): BadgeVariant {
     case "REJECTED":
     case "FAILED":
       return "error";
-    case "EXECUTING":
     case "CLASSIFYING":
       return "info";
     default:

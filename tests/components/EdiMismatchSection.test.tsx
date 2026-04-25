@@ -73,6 +73,20 @@ describe("EdiMismatchSection", () => {
       render(<EdiMismatchSection data={{ ...base, classification: "ESCALATE", notification_template: null }} />);
       expect(screen.getAllByText(/Escalate/i).length).toBeGreaterThan(0);
     });
+
+    it("renders an unknown classification with the neutral fallback rather than crashing (CLAUDE.md Guardrail #1)", () => {
+      // Simulate a forward-compat scenario where asoe2 shipped a new
+      // EdiMismatchClassification literal the UI bundle doesn't know
+      // yet. The render must not throw and must surface the literal
+      // verbatim so an operator can still triage the record.
+      const newLiteral = "MANUAL_RELEASE" as EdiMismatchAnalysisData["classification"];
+      expect(() =>
+        render(
+          <EdiMismatchSection data={{ ...base, classification: newLiteral }} />,
+        ),
+      ).not.toThrow();
+      expect(screen.getByText("MANUAL_RELEASE")).toBeInTheDocument();
+    });
   });
 
   describe("unknown-value shape matrix", () => {
