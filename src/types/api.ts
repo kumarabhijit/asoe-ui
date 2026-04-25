@@ -162,6 +162,18 @@ export interface TraceResponse {
   sap_actions?: SAPActionStep[];
   /** Copy-paste-ready customer communication draft. */
   customer_email_draft?: string;
+
+  /* ── Verdict Pillar 2.3 — structured audit-gap surface ──────────────
+     When the build_analysis node flags AUDIT_CONTEXT_MISSING, these
+     fields carry the Pydantic class name + ordered list of missing
+     audit-bearing fields so auditors don't have to regex the
+     free-text explanation. Both undefined when coverage was
+     complete. Mirrors asoe2 api/schemas.py::TraceResponse. */
+  /** Pydantic class name whose audit-bearing fields were incomplete. */
+  audit_context_missing_class?: string;
+  /** Ordered list of audit-bearing field names that could not be
+   *  populated for this record. */
+  audit_context_missing_fields?: string[];
 }
 
 /* ── Workflow ──────────────────────────────────────────────────────── */
