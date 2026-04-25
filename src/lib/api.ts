@@ -1042,6 +1042,12 @@ export const exceptionsApi = {
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
     const isFailed = exc.lifecycle_state === "FAILED";
+    // Verdict Pillar 2.3: when the build_analysis node flagged the
+    // record AUDIT_CONTEXT_MISSING, the trace carries the structured
+    // gap surface. Mock-mode records don't ship in that state today,
+    // so both fields are empty/undefined; the live backend
+    // populates them when coverage fails.
+    const isAuditGap = exc.final_status === "AUDIT_CONTEXT_MISSING";
     const enrichment = MOCK_TRACE_ENRICHMENT[exc.id] ?? {};
     return {
       trace_id: exc.id + "-trace",
@@ -1052,13 +1058,27 @@ export const exceptionsApi = {
       shadow_policy_hits: exc.shadow_verdict === "RED" ? ["PENALTY_MATRIX_VIOLATION"] : [],
       recipe_name: exc.selected_recipe,
       constrained_output_schemas: { intent: "IntentDecision", shadow: "ShadowDecisionSchema" },
-      gateway_calls: exc.final_status === "COMPLETE" ? ["erp:update_condition_record"] : [],
+      // Mock-mode gateway list reflects the post-2026-04-22 graph
+      // (gateway READS run BEFORE shadow per ADR-025), so even a
+      // shadow-gated record carries the read-side gateway calls
+      // (e.g. oms/get_inventory_snapshot) — only the write-side
+      // effects (erp:update_condition_record) are gated on
+      // shadow GREEN + recipe success.
+      gateway_calls: exc.final_status === "COMPLETE"
+        ? ["oms:get_inventory_snapshot", "erp:update_condition_record"]
+        : exc.shadow_verdict
+          ? ["oms:get_inventory_snapshot"]
+          : [],
       backend_fallback: "deterministic_fallback",
       is_fallback_generated: true,
       final_status: exc.final_status,
       explanation: isFailed
         ? "Gateway 'erp:update_condition_record' returned TIMEOUT after 30000ms. Recipe aborted before applying changes; no SAP side effects occurred."
-        : "Deterministic execution completed successfully.",
+        : isAuditGap
+          ? "Audit-bearing fields missing from analysis projection. Record cannot be presented to an operator without authoritative values for these fields — see compliance/audit_bearing_registry.yaml."
+          : "Deterministic execution completed successfully.",
+      audit_context_missing_class: isAuditGap ? "PriceAnalysisData" : undefined,
+      audit_context_missing_fields: isAuditGap ? ["doc_number", "rule_id"] : [],
       ...enrichment,
     };
   },

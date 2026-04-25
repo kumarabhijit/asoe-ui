@@ -78,6 +78,15 @@ UI ← WebSocket event (WSEvent.trace_id) ← Redis pub/sub ← Worker
 
 - The `trace_id` and TraceRecord fields (skill_name, intent_selected, shadow_verdict, recipe_name, gateway_calls) are displayed in the **Trace Evidence** collapsible section within ExceptionDetailPanel, accessible via the "Show Diagnostics" toggle
 - Resolution Data (JSON) is also nested within Trace Evidence for audit review
+- **Verdict Pillar 2.3 audit-gap surface (Phase 8.12):** when the
+  `build_analysis` graph node flags a record `AUDIT_CONTEXT_MISSING`,
+  the Trace Evidence section additionally renders
+  `audit_context_missing_class` (e.g. `PriceAnalysisData`) +
+  `audit_context_missing_fields` (ordered list of audit-bearing
+  fields the registry required but the gateway/recipe couldn't
+  populate). Auditors read the gap directly rather than regexing
+  the free-text explanation. Mirrors
+  `asoe2/api/schemas.py::TraceResponse` lines 311-318.
 
 **Idempotency-Key emission (Phase 2 #9):** Every mutating client method (`disposition`, `escalate`, `cosign`, `reanalyze`, `resolve`, `resolveAsync`) emits an `Idempotency-Key` header on the outbound request. When the caller does not supply one via `RequestOptions.idempotencyKey`, `src/lib/api.ts::generateIdempotencyKey()` produces a UUID v4 per invocation. This guards against double-click and network-retry replays: the backend honours the key by returning the prior response when a duplicate arrives, preventing accidental double-dispositions. Together with `X-Trace-ID` this gives every mutating UI action a stable client-side identity that survives retries.
 

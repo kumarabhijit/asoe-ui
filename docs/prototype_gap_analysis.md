@@ -56,7 +56,7 @@ The React application (Next.js 16 App Router) currently implements:
 |----------|-------------------|-------------|-----|
 | Main Tabs | 5 | 3 operational + 1 stub | **2 missing tabs** (Quota, Performance) |
 | Admin Sections | 8 | 1 stub | **8 sections to build** |
-| Exception Types | 8 with dedicated renderers | 8 types, 6 with dedicated renderers (Price, Duplicate, BackOrder, OverMax, MOQ, Pallet) | **1 dedicated renderer missing** (Delivery Delay) |
+| Exception Types | 8 with dedicated renderers | 10 sections backend-backed (Price, Duplicate, OrderComparison, BackOrder, OverMax, MOQ, Pallet, DeliveryDelay, PriceHold, EDI Mismatch) — D18 SHIPPED 10/10 after Phase 8.12 / asoe2 Verdict full-close | **None** — every documented section has a dedicated renderer + backend adapter + audit-bearing field coverage enforced by `build_analysis` |
 | AI Agents | 5 specialized + chat | Generic mock only | **5 specialized agents** |
 | Cross-cutting | Chat, Upload, Personas, Dark Mode, KG | None | **All missing** |
 | Testing | N/A (prototype) | 226 tests | Ahead of prototype |

@@ -205,6 +205,24 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
                         <TraceField label="Gateway Calls" value={trace.gateway_calls.join(", ")} />
                       )}
                       <TraceField label="Final Status" value={trace.final_status} />
+                      {/* Verdict Pillar 2.3 audit-gap surface — present
+                          only when build_analysis flagged
+                          AUDIT_CONTEXT_MISSING. Auditors see the
+                          missing-class + ordered field list directly
+                          rather than regexing the explanation. */}
+                      {trace.audit_context_missing_fields &&
+                        trace.audit_context_missing_fields.length > 0 && (
+                        <>
+                          <TraceField
+                            label="Audit Gap (class)"
+                            value={trace.audit_context_missing_class}
+                          />
+                          <TraceField
+                            label="Audit Gap (fields)"
+                            value={trace.audit_context_missing_fields.join(", ")}
+                          />
+                        </>
+                      )}
                     </div>
                   </div>
                 )}

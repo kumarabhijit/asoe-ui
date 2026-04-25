@@ -57,7 +57,7 @@ src/
 │   ├── Sidebar.tsx               # 480px slide-right intervention panel
 │   ├── Toast.tsx                 # 4.5s auto-dismiss, status-colored, solid-fill
 │   ├── UserSwitcher.tsx          # Sandbox-only user switcher (signIn credentials flow, server round-trip)
-│   └── WaterfallStepper.tsx      # 10-node pipeline progress visualization
+│   └── WaterfallStepper.tsx      # 11-node pipeline progress visualization (post-ADR-025)
 ├── hooks/
 │   ├── useAuth.ts                # Wraps NextAuth session with typed user + visibleTabs, assignedAccounts
 │   ├── useErpProfile.ts          # ERP-vendor-aware label resolver (useIntentLabel, useSubTypeLabel)
@@ -101,7 +101,7 @@ src/
 | `Toast` | Tailwind | 4.5s auto-dismiss, status-colored, slide-in animation | Via ToastProvider |
 | `Sidebar` | Tailwind | 480px panel, escape-to-close, focus trap | (Available, not used in Outlook layout) |
 | `ActivityIndicator` | Tailwind | Node-specific domain-aware messages | WaterfallStepper |
-| `WaterfallStepper` | Tailwind | 10-node pipeline with per-node states | ExceptionDetailPanel |
+| `WaterfallStepper` | Tailwind | 11-node pipeline with per-node states (post-ADR-025) | ExceptionDetailPanel |
 | `AgentReasoningCard` | Tailwind | Layer 1 only (recommendation + actions), verdict × permission button matrix (Option A): `canApprove` / `canOverride` / `canEscalate` / `actionInFlight` / `recommendedAction` props. `Override…` + Approve-tooltip preview. | ExceptionDetailPanel |
 | `PricingWaterfall` | Tailwind | Pricing condition chain timeline | ExceptionDetailPanel |
 | `GapBar` | Tailwind | Horizontal bar: primary vs secondary qty, shortfall/excess mode, gap indicator | BackOrderSection, OverMaxSection, MOQSection |
@@ -112,7 +112,7 @@ src/
 
 **Badge variant mappers** (`Badge.tsx`): `verdictVariant()`, `lifecycleVariant()`, `rootCauseVariant()`, `categoryVariant()`, `inboxStatusVariant()` — all follow the same pattern: map API-provided strings to CSS variants with a `default` fallback.
 
-**PricingWaterfall vs WaterfallStepper:** WaterfallStepper visualizes the 10-node pipeline execution (WebSocket-driven). PricingWaterfall visualizes pricing condition chains for line items (API data-driven). They share a timeline visual metaphor but differ in data model and purpose.
+**PricingWaterfall vs WaterfallStepper:** WaterfallStepper visualizes the 11-node pipeline execution (WebSocket-driven). PricingWaterfall visualizes pricing condition chains for line items (API data-driven). They share a timeline visual metaphor but differ in data model and purpose.
 
 **Shadcn components installed:** Select, DropdownMenu, Dialog (Radix primitives + Tailwind styling). **Pending:** DataTable (Tanstack Table), Tooltip.
 
@@ -262,7 +262,7 @@ Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 | `ShadowVerdict` | `ShadowStatus` enum | exceptions.ts |
 | `TerminalStatus` | `TerminalStatus` enum | exceptions.ts |
 | `LifecycleState` | `LIFECYCLE_STATES` list — `EXECUTING` removed, `PENDING_COSIGN` added (Phase 2 #5 four-eyes staging state) | exceptions.ts |
-| `PipelineNode` | 10 node names from orchestration/nodes.py | exceptions.ts |
+| `PipelineNode` | 11 node names from orchestration/nodes.py (incl. build_analysis) | exceptions.ts |
 | `OrderEvent` | `OrderEvent` model | exceptions.ts |
 | `ComplianceDecision` | `ComplianceDecision` model | exceptions.ts |
 | `ExceptionSummary` | `ExceptionSummary` schema (+ `account_id`, `account_name`) | exceptions.ts |

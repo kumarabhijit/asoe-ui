@@ -267,6 +267,24 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 
 ---
 
+### [x] PHASE 8.12: Verdict UI Sync (audit-gap surface + ADR-025 pipeline)
+**Companion to:** asoe2 Verdict full-close engagement (T1-T5 grandfather-clause retirements + ADR-025 graph reorder).
+- [x] `exceptionsApi.orderAnalysis()` real-API branch (`src/lib/api.ts`) — UI now actually fetches `/api/v1/exceptions/{id}/analysis` from the backend in real-API mode; was mock-only and silently dropped every enrichment section
+- [x] `PipelineNode` union (`src/types/exceptions.ts`) — adds `build_analysis`; reorders `select_recipe / resolve_dependencies / validate_types` BEFORE `shadow_audit` per ADR-025
+- [x] `WaterfallStepper.NODE_LABELS` (`src/components/ui/WaterfallStepper.tsx`) — adds "Build Analysis" + dataSummary surfaces audit-gap fields
+- [x] `AgentReasoningCard.NODE_LABELS` + `ActivityIndicator.NODE_MESSAGES` — same refresh
+- [x] Mock pipeline factory (`src/app/exceptions/shared.tsx`) — `PIPELINE_NODES` reordered + `build_analysis` appended; `STATE_PROGRESS` recalibrated for the 11-node sequence; `SHADOW_GATED_TERMINAL_STATES` set + skipped-middle logic so YELLOW/RED paths show `execute_recipe / apply_effects` skipped while `build_analysis` is completed
+- [x] `TraceResponse` UI type (`src/types/api.ts`) gains `audit_context_missing_class` + `audit_context_missing_fields` (mirrors backend Pillar 2.3)
+- [x] Mock trace generator (`src/lib/api.ts::exceptionsApi.trace`) synthesises audit-gap fields when `final_status === "AUDIT_CONTEXT_MISSING"`; `gateway_calls` reflects ADR-025 (read-side calls present even on shadow-gated records)
+- [x] DiagnosticsSection (`src/app/exceptions/DiagnosticsSection.tsx`) renders the structured audit-gap surface (class + ordered field list)
+- [x] `tests/browser/enrichment-sections.spec.ts` (6 new specs): live-stack coverage for BackOrder, DuplicatePO + OrderComparison, DeliveryDelay, OverMax, MOQ, PriceAnalysis
+- [x] Brittle Playwright specs fixed: Override locator (matches "Choose different action" aria-label); `createYellowException` helper now seeds a real YELLOW BACK_ORDER fixture; EdiMismatchSection scoped to its accessible region to avoid strict-mode multi-match
+- [x] Vercel build fix: `orderAnalysis()` 404 detection uses `err instanceof Error` + regex on http() message format (was casting to APIError which has no `.status`)
+
+✅ Outcome: D18 drift register flipped PARTIAL 6/10 → SHIPPED 10/10. Mock pipeline reflects ADR-025 (gateway READS pre-shadow + `build_analysis` terminal). Audit-gap surface visible on every record that fails coverage. 474 unit tests pass; 16/16 Playwright e2e green against the live stack. (2026-04-25)
+
+---
+
 ## Remaining Phases
 
 ### [ ] PHASE 9: Settings & Admin Page
