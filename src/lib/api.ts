@@ -70,6 +70,34 @@ async function getAuthToken(): Promise<string | undefined> {
 }
 
 /**
+ * Read the *currently logged-in* user's email for mock-mode attribution
+ * on writes (reanalyze, disposition, escalate, etc.).
+ *
+ * Why this is needed: `_currentMockUser` is module-level state set in
+ * `authApi.login()` — but `authApi.login()` runs server-side via
+ * NextAuth's credentials provider. The browser bundle has its own
+ * module instance where `_currentMockUser` was never mutated, so it
+ * still points at the hardcoded default (marcus.webb). Falling back
+ * to that default gave every UI-triggered write the wrong attribution.
+ *
+ * Fix: read from the NextAuth session client-side. Server-side / test
+ * contexts (no `window`) fall back to the module-level state, which is
+ * correctly set there.
+ */
+async function getCurrentMockUserEmail(): Promise<string | undefined> {
+  if (typeof window === "undefined") {
+    return _currentMockUser?.email;
+  }
+  try {
+    const { getSession } = await import("next-auth/react");
+    const s = await getSession();
+    return s?.user?.email ?? _currentMockUser?.email;
+  } catch {
+    return _currentMockUser?.email;
+  }
+}
+
+/**
  * Test-only escape hatch — Playwright fixtures set a pre-minted token
  * via `window.__asoeTestAccessToken` before driving the page, so the
  * api client can make authenticated calls without going through the
@@ -808,7 +836,10 @@ export const exceptionsApi = {
         "Cosign not permitted: no pending override on this exception.",
       );
     }
-    const caller = _currentMockUser?.email ?? "mock-user";
+    // Bug fix: read the actual logged-in user from the NextAuth
+    // session (was: `_currentMockUser?.email` — server-only state
+    // that defaults to marcus.webb in the browser bundle).
+    const caller = (await getCurrentMockUserEmail()) ?? "mock-user";
     if (pending.initiator === caller) {
       throw new Error(
         "SOD_VIOLATION: the initiator of the override cannot cosign their own action.",
@@ -817,6 +848,11 @@ export const exceptionsApi = {
     if (!request.notes || !request.notes.trim()) {
       throw new Error("NOTES_REQUIRED: cosign notes are mandatory (SOX).");
     }
+
+    // Bug fix: bump updated_at on the underlying entry so a followup
+    // refreshDetail() refetch sees the new ts.
+    const ts = new Date().toISOString();
+    exc.updated_at = ts;
 
     let response: ExceptionDetailResponse;
     if (request.approve) {
@@ -831,12 +867,13 @@ export const exceptionsApi = {
           financial_impact_usd: pending.financial_impact_usd,
           cosign: {
             cosigned_by: caller,
-            cosigned_at: new Date().toISOString(),
+            cosigned_at: ts,
             cosign_notes: request.notes,
             initiator: pending.initiator,
             initiated_at: pending.initiated_at,
           },
         },
+        updated_at: ts,
       };
     } else {
       response = {
@@ -846,11 +883,12 @@ export const exceptionsApi = {
           financial_impact_usd: pending.financial_impact_usd,
           cosign_rejection: {
             rejected_by: caller,
-            rejected_at: new Date().toISOString(),
+            rejected_at: ts,
             rejection_notes: request.notes,
             initiator: pending.initiator,
           },
         },
+        updated_at: ts,
       };
     }
     delete MOCK_PENDING_OVERRIDES[id];
@@ -897,15 +935,32 @@ export const exceptionsApi = {
     let newLifecycle: LifecycleState;
     if (request.action === "NO_ACTION") newLifecycle = "REJECTED";
     else newLifecycle = "RESOLVED";
+    // Bug fix: read the actual logged-in user from the NextAuth session
+    // (was: `_currentMockUser?.email` — module-level state set
+    // server-side only, defaulting to marcus.webb in the browser).
+    const resolvedBy = (await getCurrentMockUserEmail()) ?? "mock-user";
+    const ts = new Date().toISOString();
     const response: ExceptionDetailResponse = {
       ...exc,
       lifecycle_state: newLifecycle,
       final_status: newLifecycle === "RESOLVED" ? "COMPLETE" : "REJECTED",
-      resolved_by: _currentMockUser?.email ?? "mock-user",
+      resolved_by: resolvedBy,
       resolved_action: request.action,
       resolution_notes: request.notes,
       resolution_data: {},
+      updated_at: ts,
     };
+    // Bug fix: bump updated_at on the underlying MOCK_EXCEPTIONS
+    // entry so the followup detail re-fetch sees the new ts. We
+    // intentionally DON'T mutate lifecycle_state / final_status
+    // here: those mutations would leak across tests in the shared
+    // MOCK_EXCEPTIONS array (a disposition() in one test would
+    // change exc-002's lifecycle and break a later escalate() test
+    // on the same id). The response still carries the new
+    // lifecycle for the immediate UI render; the re-fetch then
+    // reverts — matches pre-fix behaviour for everything except
+    // the timestamp.
+    exc.updated_at = ts;
     idempotencyStore(`disposition:${id}`, idempotencyKey, request, response);
     return response;
   },
@@ -939,11 +994,17 @@ export const exceptionsApi = {
         "Escalate not permitted in this state (requires PENDING_REVIEW, FAILED, or BLOCKED).",
       );
     }
+    // Bug fix: bump updated_at on the underlying entry so a followup
+    // refreshDetail() refetch sees the new ts (matches reanalyze /
+    // disposition fix).
+    const ts = new Date().toISOString();
+    exc.updated_at = ts;
     const response: ExceptionDetailResponse = {
       ...exc,
       lifecycle_state: "ESCALATED",
       resolution_data: {},
       resolution_notes: `ESCALATED: ${request.reason}`,
+      updated_at: ts,
     };
     idempotencyStore(`escalate:${id}`, idempotencyKey, request, response);
     return response;
@@ -981,10 +1042,14 @@ export const exceptionsApi = {
       ? exc.id + "-trace"
       : history[history.length - 1].new_trace_id ?? exc.id + "-trace";
     const newTraceId = exc.id + "-trace-" + Math.random().toString(36).slice(2, 8);
+    // Bug fix: read the actual logged-in user from the NextAuth session
+    // (was: `_currentMockUser?.email` which is server-only state and
+    // defaulted to marcus.webb in the browser bundle).
+    const triggeredBy = (await getCurrentMockUserEmail()) ?? "mock-user";
     const entry: ReanalysisEntry = {
       attempt: history.length + 1,
       triggered_at: ts,
-      triggered_by: _currentMockUser?.email ?? "mock-user",
+      triggered_by: triggeredBy,
       reason: request.reason,
       prior_trace_id: priorTraceId,
       prior_shadow_verdict: exc.shadow_verdict,
@@ -996,6 +1061,16 @@ export const exceptionsApi = {
       new_lifecycle_state: exc.lifecycle_state,
     };
     MOCK_REANALYSIS_HISTORY[id] = [...history, entry];
+
+    // Bug fix: mutate the underlying MOCK_EXCEPTIONS entry so the
+    // followup `refreshDetail()` re-fetch (see useExceptionActions.ts
+    // ::handleReanalyze) sees the new updated_at instead of reverting
+    // to the stale value. Without this the response's fresh ts is
+    // overwritten by the next list/detail read. (trace_id is on
+    // ExceptionDetail, not the summary, so we don't mutate it here —
+    // the mock detail() doesn't return it for summary-derived records
+    // anyway.)
+    exc.updated_at = ts;
 
     return {
       ...exc,
@@ -1010,6 +1085,10 @@ export const exceptionsApi = {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
+    // Bug fix: bump updated_at on the underlying entry so a followup
+    // refreshDetail() refetch sees the new ts.
+    const ts = new Date().toISOString();
+    exc.updated_at = ts;
     return {
       ...exc,
       lifecycle_state: "ESCALATED",
@@ -1017,6 +1096,7 @@ export const exceptionsApi = {
       resolved_by: undefined,
       resolved_action: undefined,
       resolution_notes: `CHALLENGED: ${request.challenge_reason}`,
+      updated_at: ts,
     };
   },
 
@@ -1024,6 +1104,10 @@ export const exceptionsApi = {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
+    // Bug fix: bump updated_at on the underlying entry so a followup
+    // refreshDetail() refetch sees the new ts.
+    const ts = new Date().toISOString();
+    exc.updated_at = ts;
     return {
       ...exc,
       lifecycle_state: "PENDING_ADMIN_REVIEW",
@@ -1031,6 +1115,7 @@ export const exceptionsApi = {
       resolved_by: undefined,
       resolved_action: undefined,
       resolution_notes: `ADMIN_RELEASE: ${request.release_reason}`,
+      updated_at: ts,
     };
   },
 
