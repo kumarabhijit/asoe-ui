@@ -33,9 +33,29 @@ const CLASSIFICATION_BADGE: Record<EdiMismatchClassification, { variant: "succes
  * sub_types carry different value shapes (SKU=string, QTY=number,
  * SHIP_TO=DC code, UOM=enum). Render verbatim with a stable string
  * coercion — no type-specific dispatch.
+ *
+ * Both fields are audit-bearing per
+ * compliance/audit_bearing_registry.yaml. Returning a literal "—"
+ * placeholder for null/undefined would be a partial-truth state
+ * (CLAUDE.md Guardrail #6 / Verdict 2026-04-22). The composer is
+ * supposed to have routed records with absent values to
+ * AUDIT_CONTEXT_MISSING upstream; if we still get an absent value
+ * here it's a bug worth noticing — return null so isPresent() at
+ * the call site can suppress the row entirely (structural
+ * omission), and emit a dev-mode console warning so the regression
+ * surfaces.
  */
-function renderUnknown(value: unknown): string {
-  if (value === null || value === undefined) return "—";
+function renderUnknown(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[EdiMismatchSection] audit-bearing expected_value/received_value " +
+        "is absent — composer should have routed this record to " +
+        "AUDIT_CONTEXT_MISSING. Rendering with structural omission.",
+      );
+    }
+    return null;
+  }
   if (typeof value === "object") {
     try { return JSON.stringify(value); } catch { return String(value); }
   }
@@ -116,7 +136,12 @@ export function EdiMismatchSection({ data }: EdiMismatchSectionProps) {
   );
 }
 
-function ValueCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function ValueCard({ label, value, highlight }: { label: string; value: string | null; highlight?: boolean }) {
+  // Structural omission (CLAUDE.md Guardrail #6): if renderUnknown
+  // returned null, the audit-bearing field was absent and the
+  // composer should have routed to AUDIT_CONTEXT_MISSING upstream.
+  // Rendering nothing is the correct fallback — never a "—".
+  if (value === null) return null;
   return (
     <div
       className={

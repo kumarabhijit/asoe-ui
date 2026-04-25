@@ -127,21 +127,25 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
                       <p className="text-caption text-text-secondary m-0 mb-8 whitespace-pre-wrap">
                         {entry.reason}
                       </p>
+                      {/* Structural omission per CLAUDE.md Guardrail #6:
+                          show only the verdict / final-status pair
+                          components that are actually present. The
+                          previous `?? "—"` rendering created a
+                          partial-truth state where an absent
+                          prior-verdict looked indistinguishable from
+                          a transition where the verdict didn't
+                          change. */}
                       <div className="grid grid-cols-2 gap-8 text-label">
-                        <div>
-                          <span className="text-text-quaternary uppercase tracking-wider">Prior</span>
-                          <div className="text-caption text-text-secondary mt-px">
-                            {entry.prior_shadow_verdict ?? "—"} /{" "}
-                            {entry.prior_final_status ?? "—"}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-text-quaternary uppercase tracking-wider">After</span>
-                          <div className="text-caption text-text-secondary mt-px">
-                            {entry.new_shadow_verdict ?? "—"} /{" "}
-                            {entry.new_final_status ?? "—"}
-                          </div>
-                        </div>
+                        <ReanalysisTransition
+                          label="Prior"
+                          verdict={entry.prior_shadow_verdict}
+                          status={entry.prior_final_status}
+                        />
+                        <ReanalysisTransition
+                          label="After"
+                          verdict={entry.new_shadow_verdict}
+                          status={entry.new_final_status}
+                        />
                       </div>
                     </div>
                   ))}
@@ -328,8 +332,11 @@ function SAPActionsList({ actions }: {
                   {a.transaction}
                 </td>
                 <td className="px-10 py-6 font-mono text-text-tertiary align-top">
-                  {a.table ?? "—"}
-                  {a.field && <span className="text-text-quaternary"> / {a.field}</span>}
+                  {/* Structural omission (CLAUDE.md Guardrail #6):
+                      empty cell when neither table nor field is
+                      present, rather than rendering "—". */}
+                  {a.table ?? ""}
+                  {a.field && <span className="text-text-quaternary">{a.table ? " / " : ""}{a.field}</span>}
                 </td>
                 <td className="px-10 py-6 text-text-secondary align-top">
                   {a.description}
@@ -383,6 +390,37 @@ function CustomerEmailDraft({ body }: { body: string }) {
       <pre className="m-0 p-10 rounded-sm bg-surface-secondary text-caption text-text-secondary font-sans leading-normal whitespace-pre-wrap">
         {body}
       </pre>
+    </div>
+  );
+}
+
+/**
+ * Reanalysis-history transition cell — shows only the components of
+ * a verdict/status pair that are present. CLAUDE.md Guardrail #6:
+ * absent components are structurally omitted (no "—" placeholder)
+ * because a partial-truth value here conceals whether the prior
+ * value was missing or unchanged.
+ */
+function ReanalysisTransition({
+  label,
+  verdict,
+  status,
+}: {
+  label: string;
+  verdict?: string;
+  status?: string;
+}) {
+  const parts = [verdict, status].filter(
+    (p): p is string => typeof p === "string" && p.length > 0,
+  );
+  return (
+    <div>
+      <span className="text-text-quaternary uppercase tracking-wider">{label}</span>
+      {parts.length > 0 && (
+        <div className="text-caption text-text-secondary mt-px">
+          {parts.join(" / ")}
+        </div>
+      )}
     </div>
   );
 }

@@ -730,3 +730,63 @@ Order of adoption (suggested, by complexity):
 Each takes ~2–4 hours including tests; the gateway-persistence
 ones (backorder, duplicate_detection) need an upstream schema change
 to persist gateway-fetched data on the record.
+
+---
+
+## Review-finding follow-ups (open backlog after the 2026-04-25 review)
+
+The 2026-04-25 review surfaced 8 findings. Six landed in
+fix-commits (N1 badge fallbacks, N2 partial-truth `?? "—"` removal,
+N3 ASOE_ENV default flip, N6 dead `case "EXECUTING"`, N7 composer
+docstring; N8 gstack version note logged). Two are intentionally
+left open as tracked backlog items because they're broader cleanups
+better handled as their own focused PRs than spliced into the fix
+batch.
+
+### Open: N4 — `useConditionalField` is a primitive without consumers
+**File:** `src/hooks/useConditionalField.ts` (+ test
+`tests/hooks/useConditionalField.test.ts`).
+**Status:** Implemented + tested + zero importers.
+**Why deferred:** the hook was shipped ahead of the per-section
+EvidenceBlock refactor (N5 below). Closing the gap means: each
+section that owns a conditional field
+(`alternate_warehouses`, `substitutes`, `production`, `inbound_po`
+on BackOrder; the depends_on predicates listed in
+asoe2/compliance/audit_bearing_registry.yaml) wires the hook into
+its EvidenceBlock instance so the composer-side
+`depends_on resolved_action == X` logic has a UI counterpart.
+**Action when picked up:** adopt in `BackOrderSection` first
+(richest set of conditional fields), then the others. Each
+adoption is a focused commit; the hook's existing tests already
+pin its semantics.
+
+### Open: N5 — Complete EvidenceBlock adoption (4 of 11 sections)
+**Already adopted:** `DeliveryDelaySection`, `MOQSection`,
+`OverMaxSection`, `PalletConfigSection`.
+**Still on legacy patterns:** `BackOrderSection`,
+`DuplicateDetectionSection`, `EdiMismatchSection`,
+`OrderComparisonSection`, `PriceAnalysisSection`,
+`PriceHoldSection`, `AgentAnalysisSection`.
+**Why deferred:** each section's EvidenceBlock migration is a
+focused review (audit-bearing vs conditional vs contextual
+classifications come from
+`asoe2/compliance/audit_bearing_registry.yaml`), and lumping seven
+into one commit is hard to review. Best paired with N4 as each
+section gets refactored.
+**Action when picked up:** track per-section in this section as
+checklist items as they land:
+- [ ] AgentAnalysisSection
+- [ ] BackOrderSection  (also closes N4 for its conditional
+  alternate_warehouses / substitutes / production / inbound_po)
+- [ ] DuplicateDetectionSection
+- [ ] EdiMismatchSection
+- [ ] OrderComparisonSection
+- [ ] PriceAnalysisSection
+- [ ] PriceHoldSection
+
+When all 11 adopt, the `?? "—"` / `data.field ?? fallback` pattern
+should be ungrep-able outside of `EvidenceBlock` itself.
+
+### Logged: N8 — gstack 1.5.1.0 → 1.12.2.0
+External repo, out of scope here. Logged so the next dependency
+review has the ticket.

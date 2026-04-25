@@ -37,9 +37,14 @@ export function ContextStrip({ entityProfile: ep, impactMetrics: im, defaultOpen
             {ep && (
               <div className="flex flex-col gap-4 text-caption">
                 <ContextRow icon={<User size={11} />} label="Customer" value={`${ep.customer_name} (${ep.bp_number})`} />
-                <ContextRow icon={<Building2 size={11} />} label="Tier" value={ep.customer_tier ?? "—"} badge={ep.vip_status ? "VIP" : undefined} />
-                <ContextRow icon={<Shield size={11} />} label="Credit" value={ep.credit_standing ?? "—"} />
-                <ContextRow icon={<MapPin size={11} />} label="Location" value={ep.location ?? "—"} />
+                {/* CLAUDE.md Guardrail #6: contextual fields use
+                    structural omission (render nothing) when absent.
+                    `?? "—"` was the partial-truth anti-pattern flagged
+                    by the Verdict 2026-04-22 workshop. ContextRow
+                    returns null when value is undefined. */}
+                <ContextRow icon={<Building2 size={11} />} label="Tier" value={ep.customer_tier} badge={ep.vip_status ? "VIP" : undefined} />
+                <ContextRow icon={<Shield size={11} />} label="Credit" value={ep.credit_standing} />
+                <ContextRow icon={<MapPin size={11} />} label="Location" value={ep.location} />
               </div>
             )}
           </div>
@@ -73,10 +78,18 @@ export function ContextStrip({ entityProfile: ep, impactMetrics: im, defaultOpen
 function ContextRow({ icon, label, value, badge, highlight }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  /**
+   * Structural omission for contextual entity-profile fields
+   * (CLAUDE.md Guardrail #6 / Verdict 2026-04-22). When the
+   * field is undefined the entire row is suppressed — no dash,
+   * no "—", no placeholder. Operator does not see a column they
+   * have no value for.
+   */
+  value: string | undefined;
   badge?: string;
   highlight?: boolean;
 }) {
+  if (value === undefined || value === null || value === "") return null;
   return (
     <div className="flex items-center gap-6 min-w-0">
       <span className="text-text-quaternary shrink-0">{icon}</span>

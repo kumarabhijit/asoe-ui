@@ -9,6 +9,7 @@
  *   8.   `expected_value` / `received_value` shape matrix — string,
  *        number, and object shapes all render via `renderUnknown`.
  */
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { EdiMismatchSection } from "@/app/exceptions/EdiMismatchSection";
 import type { EdiMismatchAnalysisData } from "@/types/exceptions";
@@ -106,6 +107,41 @@ describe("EdiMismatchSection", () => {
       );
       expect(screen.getByText(JSON.stringify(objVal))).toBeInTheDocument();
       expect(screen.getByText("42")).toBeInTheDocument();
+    });
+  });
+
+  describe("audit-bearing absence (Guardrail #6 — no partial-truth)", () => {
+    it("renders structural omission for null expected_value rather than '—'", () => {
+      // expected_value / received_value are audit-bearing per
+      // compliance/audit_bearing_registry.yaml. The composer is
+      // supposed to route absent records to AUDIT_CONTEXT_MISSING
+      // upstream, but if a section ever sees a null value it must
+      // NOT render the partial-truth "—" placeholder. Drop the row
+      // entirely so the operator never sees a half-truth.
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        render(
+          <EdiMismatchSection
+            data={{
+              ...base,
+              sub_type: "QTY_MISMATCH",
+              classification: "REVIEW",
+              expected_value: null,
+              received_value: 42,
+            }}
+          />,
+        );
+        // 42 still renders (received side is present).
+        expect(screen.getByText("42")).toBeInTheDocument();
+        // The "Expected" card is suppressed entirely — no "—" anywhere.
+        expect(screen.queryByText("—")).toBeNull();
+        // Dev-mode warning fires so the regression is visible.
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining("audit-bearing"),
+        );
+      } finally {
+        warn.mockRestore();
+      }
     });
   });
 });
