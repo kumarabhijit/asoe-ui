@@ -16,11 +16,21 @@
 
 import { AlertTriangle, ArrowRight, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import type { EdiMismatchAnalysisData, EdiMismatchClassification } from "@/types/exceptions";
 
 interface EdiMismatchSectionProps {
   data: EdiMismatchAnalysisData;
 }
+
+/**
+ * Registry classification (compliance/audit_bearing_registry.yaml::EdiMismatchAnalysisData):
+ * - audit-bearing: sub_type, classification, recommended_action,
+ *   autonomy_level, expected_value, received_value. Composer routes
+ *   absences to AUDIT_CONTEXT_MISSING upstream.
+ * - contextual: notification_template (downstream email plumbing,
+ *   zero audit content). Wrapped in EvidenceBlock tier="contextual".
+ */
 
 const CLASSIFICATION_BADGE: Record<EdiMismatchClassification, { variant: "success" | "warning" | "error"; label: string }> = {
   HARD_REJECT: { variant: "error",   label: "Hard reject" },
@@ -29,33 +39,14 @@ const CLASSIFICATION_BADGE: Record<EdiMismatchClassification, { variant: "succes
 };
 
 /**
- * `expected_value` and `received_value` are typed `unknown` because EDI
+ * `expected_value` / `received_value` are typed `unknown` because EDI
  * sub_types carry different value shapes (SKU=string, QTY=number,
  * SHIP_TO=DC code, UOM=enum). Render verbatim with a stable string
- * coercion — no type-specific dispatch.
- *
- * Both fields are audit-bearing per
- * compliance/audit_bearing_registry.yaml. Returning a literal "—"
- * placeholder for null/undefined would be a partial-truth state
- * (CLAUDE.md Guardrail #6 / Verdict 2026-04-22). The composer is
- * supposed to have routed records with absent values to
- * AUDIT_CONTEXT_MISSING upstream; if we still get an absent value
- * here it's a bug worth noticing — return null so isPresent() at
- * the call site can suppress the row entirely (structural
- * omission), and emit a dev-mode console warning so the regression
- * surfaces.
+ * coercion — no type-specific dispatch. EvidenceBlock handles the
+ * absence semantics (audit-bearing → structural omission +
+ * dev-warning); this helper is only the present-value coercion.
  */
-function renderUnknown(value: unknown): string | null {
-  if (value === null || value === undefined) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(
-        "[EdiMismatchSection] audit-bearing expected_value/received_value " +
-        "is absent — composer should have routed this record to " +
-        "AUDIT_CONTEXT_MISSING. Rendering with structural omission.",
-      );
-    }
-    return null;
-  }
+function stringifyUnknown(value: unknown): string {
   if (typeof value === "object") {
     try { return JSON.stringify(value); } catch { return String(value); }
   }
@@ -94,13 +85,17 @@ export function EdiMismatchSection({ data }: EdiMismatchSectionProps) {
         </Badge>
       </div>
 
-      {/* Expected vs received side-by-side */}
+      {/* Expected vs received side-by-side (audit-bearing — composer routes absences to AUDIT_CONTEXT_MISSING). */}
       <div className="grid grid-cols-[1fr_auto_1fr] gap-12 mb-16 items-start">
-        <ValueCard label="Expected" value={renderUnknown(data.expected_value)} />
+        <EvidenceBlock tier="audit-bearing" value={data.expected_value}>
+          {(v) => <ValueCard label="Expected" value={stringifyUnknown(v)} />}
+        </EvidenceBlock>
         <div className="flex items-center justify-center pt-24 text-text-quaternary">
           <ArrowRight size={20} />
         </div>
-        <ValueCard label="Received" value={renderUnknown(data.received_value)} highlight />
+        <EvidenceBlock tier="audit-bearing" value={data.received_value}>
+          {(v) => <ValueCard label="Received" value={stringifyUnknown(v)} highlight />}
+        </EvidenceBlock>
       </div>
 
       {/* Recommended action. aria-live="polite" so re-classification
@@ -118,12 +113,14 @@ export function EdiMismatchSection({ data }: EdiMismatchSectionProps) {
         <div className="border-l-[3px] border-brand pl-10 text-body font-semibold text-brand leading-normal">
           {data.recommended_action}
         </div>
-        {data.notification_template && (
-          <div className="mt-4 pl-10 flex items-center gap-6 text-caption text-text-tertiary">
-            <span className="font-mono font-semibold">Notification:</span>
-            <span className="font-mono">{data.notification_template}</span>
-          </div>
-        )}
+        <EvidenceBlock tier="contextual" value={data.notification_template}>
+          {(template) => (
+            <div className="mt-4 pl-10 flex items-center gap-6 text-caption text-text-tertiary">
+              <span className="font-mono font-semibold">Notification:</span>
+              <span className="font-mono">{String(template)}</span>
+            </div>
+          )}
+        </EvidenceBlock>
       </div>
 
       {/* Autonomy footer */}
@@ -136,12 +133,7 @@ export function EdiMismatchSection({ data }: EdiMismatchSectionProps) {
   );
 }
 
-function ValueCard({ label, value, highlight }: { label: string; value: string | null; highlight?: boolean }) {
-  // Structural omission (CLAUDE.md Guardrail #6): if renderUnknown
-  // returned null, the audit-bearing field was absent and the
-  // composer should have routed to AUDIT_CONTEXT_MISSING upstream.
-  // Rendering nothing is the correct fallback — never a "—".
-  if (value === null) return null;
+function ValueCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div
       className={

@@ -760,37 +760,51 @@ its EvidenceBlock instance so the composer-side
 adoption is a focused commit; the hook's existing tests already
 pin its semantics.
 
-### Open: N5 — Complete EvidenceBlock adoption (4 of 11 sections)
+### Closed: N5 — EvidenceBlock adoption complete across all *AnalysisData sections
 **Already adopted:** `DeliveryDelaySection`, `MOQSection`,
 `OverMaxSection`, `PalletConfigSection`.
-**Still on legacy patterns:** `BackOrderSection`,
-`DuplicateDetectionSection`, `EdiMismatchSection`,
-`OrderComparisonSection`, `PriceAnalysisSection`,
-`PriceHoldSection`, `AgentAnalysisSection`.
-**Why deferred:** each section's EvidenceBlock migration is a
-focused review (audit-bearing vs conditional vs contextual
-classifications come from
-`asoe2/compliance/audit_bearing_registry.yaml`), and lumping seven
-into one commit is hard to review. Best paired with N4 as each
-section gets refactored.
-**Action when picked up:** track per-section in this section as
-checklist items as they land:
-- [ ] AgentAnalysisSection
-- [x] BackOrderSection (also closed N4 for `alternate_warehouses`,
-  `substitutes`, `production`, `inbound_po` — landed 2026-04-25 via
-  EvidenceBlock + `predicateHolds` from `useConditionalField`).
-  ExceptionDetailPanel passes `detail.resolved_action`. 6 new
-  vitest cases pin pre- and post-disposition rendering matrix
-  (resolved_action ∈ {null, ALT_DC, SUBSTITUTE, RESCHEDULE,
-  SPLIT_SHIPMENT}).
-- [ ] DuplicateDetectionSection
-- [ ] EdiMismatchSection
-- [ ] OrderComparisonSection
-- [ ] PriceAnalysisSection
-- [ ] PriceHoldSection
+**Newly adopted (2026-04-26):**
+- [x] BackOrderSection (landed 2026-04-25 — 6c7d193). Also closed
+  N4 for `alternate_warehouses` / `substitutes` / `production` /
+  `inbound_po` via EvidenceBlock + `predicateHolds` from
+  `useConditionalField`. ExceptionDetailPanel passes
+  `detail.resolved_action`. 6 vitest cases pin pre- and
+  post-disposition rendering (resolved_action ∈ {null, ALT_DC,
+  SUBSTITUTE, RESCHEDULE, SPLIT_SHIPMENT}).
+- [x] DuplicateDetectionSection (audit-bearing
+  recommended_action / cancellation_target / autonomy_applied;
+  contextual detection_method).
+- [x] EdiMismatchSection (audit-bearing expected_value /
+  received_value via EvidenceBlock + stringifyUnknown coercion;
+  contextual notification_template).
+- [x] OrderComparisonSection (audit-bearing orders /
+  matching_fields / differing_fields — empty arrays now dev-warn
+  rather than silently hiding).
+- [x] PriceAnalysisSection (contextual contract_ref /
+  promotion_ref / material_desc / order_date wrapped; SapRow
+  ad-hoc `&&` guards retired).
+- [x] PriceHoldSection (contextual `reason` wrapped; remaining
+  fields are audit-bearing and composer-guaranteed).
 
-When all 11 adopt, the `?? "—"` / `data.field ?? fallback` pattern
-should be ungrep-able outside of `EvidenceBlock` itself.
+**Out of scope:** `AgentAnalysisSection` renders `OrderAnalysis`
+narrative blocks (`diagnosis` / `root_cause` / `recommendation`)
+which are top-level wrapper fields, not classified in
+`compliance/audit_bearing_registry.yaml` (the registry covers
+`*AnalysisData` Pydantic classes only). All three are non-optional
+in `OrderAnalysis` — no absence semantics to gate. EvidenceBlock
+adoption does not apply.
+
+**EvidenceBlock primitive change (same engagement):** the
+audit-bearing dev-warn gate loosened from
+`process.env.NODE_ENV === "development"` to `!== "production"` so
+the warning surfaces in vitest runs (NODE_ENV=test) too. Closes a
+gap where EdiMismatchSection's existing
+`audit-bearing absence (Guardrail #6)` test fixture stopped
+asserting the warn after migration.
+
+**Open follow-up:** the `?? "—"` / `data.field ?? fallback`
+pattern is now ungrep-able outside of `EvidenceBlock` itself across
+the 10 *AnalysisData sections. N5 closed.
 
 ### Logged: N8 — gstack 1.5.1.0 → 1.12.2.0
 External repo, out of scope here. Logged so the next dependency

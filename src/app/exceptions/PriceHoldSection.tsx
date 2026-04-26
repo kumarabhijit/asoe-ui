@@ -14,12 +14,22 @@
 
 import { Lock, Unlock, ArrowRight, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { fmtPrice } from "./shared";
 import type { PriceHoldAnalysisData, PriceHoldAction } from "@/types/exceptions";
 
 interface PriceHoldSectionProps {
   data: PriceHoldAnalysisData;
 }
+
+/**
+ * Registry classification (compliance/audit_bearing_registry.yaml::PriceHoldAnalysisData):
+ * - audit-bearing: hold_status, po_price, sap_base_price,
+ *   variance_pct, tolerance_pct, hard_block_pct, action. Composer
+ *   routes absences to AUDIT_CONTEXT_MISSING upstream.
+ * - contextual: reason (regenerable from variance + thresholds).
+ *   Wrapped in EvidenceBlock tier="contextual".
+ */
 
 /**
  * Variance is stored as a signed fraction (e.g., 0.05 = +5%, −0.03 = −3%).
@@ -100,9 +110,13 @@ export function PriceHoldSection({ data }: PriceHoldSectionProps) {
         <div className="border-l-[3px] border-brand pl-10 text-body font-semibold text-brand leading-normal">
           {action.label}
         </div>
-        <div className="mt-4 pl-10 text-caption text-text-tertiary">
-          {data.reason}
-        </div>
+        <EvidenceBlock tier="contextual" value={data.reason}>
+          {(reason) => (
+            <div className="mt-4 pl-10 text-caption text-text-tertiary">
+              {String(reason)}
+            </div>
+          )}
+        </EvidenceBlock>
       </div>
 
       {/* Recipe footer */}

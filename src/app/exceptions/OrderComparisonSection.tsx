@@ -12,12 +12,23 @@
 
 import { GitCompare, Check, X } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { fmtPrice } from "./shared";
 import type { OrderComparisonData, ComparisonOrder } from "@/types/exceptions";
 
 interface OrderComparisonSectionProps {
   data: OrderComparisonData;
 }
+
+/**
+ * Registry classification (compliance/audit_bearing_registry.yaml::OrderComparisonData):
+ * - audit-bearing: orders, matching_fields, differing_fields.
+ *   Synthesised from DuplicateDetection — same attestation target.
+ *   Empty arrays count as absent per `_populated`; an empty
+ *   `matching_fields` would have routed to AUDIT_CONTEXT_MISSING
+ *   upstream. EvidenceBlock fails closed (structural omission) and
+ *   dev-warns rather than silently hiding the row.
+ */
 
 export function OrderComparisonSection({ data }: OrderComparisonSectionProps) {
   return (
@@ -33,45 +44,53 @@ export function OrderComparisonSection({ data }: OrderComparisonSectionProps) {
         </span>
       </div>
 
-      {/* Matching / Differing field badges */}
+      {/* Matching / Differing field badges (audit-bearing) */}
       <div className="flex gap-16 mb-12 flex-wrap">
-        {data.matching_fields.length > 0 && (
-          <div>
-            <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4 flex items-center gap-4">
-              <Check size={10} className="text-success" />
-              Matching Fields
+        <EvidenceBlock tier="audit-bearing" value={data.matching_fields}>
+          {(fields) => (
+            <div>
+              <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4 flex items-center gap-4">
+                <Check size={10} className="text-success" />
+                Matching Fields
+              </div>
+              <div className="flex flex-wrap gap-4">
+                {(fields as string[]).map((f) => (
+                  <Badge key={f} variant="success" size="sm">{f.replace(/_/g, " ")}</Badge>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-4">
-              {data.matching_fields.map((f) => (
-                <Badge key={f} variant="success" size="sm">{f.replace(/_/g, " ")}</Badge>
-              ))}
+          )}
+        </EvidenceBlock>
+        <EvidenceBlock tier="audit-bearing" value={data.differing_fields}>
+          {(fields) => (
+            <div>
+              <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4 flex items-center gap-4">
+                <X size={10} className="text-error" />
+                Differing Fields
+              </div>
+              <div className="flex flex-wrap gap-4">
+                {(fields as string[]).map((f) => (
+                  <Badge key={f} variant="error" size="sm">{f.replace(/_/g, " ")}</Badge>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-        {data.differing_fields.length > 0 && (
-          <div>
-            <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4 flex items-center gap-4">
-              <X size={10} className="text-error" />
-              Differing Fields
-            </div>
-            <div className="flex flex-wrap gap-4">
-              {data.differing_fields.map((f) => (
-                <Badge key={f} variant="error" size="sm">{f.replace(/_/g, " ")}</Badge>
-              ))}
-            </div>
-          </div>
-        )}
+          )}
+        </EvidenceBlock>
       </div>
 
-      {/* Orders side-by-side */}
-      <div
-        className="grid gap-12"
-        style={{ gridTemplateColumns: `repeat(${data.orders.length}, 1fr)` }}
-      >
-        {data.orders.map((order, i) => (
-          <OrderComparisonCard key={order.so_number} order={order} index={i} />
-        ))}
-      </div>
+      {/* Orders side-by-side (audit-bearing) */}
+      <EvidenceBlock tier="audit-bearing" value={data.orders}>
+        {(orders) => (
+          <div
+            className="grid gap-12"
+            style={{ gridTemplateColumns: `repeat(${(orders as ComparisonOrder[]).length}, 1fr)` }}
+          >
+            {(orders as ComparisonOrder[]).map((order, i) => (
+              <OrderComparisonCard key={order.so_number} order={order} index={i} />
+            ))}
+          </div>
+        )}
+      </EvidenceBlock>
     </section>
   );
 }

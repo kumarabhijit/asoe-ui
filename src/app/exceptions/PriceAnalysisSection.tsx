@@ -8,14 +8,26 @@
 "use client";
 
 import { useState } from "react";
-import { DollarSign, TrendingDown, Package, FileText, AlertTriangle, Tag, Calendar } from "lucide-react";
+import { DollarSign, TrendingDown, FileText, AlertTriangle, Tag, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import type { PriceAnalysisData } from "@/types/exceptions";
 import { fmtPrice } from "./shared";
 
 interface PriceAnalysisSectionProps {
   data: PriceAnalysisData;
 }
+
+/**
+ * Registry classification (compliance/audit_bearing_registry.yaml::PriceAnalysisData):
+ * - audit-bearing: erp_unit_price, po_unit_price, variance_amount,
+ *   variance_pct, total_at_risk, total_quantity, uom, doc_type,
+ *   doc_number, sku, rule_id, root_cause_category. Composer routes
+ *   absences to AUDIT_CONTEXT_MISSING upstream.
+ * - contextual: contract_ref, promotion_ref, material_desc,
+ *   order_date. Wrapped in EvidenceBlock tier="contextual" — absent
+ *   → render nothing (structural omission).
+ */
 
 export function PriceAnalysisSection({ data }: PriceAnalysisSectionProps) {
   const [showSapContext, setShowSapContext] = useState(false);
@@ -151,20 +163,30 @@ export function PriceAnalysisSection({ data }: PriceAnalysisSectionProps) {
             <SapRow label="Doc Type" value={data.doc_type} />
             <SapRow label="Doc Number" value={data.doc_number} mono />
             <SapRow label="SKU" value={data.sku} mono />
-            <SapRow label="Material" value={data.material_desc} />
+            {/* material_desc / order_date are contextual — render only when present. */}
+            <EvidenceBlock tier="contextual" value={data.material_desc}>
+              {(v) => <SapRow label="Material" value={String(v)} />}
+            </EvidenceBlock>
             <SapRow label="Quantity" value={`${data.total_quantity.toLocaleString()} ${data.uom}`} />
-            <SapRow label="Order Date" value={new Date(data.order_date).toLocaleDateString()} />
+            <EvidenceBlock tier="contextual" value={data.order_date}>
+              {(v) => <SapRow label="Order Date" value={new Date(String(v)).toLocaleDateString()} />}
+            </EvidenceBlock>
             <SapRow label="Rule" value={data.rule_id} mono highlight />
             <SapRow label="Root Cause" value={data.root_cause_category} />
-            {data.contract_ref && <SapRow label="Contract" value={data.contract_ref} mono />}
-            {data.promotion_ref && (
-              <SapRow
-                label="Promotion"
-                value={data.promotion_ref}
-                mono
-                icon={<Calendar size={10} className="text-warning" />}
-              />
-            )}
+            {/* contract_ref / promotion_ref are contextual — present iff line is contract- or promo-governed. */}
+            <EvidenceBlock tier="contextual" value={data.contract_ref}>
+              {(v) => <SapRow label="Contract" value={String(v)} mono />}
+            </EvidenceBlock>
+            <EvidenceBlock tier="contextual" value={data.promotion_ref}>
+              {(v) => (
+                <SapRow
+                  label="Promotion"
+                  value={String(v)}
+                  mono
+                  icon={<Calendar size={10} className="text-warning" />}
+                />
+              )}
+            </EvidenceBlock>
           </div>
         )}
       </div>
