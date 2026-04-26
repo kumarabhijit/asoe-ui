@@ -30,7 +30,16 @@ export default defineConfig({
   testDir: "./tests/browser",
   timeout: 30_000,
   expect: { timeout: 5_000 },
-  fullyParallel: false, // in-memory shared state on the backend
+  // The asoe2 backend uses an in-memory exception store and audit log
+  // that is process-global. Specs reset tenant state between tests via
+  // POST /_sandbox/tenant/reset; if two workers run concurrently, one
+  // worker's reset wipes another worker's freshly-seeded exception and
+  // the detail page renders "Exception not found". `fullyParallel: false`
+  // alone only serializes tests *within* a file — files still parallelize
+  // across workers. Pin workers=1 so the whole suite is serial against
+  // the shared backend.
+  fullyParallel: false,
+  workers: 1,
   retries: 0,
   reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
   use: {
