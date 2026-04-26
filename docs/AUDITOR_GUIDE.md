@@ -91,7 +91,7 @@ UI ← WebSocket event (WSEvent.trace_id) ← Redis pub/sub ← Worker
 **Idempotency-Key emission (Phase 2 #9):** Every mutating client method (`disposition`, `escalate`, `cosign`, `reanalyze`, `resolve`, `resolveAsync`) emits an `Idempotency-Key` header on the outbound request. When the caller does not supply one via `RequestOptions.idempotencyKey`, `src/lib/api.ts::generateIdempotencyKey()` produces a UUID v4 per invocation. This guards against double-click and network-retry replays: the backend honours the key by returning the prior response when a duplicate arrives, preventing accidental double-dispositions. Together with `X-Trace-ID` this gives every mutating UI action a stable client-side identity that survives retries.
 
 **Audit event visibility:** The UI does not render the hash-chained audit log itself (asoe2 Phase 20 `audit_log` is server-side, verifiable out-of-band by auditors). The UI displays the **human-consumable projection** of that chain:
-- `reanalysis_history` — prior re-analysis attempts with reasons (rendered in DiagnosticsSection)
+- `reanalysis_history` — prior re-analysis attempts with reasons (rendered in DiagnosticsSection). Each entry's `triggered_by` carries the operator's email; in real-API mode the backend reads identity from the JWT, in mock mode the UI threads `user.email` from `useAuth()` synchronously into `exceptionsApi.reanalyze(id, req, triggeredBy)` so mock attribution is deterministic and matches the logged-in operator.
 - `pending_override` cosign metadata — initiator, action, reason_tag, financial_impact_usd, initiated_at (rendered in the cosign banner when `lifecycle_state === "PENDING_COSIGN"`)
 - `cosign` metadata after sign-off — cosigned_by, cosigned_at, cosign_notes (rendered in resolution data)
 

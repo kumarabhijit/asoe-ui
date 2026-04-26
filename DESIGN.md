@@ -60,7 +60,9 @@ src/
 │   └── WaterfallStepper.tsx      # 11-node pipeline progress visualization (post-ADR-025)
 ├── hooks/
 │   ├── useAuth.ts                # Wraps NextAuth session with typed user + visibleTabs, assignedAccounts
+│   ├── useConditionalField.ts    # Registry-aware predicate evaluator (`resolved_action == X` / `in [..]`); exports the pure `predicateHolds(dependsOn, resolvedAction)` for sections to feed `EvidenceBlock`'s `predicateHolds` prop
 │   ├── useErpProfile.ts          # ERP-vendor-aware label resolver (useIntentLabel, useSubTypeLabel)
+│   ├── useExceptionActions.ts    # HITL action-handler bundle (approve/reject/escalate/override/cosign/reanalyze) + override dialog state; reads `user.email` from useAuth and threads it into the reanalyze attribution
 │   ├── useHealth.ts              # Fetches runtime enums from /api/v1/health
 │   └── useWebSocket.ts           # Section 8 protocol with reconnection backoff
 ├── config/
@@ -105,6 +107,7 @@ src/
 | `AgentReasoningCard` | Tailwind | Layer 1 only (recommendation + actions), verdict × permission button matrix (Option A): `canApprove` / `canOverride` / `canEscalate` / `actionInFlight` / `recommendedAction` props. `Override…` + Approve-tooltip preview. | ExceptionDetailPanel |
 | `PricingWaterfall` | Tailwind | Pricing condition chain timeline | ExceptionDetailPanel |
 | `GapBar` | Tailwind | Horizontal bar: primary vs secondary qty, shortfall/excess mode, gap indicator | BackOrderSection, OverMaxSection, MOQSection |
+| `EvidenceBlock` | Tailwind | Three-state Layer-2 evidence renderer: PRESENT (caller renders), STRUCTURALLY OMITTED (contextual absent → null), CONTEXT NOT REQUIRED (conditional + predicate fails → labelled placeholder). Audit-bearing absences emit a non-production console.warn so registry/adapter drift is visible in dev + vitest. CLAUDE.md Guardrail #6. | All 10 `*AnalysisData` enrichment sections (PriceHold, EdiMismatch, DeliveryDelay, OverMax, MOQ, PalletConfig, BackOrder, DuplicateDetection, OrderComparison, PriceAnalysis) |
 | `GravitationalOrbs` | Custom (canvas) | Canvas animated background | Login |
 | `UserSwitcher` | Tailwind | Sandbox-only user switcher dropdown, server round-trip via `signIn("credentials")` | NavBar (all pages) |
 
@@ -191,6 +194,8 @@ NavBar (sticky top, 56px)
 {analysis?.edi_mismatch_analysis && <EdiMismatchSection data={analysis.edi_mismatch_analysis} />}
 ```
 Adding a new enrichment section requires only: (1) add the type to `OrderAnalysis`, (2) create the section component, (3) add the conditional render — zero dispatch logic.
+
+**EvidenceBlock + useConditionalField adoption (Pillar 3):** Every `*AnalysisData` enrichment section above renders Layer-2 evidence rows through the `EvidenceBlock` primitive. The component honours the registry classifications in `asoe2/compliance/audit_bearing_registry.yaml` — `audit-bearing` (composer-guaranteed; absence dev-warns and renders null), `conditional` (predicate-gated; absence renders the labelled "Context Not Required for Resolution" placeholder), `contextual` (absence is structural omission). Sections with conditional fields (today: `BackOrderSection` — `alternate_warehouses` / `substitutes` / `production` / `inbound_po`) feed `EvidenceBlock`'s `predicateHolds` prop with `predicateHolds(dependsOn, resolvedAction)` from `useConditionalField`. Pre-disposition (`resolvedAction == null`) the section is the operator's decision surface, so all conditional evidence renders if present; post-disposition the registry predicate is enforced strictly. Ad-hoc `?? "—"` and `data.field ?? fallback` patterns are now ungrep-able outside of `EvidenceBlock` itself across the 10 enrichment sections.
 
 **Shared helpers** (`shared.tsx`): `CollapsibleHeader` (used by ContextStrip, DiagnosticsSection) and `fmtPrice` (used by HeaderRibbon, ContextStrip, EvidenceGrid, enrichment sections).
 
@@ -350,6 +355,8 @@ Maps to Section 6.2 REST endpoints:
 **Mock strategy:** All endpoints return mock data with simulated latency. To connect to real FastAPI, replace the mock implementations with `fetch()` calls to `NEXT_PUBLIC_API_URL`. The interface (function signatures and return types) stays the same.
 
 **Idempotency-Key handling:** Every mutating client method (`disposition`, `escalate`, `cosign`, `reanalyze`, `resolve`, `resolveAsync`) accepts an optional `RequestOptions` second argument with `idempotencyKey?: string`. When omitted, the client generates a UUID v4 per invocation via `generateIdempotencyKey()` and sends it as the `Idempotency-Key` header. The mock implementation maintains a per-endpoint cache keyed by `(endpoint, key)` so replayed calls return the cached response and key-with-different-body raises a conflict — mirroring backend behavior.
+
+**Reanalyze attribution (mock-mode):** `exceptionsApi.reanalyze(id, request, triggeredBy?)` accepts an optional third `triggeredBy` arg. `useExceptionActions::handleReanalyze` reads `user.email` from `useAuth()` (the live React session) and threads it through synchronously, so the displayed `triggered_by` on the persisted `ReanalysisEntry` always matches the logged-in operator. Real-API mode ignores the arg and reads identity from the JWT instead. The previous async `getSession()`-via-dynamic-import lookup remains as a fallback for callers without a synchronous user context (e.g. test fixtures).
 
 **Contract-driven DTOs (Phase 2 #9):** `DispositionRequest`, `EscalateRequest`, `CosignRequest`, `ReanalyzeRequest`, and `ChallengeRequest` are aliased from `src/types/generated.ts`, which is produced by `npm run generate-types` from the committed `asoe2/openapi/asoe2.openapi.json`. Hand-editing these shapes is not permitted — change the Pydantic model in `asoe2/api/schemas.py`, re-export OpenAPI, regenerate. `tests/architectural/openapi_drift.test.ts` fails CI on drift.
 

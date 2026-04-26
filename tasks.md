@@ -743,22 +743,19 @@ left open as tracked backlog items because they're broader cleanups
 better handled as their own focused PRs than spliced into the fix
 batch.
 
-### Open: N4 — `useConditionalField` is a primitive without consumers
+### Closed: N4 — `useConditionalField` adopted in BackOrderSection
 **File:** `src/hooks/useConditionalField.ts` (+ test
 `tests/hooks/useConditionalField.test.ts`).
-**Status:** Implemented + tested + zero importers.
-**Why deferred:** the hook was shipped ahead of the per-section
-EvidenceBlock refactor (N5 below). Closing the gap means: each
-section that owns a conditional field
-(`alternate_warehouses`, `substitutes`, `production`, `inbound_po`
-on BackOrder; the depends_on predicates listed in
-asoe2/compliance/audit_bearing_registry.yaml) wires the hook into
-its EvidenceBlock instance so the composer-side
-`depends_on resolved_action == X` logic has a UI counterpart.
-**Action when picked up:** adopt in `BackOrderSection` first
-(richest set of conditional fields), then the others. Each
-adoption is a focused commit; the hook's existing tests already
-pin its semantics.
+**Status:** Pure exported `predicateHolds(dependsOn, resolvedAction)`
+is consumed by `BackOrderSection` (the only enrichment section in
+the registry today with `depends_on resolved_action == X`
+predicates: `alternate_warehouses` / `substitutes` / `production`
+/ `inbound_po`). The full `useConditionalField` React-hook form
+remains zero-importer because the section pre-computes the
+predicate values once per render at the top of the component (no
+per-row hook needed). If a future section gains conditional fields
+(see asoe2/compliance/audit_bearing_registry.yaml — none today),
+adopt the same pattern.
 
 ### Closed: N5 — EvidenceBlock adoption complete across all *AnalysisData sections
 **Already adopted:** `DeliveryDelaySection`, `MOQSection`,
