@@ -12,12 +12,24 @@
 
 import { Copy, ArrowRight, Shield, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { fmtPrice } from "./shared";
 import type { DuplicateDetectionData, OrderSnapshot } from "@/types/exceptions";
 
 interface DuplicateDetectionSectionProps {
   data: DuplicateDetectionData;
 }
+
+/**
+ * Registry classification (compliance/audit_bearing_registry.yaml::DuplicateDetectionData):
+ * - audit-bearing: days_between, confidence, recommended_action,
+ *   cancellation_target, autonomy_applied, original_order, duplicate_order.
+ *   The composer routes missing values to AUDIT_CONTEXT_MISSING upstream;
+ *   absence here is a registry/adapter bug. EvidenceBlock fails closed
+ *   (structural omission) and dev-warns.
+ * - contextual: detection_method (regenerable from signal_scores).
+ *   Wrapped in EvidenceBlock tier="contextual" — absent → render nothing.
+ */
 
 export function DuplicateDetectionSection({ data }: DuplicateDetectionSectionProps) {
   return (
@@ -45,37 +57,53 @@ export function DuplicateDetectionSection({ data }: DuplicateDetectionSectionPro
         <OrderCard label="Duplicate Order" order={data.duplicate_order} highlight />
       </div>
 
-      {/* Detection method */}
-      <div className="mb-12">
-        <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
-          Detection Method
-        </div>
-        <div className="flex items-center gap-8 text-body text-text-secondary">
-          <Shield size={14} className="text-text-tertiary shrink-0" />
-          {data.detection_method}
-        </div>
-      </div>
+      {/* Detection method (contextual — regenerable from signal_scores) */}
+      <EvidenceBlock tier="contextual" value={data.detection_method}>
+        {(method) => (
+          <div className="mb-12">
+            <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
+              Detection Method
+            </div>
+            <div className="flex items-center gap-8 text-body text-text-secondary">
+              <Shield size={14} className="text-text-tertiary shrink-0" />
+              {String(method)}
+            </div>
+          </div>
+        )}
+      </EvidenceBlock>
 
-      {/* Recommended action */}
-      <div className="mb-12">
-        <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
-          Recommended Action
-        </div>
-        <div className="border-l-[3px] border-brand pl-10 text-body font-semibold text-brand leading-normal">
-          {data.recommended_action}
-        </div>
-        <div className="mt-4 pl-10 flex items-center gap-6 text-caption text-text-tertiary">
-          <span className="font-mono font-semibold">Cancel target:</span>
-          <span className="font-mono text-error font-semibold">{data.cancellation_target}</span>
-        </div>
-      </div>
+      {/* Recommended action (audit-bearing) */}
+      <EvidenceBlock tier="audit-bearing" value={data.recommended_action}>
+        {(action) => (
+          <div className="mb-12">
+            <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
+              Recommended Action
+            </div>
+            <div className="border-l-[3px] border-brand pl-10 text-body font-semibold text-brand leading-normal">
+              {String(action)}
+            </div>
+            <EvidenceBlock tier="audit-bearing" value={data.cancellation_target}>
+              {(target) => (
+                <div className="mt-4 pl-10 flex items-center gap-6 text-caption text-text-tertiary">
+                  <span className="font-mono font-semibold">Cancel target:</span>
+                  <span className="font-mono text-error font-semibold">{String(target)}</span>
+                </div>
+              )}
+            </EvidenceBlock>
+          </div>
+        )}
+      </EvidenceBlock>
 
-      {/* Autonomy level */}
-      <div className="flex items-center gap-8 px-12 py-8 bg-surface-secondary rounded-sm text-caption">
-        <Clock size={12} className="text-text-tertiary" />
-        <span className="text-text-tertiary font-semibold">Autonomy:</span>
-        <span className="text-text-secondary">{data.autonomy_applied}</span>
-      </div>
+      {/* Autonomy level (audit-bearing) */}
+      <EvidenceBlock tier="audit-bearing" value={data.autonomy_applied}>
+        {(autonomy) => (
+          <div className="flex items-center gap-8 px-12 py-8 bg-surface-secondary rounded-sm text-caption">
+            <Clock size={12} className="text-text-tertiary" />
+            <span className="text-text-tertiary font-semibold">Autonomy:</span>
+            <span className="text-text-secondary">{String(autonomy)}</span>
+          </div>
+        )}
+      </EvidenceBlock>
     </section>
   );
 }

@@ -404,7 +404,10 @@ export default function ExceptionDetailPanel({
             <OrderComparisonSection data={analysis.order_comparison} />
           )}
           {analysis?.backorder_analysis && (
-            <BackOrderSection data={analysis.backorder_analysis} />
+            <BackOrderSection
+              data={analysis.backorder_analysis}
+              resolvedAction={detail.resolved_action}
+            />
           )}
           {analysis?.overmax_analysis && (
             <OverMaxSection data={analysis.overmax_analysis} />

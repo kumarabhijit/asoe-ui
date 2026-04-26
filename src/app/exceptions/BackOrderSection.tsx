@@ -12,18 +12,56 @@ import { useState } from "react";
 import { Package, Warehouse, ArrowRight, Truck, Star, ChevronDown, Factory, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GapBar } from "@/components/ui/GapBar";
+import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
+import { predicateHolds } from "@/hooks/useConditionalField";
 import type { BackOrderAnalysisData, ResolutionOption } from "@/types/exceptions";
 import { fmtPrice } from "./shared";
 
 interface BackOrderSectionProps {
   data: BackOrderAnalysisData;
+  /**
+   * The exception's `resolved_action`, when set. Drives whether the
+   * conditional fields (`alternate_warehouses`, `substitutes`,
+   * `production`, `inbound_po`) render their data, render the
+   * "Context Not Required for Resolution" placeholder, or stay
+   * hidden. Null pre-disposition (operator hasn't picked an action
+   * yet) — in that mode every conditional field renders its data
+   * if present, because the section is the operator's decision
+   * surface. Mirrors the registry semantics in
+   * compliance/audit_bearing_registry.yaml::BackOrderAnalysisData.
+   */
+  resolvedAction?: string | null;
 }
 
-export function BackOrderSection({ data }: BackOrderSectionProps) {
+export function BackOrderSection({ data, resolvedAction = null }: BackOrderSectionProps) {
   const [showInventory, setShowInventory] = useState(true);
   const [selectedOption, setSelectedOption] = useState<string | null>(
     data.resolution_options.find((o) => o.recommended)?.id ?? null,
   );
+
+  // Pre- vs post-disposition gating for conditional registry fields.
+  // Pre-disposition: the operator is picking an action; all evidence
+  // renders if present. Post-disposition: only the predicate-matching
+  // evidence stays in scope; non-matching conditional fields collapse
+  // to "Context Not Required for Resolution" (the registry's
+  // structural-omission alternative).
+  const isPostDisposition = resolvedAction != null;
+  const altDcEnforced = predicateHolds(
+    "resolved_action == ALT_DC", resolvedAction ?? null,
+  );
+  const substituteEnforced = predicateHolds(
+    "resolved_action == SUBSTITUTE", resolvedAction ?? null,
+  );
+  const rescheduleEnforced = predicateHolds(
+    "resolved_action == RESCHEDULE", resolvedAction ?? null,
+  );
+  // EvidenceBlock's `predicateHolds` prop: pre-disposition treats the
+  // predicate as always-holding so present data renders; post-
+  // disposition uses the registry-strict result.
+  const altDcShows = !isPostDisposition || altDcEnforced;
+  const substituteShows = !isPostDisposition || substituteEnforced;
+  const rescheduleShows = !isPostDisposition || rescheduleEnforced;
+  const alternateCount = altDcShows ? data.alternate_warehouses.length : 0;
 
   return (
     <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
@@ -69,7 +107,7 @@ export function BackOrderSection({ data }: BackOrderSectionProps) {
           >
             <Warehouse size={14} className="text-text-tertiary" />
             <span className="text-caption font-semibold text-text-secondary flex-1">
-              DC Inventory ({1 + data.alternate_warehouses.length} locations)
+              DC Inventory ({1 + alternateCount} location{1 + alternateCount === 1 ? "" : "s"})
             </span>
             <ChevronDown
               size={12}
@@ -94,86 +132,137 @@ export function BackOrderSection({ data }: BackOrderSectionProps) {
                 </span>
               </div>
 
-              {/* Alternate warehouses */}
-              {data.alternate_warehouses.map((wh) => (
-                <div
-                  key={wh.plant}
-                  className="flex items-center gap-8 px-12 py-6 border-b border-border last:border-b-0 hover:bg-surface-row-hover transition-colors"
-                >
-                  <Truck size={12} className="text-text-quaternary shrink-0" />
-                  <span className="text-caption text-text-primary flex-1">{wh.name}</span>
-                  <span className="text-label text-text-tertiary">{wh.region}</span>
-                  <span className="text-caption font-mono text-text-primary">{wh.qty.toLocaleString()} {data.uom}</span>
-                  <span className="text-label text-text-tertiary">{wh.eta_days}d</span>
-                  <span className={cn(
-                    "text-label font-mono",
-                    wh.freight_delta_per_unit > 0 ? "text-warning" : "text-success",
-                  )}>
-                    {wh.freight_delta_per_unit > 0 ? "+" : ""}{fmtPrice(wh.freight_delta_per_unit)}/u
-                  </span>
-                </div>
-              ))}
+              {/* Alternate warehouses — registry tier=conditional,
+                  depends_on resolved_action == ALT_DC. Pre-
+                  disposition (no resolved_action yet) we render the
+                  list as decision evidence; post-disposition with a
+                  non-ALT_DC action we collapse to the
+                  "Context Not Required" placeholder. */}
+              <EvidenceBlock
+                tier="conditional"
+                value={data.alternate_warehouses}
+                predicateHolds={altDcShows}
+              >
+                {(value) => (
+                  <>
+                    {(value as typeof data.alternate_warehouses).map((wh) => (
+                      <div
+                        key={wh.plant}
+                        className="flex items-center gap-8 px-12 py-6 border-b border-border last:border-b-0 hover:bg-surface-row-hover transition-colors"
+                      >
+                        <Truck size={12} className="text-text-quaternary shrink-0" />
+                        <span className="text-caption text-text-primary flex-1">{wh.name}</span>
+                        <span className="text-label text-text-tertiary">{wh.region}</span>
+                        <span className="text-caption font-mono text-text-primary">{wh.qty.toLocaleString()} {data.uom}</span>
+                        <span className="text-label text-text-tertiary">{wh.eta_days}d</span>
+                        <span className={cn(
+                          "text-label font-mono",
+                          wh.freight_delta_per_unit > 0 ? "text-warning" : "text-success",
+                        )}>
+                          {wh.freight_delta_per_unit > 0 ? "+" : ""}{fmtPrice(wh.freight_delta_per_unit)}/u
+                        </span>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </EvidenceBlock>
             </div>
           )}
         </div>
 
-        {/* ── Production & Substitutes ─────────────────────────────────── */}
-        {(data.production || data.inbound_po || data.substitutes.length > 0) && (
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-8">
-            {data.production && (
-              <div className="p-10 rounded-md border border-border bg-surface-secondary">
-                <div className="flex items-center gap-4 text-text-quaternary mb-4">
-                  <Factory size={12} />
-                  <span className="text-label font-bold uppercase tracking-wider">Production</span>
+        {/* ── Production & Substitutes (registry-conditional fields)
+            Each block is wrapped in EvidenceBlock so post-disposition
+            with a non-matching action collapses to "Context Not
+            Required for Resolution" — the Verdict's named alternative
+            to partial-truth states. Pre-disposition treats every
+            predicate as holding so present data still renders for
+            the operator's decision. ──────────────────────────── */}
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-8">
+          {/* production: depends_on resolved_action == RESCHEDULE */}
+          <EvidenceBlock
+            tier="conditional"
+            value={data.production}
+            predicateHolds={rescheduleShows}
+          >
+            {(value) => {
+              const production = value as NonNullable<BackOrderAnalysisData["production"]>;
+              return (
+                <div className="p-10 rounded-md border border-border bg-surface-secondary">
+                  <div className="flex items-center gap-4 text-text-quaternary mb-4">
+                    <Factory size={12} />
+                    <span className="text-label font-bold uppercase tracking-wider">Production</span>
+                  </div>
+                  <div className="text-caption text-text-primary">
+                    <span className="font-mono font-bold">{production.qty.toLocaleString()} {data.uom}</span>
+                    <span className="text-text-tertiary"> due </span>
+                    <span className="font-mono">{new Date(production.date).toLocaleDateString()}</span>
+                  </div>
                 </div>
-                <div className="text-caption text-text-primary">
-                  <span className="font-mono font-bold">{data.production.qty.toLocaleString()} {data.uom}</span>
-                  <span className="text-text-tertiary"> due </span>
-                  <span className="font-mono">{new Date(data.production.date).toLocaleDateString()}</span>
+              );
+            }}
+          </EvidenceBlock>
+
+          {/* inbound_po: depends_on resolved_action == RESCHEDULE */}
+          <EvidenceBlock
+            tier="conditional"
+            value={data.inbound_po}
+            predicateHolds={rescheduleShows}
+          >
+            {(value) => {
+              const ipo = value as NonNullable<BackOrderAnalysisData["inbound_po"]>;
+              return (
+                <div className="p-10 rounded-md border border-border bg-surface-secondary">
+                  <div className="flex items-center gap-4 text-text-quaternary mb-4">
+                    <Package size={12} />
+                    <span className="text-label font-bold uppercase tracking-wider">Inbound PO</span>
+                  </div>
+                  <div className="text-caption text-text-primary">
+                    <span className="font-mono font-bold">{ipo.po_num}</span>
+                    <span className="text-text-tertiary"> — </span>
+                    <span className="font-mono">{ipo.qty.toLocaleString()} {data.uom}</span>
+                    <span className="text-text-tertiary"> ETA </span>
+                    <span className="font-mono">{new Date(ipo.eta).toLocaleDateString()}</span>
+                  </div>
                 </div>
-              </div>
-            )}
-            {data.inbound_po && (
-              <div className="p-10 rounded-md border border-border bg-surface-secondary">
-                <div className="flex items-center gap-4 text-text-quaternary mb-4">
-                  <Package size={12} />
-                  <span className="text-label font-bold uppercase tracking-wider">Inbound PO</span>
+              );
+            }}
+          </EvidenceBlock>
+
+          {/* substitutes: depends_on resolved_action == SUBSTITUTE */}
+          <EvidenceBlock
+            tier="conditional"
+            value={data.substitutes}
+            predicateHolds={substituteShows}
+          >
+            {(value) => {
+              const subs = value as BackOrderAnalysisData["substitutes"];
+              return (
+                <div className="p-10 rounded-md border border-border bg-surface-secondary col-span-full">
+                  <div className="flex items-center gap-4 text-text-quaternary mb-6">
+                    <Tag size={12} />
+                    <span className="text-label font-bold uppercase tracking-wider">Substitute SKUs</span>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    {subs.map((sub) => (
+                      <div key={sub.sku} className="flex items-center gap-6 text-caption">
+                        <span className="font-mono text-brand font-bold">{sub.sku}</span>
+                        <span className="text-text-primary flex-1">{sub.description}</span>
+                        <span className="font-mono text-text-secondary">{sub.available_qty.toLocaleString()} avail</span>
+                        <span className={cn(
+                          "font-mono",
+                          sub.price_delta_pct > 0 ? "text-error" : sub.price_delta_pct < 0 ? "text-success" : "text-text-tertiary",
+                        )}>
+                          {sub.price_delta_pct > 0 ? "+" : ""}{sub.price_delta_pct.toFixed(1)}%
+                        </span>
+                        <span className="text-text-tertiary">{(sub.acceptance_rate * 100).toFixed(0)}% accept</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="text-caption text-text-primary">
-                  <span className="font-mono font-bold">{data.inbound_po.po_num}</span>
-                  <span className="text-text-tertiary"> — </span>
-                  <span className="font-mono">{data.inbound_po.qty.toLocaleString()} {data.uom}</span>
-                  <span className="text-text-tertiary"> ETA </span>
-                  <span className="font-mono">{new Date(data.inbound_po.eta).toLocaleDateString()}</span>
-                </div>
-              </div>
-            )}
-            {data.substitutes.length > 0 && (
-              <div className="p-10 rounded-md border border-border bg-surface-secondary col-span-full">
-                <div className="flex items-center gap-4 text-text-quaternary mb-6">
-                  <Tag size={12} />
-                  <span className="text-label font-bold uppercase tracking-wider">Substitute SKUs</span>
-                </div>
-                <div className="flex flex-col gap-4">
-                  {data.substitutes.map((sub) => (
-                    <div key={sub.sku} className="flex items-center gap-6 text-caption">
-                      <span className="font-mono text-brand font-bold">{sub.sku}</span>
-                      <span className="text-text-primary flex-1">{sub.description}</span>
-                      <span className="font-mono text-text-secondary">{sub.available_qty.toLocaleString()} avail</span>
-                      <span className={cn(
-                        "font-mono",
-                        sub.price_delta_pct > 0 ? "text-error" : sub.price_delta_pct < 0 ? "text-success" : "text-text-tertiary",
-                      )}>
-                        {sub.price_delta_pct > 0 ? "+" : ""}{sub.price_delta_pct.toFixed(1)}%
-                      </span>
-                      <span className="text-text-tertiary">{(sub.acceptance_rate * 100).toFixed(0)}% accept</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+              );
+            }}
+          </EvidenceBlock>
+        </div>
 
         {/* ── Resolution Options (Ranked) ──────────────────────────────── */}
         {data.resolution_options.length > 0 && (

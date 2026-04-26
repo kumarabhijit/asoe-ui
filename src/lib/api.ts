@@ -1010,7 +1010,26 @@ export const exceptionsApi = {
     return response;
   },
 
-  async reanalyze(id: string, request: ReanalyzeRequest): Promise<ExceptionDetailResponse> {
+  async reanalyze(
+    id: string,
+    request: ReanalyzeRequest,
+    /**
+     * Optional — caller-provided email of the user triggering the
+     * reanalysis. The component layer reads this from `useAuth()`'s
+     * session-backed user object and passes it in synchronously.
+     * Preferred path for mock mode: avoids the
+     * `getSession()`-via-dynamic-import lookup which can return null
+     * during hydration races and silently fall back to the module-level
+     * default user (yielding wrong attribution like the literal
+     * "mock-user" or the marcus.webb default). When a value is
+     * provided here, attribution is deterministic.
+     *
+     * Falls through to `getCurrentMockUserEmail()` when omitted (e.g.
+     * test contexts that haven't set up a session). Production /
+     * real-API mode reads identity from the JWT, ignoring this arg.
+     */
+    triggeredBy?: string,
+  ): Promise<ExceptionDetailResponse> {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
@@ -1042,14 +1061,16 @@ export const exceptionsApi = {
       ? exc.id + "-trace"
       : history[history.length - 1].new_trace_id ?? exc.id + "-trace";
     const newTraceId = exc.id + "-trace-" + Math.random().toString(36).slice(2, 8);
-    // Bug fix: read the actual logged-in user from the NextAuth session
-    // (was: `_currentMockUser?.email` which is server-only state and
-    // defaulted to marcus.webb in the browser bundle).
-    const triggeredBy = (await getCurrentMockUserEmail()) ?? "mock-user";
+    // Identity resolution: prefer the caller-provided email (read
+    // synchronously from useAuth() in the component tree); fall back
+    // to the async getSession() lookup; final fallback is the
+    // module-level default. The two-tier order means the React
+    // session is the source of truth on every UI-driven write.
+    const resolvedTriggeredBy = triggeredBy ?? (await getCurrentMockUserEmail()) ?? "mock-user";
     const entry: ReanalysisEntry = {
       attempt: history.length + 1,
       triggered_at: ts,
-      triggered_by: triggeredBy,
+      triggered_by: resolvedTriggeredBy,
       reason: request.reason,
       prior_trace_id: priorTraceId,
       prior_shadow_verdict: exc.shadow_verdict,

@@ -133,11 +133,9 @@ export function EvidenceBlock({
   // have routed to AUDIT_CONTEXT_MISSING), but if it does we fail
   // closed: render nothing rather than show partial truth. Dev
   // mode logs a warning so the gap is visible during development.
-  if (
-    tier === "audit-bearing" &&
-    typeof window !== "undefined" &&
-    process.env.NODE_ENV === "development"
-  ) {
+  // Non-production: log the gap so it surfaces in dev consoles AND
+  // vitest runs (NODE_ENV=test). Production stays silent.
+  if (tier === "audit-bearing" && process.env.NODE_ENV !== "production") {
     // eslint-disable-next-line no-console
     console.warn(
       "[EvidenceBlock] audit-bearing field is absent on the payload " +

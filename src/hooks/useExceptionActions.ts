@@ -55,7 +55,7 @@ export interface UseExceptionActionsOptions {
 
 export function useExceptionActions(opts: UseExceptionActionsOptions) {
   const { exceptionId, detail, setDetail, onActionComplete, refreshDetail } = opts;
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { addToast } = useToast();
 
   const [actionInFlight, setActionInFlight] = useState<ActionInFlight>(null);
@@ -255,7 +255,14 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
     }
     setActionInFlight("reanalyze");
     try {
-      const updated = await exceptionsApi.reanalyze(exceptionId, { reason });
+      // Pass the React-session user email straight through so mock-mode
+      // attribution is deterministic. Without this the api falls back
+      // to a side-channel module variable that can be stale across the
+      // server / browser bundle split (resulting in attribution to
+      // "User" / "mock-user" / the default seed user instead of the
+      // actually-logged-in operator).
+      const triggeredBy = user?.email ?? undefined;
+      const updated = await exceptionsApi.reanalyze(exceptionId, { reason }, triggeredBy);
       setDetail(updated);
       if (refreshDetail) await refreshDetail();
       addToast("success", `Exception ${exceptionId} re-analyzed`);
@@ -264,7 +271,7 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       console.error("Reanalyze failed:", err);
       addToast("error", err instanceof Error ? err.message : "Re-analysis failed.");
     } finally { setActionInFlight(null); }
-  }, [exceptionId, hasPermission, addToast, setDetail, onActionComplete, refreshDetail]);
+  }, [exceptionId, hasPermission, addToast, setDetail, onActionComplete, refreshDetail, user?.email]);
 
   return {
     actionInFlight,
