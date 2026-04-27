@@ -26,8 +26,11 @@ export const authOptions: NextAuthOptions = {
           });
           const user = res.user;
           if (!user) return null;
+          // Backend's UserProfile (asoe2/api/schemas.py) only carries `sub`,
+          // not `id`. NextAuth needs a non-empty `id` on the returned user
+          // object or it will assign undefined and fail the session.
           return {
-            id: user.id,
+            id: user.sub,
             email: user.email,
             name: user.name,
             title: user.title,

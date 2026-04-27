@@ -708,9 +708,12 @@ export const exceptionsApi = {
     limit?: number;
   }): Promise<ExceptionListResponse> {
     if (USE_REAL_API) {
+      // Server reads the query param as `status` (api/routes/exceptions.py).
+      // The internal mock store keyed off `lifecycle_state` is unrelated;
+      // do not rename this back without coordinating a server change.
       return http<ExceptionListResponse>("/api/v1/exceptions", {
         query: {
-          lifecycle_state: params?.status,
+          status: params?.status,
           intent: params?.intent,
           cursor: params?.cursor,
           limit: params?.limit,
