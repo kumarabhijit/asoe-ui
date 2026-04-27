@@ -103,9 +103,11 @@ asoe-ui/
 
 | Variable | Default | Description |
 |---|---|---|
-| `NEXTAUTH_URL` | `http://localhost:3000` | NextAuth base URL |
-| `NEXTAUTH_SECRET` | — | JWT signing secret (required) |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | FastAPI backend URL |
+| `NEXTAUTH_URL` | `http://localhost:3000` | NextAuth base URL. On Azure pre-prod the bicep template sets this to `https://${uiAppName}.${defaultDomain}` automatically. |
+| `NEXTAUTH_SECRET` | — | JWT signing secret (required). Auto-generated and preserved across re-runs by `scripts/deploy-azure.sh` in the asoe2 repo when `DEPLOY_UI=1`. |
+| `AUTH_TRUST_HOST` | `true` (Azure pre-prod) | Lets NextAuth honor the request's `Host` header — needed for Vercel preview hostnames that change per PR. |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | FastAPI backend URL. **Inlined into the client bundle at build time** (Next.js NEXT_PUBLIC_* contract); cannot be overridden at runtime. The asoe2 deploy script passes it as `--build-arg` to `az acr build`. |
+| `NEXT_PUBLIC_USE_REAL_API` | unset (mock mode) | Set to `"1"` to switch the api client (`src/lib/api.ts`) from local mock data to live `fetch()` against `NEXT_PUBLIC_API_URL`. Production / pre-prod must set this. |
 | `NEXT_PUBLIC_SHOW_PREVIEW_FEATURES` | `true` | Show preview/upcoming feature tabs (SAP Data, Change Analysis). Set to `"false"` for production to hide. |
 | `NEXT_PUBLIC_ASOE_ERP_VENDOR` | `SAP` (committed default in `next.config.mjs`) | ERP vocabulary used for intent / sub_type display labels. Allowed values: `SAP`, `ORACLE`, `SALESFORCE`, `GENERIC`. Invalid / missing values fall back to `GENERIC`. See `src/config/erp-label-map.ts` for the per-vendor maps and `src/hooks/useErpProfile.ts` for the resolver. Canonical backend codes (intent enum, recipe names) are unaffected. |
 | `SSO_CLIENT_ID` | — | OIDC client ID (per IdP) |
@@ -113,6 +115,22 @@ asoe-ui/
 | `SSO_ISSUER_URL` | — | OIDC issuer URL (per IdP) |
 
 See `.env.local.example` for the full template.
+
+---
+
+## Deployment
+
+| Environment | Host | How |
+|---|---|---|
+| Dev / per-PR previews | Vercel | Push to branch — Vercel auto-deploys. Set `NEXT_PUBLIC_USE_REAL_API=1` and `NEXT_PUBLIC_API_URL=https://<sandbox-api-fqdn>` on the Vercel Preview scope. |
+| Pre-prod (sandbox) | Azure Container Apps (recommended) | Run `scripts/deploy-azure.sh` in the **asoe2** repo with `DEPLOY_UI=1` and `ASOE_UI_PATH=/path/to/this/repo`. The deploy script builds the standalone Next.js image into ACR with `NEXT_PUBLIC_API_URL` baked in, then provisions a sister Container App alongside the API. |
+| Pre-prod (alternative) | Vercel | Set the same env vars as dev/preview; CORS origin is already in the API's allowlist. |
+
+The asoe-ui repo ships a production `Dockerfile` (multi-stage, standalone,
+non-root, port 3000) used only by Azure pre-prod. Vercel does not use
+this Dockerfile — Vercel runs `next build` against `package.json`
+directly. Full Azure runbook (incl. `redeploy-ui.sh` for fast UI-only
+redeploys) lives at `asoe2/docs/deploy-azure-container-apps.md`.
 
 ---
 
