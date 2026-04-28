@@ -48,6 +48,13 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Next.js requires a `public/` directory at runtime even when empty
+# (server.js does `path.join(__dirname, 'public')`). asoe-ui doesn't
+# ship static assets today, so the source repo doesn't have one;
+# create it as a no-op so the runner-stage COPY below always finds
+# something to copy.
+RUN mkdir -p public
+
 RUN npm run build
 
 # ---------------------------------------------------------------------------
