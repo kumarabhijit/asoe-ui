@@ -241,6 +241,13 @@ function ExceptionQueueContent() {
     enabled: !!user && !!accessToken,
     onEvent: handleWsEvent,
     onReconnect: handleWsReconnect,
+    // Section 8.4 polling fallback. When the WS has been unhealthy
+    // long enough that the hook gives up on real-time, fall back to
+    // refreshing the queue every ~5s so the operator's view doesn't
+    // go stale. Same silent-refresh path as the WS event handlers
+    // so the loading spinner doesn't flash. Auto-clears when WS
+    // recovers.
+    onPollFallback: handleWsReconnect,
   });
 
   /* ── Client-side search filter (account scoping is server-side) ──── */
