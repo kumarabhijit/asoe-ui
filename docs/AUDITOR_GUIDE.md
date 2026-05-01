@@ -164,11 +164,13 @@ The UI renders compliance-critical data faithfully from the backend:
 | Data | Source API | UI Component |
 |---|---|---|
 | Shadow verdict (GREEN/YELLOW/RED) | `GET /exceptions/{id}` | AgentReasoningCard Layer 1 |
+| **Agent confidence (0-100)** | `GET /exceptions/{id}/analysis` → `AnalysisResponse.confidence` | AgentReasoningCard Layer 1 (Confidence pill) — sourced from the **real classifier output** persisted in `trace_data["intent_confidence"]`; never a fabricated default. See asoe2 `docs/AUDITOR_GUIDE.md` §2.1 for the source-of-truth statement. |
 | Policy hits | `GET /exceptions/{id}/trace` | AgentReasoningCard Layer 2 |
 | Gateway calls | Trace response | AgentReasoningCard Layer 2 |
 | Backend fallback tier | Trace response | AgentReasoningCard Layer 2 |
 | Resolution data | Exception detail | DiagnosticsSection JSON view |
-| Pipeline progress | WebSocket events (wired to detail panel via `onRefreshRef`) | WaterfallStepper (in DiagnosticsSection) |
+| Pipeline progress | WebSocket events (wired to detail panel via `onRefreshRef`); REST polling fallback after 5 failed reconnects (§8.4) | WaterfallStepper (in DiagnosticsSection) |
+| **Pipeline failure banner** | `lifecycle_state === "FAILED"` + execution_log error fields | AgentReasoningCard `executionError` branch — distinct from RED verdict (compliance decision) and from "Shadow has not yet completed" (which previously rendered for every FAILED state and was misleading); see drift register D21 |
 | resolved_by / resolved_action / resolution_notes | Exception detail | DiagnosticsSection |
 | Duplicate detection (original vs duplicate order, confidence, autonomy) | `GET /exceptions/{id}/analysis` | DuplicateDetectionSection (data-presence) |
 | Order comparison (matching/differing fields, line-item diff) | `GET /exceptions/{id}/analysis` | OrderComparisonSection (data-presence) |
