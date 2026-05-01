@@ -54,7 +54,7 @@ function ExceptionQueueContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { health } = useHealth();
-  const { user, visibleTabs } = useAuth();
+  const { user, accessToken, visibleTabs } = useAuth();
 
   useEffect(() => { document.title = "Exception Queue — ASOE"; }, []);
 
@@ -227,8 +227,18 @@ function ExceptionQueueContent() {
   }, [fetchData]);
 
   useWebSocket({
-    token: user?.id ? "mock-ws-token" : undefined,
-    enabled: !!user,
+    // Pass the real backend-issued JWT so the WebSocket auth message
+    // (Section 8.1) carries a token the asoe2 ws_router can validate.
+    // The previous "mock-ws-token" placeholder authenticated only
+    // against the mock api; against the real backend the connection
+    // would close immediately on receipt of the auth frame and the
+    // exponential-backoff loop would reconnect-and-fail forever
+    // without ever delivering an event. We still gate on user (not
+    // accessToken) for the `enabled` flag so the hook waits for
+    // session hydration on first paint instead of flashing a
+    // disconnect+reconnect when accessToken arrives.
+    token: accessToken,
+    enabled: !!user && !!accessToken,
     onEvent: handleWsEvent,
     onReconnect: handleWsReconnect,
   });
