@@ -7,7 +7,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ExceptionDetail, PipelineNode } from "@/types/exceptions";
+import type { ExceptionDetail, OrderAnalysis, PipelineNode } from "@/types/exceptions";
 import type { NodeState } from "@/components/ui/WaterfallStepper";
 import type { TraceResponse } from "@/types/api";
 
@@ -66,17 +66,33 @@ const SHADOW_GATED_TERMINAL_STATES = new Set([
 ]);
 
 /**
- * Compact demo payload per pipeline node. Real runs populate these
- * fields from the TraceRecord / ExecutionLog on the backend; the
- * demo-time helper derives the obvious ones from the exception
- * itself so the waterfall steps have something to show.
+ * Compact display payload per pipeline node. Per Verdict 2026-04-22 /
+ * Guardrail #6: every value rendered must come from the backend, never
+ * synthesised. So this projects fields that are already on the
+ * `ExceptionDetail` (lifecycle, recipe, verdict, final status) and on
+ * the `OrderAnalysis` (LLM confidence) — both of which are produced by
+ * the same `build_analysis` graph node. Returns ``undefined`` when the
+ * authoritative field is absent — never a placeholder, never a
+ * fallback. The WaterfallStepper handles the missing case.
  */
 function buildNodeData(
   node: PipelineNode,
   exc: ExceptionDetail,
+  analysis?: OrderAnalysis | null,
 ): Record<string, unknown> | undefined {
   switch (node) {
-    case "classify": return exc.intent ? { intent: exc.intent, confidence: 0.92 } : undefined;
+    case "classify": {
+      if (!exc.intent) return undefined;
+      // analysis.confidence is on a 0-100 scale (matches asoe2/api/schemas.py
+      // AnalysisResponse.confidence). Normalise to 0-1 for the UI; omit the
+      // confidence key entirely when the analysis hasn't loaded yet so the
+      // step renders as "no value yet" rather than a fabricated number.
+      const data: Record<string, unknown> = { intent: exc.intent };
+      if (typeof analysis?.confidence === "number") {
+        data.confidence = analysis.confidence / 100;
+      }
+      return data;
+    }
     case "shadow_audit": return exc.shadow_verdict ? { shadow_verdict: exc.shadow_verdict } : undefined;
     case "select_recipe": return exc.selected_recipe ? { selected_recipe: exc.selected_recipe } : undefined;
     case "apply_effects": return exc.final_status ? { final_status: exc.final_status } : undefined;
@@ -86,15 +102,26 @@ function buildNodeData(
 }
 
 /**
- * Synthesize pipeline-node states for the WaterfallStepper from an
- * exception's current lifecycle_state. Pure — moving from the
- * orchestrator keeps ExceptionDetailPanel focused on orchestration
- * (review M3). `trace` is currently unused; kept in the signature
- * for when the real trace payload drives the step timings.
+ * Project pipeline-node states for the WaterfallStepper from the
+ * exception's current lifecycle_state, optionally enriched with the
+ * `OrderAnalysis` payload for backend-authoritative values like
+ * confidence.
+ *
+ * Pure. Does NOT synthesise step timings: per-node ``duration_ms``
+ * comes back undefined unless the backend (a future
+ * `TraceResponse.completed_nodes` projection) provides real
+ * measurements. Showing random durations was a Verdict 2026-04-22 /
+ * Guardrail #6 violation — the renderer now honestly displays nothing
+ * in the place of timings we don't have.
+ *
+ * `trace` is currently unused; kept in the signature for the planned
+ * extension where the trace payload carries real per-node timings +
+ * data captured by ``api/events.py::PipelineProgressPayload``.
  */
 export function buildNodeStates(
   exc: ExceptionDetail,
   _trace?: TraceResponse,
+  analysis?: OrderAnalysis | null,
 ): NodeState[] {
   const completedUpTo = STATE_PROGRESS[exc.lifecycle_state] ?? 0;
   const isFailed = FAILED_STATES.has(exc.lifecycle_state);
@@ -113,8 +140,11 @@ export function buildNodeStates(
       return {
         node,
         status: "completed",
-        duration_ms: 200 + Math.round(Math.random() * 800),
-        data: buildNodeData(node, exc),
+        // duration_ms intentionally omitted — backend doesn't expose
+        // per-node timings via the analysis/detail payloads yet, and
+        // synthesising one (e.g. Math.random()) violates Verdict
+        // 2026-04-22 / Guardrail #6.
+        data: buildNodeData(node, exc, analysis),
       };
     }
     if (i === completedUpTo && isInProgress) return { node, status: "started" };

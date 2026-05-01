@@ -207,7 +207,7 @@ export default function ExceptionDetailPanel({
 
   /* ── Derived values ──────────────────────────────────────────────── */
 
-  const nodeStates = buildNodeStates(detail, trace ?? undefined);
+  const nodeStates = buildNodeStates(detail, trace ?? undefined, analysis);
   const selectedAnalysis = analysis?.lines?.find((l) => l.line_id === selectedLine);
   const totalErp = lineItems.reduce((s, l) => s + l.erp_price * l.quantity, 0);
   const totalPo = lineItems.reduce((s, l) => s + l.po_price * l.quantity, 0);
@@ -353,7 +353,14 @@ export default function ExceptionDetailPanel({
               verdict={detail.shadow_verdict as ShadowVerdict}
               executionError={executionError}
               intent={detail.intent ?? undefined}
-              confidence={analysis?.confidence ? analysis.confidence / 100 : 0.92}
+              // Backend confidence is 0-100 (asoe2/api/schemas.py
+              // AnalysisResponse.confidence). Normalise to 0-1 for the
+              // bar. Pass through `undefined` when the analysis hasn't
+              // loaded — AgentReasoningCard hides the bar in that case
+              // (a fabricated default would silently disagree with the
+              // pipeline classify-node confidence — Verdict 2026-04-22
+              // partial-truth violation).
+              confidence={typeof analysis?.confidence === "number" ? analysis.confidence / 100 : undefined}
               recipeName={detail.selected_recipe ?? undefined}
               // Surfaced as a hover tooltip on the Approve button so the
               // reviewer sees the exact action they're accepting.
