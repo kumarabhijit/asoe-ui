@@ -485,6 +485,39 @@ export default function ExceptionDetailPanel({
               reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
               actionInFlight={actionInFlight}
             />
+          ) : executionError ? (
+            // Lifecycle=FAILED with no shadow_verdict means the pipeline
+            // crashed AT or AFTER shadow_audit (lifecycle FAILED maps
+            // to STATE_PROGRESS index 9 → 9 nodes ran), but the
+            // crashing node never wrote a verdict back. Surface this
+            // as a distinct execution-error state instead of the
+            // generic "shadow has not yet completed" copy — the
+            // pipeline DID run; it broke. The two surfaces (Agent
+            // Recommendation vs. Pipeline Progress) now agree on the
+            // failure point. Verdict 2026-04-22 / Guardrail #6:
+            // distinct facts must render distinctly.
+            <div
+              role="alert"
+              aria-live="polite"
+              className="p-12 bg-error-subtle border border-error-border rounded-md flex items-start gap-8"
+            >
+              <AlertTriangle size={14} className="text-error mt-px shrink-0" />
+              <div className="flex flex-col gap-4 min-w-0">
+                <div className="text-caption font-semibold text-error">
+                  {executionError.node
+                    ? `Pipeline failed at ${executionError.node}`
+                    : "Pipeline failed"}
+                </div>
+                <div className="text-label text-text-secondary break-words">
+                  {executionError.message}
+                </div>
+                {executionError.failedAt && (
+                  <div className="text-label text-text-tertiary font-mono">
+                    {new Date(executionError.failedAt).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
             <div className="p-12 bg-surface-primary rounded-md shadow-sm flex items-center gap-8 text-caption text-text-tertiary">
               <AlertTriangle size={14} />
