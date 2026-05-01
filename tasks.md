@@ -283,6 +283,21 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 
 ✅ Outcome: D18 drift register flipped PARTIAL 6/10 → SHIPPED 10/10. Mock pipeline reflects ADR-025 (gateway READS pre-shadow + `build_analysis` terminal). Audit-gap surface visible on every record that fails coverage. 474 unit tests pass; 16/16 Playwright e2e green against the live stack. (2026-04-25)
 
+### [x] PHASE 8.13: Post-deploy stabilisation (live-stack fixes + WS resilience)
+**Companion to:** asoe2 Phase 26 (post-deploy fixes — JWT TTLs, confidence persistence, V005 migration, ADR-026/027 drafts).
+- [x] `useWebSocket` (`src/hooks/useWebSocket.ts`) — REST polling fallback per `ui_architecture.md` §8.4. After `POLL_FALLBACK_THRESHOLD = 5` consecutive failed reconnect attempts, the hook switches to interval polling on `/api/v1/exceptions/{id}` and surfaces `onReconnect` / `onPollFallback` callbacks so the detail panel can re-fetch quietly. (Container Apps closes idle WS at 4 minutes; this prevents the stale-detail-panel observed during long YELLOW reviews.)
+- [x] `useWebSocket` JWT auth — uses the real backend access token from session storage instead of the `'mock-ws-token'` placeholder; first message remains the Section 8 `{type: "auth", token}` envelope.
+- [x] `ExceptionDetailPanel` (`src/app/exceptions/ExceptionDetailPanel.tsx`) — adds an `executionError` render branch between verdict-present and shadow-pending fallback. A `lifecycle === "FAILED"` record now shows "Pipeline failed at <node>" with the trace explanation and timestamp, instead of the misleading "Shadow has not yet completed" copy that previously rendered for every FAILED state.
+- [x] AgentReasoningCard `executionError` prop wiring — the card drives the FAILED banner via `executionError !== undefined`, distinct from RED verdict (compliance decision). `canReanalyze` predicate unchanged (still permits YELLOW + cosign + escalated states).
+- [x] Detail panel 401 surfacing — when the WS auth handshake or REST refresh returns 401, the panel surfaces the unauthenticated state inline rather than silently dropping the record. Auto re-fetch on WS reconnect.
+- [x] List pagination — `exceptionsApi.list` uses cursor pagination (mirrors backend `next_cursor` envelope); silent refresh on `task_complete` WS events keeps the list current without flicker.
+- [x] `exceptionsApi.reanalyze` (`src/lib/api.ts`) — adds the missing `if (USE_REAL_API)` branch. Was silently mock-only; against the live backend, the mock-find returned undefined and threw "Exception not found" on every Reanalyze click.
+- [x] Pipeline confidence projection (`src/app/exceptions/shared.tsx::buildNodeData`) — `classify` row's `data.confidence` now comes from `analysis.confidence / 100` (the real persisted classifier value), with the key omitted entirely when analysis hasn't loaded. Per-node random `duration_ms` synthesis removed (Verdict 2026-04-22 / Guardrail #6 violation — UI no longer fabricates timings the backend doesn't emit).
+- [x] Architectural lock test (`tests/architectural/exceptions_api_live_branches.test.ts`) — walks every `LIVE_METHODS` entry asserting `if (USE_REAL_API)` and the matching path fragment exist; reanalyze-specific regression assertion: `USE_REAL_API` must appear textually before `MOCK_EXCEPTIONS.find`.
+- [x] Vitest: 519 passed across 38 files, no regressions.
+
+✅ Outcome: live-stack stabilisation. Reanalyze works end-to-end. FAILED records render an honest pipeline failure banner with the node name. WS resilience matches `ui_architecture.md` §8.4. Confidence pill driven by the real backend value, not synthesis. (2026-05-01)
+
 ---
 
 ## Remaining Phases
