@@ -174,6 +174,82 @@ export interface TraceResponse {
   /** Ordered list of audit-bearing field names that could not be
    *  populated for this record. */
   audit_context_missing_fields?: string[];
+
+  /* ── ADR-027 Phase B — per-node executed-trace evidence ────────
+     Ordered list of nodes that ran for this record's traversal,
+     each entry carrying timing + decision + exit verdict + policy
+     hits + per-gateway sub-spans. Empty when the record's trace
+     was written before Phase B's instrumentation landed (banner
+     "executed-path evidence not available — entry pre-dates
+     per-node tracking"). Mirrors asoe2 api/schemas.py::TraceResponse. */
+  executed_nodes?: ExecutedNode[];
+}
+
+
+/* ── ADR-027 Phase A — pipeline topology (for the DAG view) ──────
+   Mirrors asoe2 api/schemas.py::PipelineTopology. Cached client-
+   side by topology_hash; revalidated on the useHealth polling tick. */
+
+export interface PipelineTopologyNode {
+  id: string;
+  label: string;
+  kind: "node" | "terminal";
+}
+
+export interface PipelineTopologyEdge {
+  from_node: string;
+  to_node: string;
+  conditional: boolean;
+  /** Human verdict label that drove the edge. Null on unconditional
+   *  edges. Examples: "ok", "breach", "no_recipe", "required_gw_fail",
+   *  "invocation_fail", "red", "yellow", "green",
+   *  "cross_check_disagreement". */
+  verdict_label: string | null;
+}
+
+export interface PipelineTopology {
+  topology_hash: string;
+  nodes: PipelineTopologyNode[];
+  edges: PipelineTopologyEdge[];
+}
+
+
+/* ── ADR-027 Phase B — per-node executed-trace evidence ──────────
+   Mirrors asoe2 contracts/models.py::ExecutedNode. */
+
+export interface GatewayCallSpan {
+  gateway: string;
+  started_at: string;
+  finished_at?: string;
+  duration_ms?: number;
+  status: "ok" | "error" | "timeout";
+}
+
+export interface ExecutedNode {
+  /** Canonical orchestration node name (matches PipelineTopologyNode.id). */
+  node: string;
+  /** ISO-8601 — node start. */
+  entered_at: string;
+  /** ISO-8601 — node end (undefined if errored mid-flight). */
+  completed_at?: string;
+  /** Wall-clock duration; for resolve_dependencies this is the fan-out
+   *  span (per-gateway durations live in sub_spans). */
+  duration_ms?: number;
+  /** Convenience top-level — equals entered_at. Kept for trace-style
+   *  consistency with shadow_verdict / final_status row labels. */
+  timestamp: string;
+  status: "completed" | "halted" | "errored";
+  /** Node-specific decision payload (intent + confidence on classify,
+   *  recipe on select_recipe, shadow_status on shadow_audit, etc.). */
+  decision: Record<string, unknown>;
+  /** Verdict label that drove the next route. Null for nodes whose
+   *  exit is not a conditional gate (ingest, load_skill,
+   *  execute_recipe, apply_effects, build_analysis). */
+  exit_verdict?: string | null;
+  /** Populated on shadow_audit; [] elsewhere. */
+  policy_hits: string[];
+  /** Populated on resolve_dependencies; [] elsewhere. */
+  sub_spans: GatewayCallSpan[];
 }
 
 /* ── Workflow ──────────────────────────────────────────────────────── */

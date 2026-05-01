@@ -28,6 +28,7 @@ import type {
   WorkflowResult,
   PolicyOverrideRequest,
   PolicyOverrideResponse,
+  PipelineTopology,
 } from "@/types/api";
 import type { HealthResponse, ExceptionSummary, LifecycleState, LineItem, OrderAnalysis, ReanalysisEntry } from "@/types/exceptions";
 import { ROLE_PERMISSIONS } from "./roles";
@@ -1307,6 +1308,59 @@ export const exceptionsApi = {
     return MOCK_ORDER_ANALYSES[id] ?? null;
   },
 };
+
+/* ── Pipeline topology API (/api/v1/pipeline/topology) ───────────────
+   ADR-027 Phase A — backend introspection of the compiled LangGraph.
+   Cached client-side by topology_hash; the response is the SHAPE of
+   the graph (nodes + edges + verdict labels), not per-record data,
+   so it's safe to cache aggressively across users / records. */
+
+const MOCK_PIPELINE_TOPOLOGY: PipelineTopology = {
+  topology_hash: "mock-topology-v1",
+  nodes: [
+    { id: "ingest", label: "ingest", kind: "node" },
+    { id: "classify", label: "classify", kind: "node" },
+    { id: "load_skill", label: "load_skill", kind: "node" },
+    { id: "validate_circuit_breaker", label: "validate_circuit_breaker", kind: "node" },
+    { id: "select_recipe", label: "select_recipe", kind: "node" },
+    { id: "resolve_dependencies", label: "resolve_dependencies", kind: "node" },
+    { id: "validate_types", label: "validate_types", kind: "node" },
+    { id: "shadow_audit", label: "shadow_audit", kind: "node" },
+    { id: "execute_recipe", label: "execute_recipe", kind: "node" },
+    { id: "apply_effects", label: "apply_effects", kind: "node" },
+    { id: "build_analysis", label: "build_analysis", kind: "terminal" },
+  ],
+  edges: [
+    { from_node: "ingest", to_node: "classify", conditional: false, verdict_label: null },
+    { from_node: "classify", to_node: "load_skill", conditional: false, verdict_label: null },
+    { from_node: "classify", to_node: "build_analysis", conditional: true, verdict_label: "cross_check_disagreement" },
+    { from_node: "load_skill", to_node: "validate_circuit_breaker", conditional: false, verdict_label: null },
+    { from_node: "validate_circuit_breaker", to_node: "build_analysis", conditional: true, verdict_label: "breach" },
+    { from_node: "validate_circuit_breaker", to_node: "select_recipe", conditional: true, verdict_label: "ok" },
+    { from_node: "select_recipe", to_node: "build_analysis", conditional: true, verdict_label: "no_recipe" },
+    { from_node: "select_recipe", to_node: "resolve_dependencies", conditional: true, verdict_label: "ok" },
+    { from_node: "resolve_dependencies", to_node: "build_analysis", conditional: true, verdict_label: "required_gw_fail" },
+    { from_node: "resolve_dependencies", to_node: "validate_types", conditional: true, verdict_label: "ok" },
+    { from_node: "validate_types", to_node: "build_analysis", conditional: true, verdict_label: "invocation_fail" },
+    { from_node: "validate_types", to_node: "shadow_audit", conditional: true, verdict_label: "ok" },
+    { from_node: "shadow_audit", to_node: "build_analysis", conditional: true, verdict_label: "red" },
+    { from_node: "shadow_audit", to_node: "build_analysis", conditional: true, verdict_label: "yellow" },
+    { from_node: "shadow_audit", to_node: "execute_recipe", conditional: true, verdict_label: "green" },
+    { from_node: "execute_recipe", to_node: "apply_effects", conditional: false, verdict_label: null },
+    { from_node: "apply_effects", to_node: "build_analysis", conditional: false, verdict_label: null },
+  ],
+};
+
+export const pipelineApi = {
+  async topology(): Promise<PipelineTopology> {
+    if (USE_REAL_API) {
+      return http<PipelineTopology>("/api/v1/pipeline/topology");
+    }
+    await delay(50);
+    return MOCK_PIPELINE_TOPOLOGY;
+  },
+};
+
 
 /* ── Workflow API (/api/v1/workflows) ──────────────────────────────── */
 

@@ -36,7 +36,7 @@ import { Badge, verdictVariant } from "./Badge";
 import { Button } from "./Button";
 import { cn } from "@/lib/utils";
 import { useIntentLabel } from "@/hooks/useErpProfile";
-import type { ShadowVerdict, PipelineNode } from "@/types/exceptions";
+import type { ShadowVerdict } from "@/types/exceptions";
 
 /**
  * ExecutionError — a backend-reported execution failure distinct from a
@@ -44,8 +44,10 @@ import type { ShadowVerdict, PipelineNode } from "@/types/exceptions";
  * out, or the circuit breaker trips. Not the same as RED (policy block).
  */
 export interface ExecutionError {
-  /** Pipeline node that failed, if known */
-  node?: PipelineNode;
+  /** Pipeline node that failed, if known. Open string per
+   *  Guardrail #2 — sourced from trace.executed_nodes whose canonical
+   *  names come from the compiled-graph topology, not a UI enum. */
+  node?: string;
   /** Human-readable failure message from backend (trace.explanation) */
   message: string;
   /** ISO timestamp of the failure */
@@ -121,19 +123,15 @@ const VERDICT_CONFIG: Record<ShadowVerdict, { label: string; icon: ReactNode }> 
   RED: { label: "Blocked by Policy", icon: <ShieldX size={14} /> },
 };
 
-const NODE_LABELS: Partial<Record<PipelineNode, string>> = {
-  ingest: "Ingest Event",
-  classify: "Classify Intent",
-  load_skill: "Load Skill",
-  validate_circuit_breaker: "Circuit Breaker",
-  select_recipe: "Select Recipe",
-  resolve_dependencies: "Resolve Dependencies",
-  validate_types: "Validate Types",
-  shadow_audit: "Compliance Shadow",
-  execute_recipe: "Execute Recipe",
-  apply_effects: "Apply Effects",
-  build_analysis: "Build Analysis",
-};
+/** Title-case snake_case node ids for display. Node names are sourced
+ *  from the compiled-graph topology (open set per Guardrail #2), not
+ *  from a closed UI enum — so this is a pure transform, not a mapping. */
+function humanizeNode(id: string): string {
+  return id
+    .split("_")
+    .map((p) => (p.length === 0 ? "" : p[0].toUpperCase() + p.slice(1)))
+    .join(" ");
+}
 
 /** Human-friendly rendering of an AllowedResolutionAction code for the
  *  Approve-button tooltip. ALLOW_BOTH → "Allow both". The action code itself
@@ -281,7 +279,7 @@ export function AgentReasoningCard({
               <XCircle size={14} className="text-error shrink-0" />
               <span className="text-label font-semibold text-error uppercase tracking-wider">
                 {executionError.node
-                  ? `Failed at ${NODE_LABELS[executionError.node] ?? executionError.node}`
+                  ? `Failed at ${humanizeNode(executionError.node)}`
                   : "Pipeline failure"}
               </span>
             </div>

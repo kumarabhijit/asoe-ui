@@ -2,33 +2,112 @@
  * DiagnosticsSection — Layer 5 of the Exception Detail Panel.
  *
  * Hidden behind a "Show Diagnostics" toggle. Contains:
- *   - Pipeline Progress (WaterfallStepper)
+ *   - Pipeline (EventsTimeline default, PipelineDAG behind disclosure;
+ *     audit/admin roles get DAG default — ADR-027 Phase E)
+ *   - Attempt selector (latest + every reanalysis_history entry —
+ *     ADR-027 rev. 3 attempt-scoping)
  *   - Trace Evidence (evidence tabs, SAP data, change analysis, resolution data)
+ *
+ * Replaces the legacy WaterfallStepper + PIPELINE_NODES rendering. The
+ * UI no longer mirrors the topology — both surfaces consume
+ * `executed_nodes` from the trace and `PipelineTopology` from the
+ * authoritative endpoint.
  */
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, Terminal, ClipboardCopy, CheckCircle2 } from "lucide-react";
-import { WaterfallStepper, type NodeState } from "@/components/ui/WaterfallStepper";
-import { cn } from "@/lib/utils";
+import { lazy, Suspense, useMemo, useState } from "react";
+import { ChevronDown, Terminal, ClipboardCopy, CheckCircle2, GitBranch, ListOrdered } from "lucide-react";
 import { CollapsibleHeader } from "./shared";
+import { EventsTimeline } from "@/components/ui/EventsTimeline";
+import { useTopology } from "@/hooks/useTopology";
+import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 import type { ExceptionDetail } from "@/types/exceptions";
-import type { TraceResponse } from "@/types/api";
+import type { ExecutedNode, TraceResponse } from "@/types/api";
+
+// PipelineDAG ships dagre + a small SVG renderer; lazy-load so the
+// detail-page open path stays light. The audit-default branch
+// triggers the chunk on mount; non-audit users only fetch when they
+// expand the disclosure.
+const PipelineDAG = lazy(() =>
+  import("@/components/ui/PipelineDAG").then((m) => ({ default: m.PipelineDAG })),
+);
 
 interface DiagnosticsSectionProps {
   detail: ExceptionDetail;
   trace: TraceResponse | null;
-  nodeStates: NodeState[];
   showPreview: boolean;
 }
 
-export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: DiagnosticsSectionProps) {
+interface AttemptOption {
+  /** "current" for the latest trace, otherwise the attempt number. */
+  id: "current" | number;
+  label: string;
+  executedNodes: ExecutedNode[];
+  finalStatus?: string | null;
+  preBackendInstrumentation: boolean;
+}
+
+function buildAttemptOptions(
+  detail: ExceptionDetail,
+  trace: TraceResponse | null,
+): AttemptOption[] {
+  const options: AttemptOption[] = [];
+  // Latest attempt = current trace.executed_nodes.
+  const latestNodes = trace?.executed_nodes ?? [];
+  options.push({
+    id: "current",
+    label: detail.reanalysis_history && detail.reanalysis_history.length > 0
+      ? `Attempt ${detail.reanalysis_history.length + 1} (current)`
+      : "Current trace",
+    executedNodes: latestNodes,
+    finalStatus: trace?.final_status ?? detail.final_status ?? null,
+    preBackendInstrumentation: latestNodes.length === 0,
+  });
+  // Prior attempts in reverse chronological order so the most recent
+  // prior attempt is at the top of the dropdown after "current".
+  const history = detail.reanalysis_history ?? [];
+  for (const entry of [...history].reverse()) {
+    const executed = entry.executed_nodes ?? [];
+    options.push({
+      id: entry.attempt,
+      label: `Attempt ${entry.attempt}`,
+      executedNodes: executed,
+      finalStatus: entry.new_final_status ?? null,
+      preBackendInstrumentation: executed.length === 0,
+    });
+  }
+  return options;
+}
+
+export function DiagnosticsSection({ detail, trace, showPreview }: DiagnosticsSectionProps) {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [pipelineOpen, setPipelineOpen] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [detailTab, setDetailTab] = useState("evidence");
+  // Audit users default to the DAG view per ADR-027 Phase E. The
+  // available roles are analyst | manager | admin | viewer | partner;
+  // admin is the closest to the documented audit role and is what
+  // triggers the DAG default until a dedicated `audit` role lands
+  // (tracked in ADR-027 Open Question §4 RESOLVED).
+  const { hasRole } = useAuth();
+  const dagDefault = hasRole("admin");
+  const [view, setView] = useState<"timeline" | "dag">(
+    dagDefault ? "dag" : "timeline",
+  );
+  const { topology } = useTopology();
   const history = detail.reanalysis_history ?? [];
+
+  const attemptOptions = useMemo(
+    () => buildAttemptOptions(detail, trace),
+    [detail, trace],
+  );
+  const [selectedAttemptId, setSelectedAttemptId] = useState<"current" | number>(
+    "current",
+  );
+  const selectedAttempt =
+    attemptOptions.find((o) => o.id === selectedAttemptId) ?? attemptOptions[0];
 
   const DETAIL_TABS = [
     { id: "evidence", label: "Evidence" },
@@ -37,6 +116,23 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
       { id: "changes", label: "Change Analysis" },
     ] : []),
   ];
+
+  const pipelineBadge = (() => {
+    if (selectedAttempt.preBackendInstrumentation) return "no trace";
+    const halted = selectedAttempt.executedNodes.some(
+      (n) => n.status === "halted" || n.status === "errored",
+    );
+    if (halted) return "halted";
+    if (selectedAttempt.finalStatus === "COMPLETE") return "complete";
+    return "executed";
+  })();
+  const pipelineBadgeVariant = (() => {
+    if (selectedAttempt.preBackendInstrumentation) return "neutral";
+    if (selectedAttempt.executedNodes.some((n) => n.status === "errored")) return "error";
+    if (selectedAttempt.executedNodes.some((n) => n.status === "halted")) return "info";
+    if (selectedAttempt.finalStatus === "COMPLETE") return "success";
+    return "neutral";
+  })();
 
   return (
     <>
@@ -59,38 +155,100 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
 
       {diagnosticsOpen && (
         <div className="flex flex-col gap-12">
-          {/* Pipeline Progress */}
+          {/* Pipeline */}
           <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
             <CollapsibleHeader
-              title="Pipeline Progress"
+              title="Pipeline"
               open={pipelineOpen}
               onToggle={() => setPipelineOpen((v) => !v)}
-              badge={
-                nodeStates.some((n) => n.status === "failed") ? "failed"
-                : nodeStates.some((n) => n.status === "started") ? "in progress"
-                : nodeStates.every((n) => n.status === "completed" || n.status === "skipped") ? "complete"
-                : "pending"
-              }
-              badgeVariant={
-                nodeStates.some((n) => n.status === "failed") ? "error"
-                : nodeStates.some((n) => n.status === "started") ? "info"
-                : nodeStates.every((n) => n.status === "completed" || n.status === "skipped") ? "success"
-                : "neutral"
-              }
+              badge={pipelineBadge}
+              badgeVariant={pipelineBadgeVariant}
             />
             {pipelineOpen && (
-              <div className="border-t border-border px-16 py-12">
-                <WaterfallStepper
-                  nodes={nodeStates}
-                  intent={detail.intent ?? undefined}
-                  allowReplay
-                />
+              <div className="border-t border-border px-16 py-12 flex flex-col gap-12">
+                {/* Attempt selector + view toggle */}
+                <div className="flex items-center gap-12 flex-wrap">
+                  {attemptOptions.length > 1 && (
+                    <label className="flex items-center gap-6 text-label">
+                      <span className="text-text-quaternary uppercase tracking-wider font-semibold">
+                        Attempt
+                      </span>
+                      <select
+                        value={String(selectedAttemptId)}
+                        onChange={(e) =>
+                          setSelectedAttemptId(
+                            e.target.value === "current"
+                              ? "current"
+                              : Number(e.target.value),
+                          )
+                        }
+                        className="bg-surface-secondary border border-border rounded-sm px-8 py-4 text-caption text-text-primary cursor-pointer"
+                      >
+                        {attemptOptions.map((opt) => (
+                          <option key={String(opt.id)} value={String(opt.id)}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <div
+                    className="flex items-center rounded-sm border border-border overflow-hidden ml-auto"
+                    role="group"
+                    aria-label="Pipeline view mode"
+                  >
+                    <ViewToggleButton
+                      label="Timeline"
+                      icon={<ListOrdered size={11} />}
+                      active={view === "timeline"}
+                      onClick={() => setView("timeline")}
+                    />
+                    <ViewToggleButton
+                      label="DAG"
+                      icon={<GitBranch size={11} />}
+                      active={view === "dag"}
+                      onClick={() => setView("dag")}
+                    />
+                  </div>
+                </div>
+
+                {selectedAttempt.preBackendInstrumentation && (
+                  <div className="px-12 py-10 rounded-sm bg-warning-subtle text-caption text-warning">
+                    Executed-path evidence not available for this attempt — entry
+                    pre-dates per-node tracking. (ADR-027 Phase B migration window.)
+                  </div>
+                )}
+
+                {view === "timeline" && (
+                  <EventsTimeline
+                    executedNodes={selectedAttempt.executedNodes}
+                    finalStatus={selectedAttempt.finalStatus}
+                  />
+                )}
+                {view === "dag" && topology && (
+                  <Suspense fallback={
+                    <div className="text-caption text-text-tertiary px-12 py-16">
+                      Loading DAG view…
+                    </div>
+                  }>
+                    <PipelineDAG
+                      topology={topology}
+                      executedNodes={selectedAttempt.executedNodes}
+                      finalStatus={selectedAttempt.finalStatus}
+                    />
+                  </Suspense>
+                )}
+                {view === "dag" && !topology && (
+                  <div className="text-caption text-text-tertiary px-12 py-16">
+                    Fetching topology…
+                  </div>
+                )}
               </div>
             )}
           </section>
 
-          {/* Reanalysis History — append-only audit trail of human-triggered
-              graph replays. Rendered only when history exists. */}
+          {/* Reanalysis History — preserved for audit detail; the
+              attempt selector above is the operator-facing view. */}
           {history.length > 0 && (
             <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
               <CollapsibleHeader
@@ -127,14 +285,6 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
                       <p className="text-caption text-text-secondary m-0 mb-8 whitespace-pre-wrap">
                         {entry.reason}
                       </p>
-                      {/* Structural omission per CLAUDE.md Guardrail #6:
-                          show only the verdict / final-status pair
-                          components that are actually present. The
-                          previous `?? "—"` rendering created a
-                          partial-truth state where an absent
-                          prior-verdict looked indistinguishable from
-                          a transition where the verdict didn't
-                          change. */}
                       <div className="grid grid-cols-2 gap-8 text-label">
                         <ReanalysisTransition
                           label="Prior"
@@ -182,9 +332,6 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
 
                 {detailTab === "evidence" && trace && (
                   <div className="text-caption text-text-secondary flex flex-col gap-14">
-                    {/* Human-facing structured narrative — renders only when
-                        the recipe produced these fields. Purely informational;
-                        no UI logic branches on their values. */}
                     {trace.narrative && <NarrativeBlock text={trace.narrative} />}
                     {trace.resolution_steps && trace.resolution_steps.length > 0 && (
                       <ResolutionSteps steps={trace.resolution_steps} />
@@ -209,11 +356,6 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
                         <TraceField label="Gateway Calls" value={trace.gateway_calls.join(", ")} />
                       )}
                       <TraceField label="Final Status" value={trace.final_status} />
-                      {/* Verdict Pillar 2.3 audit-gap surface — present
-                          only when build_analysis flagged
-                          AUDIT_CONTEXT_MISSING. Auditors see the
-                          missing-class + ordered field list directly
-                          rather than regexing the explanation. */}
                       {trace.audit_context_missing_fields &&
                         trace.audit_context_missing_fields.length > 0 && (
                         <>
@@ -259,7 +401,35 @@ export function DiagnosticsSection({ detail, trace, nodeStates, showPreview }: D
   );
 }
 
-/** Trace field — label + value pair */
+function ViewToggleButton({
+  label,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "flex items-center gap-4 px-10 py-4 bg-transparent border-none cursor-pointer text-label font-sans transition-colors duration-fast",
+        active
+          ? "bg-brand text-white"
+          : "text-text-tertiary hover:text-text-primary",
+      )}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
 function TraceField({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
   if (!value) return null;
   return (
@@ -273,8 +443,6 @@ function TraceField({ label, value, mono }: { label: string; value?: string | nu
     </div>
   );
 }
-
-/* ── Layer 2 narrative sub-components ───────────────────────────────── */
 
 function NarrativeBlock({ text }: { text: string }) {
   return (
@@ -332,9 +500,6 @@ function SAPActionsList({ actions }: {
                   {a.transaction}
                 </td>
                 <td className="px-10 py-6 font-mono text-text-tertiary align-top">
-                  {/* Structural omission (CLAUDE.md Guardrail #6):
-                      empty cell when neither table nor field is
-                      present, rather than rendering "—". */}
                   {a.table ?? ""}
                   {a.field && <span className="text-text-quaternary">{a.table ? " / " : ""}{a.field}</span>}
                 </td>
@@ -358,10 +523,7 @@ function CustomerEmailDraft({ body }: { body: string }) {
       setCopied(true);
       const t = setTimeout(() => setCopied(false), 2000);
       return () => clearTimeout(t);
-    }).catch(() => {
-      // navigator.clipboard may be unavailable in test environments;
-      // swallow silently — the draft is still visible to copy manually.
-    });
+    }).catch(() => {});
   }
 
   return (
@@ -394,13 +556,6 @@ function CustomerEmailDraft({ body }: { body: string }) {
   );
 }
 
-/**
- * Reanalysis-history transition cell — shows only the components of
- * a verdict/status pair that are present. CLAUDE.md Guardrail #6:
- * absent components are structurally omitted (no "—" placeholder)
- * because a partial-truth value here conceals whether the prior
- * value was missing or unchanged.
- */
 function ReanalysisTransition({
   label,
   verdict,
