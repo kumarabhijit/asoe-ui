@@ -1033,6 +1033,22 @@ export const exceptionsApi = {
      */
     triggeredBy?: string,
   ): Promise<ExceptionDetailResponse> {
+    if (USE_REAL_API) {
+      // Live path was missing entirely — UI was reaching the mock body
+      // below against the real backend, MOCK_EXCEPTIONS.find returned
+      // undefined, and the call threw "Exception not found" with no
+      // network roundtrip. Mirrors the asoe2 route POST
+      // /api/v1/exceptions/{id}/reanalyze (manager+ gated). The backend
+      // attributes the trigger from the JWT `sub` / `email` claims, so
+      // the triggeredBy arg is mock-only.
+      return http<ExceptionDetailResponse>(
+        `/api/v1/exceptions/${id}/reanalyze`,
+        {
+          method: "POST",
+          body: request,
+        },
+      );
+    }
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
