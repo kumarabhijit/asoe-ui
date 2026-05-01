@@ -20,9 +20,17 @@ interface ExtendedUser {
 export function useAuth() {
   const { data: session, status } = useSession();
   const user = session?.user as ExtendedUser | undefined;
+  // The backend-issued JWT lives on the session root, exposed by the
+  // session callback in lib/auth.ts. The api client reads it via
+  // getSession() at request time; consumers that need the value
+  // synchronously (e.g. the WebSocket hook, which takes the token as
+  // a connect-time arg) get it through this hook instead.
+  const accessToken = (session as unknown as { accessToken?: string } | null)
+    ?.accessToken;
 
   return {
     user,
+    accessToken,
     isAuthenticated: status === "authenticated",
     isLoading: status === "loading",
     hasRole: (role: Role) => user?.roles?.includes(role) ?? false,

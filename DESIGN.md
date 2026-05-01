@@ -202,6 +202,8 @@ Adding a new enrichment section requires only: (1) add the type to `OrderAnalysi
 
 **Disposition handlers:** `handleApprove`, `handleReject`, and `submitOverride` all route through `exceptionsApi.disposition()` after Phase 3 consolidation — the server derives sub_type from whether the chosen action equals the recommended action. `handleEscalate` calls `exceptionsApi.escalate()` directly (no longer piggybacking on override with `action: "ESCALATE"`).
 
+**Execution-error rendering:** When `lifecycle_state === "FAILED"`, the panel renders an `executionError` branch ("Pipeline failed at <node>") with the trace explanation and timestamp. This is distinct from a RED shadow verdict (which is a compliance decision, not a runtime crash) and from the "Shadow has not yet completed" fallback (which previously rendered for every FAILED state and was misleading — the failure may be at any node, not just shadow). `AgentReasoningCard` consumes `executionError !== undefined` to drive the FAILED banner. (See `ui_architecture.md` §9 drift register entry on `executionError` rendering.)
+
 **Action feedback:** All mutations show toast notifications (success/error) via `useToast()`. List auto-refreshes after any action via `onActionComplete` callback.
 
 **WebSocket wiring:** The page orchestrator connects via `useWebSocket` and routes events to the detail panel via `onRefreshRef`. `pipeline_progress` events update the WaterfallStepper in real-time. `exception_update` and `task_complete` events refresh both the list and the currently viewed exception.
@@ -339,7 +341,7 @@ Maps to Section 6.2 REST endpoints:
 | `exceptionsApi.disposition()` | `PATCH /api/v1/exceptions/{id}/disposition` | 6.2 (Phase 3 consolidation — replaces override/approve/reject) |
 | `exceptionsApi.escalate()` | `POST /api/v1/exceptions/{id}/escalate` | 6.2 |
 | `exceptionsApi.cosign()` | `POST /api/v1/exceptions/{id}/cosign` | 6.2 (four-eyes second-reviewer) |
-| `exceptionsApi.reanalyze()` | `POST /api/v1/exceptions/{id}/reanalyze` | 6.2 |
+| `exceptionsApi.reanalyze()` | `POST /api/v1/exceptions/{id}/reanalyze` | 6.2 (live `if (USE_REAL_API)` branch — was silently mock-only pre-2026-05-01; architectural lock test in `tests/architectural/exceptions_api_live_branches.test.ts` walks every `LIVE_METHODS` entry and asserts the gate exists) |
 | `exceptionsApi.trace()` | `GET /api/v1/exceptions/{id}/trace` | 6.2 |
 | `exceptionsApi.stats()` | `GET /api/v1/exceptions/stats` | 6.2 |
 | `exceptionsApi.lineItems()` | Line items for an exception (UI mock) | — |
@@ -399,12 +401,13 @@ Maps to Section 6.2 REST endpoints:
 
 Implements Section 8:
 1. Connect to `ws://host/api/v1/ws`
-2. Send auth message: `{ type: "auth", token, last_seen }`
+2. Send auth message: `{ type: "auth", token, last_seen }` — uses the real backend access token from session storage (was `'mock-ws-token'` placeholder pre-2026-05-01)
 3. Receive `WSEvent` messages (`pipeline_progress`, `exception_update`, `task_complete`, `error`)
 4. Reconnect with exponential backoff (1s, 2s, 4s, 8s, max 30s)
 5. Send `last_seen_timestamp` on reconnect for event replay (60-second buffer)
+6. **Polling fallback (§8.4):** after `POLL_FALLBACK_THRESHOLD = 5` consecutive failed reconnect attempts, the hook switches to interval polling on `/api/v1/exceptions/{id}` and emits the `onPollFallback` callback so consumers can switch their refresh strategy. `onReconnect` fires when the WS comes back. Container Apps closes idle WS at 4 minutes; this prevents stale detail panels during long YELLOW reviews.
 
-**Exception Queue wiring:** The page orchestrator (`/exceptions/page.tsx`) subscribes to WebSocket events and routes them to the detail panel via `onRefreshRef`. `pipeline_progress` events for the currently viewed exception update the WaterfallStepper in real-time. `exception_update` and `task_complete` events refresh both the exception list and the detail panel.
+**Exception Queue wiring:** The page orchestrator (`/exceptions/page.tsx`) subscribes to WebSocket events and routes them to the detail panel via `onRefreshRef`. `pipeline_progress` events for the currently viewed exception update the WaterfallStepper in real-time. `exception_update` and `task_complete` events refresh both the exception list and the detail panel. On reconnect or polling fallback, the panel issues a silent refresh (no flicker).
 
 ---
 

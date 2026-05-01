@@ -54,7 +54,7 @@ function ExceptionQueueContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { health } = useHealth();
-  const { user, visibleTabs } = useAuth();
+  const { user, accessToken, visibleTabs } = useAuth();
 
   useEffect(() => { document.title = "Exception Queue — ASOE"; }, []);
 
@@ -99,24 +99,58 @@ function ExceptionQueueContent() {
   }
 
   /* ── Data fetching ───────────────────────────────────────────────── */
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  //
+  // `silent: true` is used by the WebSocket event handler so an
+  // exception_update / task_complete event refreshes the list without
+  // flashing the loading spinner — the user's scroll position and any
+  // hover state are preserved. The initial mount + filter changes
+  // pass silent=false so the first paint shows a proper loading
+  // indicator.
+  //
+  // We follow the cursor pagination contract on every refresh until
+  // `has_more === false`. Mock mode short-circuits with has_more=false
+  // on page 1, so the loop is a no-op there. Live mode currently
+  // returns ~10 rows in a single page (limit=50 default), so the loop
+  // is also short — but if the row count grows past one page, this is
+  // what makes the queue render the full result set instead of just
+  // the first page.
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
-      const [excRes, statsRes] = await Promise.all([
-        exceptionsApi.list({
+      const allRows: ExceptionSummary[] = [];
+      let cursor: string | undefined = undefined;
+      let safety = 0;
+      do {
+        const page = await exceptionsApi.list({
           status: filterState || undefined,
           intent: filterIntent || undefined,
-        }),
-        exceptionsApi.stats(),
-      ]);
-      setExceptions(excRes.data);
+          cursor,
+        });
+        allRows.push(...page.data);
+        cursor = page.has_more ? (page.cursor ?? undefined) : undefined;
+        safety += 1;
+        if (safety > 50) {
+          // Defensive: never spin forever if the backend reports
+          // has_more=true without advancing the cursor.
+          console.warn("Pagination loop safety triggered after 50 pages");
+          break;
+        }
+      } while (cursor);
+
+      const statsRes = await exceptionsApi.stats();
+      setExceptions(allRows);
       setStats(statsRes);
     } catch (err) {
       console.error("Failed to fetch exceptions:", err);
-      setError("Failed to load exceptions. Check your connection and try again.");
+      if (!silent) {
+        setError("Failed to load exceptions. Check your connection and try again.");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [filterState, filterIntent]);
 
@@ -150,14 +184,17 @@ function ExceptionQueueContent() {
         detailRefreshRef.current?.();
       }
     } else if (event.type === "exception_update") {
-      // Exception state changed — refresh list + detail if viewing this exception
-      fetchData();
+      // Exception state changed — silently refresh list + detail if
+      // viewing this exception. silent=true avoids flashing the
+      // loading spinner / clearing the queue while the operator is
+      // mid-scroll on every state transition.
+      fetchData({ silent: true });
       if (event.exception_id === selectedId) {
         detailRefreshRef.current?.();
       }
     } else if (event.type === "task_complete") {
-      // Task finished — refresh everything and clear any reanalysis banner.
-      fetchData();
+      // Task finished — silently refresh and clear any reanalysis banner.
+      fetchData({ silent: true });
       if (event.exception_id === selectedId) {
         detailRefreshRef.current?.();
       }
@@ -178,10 +215,39 @@ function ExceptionQueueContent() {
     }
   }, [selectedId, fetchData]);
 
+  // After a WS reconnect, reconcile both the list and the currently-
+  // viewed detail. Container Apps drops idle sockets at ~4 minutes; if
+  // the operator was scrolling or reading a detail when the drop
+  // happened, the page would otherwise keep showing pre-disconnect
+  // data with no way to know it was stale. Silent refresh keeps the
+  // scroll position; detail refresh re-runs the panel's GET.
+  const handleWsReconnect = useCallback(() => {
+    fetchData({ silent: true });
+    detailRefreshRef.current?.();
+  }, [fetchData]);
+
   useWebSocket({
-    token: user?.id ? "mock-ws-token" : undefined,
-    enabled: !!user,
+    // Pass the real backend-issued JWT so the WebSocket auth message
+    // (Section 8.1) carries a token the asoe2 ws_router can validate.
+    // The previous "mock-ws-token" placeholder authenticated only
+    // against the mock api; against the real backend the connection
+    // would close immediately on receipt of the auth frame and the
+    // exponential-backoff loop would reconnect-and-fail forever
+    // without ever delivering an event. We still gate on user (not
+    // accessToken) for the `enabled` flag so the hook waits for
+    // session hydration on first paint instead of flashing a
+    // disconnect+reconnect when accessToken arrives.
+    token: accessToken,
+    enabled: !!user && !!accessToken,
     onEvent: handleWsEvent,
+    onReconnect: handleWsReconnect,
+    // Section 8.4 polling fallback. When the WS has been unhealthy
+    // long enough that the hook gives up on real-time, fall back to
+    // refreshing the queue every ~5s so the operator's view doesn't
+    // go stale. Same silent-refresh path as the WS event handlers
+    // so the loading spinner doesn't flash. Auto-clears when WS
+    // recovers.
+    onPollFallback: handleWsReconnect,
   });
 
   /* ── Client-side search filter (account scoping is server-side) ──── */
