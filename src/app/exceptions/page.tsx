@@ -99,24 +99,58 @@ function ExceptionQueueContent() {
   }
 
   /* ── Data fetching ───────────────────────────────────────────────── */
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  //
+  // `silent: true` is used by the WebSocket event handler so an
+  // exception_update / task_complete event refreshes the list without
+  // flashing the loading spinner — the user's scroll position and any
+  // hover state are preserved. The initial mount + filter changes
+  // pass silent=false so the first paint shows a proper loading
+  // indicator.
+  //
+  // We follow the cursor pagination contract on every refresh until
+  // `has_more === false`. Mock mode short-circuits with has_more=false
+  // on page 1, so the loop is a no-op there. Live mode currently
+  // returns ~10 rows in a single page (limit=50 default), so the loop
+  // is also short — but if the row count grows past one page, this is
+  // what makes the queue render the full result set instead of just
+  // the first page.
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
-      const [excRes, statsRes] = await Promise.all([
-        exceptionsApi.list({
+      const allRows: ExceptionSummary[] = [];
+      let cursor: string | undefined = undefined;
+      let safety = 0;
+      do {
+        const page = await exceptionsApi.list({
           status: filterState || undefined,
           intent: filterIntent || undefined,
-        }),
-        exceptionsApi.stats(),
-      ]);
-      setExceptions(excRes.data);
+          cursor,
+        });
+        allRows.push(...page.data);
+        cursor = page.has_more ? (page.cursor ?? undefined) : undefined;
+        safety += 1;
+        if (safety > 50) {
+          // Defensive: never spin forever if the backend reports
+          // has_more=true without advancing the cursor.
+          console.warn("Pagination loop safety triggered after 50 pages");
+          break;
+        }
+      } while (cursor);
+
+      const statsRes = await exceptionsApi.stats();
+      setExceptions(allRows);
       setStats(statsRes);
     } catch (err) {
       console.error("Failed to fetch exceptions:", err);
-      setError("Failed to load exceptions. Check your connection and try again.");
+      if (!silent) {
+        setError("Failed to load exceptions. Check your connection and try again.");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [filterState, filterIntent]);
 
@@ -150,14 +184,17 @@ function ExceptionQueueContent() {
         detailRefreshRef.current?.();
       }
     } else if (event.type === "exception_update") {
-      // Exception state changed — refresh list + detail if viewing this exception
-      fetchData();
+      // Exception state changed — silently refresh list + detail if
+      // viewing this exception. silent=true avoids flashing the
+      // loading spinner / clearing the queue while the operator is
+      // mid-scroll on every state transition.
+      fetchData({ silent: true });
       if (event.exception_id === selectedId) {
         detailRefreshRef.current?.();
       }
     } else if (event.type === "task_complete") {
-      // Task finished — refresh everything and clear any reanalysis banner.
-      fetchData();
+      // Task finished — silently refresh and clear any reanalysis banner.
+      fetchData({ silent: true });
       if (event.exception_id === selectedId) {
         detailRefreshRef.current?.();
       }
