@@ -27,6 +27,14 @@ interface UseWebSocketOptions {
   enabled?: boolean;
   /** Callback for each received event */
   onEvent?: (event: WSEvent) => void;
+  /**
+   * Fired once after a successful reconnect (i.e. the connection
+   * dropped, the backoff fired, and the new socket reached
+   * onopen+auth). Lets the consumer reconcile any state that may
+   * have drifted while the socket was down — typically a list /
+   * detail re-fetch. Not fired on the initial connect.
+   */
+  onReconnect?: () => void;
 }
 
 interface UseWebSocketReturn {
@@ -49,6 +57,7 @@ export function useWebSocket({
   token,
   enabled = true,
   onEvent,
+  onReconnect,
 }: UseWebSocketOptions): UseWebSocketReturn {
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const [lastEvent, setLastEvent] = useState<WSEvent | null>(null);
@@ -59,6 +68,12 @@ export function useWebSocket({
   const lastSeenRef = useRef<string | null>(null);
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
+  const onReconnectRef = useRef(onReconnect);
+  onReconnectRef.current = onReconnect;
+  // Tracks whether we've ever opened a socket on this hook instance.
+  // The first onopen is the initial connect; every subsequent one is
+  // a reconnect that should fire onReconnect.
+  const hasOpenedOnceRef = useRef(false);
 
   const connect = useCallback(() => {
     if (!token || !enabled) return;
@@ -82,6 +97,17 @@ export function useWebSocket({
         ws.send(JSON.stringify(authMsg));
         setStatus("connected");
         setReconnectCount(0);
+        // Fire onReconnect after the second-and-later opens. Critical
+        // for the "exception details disappeared" UX: Container Apps
+        // closes idle WebSockets at ~4 minutes, the backoff fires, and
+        // when we reattach the consumer needs to refetch any state
+        // that might have changed while we were offline (otherwise the
+        // detail panel keeps showing pre-disconnect data with no way
+        // to know it's stale).
+        if (hasOpenedOnceRef.current) {
+          onReconnectRef.current?.();
+        }
+        hasOpenedOnceRef.current = true;
       };
 
       ws.onmessage = (event) => {

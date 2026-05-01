@@ -215,10 +215,22 @@ function ExceptionQueueContent() {
     }
   }, [selectedId, fetchData]);
 
+  // After a WS reconnect, reconcile both the list and the currently-
+  // viewed detail. Container Apps drops idle sockets at ~4 minutes; if
+  // the operator was scrolling or reading a detail when the drop
+  // happened, the page would otherwise keep showing pre-disconnect
+  // data with no way to know it was stale. Silent refresh keeps the
+  // scroll position; detail refresh re-runs the panel's GET.
+  const handleWsReconnect = useCallback(() => {
+    fetchData({ silent: true });
+    detailRefreshRef.current?.();
+  }, [fetchData]);
+
   useWebSocket({
     token: user?.id ? "mock-ws-token" : undefined,
     enabled: !!user,
     onEvent: handleWsEvent,
+    onReconnect: handleWsReconnect,
   });
 
   /* ── Client-side search filter (account scoping is server-side) ──── */

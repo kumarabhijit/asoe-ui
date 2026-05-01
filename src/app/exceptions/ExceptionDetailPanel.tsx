@@ -20,6 +20,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, type MutableRefObject } from "react";
+import { signIn } from "next-auth/react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import {
   AgentReasoningCard,
@@ -87,8 +88,33 @@ export default function ExceptionDetailPanel({
   const [analysis, setAnalysis] = useState<OrderAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedLine, setSelectedLine] = useState<string | null>(null);
+  // `fetchError` is the user-visible reason the detail isn't rendered.
+  // Distinct from `detail === null` because there are at least three
+  // legitimate states to render differently:
+  //   * still loading                → loading=true
+  //   * fetch failed (e.g. 401, 5xx) → fetchError set, detail null
+  //   * fetch succeeded but no body  → detail null, no error → "not found"
+  const [fetchError, setFetchError] = useState<{
+    kind: "unauthorized" | "not_found" | "other";
+    message: string;
+  } | null>(null);
 
   /* ── Data Fetching ───────────────────────────────────────────────── */
+
+  // Classifies an error from the http() wrapper into the three states the
+  // detail panel renders. The wrapper's Error.message format is
+  // "<CODE>: <human message>" (api.ts:155-159), so we can string-match
+  // the code prefix without parsing JSON.
+  const classifyFetchError = (err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.startsWith("UNAUTHORIZED") || msg.includes("HTTP_401") || msg.startsWith("INVALID_TOKEN")) {
+      return { kind: "unauthorized" as const, message: msg };
+    }
+    if (msg.startsWith("NOT_FOUND") || msg.includes("HTTP_404")) {
+      return { kind: "not_found" as const, message: msg };
+    }
+    return { kind: "other" as const, message: msg };
+  };
 
   const refreshDetail = useCallback(async () => {
     try {
@@ -102,8 +128,19 @@ export default function ExceptionDetailPanel({
       setTrace(traceData);
       setLineItems(items);
       setAnalysis(analysisData);
+      setFetchError(null);
     } catch (err) {
-      console.error("Failed to refresh exception detail:", err);
+      // Surface the failure so the panel can render an actionable
+      // message. Previously we logged-and-swallowed, which left the
+      // operator looking at a stale/empty panel after a 15-min token
+      // expiry with no explanation. SOX-relevant surface: silent
+      // partial-truth states are a Verdict 2026-04-22 violation.
+      const classified = classifyFetchError(err);
+      console.error(
+        `Failed to refresh exception detail (${classified.kind}):`,
+        classified.message,
+      );
+      setFetchError(classified);
     }
   }, [exceptionId]);
 
@@ -155,6 +192,7 @@ export default function ExceptionDetailPanel({
     let cancelled = false;
     async function fetchDetail() {
       setLoading(true);
+      setFetchError(null);
       try {
         const [excData, traceData, items, analysisData] = await Promise.all([
           exceptionsApi.get(exceptionId),
@@ -171,7 +209,12 @@ export default function ExceptionDetailPanel({
           else if (items[0]) setSelectedLine(items[0].line_id);
         }
       } catch (err) {
-        console.error("Failed to fetch exception detail:", err);
+        const classified = classifyFetchError(err);
+        console.error(
+          `Failed to fetch exception detail (${classified.kind}):`,
+          classified.message,
+        );
+        if (!cancelled) setFetchError(classified);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -193,6 +236,58 @@ export default function ExceptionDetailPanel({
             <div key={i} className="skeleton h-[80px] rounded-sm" />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    // Render an actionable failure state instead of the previous
+    // "Exception not found" silent default. The operator sees what
+    // went wrong AND a clear next step (sign-in for a 401, refresh
+    // for a transient error). NextAuth's signIn() routes back to
+    // the current URL via callbackUrl so the user lands on the
+    // same exception after re-auth.
+    if (fetchError.kind === "unauthorized") {
+      return (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="h-full flex flex-col items-center justify-center gap-12 px-16 text-center"
+        >
+          <div className="text-body font-semibold text-text-primary">
+            Your session has expired
+          </div>
+          <div className="text-caption text-text-secondary max-w-[320px]">
+            The access token issued at sign-in is no longer valid. Sign in
+            again to continue working on this exception.
+          </div>
+          <Button
+            variant="brand"
+            size="sm"
+            onClick={() => signIn(undefined, { callbackUrl: window.location.href })}
+          >
+            Sign in
+          </Button>
+        </div>
+      );
+    }
+    return (
+      <div
+        role="alert"
+        aria-live="polite"
+        className="h-full flex flex-col items-center justify-center gap-12 px-16 text-center"
+      >
+        <div className="text-body font-semibold text-text-primary">
+          Couldn&rsquo;t load this exception
+        </div>
+        <div className="text-caption text-text-secondary max-w-[420px]">
+          {fetchError.kind === "not_found"
+            ? "This exception was not found. It may have been deleted or you may not have access."
+            : "The backend returned an unexpected error. The detail above has the code; try Refresh."}
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => refreshDetail()}>
+          Refresh
+        </Button>
       </div>
     );
   }
