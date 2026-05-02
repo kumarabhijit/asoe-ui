@@ -36,6 +36,10 @@ interface DiagnosticsSectionProps {
   detail: ExceptionDetail;
   trace: TraceResponse | null;
   showPreview: boolean;
+  /** Optional lazy-load callback fired the first time the Diagnostics
+   *  pane opens. Lets the parent defer the trace fetch until the
+   *  operator asks to see it (PO request #4). */
+  onFirstOpen?: () => void;
 }
 
 interface AttemptOption {
@@ -79,7 +83,7 @@ function buildAttemptOptions(
   return options;
 }
 
-export function DiagnosticsSection({ detail, trace, showPreview }: DiagnosticsSectionProps) {
+export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen }: DiagnosticsSectionProps) {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [pipelineOpen, setPipelineOpen] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
@@ -132,7 +136,11 @@ export function DiagnosticsSection({ detail, trace, showPreview }: DiagnosticsSe
     <>
       {/* Diagnostics toggle */}
       <button
-        onClick={() => setDiagnosticsOpen((v) => !v)}
+        onClick={() => {
+          const next = !diagnosticsOpen;
+          setDiagnosticsOpen(next);
+          if (next && onFirstOpen) onFirstOpen();
+        }}
         className="flex items-center justify-center gap-6 w-full py-8 bg-transparent border-none cursor-pointer font-sans text-caption font-semibold text-text-tertiary transition-colors duration-fast"
         aria-expanded={diagnosticsOpen}
       >

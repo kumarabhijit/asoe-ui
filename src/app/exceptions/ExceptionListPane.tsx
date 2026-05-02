@@ -17,7 +17,7 @@ import {
   CheckCircle,
   AlertTriangle,
 } from "lucide-react";
-import { Badge, lifecycleVariant, verdictVariant } from "@/components/ui/Badge";
+import { Badge, lifecycleVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/Select";
@@ -257,6 +257,7 @@ function ExceptionCard({
       role="option"
       aria-selected={isSelected}
       tabIndex={0}
+      data-exception-id={exc.id}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -280,7 +281,12 @@ function ExceptionCard({
         </span>
       </div>
 
-      {/* Row 2: Intent tag + lifecycle badge + verdict */}
+      {/* Row 2: Intent tag + lifecycle badge.
+          The shadow-verdict pill is intentionally omitted here per the
+          PO + TRB ruling: the list card carries lifecycle state only.
+          Operators see the explicit "Audit Result" label in the detail
+          pane (HeaderRibbon), which avoids partial-truth presentation
+          while reducing list density. */}
       <div className="flex items-center gap-4 flex-wrap">
         {exc.intent && (
           <Badge variant="brand" size="sm" icon={null}>
@@ -290,11 +296,6 @@ function ExceptionCard({
         <Badge variant={lifecycleVariant(exc.lifecycle_state)} size="sm">
           {exc.lifecycle_state.replace(/_/g, " ")}
         </Badge>
-        {exc.shadow_verdict && (
-          <Badge variant={verdictVariant(exc.shadow_verdict)} size="sm">
-            {exc.shadow_verdict}
-          </Badge>
-        )}
       </div>
     </div>
   );

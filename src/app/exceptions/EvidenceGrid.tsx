@@ -23,6 +23,10 @@ interface EvidenceGridProps {
   selectedAnalysis?: LineItemAnalysis;
   totalErp: number;
   totalPo: number;
+  /** Optional lazy-load callback fired the first time the pane opens.
+   *  Used by the parent to defer the lineItems API call until the
+   *  operator actually opens this section (PO request #4). */
+  onFirstOpen?: () => void;
 }
 
 export function EvidenceGrid({
@@ -33,16 +37,23 @@ export function EvidenceGrid({
   selectedAnalysis,
   totalErp,
   totalPo,
+  onFirstOpen,
 }: EvidenceGridProps) {
   const [expanded, setExpanded] = useState(false);
 
-  if (lineItems.length === 0) return null;
+  // Allow the section to render even when lineItems hasn't loaded yet
+  // — the operator can open it and the parent's lazy fetcher kicks in.
+  // The "no lines" branch below handles the empty state.
 
   return (
     <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
       {/* Toggle header */}
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => {
+          const next = !expanded;
+          setExpanded(next);
+          if (next && onFirstOpen) onFirstOpen();
+        }}
         className="flex w-full items-center justify-between px-16 py-10 bg-transparent border-none cursor-pointer font-sans"
       >
         <div className="flex items-center gap-8">
@@ -57,7 +68,9 @@ export function EvidenceGrid({
             Evidence Detail
           </span>
           <span className="text-label font-semibold text-text-tertiary bg-surface-secondary px-2 py-px rounded-full">
-            {lineItems.length} line{lineItems.length !== 1 ? "s" : ""}
+            {lineItems.length === 0
+              ? "—"
+              : `${lineItems.length} line${lineItems.length !== 1 ? "s" : ""}`}
           </span>
         </div>
         <div className="flex items-center gap-12 text-caption">
@@ -73,6 +86,11 @@ export function EvidenceGrid({
       {/* Expanded content */}
       {expanded && (
         <div className="border-t border-border px-16 py-12">
+          {lineItems.length === 0 && (
+            <div className="text-caption text-text-tertiary italic mb-12">
+              Loading line items…
+            </div>
+          )}
           {/* Line item table */}
           <div className="overflow-x-auto mb-12">
             <table className="w-full border-collapse text-caption">

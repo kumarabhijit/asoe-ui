@@ -44,19 +44,34 @@ export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, total
         <span>{primarySkuLabel}</span>
       </div>
 
-      {/* Status row */}
-      <div className="flex items-center gap-6 flex-wrap">
-        <Badge variant={lifecycleVariant(detail.lifecycle_state)} size="sm">
-          {detail.lifecycle_state.replace(/_/g, " ")}
-        </Badge>
+      {/* Status row \u2014 labels make the two parallel facts unambiguous:
+          "Current State" is the lifecycle (where the exception sits in
+          the persistence state machine) vs. "Audit Result" which is
+          the Compliance-Shadow verdict (GREEN/YELLOW/RED). The PO
+          requested explicit labels so reviewers don't have to learn
+          which colored pill means which thing. */}
+      <div className="flex items-center gap-10 flex-wrap">
+        <div className="flex items-center gap-4">
+          <span className="text-label font-semibold uppercase tracking-wider text-text-quaternary">
+            Current State:
+          </span>
+          <Badge variant={lifecycleVariant(detail.lifecycle_state)} size="sm">
+            {detail.lifecycle_state.replace(/_/g, " ")}
+          </Badge>
+        </div>
+        {detail.shadow_verdict && (
+          <div className="flex items-center gap-4">
+            <span className="text-label font-semibold uppercase tracking-wider text-text-quaternary">
+              Audit Result:
+            </span>
+            <Badge variant={verdictVariant(detail.shadow_verdict)} size="sm">
+              {detail.shadow_verdict}
+            </Badge>
+          </div>
+        )}
         <span className="text-caption text-text-tertiary">
           {detail.event_type.replace(/_/g, " ")}
         </span>
-        {detail.shadow_verdict && (
-          <Badge variant={verdictVariant(detail.shadow_verdict)} size="sm">
-            {detail.shadow_verdict}
-          </Badge>
-        )}
         <div className="flex-1" />
         <span className="font-mono font-bold text-body text-text-primary">
           {fmtPrice(totalPo)}
