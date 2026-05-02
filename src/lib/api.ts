@@ -991,6 +991,108 @@ function _invocationFailTrace(): import("@/types/api").ExecutedNode[] {
   ];
 }
 
+/* ── Default trace dispatcher.
+   Picks the appropriate executed_nodes shape from an exception
+   summary's lifecycle / shadow_verdict / final_status fields when no
+   hand-crafted MOCK_TRACE_ENRICHMENT entry exists. Keeps every detail
+   page on the Vercel preview rendering a real path rather than the
+   pre-Phase-B empty-state banner. */
+function _defaultExecutedNodes(
+  exc: ExceptionSummary,
+): import("@/types/api").ExecutedNode[] {
+  const recipe = exc.selected_recipe ?? "GenericRecipe.py";
+
+  // FAILED records: the lifecycle reflects the canonical halt cases
+  // already covered by the explicit Phase A.0 traces. Default to the
+  // cross-check disagreement shape (the most common "failed at
+  // classify" cause) so unknown FAILED records still show a real
+  // halt path rather than empty.
+  if (exc.lifecycle_state === "FAILED") {
+    return _failedClassifyTrace();
+  }
+
+  // RED-shadowed records halt at shadow_audit with the RED verdict.
+  if (exc.shadow_verdict === "RED" || exc.final_status === "BLOCKED") {
+    return _redBlockedTrace(recipe);
+  }
+
+  // YELLOW-shadowed records halt at shadow_audit with the YELLOW
+  // verdict; covers MANUAL_REVIEW_REQUIRED, ESCALATED, and the
+  // cosign / admin review paths.
+  if (
+    exc.shadow_verdict === "YELLOW"
+    || exc.final_status === "MANUAL_REVIEW_REQUIRED"
+    || exc.final_status === "REJECTED"
+  ) {
+    return _yellowHitlTrace(recipe);
+  }
+
+  // GREEN auto-resolved (COMPLETE, RESOLVED, CLOSED).
+  if (
+    exc.shadow_verdict === "GREEN"
+    || exc.final_status === "COMPLETE"
+    || exc.lifecycle_state === "RESOLVED"
+    || exc.lifecycle_state === "CLOSED"
+  ) {
+    return _greenAutoResolvedTrace(recipe);
+  }
+
+  // INGESTED / CLASSIFYING / AUDITING — the run hasn't reached a
+  // terminal state yet. Show only the prefix that's actually run.
+  // INGESTED: ingest only. CLASSIFYING: ingest + classify started.
+  // AUDITING: through validate_types, shadow_audit started.
+  if (exc.lifecycle_state === "INGESTED") {
+    return [
+      _node("ingest", 0, 4, {
+        decision: { order_id: exc.order_id },
+      }),
+    ];
+  }
+  if (exc.lifecycle_state === "CLASSIFYING") {
+    return [
+      _node("ingest", 0, 4, { decision: { order_id: exc.order_id } }),
+      _node("classify", 4, 12, {
+        status: "completed",
+        decision: { intent: exc.intent ?? "UNKNOWN" },
+      }),
+    ];
+  }
+  if (exc.lifecycle_state === "AUDITING") {
+    return [
+      _node("ingest", 0, 4, { decision: { order_id: exc.order_id } }),
+      _node("classify", 4, 32, {
+        decision: { intent: exc.intent ?? "UNKNOWN", confidence: 0.85 },
+        exit_verdict: "ok",
+      }),
+      _node("load_skill", 36, 5, {
+        decision: { skill_name: exc.intent?.toLowerCase() ?? "unknown" },
+      }),
+      _node("validate_circuit_breaker", 41, 2, {
+        decision: { update_count: 1 },
+        exit_verdict: "ok",
+      }),
+      _node("select_recipe", 43, 11, {
+        decision: { recipe_name: recipe },
+        exit_verdict: "ok",
+      }),
+      _node("resolve_dependencies", 54, 70, {
+        decision: { recipe, gateway_count: 1 },
+        exit_verdict: "ok",
+      }),
+      _node("validate_types", 124, 3, {
+        decision: { recipe },
+        exit_verdict: "ok",
+      }),
+      // shadow_audit started but no terminal yet
+    ];
+  }
+
+  // Fallback: return the green path. Better to show *something* than
+  // a banner; the banner is reserved for backends that legitimately
+  // didn't write executed_nodes (live-mode pre-Phase-B records).
+  return _greenAutoResolvedTrace(recipe);
+}
+
 const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
   "exc-002": {
     narrative:
@@ -1647,6 +1749,17 @@ export const exceptionsApi = {
     // populates them when coverage fails.
     const isAuditGap = exc.final_status === "AUDIT_CONTEXT_MISSING";
     const enrichment = MOCK_TRACE_ENRICHMENT[exc.id] ?? {};
+    // ADR-027 Phase B — default executed_nodes derivation. When an
+    // exception doesn't have a hand-crafted trace seed in
+    // MOCK_TRACE_ENRICHMENT, fall back to a generated trace whose
+    // shape is keyed off the summary fields. This guarantees every
+    // detail page shows a real path on the Vercel preview rather
+    // than the "evidence not available" empty-state banner.
+    // Hand-crafted seeds still take precedence (they carry richer
+    // narrative + sub_spans + policy hits tuned to the canonical
+    // Phase D acceptance scenarios).
+    const executedNodes =
+      enrichment.executed_nodes ?? _defaultExecutedNodes(exc);
     return {
       trace_id: exc.id + "-trace",
       event_id: exc.order_id,
@@ -1678,6 +1791,9 @@ export const exceptionsApi = {
       audit_context_missing_class: isAuditGap ? "PriceAnalysisData" : undefined,
       audit_context_missing_fields: isAuditGap ? ["doc_number", "rule_id"] : [],
       ...enrichment,
+      // Always emit executed_nodes — derived above so the spread
+      // above can't drop it when enrichment doesn't carry one.
+      executed_nodes: executedNodes,
     };
   },
 
