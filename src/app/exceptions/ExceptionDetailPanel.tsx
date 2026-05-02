@@ -39,7 +39,7 @@ import type {
   OrderAnalysis,
 } from "@/types/exceptions";
 import type { TraceResponse } from "@/types/api";
-import { buildNodeStates, COSIGN_LIFECYCLE_STATE } from "./shared";
+import { COSIGN_LIFECYCLE_STATE } from "./shared";
 import { HeaderRibbon } from "./HeaderRibbon";
 import { ContextStrip } from "./ContextStrip";
 import { AgentAnalysisSection } from "./AgentAnalysisSection";
@@ -302,7 +302,6 @@ export default function ExceptionDetailPanel({
 
   /* ── Derived values ──────────────────────────────────────────────── */
 
-  const nodeStates = buildNodeStates(detail, trace ?? undefined, analysis);
   const selectedAnalysis = analysis?.lines?.find((l) => l.line_id === selectedLine);
   const totalErp = lineItems.reduce((s, l) => s + l.erp_price * l.quantity, 0);
   const totalPo = lineItems.reduce((s, l) => s + l.po_price * l.quantity, 0);
@@ -316,7 +315,13 @@ export default function ExceptionDetailPanel({
   const executionError: ExecutionError | undefined =
     detail.lifecycle_state === "FAILED"
       ? {
-          node: nodeStates.find((n) => n.status === "failed")?.node,
+          // ADR-027 Phase B: derive the halt node from the trace's
+          // executed_nodes list rather than the legacy
+          // PIPELINE_NODES-driven nodeStates. The first halted/errored
+          // entry IS the halt point.
+          node: trace?.executed_nodes?.find(
+            (n) => n.status === "halted" || n.status === "errored",
+          )?.node,
           message: trace?.explanation
             ?? "The pipeline reported a failure but no explanation was returned.",
           failedAt: detail.updated_at,
@@ -578,7 +583,6 @@ export default function ExceptionDetailPanel({
           <DiagnosticsSection
             detail={detail}
             trace={trace}
-            nodeStates={nodeStates}
             showPreview={showPreview}
           />
 

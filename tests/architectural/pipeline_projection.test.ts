@@ -1,84 +1,67 @@
 /**
- * Architectural lock for Verdict 2026-04-22 / Guardrail #6 in the
- * pipeline-progress projection.
+ * ADR-027 Phases C/D — architectural lock on pipeline-progress projection.
  *
- * History: shared.tsx::buildNodeStates() previously hardcoded
- * `confidence: 0.92` for the classify node and generated random
- * `duration_ms` values via Math.random() on every render. That meant:
+ * History: the legacy `buildNodeStates` projection in
+ * `app/exceptions/shared.tsx` hardcoded confidence=0.92 on classify
+ * and generated random duration_ms values via Math.random(). Both
+ * violations were closed by retiring that projection — the new
+ * EventsTimeline + PipelineDAG consume `executed_nodes` from the
+ * trace, so per-node timings + decision payloads come from the
+ * backend or are absent.
  *
- *   * The pipeline progress confidence (always 92%) silently
- *     disagreed with the AgentReasoningCard confidence (real LLM
- *     value, e.g. 80%) — two surfaces of the same fact
- *     contradicting each other on a SOX-relevant page.
- *   * Step timings updated continuously without any retry, because
- *     each render rolled new random durations.
- *
- * Both are partial-truth states the compliance engineer holds veto
- * over. This file pins the corrected behaviour: confidence comes
- * from the analysis payload, durations are NEVER synthesised.
+ * This test asserts the legacy drift surface is permanently retired:
+ *   - shared.tsx no longer exports buildNodeStates
+ *   - PIPELINE_NODES / STATE_PROGRESS arrays are gone
+ *   - WaterfallStepper is no longer mounted from app/exceptions/
+ *   - DiagnosticsSection consumes EventsTimeline + PipelineDAG +
+ *     useTopology (sourced from the compiled-graph topology endpoint,
+ *     not a UI mirror — Guardrail #2 extended to pipeline nodes per
+ *     ADR-027 §"Backend changes" #4).
  */
-
 import { describe, it, expect } from "vitest";
-import { buildNodeStates } from "../../src/app/exceptions/shared";
-import type { ExceptionDetail, OrderAnalysis } from "../../src/types/exceptions";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 
-const baseDetail = {
-  id: "exc-test-1",
-  tenant_id: "acme-corp",
-  order_id: "PO-1",
-  event_type: "EDI_850_PRICE_MISMATCH",
-  intent: "CONTRACTUAL_CORRECTION",
-  lifecycle_state: "PENDING_REVIEW",
-  shadow_verdict: "YELLOW",
-  selected_recipe: "PriceAdjustmentRecipe.py",
-  final_status: "MANUAL_REVIEW_REQUIRED",
-  trace_id: "trace-1",
-  created_at: "2026-04-29T00:00:00Z",
-  updated_at: "2026-04-29T00:00:00Z",
-} as unknown as ExceptionDetail;
+const SHARED_PATH = resolve(__dirname, "../../src/app/exceptions/shared.tsx");
+const DETAIL_PANEL_PATH = resolve(
+  __dirname,
+  "../../src/app/exceptions/ExceptionDetailPanel.tsx",
+);
+const DIAGNOSTICS_PATH = resolve(
+  __dirname,
+  "../../src/app/exceptions/DiagnosticsSection.tsx",
+);
 
-describe("buildNodeStates: confidence projection", () => {
-  it("classify node confidence comes from analysis.confidence (normalised to 0-1), not a hardcoded value", () => {
-    const analysis = { confidence: 80 } as unknown as OrderAnalysis;
-    const states = buildNodeStates(baseDetail, undefined, analysis);
-    const classify = states.find((s) => s.node === "classify")!;
-    expect(classify.status).toBe("completed");
-    expect((classify.data as Record<string, unknown> | undefined)?.confidence).toBe(0.8);
+describe("ADR-027 — legacy pipeline-progress projection retired", () => {
+  it("shared.tsx no longer exports buildNodeStates", () => {
+    const src = readFileSync(SHARED_PATH, "utf-8");
+    expect(src).not.toMatch(/export\s+function\s+buildNodeStates/);
   });
 
-  it("classify node omits confidence entirely when analysis is missing — never falls back to 0.92", () => {
-    const states = buildNodeStates(baseDetail, undefined, null);
-    const classify = states.find((s) => s.node === "classify")!;
-    const data = classify.data as Record<string, unknown> | undefined;
-    expect(data).toBeDefined();
-    expect(data!.intent).toBe("CONTRACTUAL_CORRECTION");
-    expect(data!.confidence).toBeUndefined();
+  it("shared.tsx no longer defines PIPELINE_NODES or STATE_PROGRESS", () => {
+    const src = readFileSync(SHARED_PATH, "utf-8");
+    expect(src).not.toMatch(/PIPELINE_NODES\s*[:=]/);
+    expect(src).not.toMatch(/STATE_PROGRESS\s*[:=]/);
   });
 
-  it("classify node omits confidence when analysis.confidence is missing", () => {
-    const analysis = {} as unknown as OrderAnalysis;
-    const states = buildNodeStates(baseDetail, undefined, analysis);
-    const classify = states.find((s) => s.node === "classify")!;
-    const data = classify.data as Record<string, unknown> | undefined;
-    expect(data!.confidence).toBeUndefined();
-  });
-});
-
-describe("buildNodeStates: never synthesises durations", () => {
-  it("completed nodes do not carry a duration_ms field (backend doesn't expose per-node timings yet)", () => {
-    const analysis = { confidence: 80 } as unknown as OrderAnalysis;
-    const states = buildNodeStates(baseDetail, undefined, analysis);
-    const completed = states.filter((s) => s.status === "completed");
-    expect(completed.length).toBeGreaterThan(0);
-    for (const node of completed) {
-      expect(node.duration_ms).toBeUndefined();
-    }
+  it("DiagnosticsSection no longer imports WaterfallStepper", () => {
+    const src = readFileSync(DIAGNOSTICS_PATH, "utf-8");
+    expect(src).not.toMatch(/from\s+["']@\/components\/ui\/WaterfallStepper["']/);
   });
 
-  it("two consecutive calls produce identical states (proves no Math.random)", () => {
-    const analysis = { confidence: 80 } as unknown as OrderAnalysis;
-    const a = buildNodeStates(baseDetail, undefined, analysis);
-    const b = buildNodeStates(baseDetail, undefined, analysis);
-    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  it("ExceptionDetailPanel no longer imports buildNodeStates", () => {
+    const src = readFileSync(DETAIL_PANEL_PATH, "utf-8");
+    expect(src).not.toMatch(/buildNodeStates/);
+  });
+
+  it("DiagnosticsSection consumes EventsTimeline + PipelineDAG", () => {
+    const src = readFileSync(DIAGNOSTICS_PATH, "utf-8");
+    expect(src).toMatch(/EventsTimeline/);
+    expect(src).toMatch(/PipelineDAG/);
+  });
+
+  it("DiagnosticsSection sources topology from useTopology, not a UI mirror", () => {
+    const src = readFileSync(DIAGNOSTICS_PATH, "utf-8");
+    expect(src).toMatch(/useTopology/);
   });
 });

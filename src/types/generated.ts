@@ -511,6 +511,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pipeline/topology": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Topology
+         * @description Return the live-graph topology + per-gate verdict labels.
+         *
+         *     Authentication required; no additional permission. ADR-027 §
+         *     "Backend changes" #2: adding `dashboard:read` here would be
+         *     permission theater (no per-tenant data to leak).
+         */
+        get: operations["get_topology_api_v1_pipeline_topology_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/policies/{tenant_id}": {
         parameters: {
             query?: never;
@@ -1087,6 +1111,93 @@ export interface components {
             /** Updated At */
             updated_at: string;
         };
+        /**
+         * ExecutedNode
+         * @description Per-node execution evidence (Phase B).
+         *
+         *     Appended by every orchestration node to `state.execution_trace`.
+         *     Persisted by `build_analysis` into `trace_data["executed_nodes"]`
+         *     and surfaced on `TraceResponse.executed_nodes` for the UI's
+         *     EventsTimeline + PipelineDAG.
+         *
+         *     Reanalysis: each invoke produces a fresh list; reanalysis preserves
+         *     prior attempts on `ReanalysisHistoryEntry.executed_nodes` rather
+         *     than overwriting trace_data — the SOX surface cannot accept the
+         *     audit-evidence loss.
+         *
+         *     Field semantics:
+         *       - `node`           — canonical orchestration node name
+         *       - `entered_at`     — ISO-8601, node start
+         *       - `completed_at`   — ISO-8601, node end (None if errored)
+         *       - `duration_ms`    — wall-clock; for resolve_dependencies the
+         *                             fan-out span — sub_spans hold per-gateway
+         *       - `timestamp`      — convenience top-level (matches existing trace
+         *                             style) — always equals `entered_at`
+         *       - `status`         — completed / halted / errored
+         *       - `decision`       — node-specific payload: intent+confidence on
+         *                             classify, recipe on select_recipe, verdict
+         *                             on shadow_audit, etc.
+         *       - `exit_verdict`   — the verdict label that drove the next route
+         *                             (`green` | `red` | `yellow` | `breach` |
+         *                              `cross_check_disagreement` | `ok` | …)
+         *                             None for nodes whose exit isn't a
+         *                             conditional gate (e.g. ingest, load_skill).
+         *       - `policy_hits`    — populated on shadow_audit; [] elsewhere
+         *       - `sub_spans`      — populated on resolve_dependencies; [] elsewhere
+         */
+        ExecutedNode: {
+            /** Completed At */
+            completed_at?: string | null;
+            /** Decision */
+            decision?: {
+                [key: string]: unknown;
+            };
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Entered At */
+            entered_at: string;
+            /** Exit Verdict */
+            exit_verdict?: string | null;
+            /** Node */
+            node: string;
+            /** Policy Hits */
+            policy_hits?: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "halted" | "errored";
+            /** Sub Spans */
+            sub_spans?: components["schemas"]["GatewayCallSpan"][];
+            /** Timestamp */
+            timestamp: string;
+        };
+        /**
+         * GatewayCallSpan
+         * @description Per-gateway sub-span emitted by `resolve_dependencies` (Phase B).
+         *
+         *     `resolve_dependencies` fans gateway calls out via concurrent.futures.
+         *     The single `ExecutedNode.duration_ms` is the wall-clock fan-out span;
+         *     per-gateway timing lives here so the timeline can render a nested
+         *     expand without the DAG view having to render N sub-nodes (which would
+         *     diverge from the orchestration topology — the DAG renders ONE node,
+         *     not N).
+         */
+        GatewayCallSpan: {
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Gateway */
+            gateway: string;
+            /** Started At */
+            started_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "error" | "timeout";
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1491,6 +1602,63 @@ export interface components {
             sku: string;
             /** Suggested */
             suggested: number;
+        };
+        /**
+         * PipelineTopology
+         * @description Response shape for GET /api/v1/pipeline/topology (Phase A).
+         *
+         *     `topology_hash` is a stable SHA-256 over the canonical JSON of
+         *     (nodes, edges); the UI caches by hash and revalidates on
+         *     `useHealth` polling tick (ADR-027 Open Question §1).
+         */
+        PipelineTopology: {
+            /** Edges */
+            edges: components["schemas"]["PipelineTopologyEdge"][];
+            /** Nodes */
+            nodes: components["schemas"]["PipelineTopologyNode"][];
+            /** Topology Hash */
+            topology_hash: string;
+        };
+        /**
+         * PipelineTopologyEdge
+         * @description A directed edge in the pipeline topology (Phase A).
+         *
+         *     `verdict_label` is populated for every conditional edge — both the
+         *     explicit ones (registered in `_VERDICT_LABELS`) and the implicit
+         *     classify-time disagreement gate (registered in
+         *     `_IMPLICIT_VERDICT_LABELS`). Unconditional edges carry
+         *     `verdict_label=None`.
+         *
+         *     A single compiled-graph conditional edge can produce multiple
+         *     rows when one route key (e.g. `terminal`) corresponds to multiple
+         *     verdicts (e.g. RED + YELLOW both terminate `shadow_audit`). The
+         *     introspection helper expands accordingly; the DAG renderer draws
+         *     each as a distinct labelled edge.
+         */
+        PipelineTopologyEdge: {
+            /** Conditional */
+            conditional: boolean;
+            /** From Node */
+            from_node: string;
+            /** To Node */
+            to_node: string;
+            /** Verdict Label */
+            verdict_label?: string | null;
+        };
+        /**
+         * PipelineTopologyNode
+         * @description A node in the pipeline topology (Phase A).
+         */
+        PipelineTopologyNode: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "node" | "terminal";
+            /** Label */
+            label: string;
         };
         /**
          * PolicyOverrideResponse
@@ -1940,6 +2108,8 @@ export interface components {
             customer_email_draft?: string | null;
             /** Event Id */
             event_id: string;
+            /** Executed Nodes */
+            executed_nodes?: components["schemas"]["ExecutedNode"][];
             /** Explanation */
             explanation?: string | null;
             /** Final Status */
@@ -2926,6 +3096,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    get_topology_api_v1_pipeline_topology_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineTopology"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

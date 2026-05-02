@@ -57,7 +57,11 @@ jobs:
         working-directory: asoe2
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # asoe2 uses pyproject.toml — there is no top-level
+          # requirements.txt. Install the package + its optional dev
+          # extras so uvicorn and the langgraph runtime resolve
+          # exactly the way the asoe2 test suite does.
+          pip install -e ".[dev]"
 
       - name: Install Playwright browsers
         working-directory: asoe-ui

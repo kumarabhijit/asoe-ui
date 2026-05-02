@@ -7,6 +7,8 @@
  * exist only for type safety in components that receive API data.
  */
 
+import type { ExecutedNode } from "./api";
+
 /* ── Enums (fetched from GET /api/v1/health at runtime) ────────────── */
 
 /**
@@ -190,6 +192,12 @@ export interface ReanalysisEntry {
   new_shadow_verdict?: string;
   new_final_status?: string;
   new_lifecycle_state?: string;
+  /** ADR-027 Phase B (rev. 3) — the executed_nodes list captured for
+   *  THIS attempt at the moment reanalysis kicked off. Preserved on
+   *  the entry so prior-path audit evidence isn't destroyed when the
+   *  next attempt overwrites trace_data. Empty for entries written
+   *  before Phase B's instrumentation landed. */
+  executed_nodes?: ExecutedNode[];
 }
 
 /** ExceptionDetail — full detail view (GET /api/v1/exceptions/{id}) */

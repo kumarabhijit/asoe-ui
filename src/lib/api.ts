@@ -28,6 +28,7 @@ import type {
   WorkflowResult,
   PolicyOverrideRequest,
   PolicyOverrideResponse,
+  PipelineTopology,
 } from "@/types/api";
 import type { HealthResponse, ExceptionSummary, LifecycleState, LineItem, OrderAnalysis, ReanalysisEntry } from "@/types/exceptions";
 import { ROLE_PERMISSIONS } from "./roles";
@@ -562,11 +563,536 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-021", tenant_id: "acme-corp", order_id: "PO-PM-ROUTING-001", event_type: "EDI_850_LINE_MISMATCH", intent: "CONTRACTUAL_CORRECTION", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "PriceAdjustmentRecipe.py", final_status: "COMPLETE", created_at: "2026-04-17T10:00:00Z", updated_at: "2026-04-17T10:01:00Z", account_id: "acct-walmart", account_name: "Walmart",
   },
+  // ADR-027 Phase A.0 verdict-coverage demos (FAILED-state records
+  // exercising every conditional gate's terminal verdict). These
+  // are intentionally short halts — recipe never executes, shadow
+  // may or may not run depending on where the gate halted. The UI
+  // EventsTimeline + PipelineDAG render the halt point and reason
+  // honestly rather than the linear stepper's misleading
+  // "blocked at apply_effects" mapping.
+  {
+    id: "exc-022", tenant_id: "acme-corp", order_id: "SO-CB-001", event_type: "MASS_PRICING_RECALC", intent: "MASS_PRICING_ERROR", lifecycle_state: "FAILED", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-18T07:00:00Z", updated_at: "2026-04-18T07:00:01Z", account_id: "acct-walmart", account_name: "Walmart",
+  },
+  {
+    id: "exc-023", tenant_id: "acme-corp", order_id: "SO-NR-001", event_type: "MASS_PRICING_RECALC", intent: "MASS_PRICING_ERROR", lifecycle_state: "FAILED", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-18T07:30:00Z", updated_at: "2026-04-18T07:30:00Z", account_id: "acct-kroger", account_name: "Kroger",
+  },
+  {
+    id: "exc-024", tenant_id: "acme-corp", order_id: "SO-GW-001", event_type: "DUPLICATE_PO_RECEIVED", intent: "DUPLICATE_PO", lifecycle_state: "FAILED", selected_recipe: "DuplicatePORecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-18T08:00:00Z", updated_at: "2026-04-18T08:00:02Z", account_id: "acct-target", account_name: "Target",
+  },
+  {
+    id: "exc-025", tenant_id: "acme-corp", order_id: "PO-PHR-BAD", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "FAILED", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-18T08:30:00Z", updated_at: "2026-04-18T08:30:00Z", account_id: "acct-costco", account_name: "Costco",
+  },
 ];
 
 /** Per-exception trace enrichment — optional Layer 2 fields demonstrated
  *  on a couple of representative exceptions. In production these will be
  *  populated by the recipe layer via TraceRecord extensions. */
+/* ── ADR-027 Phase B — mock executed_nodes lists for the four canonical
+   traces (Phase D acceptance fixtures): GREEN autonomous-resolved,
+   YELLOW HITL, RED BLOCKED, FAILED at classify (cross-check
+   disagreement). On the live (USE_REAL_API=1) path these come from
+   `state.execution_trace` via the asoe2 trace endpoint; on the mock
+   path the Vercel preview deploys without a live backend, so this is
+   the seed that makes EventsTimeline + PipelineDAG render a realistic
+   path instead of the "evidence not available" banner.
+
+   All timestamps relative to a base anchor so the order is monotonic
+   and durations are deterministic across builds (no Math.random — see
+   Verdict 2026-04-22 / Guardrail #6). */
+
+const MOCK_TRACE_BASE_TIME = "2026-05-01T12:00:00.000Z";
+
+function _ts(offsetMs: number): string {
+  return new Date(
+    new Date(MOCK_TRACE_BASE_TIME).getTime() + offsetMs,
+  ).toISOString();
+}
+
+function _node(
+  node: string,
+  startMs: number,
+  durationMs: number,
+  opts: {
+    status?: "completed" | "halted" | "errored";
+    decision?: Record<string, unknown>;
+    exit_verdict?: string | null;
+    policy_hits?: string[];
+    sub_spans?: Array<{
+      gateway: string;
+      started_at: string;
+      finished_at?: string;
+      duration_ms?: number;
+      status: "ok" | "error" | "timeout";
+    }>;
+  } = {},
+): import("@/types/api").ExecutedNode {
+  return {
+    node,
+    entered_at: _ts(startMs),
+    completed_at: _ts(startMs + durationMs),
+    duration_ms: durationMs,
+    timestamp: _ts(startMs),
+    status: opts.status ?? "completed",
+    decision: opts.decision ?? {},
+    exit_verdict: opts.exit_verdict ?? null,
+    policy_hits: opts.policy_hits ?? [],
+    sub_spans: opts.sub_spans ?? [],
+  };
+}
+
+function _greenAutoResolvedTrace(
+  recipeName: string,
+): import("@/types/api").ExecutedNode[] {
+  return [
+    _node("ingest", 0, 4, { decision: { order_id: "SO-1042" } }),
+    _node("classify", 4, 38, {
+      decision: { intent: "CONTRACTUAL_CORRECTION", confidence: 0.91 },
+      exit_verdict: "ok",
+    }),
+    _node("load_skill", 42, 6, {
+      decision: { skill_name: "pricing-discrepancy" },
+    }),
+    _node("validate_circuit_breaker", 48, 2, {
+      decision: { update_count: 1, batch_total_variance: 110 },
+      exit_verdict: "ok",
+    }),
+    _node("select_recipe", 50, 14, {
+      decision: { recipe_name: recipeName },
+      exit_verdict: "ok",
+    }),
+    _node("resolve_dependencies", 64, 86, {
+      decision: { recipe: recipeName, gateway_count: 2 },
+      exit_verdict: "ok",
+      sub_spans: [
+        {
+          gateway: "sap_doc/get_sales_order",
+          started_at: _ts(64),
+          finished_at: _ts(118),
+          duration_ms: 54,
+          status: "ok",
+        },
+        {
+          gateway: "sap_contract/get_pricing",
+          started_at: _ts(64),
+          finished_at: _ts(150),
+          duration_ms: 86,
+          status: "ok",
+        },
+      ],
+    }),
+    _node("validate_types", 150, 3, {
+      decision: { recipe: recipeName, param_keys: ["line_item", "order_id", "requested_price"] },
+      exit_verdict: "ok",
+    }),
+    _node("shadow_audit", 153, 11, {
+      decision: { shadow_status: "GREEN", trace_id: "trace-mock-green" },
+      exit_verdict: "green",
+      policy_hits: [],
+    }),
+    _node("execute_recipe", 164, 22, {
+      decision: { recipe: recipeName, recipe_status: "OK", final_status: "COMPLETE" },
+    }),
+    _node("apply_effects", 186, 31, {
+      decision: { recipe: recipeName, effect_count: 1, effects_ok: 1 },
+    }),
+    _node("build_analysis", 217, 4, {
+      decision: { final_status: "COMPLETE", audit_coverage: "complete" },
+    }),
+  ];
+}
+
+function _yellowHitlTrace(
+  recipeName: string,
+): import("@/types/api").ExecutedNode[] {
+  return [
+    _node("ingest", 0, 4, { decision: { order_id: "SO-1042" } }),
+    _node("classify", 4, 36, {
+      decision: { intent: "CONTRACTUAL_CORRECTION", confidence: 0.86 },
+      exit_verdict: "ok",
+    }),
+    _node("load_skill", 40, 6, {
+      decision: { skill_name: "pricing-discrepancy" },
+    }),
+    _node("validate_circuit_breaker", 46, 2, {
+      decision: { update_count: 1, batch_total_variance: 1100 },
+      exit_verdict: "ok",
+    }),
+    _node("select_recipe", 48, 14, {
+      decision: { recipe_name: recipeName },
+      exit_verdict: "ok",
+    }),
+    _node("resolve_dependencies", 62, 78, {
+      decision: { recipe: recipeName, gateway_count: 1 },
+      exit_verdict: "ok",
+      sub_spans: [
+        {
+          gateway: "sap_contract/get_pricing",
+          started_at: _ts(62),
+          finished_at: _ts(140),
+          duration_ms: 78,
+          status: "ok",
+        },
+      ],
+    }),
+    _node("validate_types", 140, 3, {
+      decision: { recipe: recipeName, param_keys: ["line_item", "order_id"] },
+      exit_verdict: "ok",
+    }),
+    _node("shadow_audit", 143, 12, {
+      status: "halted",
+      decision: { shadow_status: "YELLOW", trace_id: "trace-mock-yellow" },
+      exit_verdict: "yellow",
+      policy_hits: ["price.over_at_risk_threshold"],
+    }),
+    _node("build_analysis", 155, 4, {
+      status: "halted",
+      decision: { final_status: "MANUAL_REVIEW_REQUIRED", audit_coverage: "complete" },
+    }),
+  ];
+}
+
+function _redBlockedTrace(
+  recipeName: string,
+): import("@/types/api").ExecutedNode[] {
+  return [
+    _node("ingest", 0, 4, { decision: { order_id: "PO-EDM-SKU-001" } }),
+    _node("classify", 4, 31, {
+      decision: { intent: "EDI_MISMATCH", confidence: 0.94 },
+      exit_verdict: "ok",
+    }),
+    _node("load_skill", 35, 5, {
+      decision: { skill_name: "edi-mismatch" },
+    }),
+    _node("validate_circuit_breaker", 40, 2, {
+      decision: { update_count: 1, batch_total_variance: 0 },
+      exit_verdict: "ok",
+    }),
+    _node("select_recipe", 42, 12, {
+      decision: { recipe_name: recipeName },
+      exit_verdict: "ok",
+    }),
+    _node("resolve_dependencies", 54, 64, {
+      decision: { recipe: recipeName, gateway_count: 1 },
+      exit_verdict: "ok",
+      sub_spans: [
+        {
+          gateway: "sap_doc/get_sales_order",
+          started_at: _ts(54),
+          finished_at: _ts(118),
+          duration_ms: 64,
+          status: "ok",
+        },
+      ],
+    }),
+    _node("validate_types", 118, 3, {
+      decision: { recipe: recipeName, param_keys: ["expected_value", "order_id", "received_value", "sub_type"] },
+      exit_verdict: "ok",
+    }),
+    _node("shadow_audit", 121, 9, {
+      status: "halted",
+      decision: { shadow_status: "RED", trace_id: "trace-mock-red" },
+      exit_verdict: "red",
+      policy_hits: [
+        "edi.line_mismatch_blocks_autoresolve",
+        "compliance.fraud_signal_strong",
+      ],
+    }),
+    _node("build_analysis", 130, 4, {
+      status: "halted",
+      decision: { final_status: "BLOCKED", audit_coverage: "complete" },
+    }),
+  ];
+}
+
+function _failedClassifyTrace(): import("@/types/api").ExecutedNode[] {
+  return [
+    _node("ingest", 0, 4, { decision: { order_id: "SO-13400" } }),
+    _node("classify", 4, 412, {
+      status: "halted",
+      decision: {
+        intent: "CONTRACTUAL_CORRECTION",
+        confidence: 0.62,
+        llm_intent: "CREDIT_BLOCK",
+        deterministic_intent: "CONTRACTUAL_CORRECTION",
+        cross_check_reason: "LLM intent CREDIT_BLOCK does not match deterministic CONTRACTUAL_CORRECTION",
+      },
+      exit_verdict: "cross_check_disagreement",
+    }),
+    _node("build_analysis", 416, 3, {
+      status: "halted",
+      decision: { final_status: "FAIL_TO_HUMAN", guard: "fail_to_human_skip" },
+    }),
+  ];
+}
+
+/* ── Phase A.0 verdict-coverage: halt-at-circuit-breaker.
+   Mass-update / variance breach trips validate_circuit_breaker; the
+   gate's only conditional terminal verdict is `breach`. Halts before
+   recipe selection, so trace_data carries no recipe and shadow never
+   runs. */
+function _circuitBreakerBreachTrace(): import("@/types/api").ExecutedNode[] {
+  return [
+    _node("ingest", 0, 4, { decision: { order_id: "SO-CB-001", request_trace_id: "tr-cb-001" } }),
+    _node("classify", 4, 21, {
+      decision: { intent: "MASS_PRICING_ERROR", confidence: 0.88 },
+      exit_verdict: "ok",
+    }),
+    _node("load_skill", 25, 5, { decision: { skill_name: "mass-pricing-error" } }),
+    _node("validate_circuit_breaker", 30, 3, {
+      status: "halted",
+      decision: {
+        update_count: 152,
+        batch_total_variance: 18420,
+        reasons: [
+          "update_count 152 exceeds threshold 50",
+          "batch_total_variance $18420 exceeds threshold $5000",
+        ],
+      },
+      exit_verdict: "breach",
+    }),
+    _node("build_analysis", 33, 3, {
+      status: "halted",
+      decision: { final_status: "FAIL_TO_HUMAN", guard: "fail_to_human_skip" },
+    }),
+  ];
+}
+
+/* ── Phase A.0 verdict-coverage: halt-at-select-recipe.
+   Some intents (notably MASS_PRICING_ERROR) intentionally have no
+   recipe — shadow is the terminal voice for them. select_recipe
+   emits the `no_recipe` verdict; the run continues to shadow_audit
+   only if shadow has been wired ahead of select_recipe — which it
+   isn't. So this halts at select_recipe directly. */
+function _noRecipeTrace(): import("@/types/api").ExecutedNode[] {
+  return [
+    _node("ingest", 0, 4, { decision: { order_id: "SO-NR-001", request_trace_id: "tr-nr-001" } }),
+    _node("classify", 4, 18, {
+      decision: { intent: "MASS_PRICING_ERROR", confidence: 0.93 },
+      exit_verdict: "ok",
+    }),
+    _node("load_skill", 22, 5, { decision: { skill_name: "mass-pricing-error" } }),
+    _node("validate_circuit_breaker", 27, 2, {
+      decision: { update_count: 1, batch_total_variance: 240 },
+      exit_verdict: "ok",
+    }),
+    _node("select_recipe", 29, 8, {
+      status: "halted",
+      decision: { recipe_name: null },
+      exit_verdict: "no_recipe",
+    }),
+    _node("build_analysis", 37, 3, {
+      status: "halted",
+      decision: { final_status: "FAIL_TO_HUMAN", guard: "fail_to_human_skip" },
+    }),
+  ];
+}
+
+/* ── Phase A.0 verdict-coverage: halt-at-resolve-dependencies.
+   A recipe declares a `required_for_audit=True` gateway that times
+   out. resolve_dependencies emits `required_gw_fail` and halts —
+   shadow never runs because the audit-bearing evidence couldn't be
+   captured. The single sub_span carries the failed gateway's
+   timing + status. */
+function _requiredGwFailTrace(): import("@/types/api").ExecutedNode[] {
+  return [
+    _node("ingest", 0, 4, { decision: { order_id: "SO-GW-001", request_trace_id: "tr-gw-001" } }),
+    _node("classify", 4, 28, {
+      decision: { intent: "DUPLICATE_PO", confidence: 0.89 },
+      exit_verdict: "ok",
+    }),
+    _node("load_skill", 32, 6, { decision: { skill_name: "duplicate-po" } }),
+    _node("validate_circuit_breaker", 38, 2, {
+      decision: { update_count: 1, batch_total_variance: 0 },
+      exit_verdict: "ok",
+    }),
+    _node("select_recipe", 40, 13, {
+      decision: { recipe_name: "DuplicatePORecipe.py" },
+      exit_verdict: "ok",
+    }),
+    _node("resolve_dependencies", 53, 2014, {
+      status: "halted",
+      decision: {
+        recipe: "DuplicatePORecipe.py",
+        gateway_count: 2,
+        failed_gateway: "sap_doc/get_matched_po_details",
+      },
+      exit_verdict: "required_gw_fail",
+      sub_spans: [
+        {
+          gateway: "oms/get_fulfillment_status",
+          started_at: _ts(53),
+          finished_at: _ts(102),
+          duration_ms: 49,
+          status: "ok",
+        },
+        {
+          gateway: "sap_doc/get_matched_po_details",
+          started_at: _ts(53),
+          finished_at: _ts(2053),
+          duration_ms: 2000,
+          status: "timeout",
+        },
+      ],
+    }),
+    _node("build_analysis", 2067, 4, {
+      status: "halted",
+      decision: { final_status: "FAIL_TO_HUMAN", guard: "fail_to_human_skip" },
+    }),
+  ];
+}
+
+/* ── Phase A.0 verdict-coverage: halt-at-validate-types.
+   PriceHoldReleaseRecipe's defensive guard: sap_base_price <= 0 is
+   a routing bug, not a business exception. validate_types short-
+   circuits with `invocation_fail` rather than letting the recipe
+   throw at execution time. */
+function _invocationFailTrace(): import("@/types/api").ExecutedNode[] {
+  return [
+    _node("ingest", 0, 4, { decision: { order_id: "PO-PHR-BAD", request_trace_id: "tr-vt-001" } }),
+    _node("classify", 4, 26, {
+      decision: { intent: "PRICE_HOLD_RELEASE", confidence: 0.84 },
+      exit_verdict: "ok",
+    }),
+    _node("load_skill", 30, 5, { decision: { skill_name: "price-hold-release" } }),
+    _node("validate_circuit_breaker", 35, 2, {
+      decision: { update_count: 1, batch_total_variance: 0 },
+      exit_verdict: "ok",
+    }),
+    _node("select_recipe", 37, 11, {
+      decision: { recipe_name: "PriceHoldReleaseRecipe.py" },
+      exit_verdict: "ok",
+    }),
+    _node("resolve_dependencies", 48, 42, {
+      decision: { recipe: "PriceHoldReleaseRecipe.py", gateway_count: 1 },
+      exit_verdict: "ok",
+      sub_spans: [
+        {
+          gateway: "oms/get_price_hold_status",
+          started_at: _ts(48),
+          finished_at: _ts(90),
+          duration_ms: 42,
+          status: "ok",
+        },
+      ],
+    }),
+    _node("validate_types", 90, 2, {
+      status: "halted",
+      decision: {
+        recipe: "PriceHoldReleaseRecipe.py",
+        guard: "sap_base_price_non_positive",
+        sap_base_price: 0,
+      },
+      exit_verdict: "invocation_fail",
+    }),
+    _node("build_analysis", 92, 3, {
+      status: "halted",
+      decision: { final_status: "FAIL_TO_HUMAN", guard: "fail_to_human_skip" },
+    }),
+  ];
+}
+
+/* ── Default trace dispatcher.
+   Picks the appropriate executed_nodes shape from an exception
+   summary's lifecycle / shadow_verdict / final_status fields when no
+   hand-crafted MOCK_TRACE_ENRICHMENT entry exists. Keeps every detail
+   page on the Vercel preview rendering a real path rather than the
+   pre-Phase-B empty-state banner. */
+function _defaultExecutedNodes(
+  exc: ExceptionSummary,
+): import("@/types/api").ExecutedNode[] {
+  const recipe = exc.selected_recipe ?? "GenericRecipe.py";
+
+  // FAILED records: the lifecycle reflects the canonical halt cases
+  // already covered by the explicit Phase A.0 traces. Default to the
+  // cross-check disagreement shape (the most common "failed at
+  // classify" cause) so unknown FAILED records still show a real
+  // halt path rather than empty.
+  if (exc.lifecycle_state === "FAILED") {
+    return _failedClassifyTrace();
+  }
+
+  // RED-shadowed records halt at shadow_audit with the RED verdict.
+  if (exc.shadow_verdict === "RED" || exc.final_status === "BLOCKED") {
+    return _redBlockedTrace(recipe);
+  }
+
+  // YELLOW-shadowed records halt at shadow_audit with the YELLOW
+  // verdict; covers MANUAL_REVIEW_REQUIRED, ESCALATED, and the
+  // cosign / admin review paths.
+  if (
+    exc.shadow_verdict === "YELLOW"
+    || exc.final_status === "MANUAL_REVIEW_REQUIRED"
+    || exc.final_status === "REJECTED"
+  ) {
+    return _yellowHitlTrace(recipe);
+  }
+
+  // GREEN auto-resolved (COMPLETE, RESOLVED, CLOSED).
+  if (
+    exc.shadow_verdict === "GREEN"
+    || exc.final_status === "COMPLETE"
+    || exc.lifecycle_state === "RESOLVED"
+    || exc.lifecycle_state === "CLOSED"
+  ) {
+    return _greenAutoResolvedTrace(recipe);
+  }
+
+  // INGESTED / CLASSIFYING / AUDITING — the run hasn't reached a
+  // terminal state yet. Show only the prefix that's actually run.
+  // INGESTED: ingest only. CLASSIFYING: ingest + classify started.
+  // AUDITING: through validate_types, shadow_audit started.
+  if (exc.lifecycle_state === "INGESTED") {
+    return [
+      _node("ingest", 0, 4, {
+        decision: { order_id: exc.order_id },
+      }),
+    ];
+  }
+  if (exc.lifecycle_state === "CLASSIFYING") {
+    return [
+      _node("ingest", 0, 4, { decision: { order_id: exc.order_id } }),
+      _node("classify", 4, 12, {
+        status: "completed",
+        decision: { intent: exc.intent ?? "UNKNOWN" },
+      }),
+    ];
+  }
+  if (exc.lifecycle_state === "AUDITING") {
+    return [
+      _node("ingest", 0, 4, { decision: { order_id: exc.order_id } }),
+      _node("classify", 4, 32, {
+        decision: { intent: exc.intent ?? "UNKNOWN", confidence: 0.85 },
+        exit_verdict: "ok",
+      }),
+      _node("load_skill", 36, 5, {
+        decision: { skill_name: exc.intent?.toLowerCase() ?? "unknown" },
+      }),
+      _node("validate_circuit_breaker", 41, 2, {
+        decision: { update_count: 1 },
+        exit_verdict: "ok",
+      }),
+      _node("select_recipe", 43, 11, {
+        decision: { recipe_name: recipe },
+        exit_verdict: "ok",
+      }),
+      _node("resolve_dependencies", 54, 70, {
+        decision: { recipe, gateway_count: 1 },
+        exit_verdict: "ok",
+      }),
+      _node("validate_types", 124, 3, {
+        decision: { recipe },
+        exit_verdict: "ok",
+      }),
+      // shadow_audit started but no terminal yet
+    ];
+  }
+
+  // Fallback: return the green path. Better to show *something* than
+  // a banner; the banner is reserved for backends that legitimately
+  // didn't write executed_nodes (live-mode pre-Phase-B records).
+  return _greenAutoResolvedTrace(recipe);
+}
+
 const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
   "exc-002": {
     narrative:
@@ -583,6 +1109,7 @@ const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
     ],
     customer_email_draft:
       "Hi [Buyer name],\n\nThank you for PO 4500020017. We noticed that two line items were priced against our Q4 promotional rate (Q4-WMT-021), which expired 12/31. We've adjusted those lines to your current contract rate (PR00) — an 11% difference from the PO price.\n\nNo action is needed on your side; this correction is within your contract's published auto-adjust band. Confirmation will follow shortly.\n\nBest,\n[CSR name]",
+    executed_nodes: _yellowHitlTrace("PriceAdjustmentRecipe.py"),
   },
   "exc-013": {
     narrative:
@@ -599,6 +1126,46 @@ const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
     ],
     customer_email_draft:
       "Hi [Buyer name],\n\nWe received PO [PO#] for 40 cases of SKU-7800 (Organic Kombucha 6pk). The contracted minimum is 50 cases, which would also unlock your next volume-tier rate.\n\nWith your approval, we'll round the order up to 50 cases at the better unit price. Total net change: +$285 at a ~4% lower $/case. Alternately, we can hold and wait for a revised PO — please confirm.\n\nBest,\n[CSR name]",
+    executed_nodes: _yellowHitlTrace("MOQRoundUpRecipe.py"),
+  },
+  // GREEN autonomous-resolved sample (Phase D acceptance trace #1)
+  "exc-011": {
+    executed_nodes: _greenAutoResolvedTrace("BackOrderResolutionRecipe.py"),
+  },
+  // GREEN autonomous-resolved on the price-hold-release path (uses
+  // the same trace shape; recipe label differs).
+  "exc-017": {
+    executed_nodes: _greenAutoResolvedTrace("PriceHoldReleaseRecipe.py"),
+  },
+  // RED BLOCKED sample (Phase D acceptance trace #3)
+  "exc-019": {
+    executed_nodes: _redBlockedTrace("EdiMismatchRecipe.py"),
+  },
+  // FAILED at classify — cross-check disagreement halt (Phase D
+  // acceptance trace #4 — the SMK-CB-001 canonical case).
+  "exc-015": {
+    executed_nodes: _failedClassifyTrace(),
+  },
+  // ADR-027 Phase A.0 — every conditional-gate terminal verdict
+  // gets at least one mock so the timeline/DAG views can be
+  // exercised end-to-end across every branch. Each row's halt
+  // node and exit_verdict appears on the corresponding
+  // _VERDICT_LABELS registry entry in asoe2/orchestration/graph.py.
+  // halt at validate_circuit_breaker (verdict: breach)
+  "exc-022": {
+    executed_nodes: _circuitBreakerBreachTrace(),
+  },
+  // halt at select_recipe (verdict: no_recipe)
+  "exc-023": {
+    executed_nodes: _noRecipeTrace(),
+  },
+  // halt at resolve_dependencies (verdict: required_gw_fail)
+  "exc-024": {
+    executed_nodes: _requiredGwFailTrace(),
+  },
+  // halt at validate_types (verdict: invocation_fail)
+  "exc-025": {
+    executed_nodes: _invocationFailTrace(),
   },
 };
 
@@ -1099,6 +1666,14 @@ export const exceptionsApi = {
       new_shadow_verdict: exc.shadow_verdict,
       new_final_status: exc.final_status,
       new_lifecycle_state: exc.lifecycle_state,
+      // ADR-027 Phase B (rev. 3) — preserve the prior attempt's
+      // executed-path evidence on the history entry. On the live
+      // backend this is the executed_nodes list captured before the
+      // current trace overwrites trace_data; on the mock path we
+      // pull whatever's seeded for the record so the attempt
+      // selector renders a real path instead of the empty banner.
+      executed_nodes:
+        MOCK_TRACE_ENRICHMENT[id]?.executed_nodes ?? [],
     };
     MOCK_REANALYSIS_HISTORY[id] = [...history, entry];
 
@@ -1174,6 +1749,17 @@ export const exceptionsApi = {
     // populates them when coverage fails.
     const isAuditGap = exc.final_status === "AUDIT_CONTEXT_MISSING";
     const enrichment = MOCK_TRACE_ENRICHMENT[exc.id] ?? {};
+    // ADR-027 Phase B — default executed_nodes derivation. When an
+    // exception doesn't have a hand-crafted trace seed in
+    // MOCK_TRACE_ENRICHMENT, fall back to a generated trace whose
+    // shape is keyed off the summary fields. This guarantees every
+    // detail page shows a real path on the Vercel preview rather
+    // than the "evidence not available" empty-state banner.
+    // Hand-crafted seeds still take precedence (they carry richer
+    // narrative + sub_spans + policy hits tuned to the canonical
+    // Phase D acceptance scenarios).
+    const executedNodes =
+      enrichment.executed_nodes ?? _defaultExecutedNodes(exc);
     return {
       trace_id: exc.id + "-trace",
       event_id: exc.order_id,
@@ -1205,6 +1791,9 @@ export const exceptionsApi = {
       audit_context_missing_class: isAuditGap ? "PriceAnalysisData" : undefined,
       audit_context_missing_fields: isAuditGap ? ["doc_number", "rule_id"] : [],
       ...enrichment,
+      // Always emit executed_nodes — derived above so the spread
+      // above can't drop it when enrichment doesn't carry one.
+      executed_nodes: executedNodes,
     };
   },
 
@@ -1307,6 +1896,59 @@ export const exceptionsApi = {
     return MOCK_ORDER_ANALYSES[id] ?? null;
   },
 };
+
+/* ── Pipeline topology API (/api/v1/pipeline/topology) ───────────────
+   ADR-027 Phase A — backend introspection of the compiled LangGraph.
+   Cached client-side by topology_hash; the response is the SHAPE of
+   the graph (nodes + edges + verdict labels), not per-record data,
+   so it's safe to cache aggressively across users / records. */
+
+const MOCK_PIPELINE_TOPOLOGY: PipelineTopology = {
+  topology_hash: "mock-topology-v1",
+  nodes: [
+    { id: "ingest", label: "ingest", kind: "node" },
+    { id: "classify", label: "classify", kind: "node" },
+    { id: "load_skill", label: "load_skill", kind: "node" },
+    { id: "validate_circuit_breaker", label: "validate_circuit_breaker", kind: "node" },
+    { id: "select_recipe", label: "select_recipe", kind: "node" },
+    { id: "resolve_dependencies", label: "resolve_dependencies", kind: "node" },
+    { id: "validate_types", label: "validate_types", kind: "node" },
+    { id: "shadow_audit", label: "shadow_audit", kind: "node" },
+    { id: "execute_recipe", label: "execute_recipe", kind: "node" },
+    { id: "apply_effects", label: "apply_effects", kind: "node" },
+    { id: "build_analysis", label: "build_analysis", kind: "terminal" },
+  ],
+  edges: [
+    { from_node: "ingest", to_node: "classify", conditional: false, verdict_label: null },
+    { from_node: "classify", to_node: "load_skill", conditional: false, verdict_label: null },
+    { from_node: "classify", to_node: "build_analysis", conditional: true, verdict_label: "cross_check_disagreement" },
+    { from_node: "load_skill", to_node: "validate_circuit_breaker", conditional: false, verdict_label: null },
+    { from_node: "validate_circuit_breaker", to_node: "build_analysis", conditional: true, verdict_label: "breach" },
+    { from_node: "validate_circuit_breaker", to_node: "select_recipe", conditional: true, verdict_label: "ok" },
+    { from_node: "select_recipe", to_node: "build_analysis", conditional: true, verdict_label: "no_recipe" },
+    { from_node: "select_recipe", to_node: "resolve_dependencies", conditional: true, verdict_label: "ok" },
+    { from_node: "resolve_dependencies", to_node: "build_analysis", conditional: true, verdict_label: "required_gw_fail" },
+    { from_node: "resolve_dependencies", to_node: "validate_types", conditional: true, verdict_label: "ok" },
+    { from_node: "validate_types", to_node: "build_analysis", conditional: true, verdict_label: "invocation_fail" },
+    { from_node: "validate_types", to_node: "shadow_audit", conditional: true, verdict_label: "ok" },
+    { from_node: "shadow_audit", to_node: "build_analysis", conditional: true, verdict_label: "red" },
+    { from_node: "shadow_audit", to_node: "build_analysis", conditional: true, verdict_label: "yellow" },
+    { from_node: "shadow_audit", to_node: "execute_recipe", conditional: true, verdict_label: "green" },
+    { from_node: "execute_recipe", to_node: "apply_effects", conditional: false, verdict_label: null },
+    { from_node: "apply_effects", to_node: "build_analysis", conditional: false, verdict_label: null },
+  ],
+};
+
+export const pipelineApi = {
+  async topology(): Promise<PipelineTopology> {
+    if (USE_REAL_API) {
+      return http<PipelineTopology>("/api/v1/pipeline/topology");
+    }
+    await delay(50);
+    return MOCK_PIPELINE_TOPOLOGY;
+  },
+};
+
 
 /* ── Workflow API (/api/v1/workflows) ──────────────────────────────── */
 
