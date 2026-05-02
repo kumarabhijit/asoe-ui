@@ -20,7 +20,6 @@ import { ChevronDown, Terminal, ClipboardCopy, CheckCircle2, GitBranch, ListOrde
 import { CollapsibleHeader } from "./shared";
 import { EventsTimeline } from "@/components/ui/EventsTimeline";
 import { useTopology } from "@/hooks/useTopology";
-import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import type { ExceptionDetail } from "@/types/exceptions";
 import type { ExecutedNode, TraceResponse } from "@/types/api";
@@ -91,11 +90,13 @@ export function DiagnosticsSection({ detail, trace, showPreview }: DiagnosticsSe
   // admin is the closest to the documented audit role and is what
   // triggers the DAG default until a dedicated `audit` role lands
   // (tracked in ADR-027 Open Question §4 RESOLVED).
-  const { hasRole } = useAuth();
-  const dagDefault = hasRole("admin");
-  const [view, setView] = useState<"timeline" | "dag">(
-    dagDefault ? "dag" : "timeline",
-  );
+  // Default to the operator-first timeline view for everyone. The
+  // toggle remains visible so admin / audit users can switch to the
+  // DAG when they need the full topology overlay; the role-based
+  // default from ADR-027 Phase E was reverted on operator feedback —
+  // the timeline answers "where did this halt and why" in one glance,
+  // which is the cognitive load even audit users hit first.
+  const [view, setView] = useState<"timeline" | "dag">("timeline");
   const { topology } = useTopology();
   const history = detail.reanalysis_history ?? [];
 
@@ -117,22 +118,15 @@ export function DiagnosticsSection({ detail, trace, showPreview }: DiagnosticsSe
     ] : []),
   ];
 
-  const pipelineBadge = (() => {
-    if (selectedAttempt.preBackendInstrumentation) return "no trace";
-    const halted = selectedAttempt.executedNodes.some(
-      (n) => n.status === "halted" || n.status === "errored",
-    );
-    if (halted) return "halted";
-    if (selectedAttempt.finalStatus === "COMPLETE") return "complete";
-    return "executed";
-  })();
-  const pipelineBadgeVariant = (() => {
-    if (selectedAttempt.preBackendInstrumentation) return "neutral";
-    if (selectedAttempt.executedNodes.some((n) => n.status === "errored")) return "error";
-    if (selectedAttempt.executedNodes.some((n) => n.status === "halted")) return "info";
-    if (selectedAttempt.finalStatus === "COMPLETE") return "success";
-    return "neutral";
-  })();
+  // Pipeline status badge — sourced from final_status with a fallback
+  // for unknown values. Per CLAUDE.md Guardrail #1: visual mapping
+  // functions over API-provided strings (with a default branch) are
+  // allowed; this is not an enum gate, just display.
+  const pipelineStatus = pipelineStatusBadge(
+    selectedAttempt.finalStatus ?? null,
+    selectedAttempt.preBackendInstrumentation,
+    selectedAttempt.executedNodes,
+  );
 
   return (
     <>
@@ -161,8 +155,8 @@ export function DiagnosticsSection({ detail, trace, showPreview }: DiagnosticsSe
               title="Pipeline"
               open={pipelineOpen}
               onToggle={() => setPipelineOpen((v) => !v)}
-              badge={pipelineBadge}
-              badgeVariant={pipelineBadgeVariant}
+              badge={pipelineStatus.label}
+              badgeVariant={pipelineStatus.variant}
             />
             {pipelineOpen && (
               <div className="border-t border-border px-16 py-12 flex flex-col gap-12">
@@ -400,6 +394,59 @@ export function DiagnosticsSection({ detail, trace, showPreview }: DiagnosticsSe
     </>
   );
 }
+
+/**
+ * Map a TerminalStatus value to the section-header badge: a short human
+ * label + a CSS variant. Per CLAUDE.md Guardrail #1 / Badge.tsx
+ * convention, this is a visual-mapping function over an
+ * API-provided string with a default branch — no enum gate, just
+ * display. Adding a new TerminalStatus on the asoe2 side without
+ * touching this map ships as the safe `executed` neutral pill.
+ */
+function pipelineStatusBadge(
+  finalStatus: string | null,
+  preBackendInstrumentation: boolean,
+  executedNodes: ExecutedNode[],
+): { label: string; variant: string } {
+  if (preBackendInstrumentation) {
+    return { label: "no trace", variant: "neutral" };
+  }
+  // The error/halt status on a node ALWAYS implies a non-success
+  // outcome, but the operator-friendly label depends on which
+  // terminal status the backend wrote. Prefer that, only fall back
+  // to a generic indicator when final_status is missing.
+  if (finalStatus) {
+    switch (finalStatus) {
+      case "COMPLETE":
+      case "COMPLETE_WITH_CHILDREN":
+        return { label: "complete", variant: "success" };
+      case "BLOCKED":
+        return { label: "blocked", variant: "error" };
+      case "REJECTED":
+        return { label: "rejected", variant: "error" };
+      case "FAIL_TO_HUMAN":
+        return { label: "failed", variant: "error" };
+      case "MANUAL_REVIEW_REQUIRED":
+        return { label: "review required", variant: "info" };
+      case "AUDIT_CONTEXT_MISSING":
+        return { label: "audit gap", variant: "error" };
+    }
+    // Unknown final_status — the asoe2 vocabulary expanded; render
+    // it raw rather than swallow.
+    return { label: finalStatus.toLowerCase(), variant: "neutral" };
+  }
+  // No final_status yet (in-flight). Surface what we can from the
+  // executed_nodes status field.
+  const errored = executedNodes.some((n) => n.status === "errored");
+  if (errored) return { label: "errored", variant: "error" };
+  const halted = executedNodes.some((n) => n.status === "halted");
+  if (halted) return { label: "halted", variant: "info" };
+  if (executedNodes.length > 0) {
+    return { label: "executed", variant: "neutral" };
+  }
+  return { label: "no trace", variant: "neutral" };
+}
+
 
 function ViewToggleButton({
   label,

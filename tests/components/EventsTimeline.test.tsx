@@ -94,7 +94,9 @@ describe("EventsTimeline", () => {
         finalStatus="BLOCKED"
       />,
     );
-    expect(screen.getByText(/Halted at Shadow Audit/i)).toBeInTheDocument();
+    // Halt banner verb is sourced from finalStatus — BLOCKED → "Blocked".
+    // Generic "Halted" only fires as the default-branch fallback.
+    expect(screen.getByText(/Blocked at Shadow Audit/i)).toBeInTheDocument();
     expect(screen.getByText(/BLOCKED/)).toBeInTheDocument();
   });
 

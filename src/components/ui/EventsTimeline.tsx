@@ -96,6 +96,31 @@ function humanizeNode(id: string): string {
     .join(" ");
 }
 
+/** Map a TerminalStatus value to a halt-banner verb. Visual mapping
+ *  with a default branch — Guardrail #1: open-set, no enum gate.
+ *  "Halted" was the generic verb the prior version used; this gives
+ *  the operator the actual outcome ("Blocked", "Failed", "Review
+ *  required") so the banner is actionable in one read. */
+function haltOutcomeLabel(finalStatus: string): string {
+  switch (finalStatus) {
+    case "BLOCKED":
+      return "Blocked";
+    case "REJECTED":
+      return "Rejected";
+    case "FAIL_TO_HUMAN":
+      return "Failed";
+    case "MANUAL_REVIEW_REQUIRED":
+      return "Review required";
+    case "AUDIT_CONTEXT_MISSING":
+      return "Audit gap";
+    case "COMPLETE":
+    case "COMPLETE_WITH_CHILDREN":
+      return "Completed";
+    default:
+      return "Halted";
+  }
+}
+
 function fmtDuration(ms?: number): string | null {
   if (typeof ms !== "number") return null;
   if (ms < 1000) return `${ms}ms`;
@@ -144,7 +169,7 @@ export function EventsTimeline({
       {haltNode && finalStatus && (
         <div className="border-l-[3px] border-error pl-12 py-4 text-caption">
           <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-2">
-            Halted at {humanizeNode(haltNode.node)}
+            {haltOutcomeLabel(finalStatus)} at {humanizeNode(haltNode.node)}
           </div>
           <div className="text-text-secondary">
             Final status: <span className="font-mono">{finalStatus}</span>
