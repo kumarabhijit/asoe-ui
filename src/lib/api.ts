@@ -563,6 +563,25 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-021", tenant_id: "acme-corp", order_id: "PO-PM-ROUTING-001", event_type: "EDI_850_LINE_MISMATCH", intent: "CONTRACTUAL_CORRECTION", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "PriceAdjustmentRecipe.py", final_status: "COMPLETE", created_at: "2026-04-17T10:00:00Z", updated_at: "2026-04-17T10:01:00Z", account_id: "acct-walmart", account_name: "Walmart",
   },
+  // ADR-027 Phase A.0 verdict-coverage demos (FAILED-state records
+  // exercising every conditional gate's terminal verdict). These
+  // are intentionally short halts — recipe never executes, shadow
+  // may or may not run depending on where the gate halted. The UI
+  // EventsTimeline + PipelineDAG render the halt point and reason
+  // honestly rather than the linear stepper's misleading
+  // "blocked at apply_effects" mapping.
+  {
+    id: "exc-022", tenant_id: "acme-corp", order_id: "SO-CB-001", event_type: "MASS_PRICING_RECALC", intent: "MASS_PRICING_ERROR", lifecycle_state: "FAILED", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-18T07:00:00Z", updated_at: "2026-04-18T07:00:01Z", account_id: "acct-walmart", account_name: "Walmart",
+  },
+  {
+    id: "exc-023", tenant_id: "acme-corp", order_id: "SO-NR-001", event_type: "MASS_PRICING_RECALC", intent: "MASS_PRICING_ERROR", lifecycle_state: "FAILED", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-18T07:30:00Z", updated_at: "2026-04-18T07:30:00Z", account_id: "acct-kroger", account_name: "Kroger",
+  },
+  {
+    id: "exc-024", tenant_id: "acme-corp", order_id: "SO-GW-001", event_type: "DUPLICATE_PO_RECEIVED", intent: "DUPLICATE_PO", lifecycle_state: "FAILED", selected_recipe: "DuplicatePORecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-18T08:00:00Z", updated_at: "2026-04-18T08:00:02Z", account_id: "acct-target", account_name: "Target",
+  },
+  {
+    id: "exc-025", tenant_id: "acme-corp", order_id: "PO-PHR-BAD", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "FAILED", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-18T08:30:00Z", updated_at: "2026-04-18T08:30:00Z", account_id: "acct-costco", account_name: "Costco",
+  },
 ];
 
 /** Per-exception trace enrichment — optional Layer 2 fields demonstrated
@@ -806,6 +825,172 @@ function _failedClassifyTrace(): import("@/types/api").ExecutedNode[] {
   ];
 }
 
+/* ── Phase A.0 verdict-coverage: halt-at-circuit-breaker.
+   Mass-update / variance breach trips validate_circuit_breaker; the
+   gate's only conditional terminal verdict is `breach`. Halts before
+   recipe selection, so trace_data carries no recipe and shadow never
+   runs. */
+function _circuitBreakerBreachTrace(): import("@/types/api").ExecutedNode[] {
+  return [
+    _node("ingest", 0, 4, { decision: { order_id: "SO-CB-001", request_trace_id: "tr-cb-001" } }),
+    _node("classify", 4, 21, {
+      decision: { intent: "MASS_PRICING_ERROR", confidence: 0.88 },
+      exit_verdict: "ok",
+    }),
+    _node("load_skill", 25, 5, { decision: { skill_name: "mass-pricing-error" } }),
+    _node("validate_circuit_breaker", 30, 3, {
+      status: "halted",
+      decision: {
+        update_count: 152,
+        batch_total_variance: 18420,
+        reasons: [
+          "update_count 152 exceeds threshold 50",
+          "batch_total_variance $18420 exceeds threshold $5000",
+        ],
+      },
+      exit_verdict: "breach",
+    }),
+    _node("build_analysis", 33, 3, {
+      status: "halted",
+      decision: { final_status: "FAIL_TO_HUMAN", guard: "fail_to_human_skip" },
+    }),
+  ];
+}
+
+/* ── Phase A.0 verdict-coverage: halt-at-select-recipe.
+   Some intents (notably MASS_PRICING_ERROR) intentionally have no
+   recipe — shadow is the terminal voice for them. select_recipe
+   emits the `no_recipe` verdict; the run continues to shadow_audit
+   only if shadow has been wired ahead of select_recipe — which it
+   isn't. So this halts at select_recipe directly. */
+function _noRecipeTrace(): import("@/types/api").ExecutedNode[] {
+  return [
+    _node("ingest", 0, 4, { decision: { order_id: "SO-NR-001", request_trace_id: "tr-nr-001" } }),
+    _node("classify", 4, 18, {
+      decision: { intent: "MASS_PRICING_ERROR", confidence: 0.93 },
+      exit_verdict: "ok",
+    }),
+    _node("load_skill", 22, 5, { decision: { skill_name: "mass-pricing-error" } }),
+    _node("validate_circuit_breaker", 27, 2, {
+      decision: { update_count: 1, batch_total_variance: 240 },
+      exit_verdict: "ok",
+    }),
+    _node("select_recipe", 29, 8, {
+      status: "halted",
+      decision: { recipe_name: null },
+      exit_verdict: "no_recipe",
+    }),
+    _node("build_analysis", 37, 3, {
+      status: "halted",
+      decision: { final_status: "FAIL_TO_HUMAN", guard: "fail_to_human_skip" },
+    }),
+  ];
+}
+
+/* ── Phase A.0 verdict-coverage: halt-at-resolve-dependencies.
+   A recipe declares a `required_for_audit=True` gateway that times
+   out. resolve_dependencies emits `required_gw_fail` and halts —
+   shadow never runs because the audit-bearing evidence couldn't be
+   captured. The single sub_span carries the failed gateway's
+   timing + status. */
+function _requiredGwFailTrace(): import("@/types/api").ExecutedNode[] {
+  return [
+    _node("ingest", 0, 4, { decision: { order_id: "SO-GW-001", request_trace_id: "tr-gw-001" } }),
+    _node("classify", 4, 28, {
+      decision: { intent: "DUPLICATE_PO", confidence: 0.89 },
+      exit_verdict: "ok",
+    }),
+    _node("load_skill", 32, 6, { decision: { skill_name: "duplicate-po" } }),
+    _node("validate_circuit_breaker", 38, 2, {
+      decision: { update_count: 1, batch_total_variance: 0 },
+      exit_verdict: "ok",
+    }),
+    _node("select_recipe", 40, 13, {
+      decision: { recipe_name: "DuplicatePORecipe.py" },
+      exit_verdict: "ok",
+    }),
+    _node("resolve_dependencies", 53, 2014, {
+      status: "halted",
+      decision: {
+        recipe: "DuplicatePORecipe.py",
+        gateway_count: 2,
+        failed_gateway: "sap_doc/get_matched_po_details",
+      },
+      exit_verdict: "required_gw_fail",
+      sub_spans: [
+        {
+          gateway: "oms/get_fulfillment_status",
+          started_at: _ts(53),
+          finished_at: _ts(102),
+          duration_ms: 49,
+          status: "ok",
+        },
+        {
+          gateway: "sap_doc/get_matched_po_details",
+          started_at: _ts(53),
+          finished_at: _ts(2053),
+          duration_ms: 2000,
+          status: "timeout",
+        },
+      ],
+    }),
+    _node("build_analysis", 2067, 4, {
+      status: "halted",
+      decision: { final_status: "FAIL_TO_HUMAN", guard: "fail_to_human_skip" },
+    }),
+  ];
+}
+
+/* ── Phase A.0 verdict-coverage: halt-at-validate-types.
+   PriceHoldReleaseRecipe's defensive guard: sap_base_price <= 0 is
+   a routing bug, not a business exception. validate_types short-
+   circuits with `invocation_fail` rather than letting the recipe
+   throw at execution time. */
+function _invocationFailTrace(): import("@/types/api").ExecutedNode[] {
+  return [
+    _node("ingest", 0, 4, { decision: { order_id: "PO-PHR-BAD", request_trace_id: "tr-vt-001" } }),
+    _node("classify", 4, 26, {
+      decision: { intent: "PRICE_HOLD_RELEASE", confidence: 0.84 },
+      exit_verdict: "ok",
+    }),
+    _node("load_skill", 30, 5, { decision: { skill_name: "price-hold-release" } }),
+    _node("validate_circuit_breaker", 35, 2, {
+      decision: { update_count: 1, batch_total_variance: 0 },
+      exit_verdict: "ok",
+    }),
+    _node("select_recipe", 37, 11, {
+      decision: { recipe_name: "PriceHoldReleaseRecipe.py" },
+      exit_verdict: "ok",
+    }),
+    _node("resolve_dependencies", 48, 42, {
+      decision: { recipe: "PriceHoldReleaseRecipe.py", gateway_count: 1 },
+      exit_verdict: "ok",
+      sub_spans: [
+        {
+          gateway: "oms/get_price_hold_status",
+          started_at: _ts(48),
+          finished_at: _ts(90),
+          duration_ms: 42,
+          status: "ok",
+        },
+      ],
+    }),
+    _node("validate_types", 90, 2, {
+      status: "halted",
+      decision: {
+        recipe: "PriceHoldReleaseRecipe.py",
+        guard: "sap_base_price_non_positive",
+        sap_base_price: 0,
+      },
+      exit_verdict: "invocation_fail",
+    }),
+    _node("build_analysis", 92, 3, {
+      status: "halted",
+      decision: { final_status: "FAIL_TO_HUMAN", guard: "fail_to_human_skip" },
+    }),
+  ];
+}
+
 const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
   "exc-002": {
     narrative:
@@ -858,6 +1043,27 @@ const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
   // acceptance trace #4 — the SMK-CB-001 canonical case).
   "exc-015": {
     executed_nodes: _failedClassifyTrace(),
+  },
+  // ADR-027 Phase A.0 — every conditional-gate terminal verdict
+  // gets at least one mock so the timeline/DAG views can be
+  // exercised end-to-end across every branch. Each row's halt
+  // node and exit_verdict appears on the corresponding
+  // _VERDICT_LABELS registry entry in asoe2/orchestration/graph.py.
+  // halt at validate_circuit_breaker (verdict: breach)
+  "exc-022": {
+    executed_nodes: _circuitBreakerBreachTrace(),
+  },
+  // halt at select_recipe (verdict: no_recipe)
+  "exc-023": {
+    executed_nodes: _noRecipeTrace(),
+  },
+  // halt at resolve_dependencies (verdict: required_gw_fail)
+  "exc-024": {
+    executed_nodes: _requiredGwFailTrace(),
+  },
+  // halt at validate_types (verdict: invocation_fail)
+  "exc-025": {
+    executed_nodes: _invocationFailTrace(),
   },
 };
 
