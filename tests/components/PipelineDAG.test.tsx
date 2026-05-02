@@ -1,12 +1,13 @@
 /**
- * PipelineDAG — figure-ground unit tests (ADR-027 Phase D rev. 4).
+ * PipelineDAG — visual hierarchy + click-to-inspect tests.
  *
- * Asserts the design rule: verdict labels on un-taken edges are
- * hidden by default and revealed on hover/focus. Taken-path verdict
- * labels are always visible. The rule comes from the
- * Tufte/Munzner/Norman synthesis applied 2026-05-02 — sprinkled
- * labels on every edge violated data-ink ratio + figure-ground
- * principles.
+ * The 2026-05-02 redesign supersedes the brief hover-reveal pass:
+ * verdict labels are always visible (consistent graph), but render
+ * with strong hierarchy — taken-path labels in a brand-coloured pill
+ * with bold type, un-taken labels as low-contrast text only. Click
+ * any conditional edge to open an inline detail panel; the panel
+ * shows the source node's decision payload + policy hits + sub-spans
+ * for taken edges, or a topology-only note for un-taken edges.
  */
 import { describe, it, expect } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
@@ -37,6 +38,7 @@ const topology: PipelineTopology = {
 function makeExecutedNode(
   node: string,
   exit_verdict: string | null = null,
+  overrides: Partial<ExecutedNode> = {},
 ): ExecutedNode {
   return {
     node,
@@ -49,121 +51,230 @@ function makeExecutedNode(
     exit_verdict,
     policy_hits: [],
     sub_spans: [],
+    ...overrides,
   };
 }
 
-describe("PipelineDAG figure-ground", () => {
-  // GREEN traversal: ingest → classify → shadow_audit (green) → execute_recipe.
-  // The taken path includes the `green` verdict edge; un-taken `red` and
-  // `yellow` edges should NOT show their labels by default.
-  const greenTraversal: ExecutedNode[] = [
-    makeExecutedNode("ingest"),
-    makeExecutedNode("classify", "ok"),
-    makeExecutedNode("shadow_audit", "green"),
-    makeExecutedNode("execute_recipe"),
-  ];
+const greenTraversal: ExecutedNode[] = [
+  makeExecutedNode("ingest"),
+  makeExecutedNode("classify", "ok"),
+  makeExecutedNode("shadow_audit", "green", {
+    decision: { shadow_status: "GREEN", trace_id: "trace-mock-green" },
+    policy_hits: [],
+  }),
+  makeExecutedNode("execute_recipe"),
+];
 
-  it("shows the taken-path verdict label by default", () => {
+describe("PipelineDAG visual hierarchy", () => {
+  it("renders every verdict label (consistent graph)", () => {
     const { container } = render(
       <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
     );
-    // The "green" verdict text is rendered inside an SVG <text>.
-    const greenText = Array.from(container.querySelectorAll("text")).find(
+    const texts = Array.from(container.querySelectorAll("svg text")).map(
+      (el) => el.textContent,
+    );
+    expect(texts).toContain("green");
+    expect(texts).toContain("red");
+    expect(texts).toContain("yellow");
+  });
+
+  it("emphasises the taken-path verdict label with a pill background", () => {
+    const { container } = render(
+      <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
+    );
+    const greenText = Array.from(container.querySelectorAll("svg text")).find(
       (el) => el.textContent === "green",
     );
     expect(greenText).toBeDefined();
+    // Brand fill on the taken-path text.
+    expect(greenText!.getAttribute("fill")).toMatch(/brand/);
+    // The taken-path label gets a sibling <rect> pill in the same <g>.
+    const parentG = greenText!.parentElement;
+    expect(parentG?.querySelector("rect")).not.toBeNull();
   });
 
-  it("hides un-taken verdict labels by default (figure-ground)", () => {
+  it("renders un-taken verdict labels with low-contrast text only", () => {
     const { container } = render(
       <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
     );
-    const redText = Array.from(container.querySelectorAll("text")).find(
-      (el) => el.textContent === "red",
-    );
-    const yellowText = Array.from(container.querySelectorAll("text")).find(
-      (el) => el.textContent === "yellow",
-    );
-    expect(redText).toBeUndefined();
-    expect(yellowText).toBeUndefined();
-  });
-
-  it("reveals an un-taken verdict label on hover", () => {
-    const { container } = render(
-      <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
-    );
-    // Find the un-taken red edge group by its aria-label and hover it.
-    const redEdgeGroup = Array.from(
-      container.querySelectorAll("g[aria-label]"),
-    ).find((g) =>
-      (g.getAttribute("aria-label") ?? "").includes("verdict red"),
-    );
-    expect(redEdgeGroup).toBeDefined();
-    fireEvent.mouseEnter(redEdgeGroup!);
-    const redText = Array.from(container.querySelectorAll("text")).find(
+    const redText = Array.from(container.querySelectorAll("svg text")).find(
       (el) => el.textContent === "red",
     );
     expect(redText).toBeDefined();
+    // Quaternary text colour is the default-state un-taken contrast.
+    expect(redText!.getAttribute("fill")).toMatch(/quaternary|tertiary/);
+    // No pill rect on the un-taken label group.
+    const parentG = redText!.parentElement;
+    expect(parentG?.querySelector("rect")).toBeNull();
   });
+});
 
-  it("hides the verdict label again on mouse leave", () => {
-    const { container } = render(
+describe("PipelineDAG click-to-inspect", () => {
+  it("opens the detail panel when a conditional edge is clicked", () => {
+    const { container, queryByRole, getByText } = render(
       <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
     );
-    const redEdgeGroup = Array.from(
-      container.querySelectorAll("g[aria-label]"),
+    expect(queryByRole("region", { name: /Edge details/i })).toBeNull();
+
+    const greenEdgeGroup = Array.from(
+      container.querySelectorAll("g[role='button']"),
     ).find((g) =>
-      (g.getAttribute("aria-label") ?? "").includes("verdict red"),
-    );
-    fireEvent.mouseEnter(redEdgeGroup!);
-    fireEvent.mouseLeave(redEdgeGroup!);
-    const redText = Array.from(container.querySelectorAll("text")).find(
-      (el) => el.textContent === "red",
-    );
-    expect(redText).toBeUndefined();
-  });
-
-  it("reveals an un-taken verdict label on keyboard focus", () => {
-    const { container } = render(
-      <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
-    );
-    const redEdgeGroup = Array.from(
-      container.querySelectorAll("g[aria-label]"),
-    ).find((g) =>
-      (g.getAttribute("aria-label") ?? "").includes("verdict red"),
-    );
-    fireEvent.focus(redEdgeGroup!);
-    const redText = Array.from(container.querySelectorAll("text")).find(
-      (el) => el.textContent === "red",
-    );
-    expect(redText).toBeDefined();
-  });
-
-  it("conditional edges have aria-labels for screen readers", () => {
-    const { container } = render(
-      <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
-    );
-    // shadow_audit→build_analysis (red) and (yellow) and (green→execute_recipe)
-    // each carry aria-labels.
-    const labelled = Array.from(container.querySelectorAll("g[aria-label]"));
-    const redEdge = labelled.some((g) =>
-      (g.getAttribute("aria-label") ?? "").includes("verdict red"),
-    );
-    const yellowEdge = labelled.some((g) =>
-      (g.getAttribute("aria-label") ?? "").includes("verdict yellow"),
-    );
-    const greenEdge = labelled.some((g) =>
       (g.getAttribute("aria-label") ?? "").includes("verdict green"),
     );
-    expect(redEdge).toBe(true);
-    expect(yellowEdge).toBe(true);
-    expect(greenEdge).toBe(true);
+    expect(greenEdgeGroup).toBeDefined();
+    fireEvent.click(greenEdgeGroup!);
+
+    const panel = queryByRole("region", { name: /Edge details/i });
+    expect(panel).not.toBeNull();
+    // Header in the detail panel reads "Shadow Audit → Execute Recipe".
+    expect(panel!.textContent).toMatch(/Shadow Audit/);
+    expect(panel!.textContent).toMatch(/Execute Recipe/);
+    // Suppress unused-binding lint for getByText (used in other tests).
+    expect(typeof getByText).toBe("function");
   });
 
-  it("renders the inspect-on-hover hint", () => {
+  it("clicking the same edge twice closes the detail panel", () => {
+    const { container, queryByRole } = render(
+      <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
+    );
+    const greenEdgeGroup = Array.from(
+      container.querySelectorAll("g[role='button']"),
+    ).find((g) =>
+      (g.getAttribute("aria-label") ?? "").includes("verdict green"),
+    );
+    fireEvent.click(greenEdgeGroup!);
+    expect(queryByRole("region", { name: /Edge details/i })).not.toBeNull();
+    fireEvent.click(greenEdgeGroup!);
+    expect(queryByRole("region", { name: /Edge details/i })).toBeNull();
+  });
+
+  it("renders the source node's decision payload for a taken edge", () => {
+    const { container, getByText } = render(
+      <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
+    );
+    const greenEdgeGroup = Array.from(
+      container.querySelectorAll("g[role='button']"),
+    ).find((g) =>
+      (g.getAttribute("aria-label") ?? "").includes("verdict green"),
+    );
+    fireEvent.click(greenEdgeGroup!);
+    expect(getByText(/Decision \(from Shadow Audit\)/i)).toBeDefined();
+    // The decision JSON dump should include the seeded shadow_status.
+    expect(getByText(/GREEN/)).toBeDefined();
+  });
+
+  it("renders policy hits when shadow_audit recorded any", () => {
+    // Include build_analysis after shadow_audit so the
+    // shadow_audit→build_analysis (red) edge is in the taken set.
+    const trace: ExecutedNode[] = [
+      ...greenTraversal.slice(0, 2),
+      makeExecutedNode("shadow_audit", "red", {
+        status: "halted",
+        decision: { shadow_status: "RED" },
+        policy_hits: ["mass_pricing.compliance_block"],
+      }),
+      makeExecutedNode("build_analysis", null, { status: "halted" }),
+    ];
+    const { container, getByText } = render(
+      <PipelineDAG topology={topology} executedNodes={trace} />,
+    );
+    const redEdgeGroup = Array.from(
+      container.querySelectorAll("g[role='button']"),
+    ).find((g) =>
+      (g.getAttribute("aria-label") ?? "").includes("verdict red"),
+    );
+    fireEvent.click(redEdgeGroup!);
+    expect(getByText(/Policy hits/i)).toBeDefined();
+    expect(getByText(/mass_pricing\.compliance_block/)).toBeDefined();
+  });
+
+  it("renders gateway sub-spans when the source node recorded any", () => {
+    // Trace covers shadow_audit (with sub_spans) → execute_recipe so
+    // the shadow_audit→execute_recipe (green) edge is taken.
+    const traceWithSubSpans: ExecutedNode[] = [
+      makeExecutedNode("ingest"),
+      makeExecutedNode("classify", "ok"),
+      makeExecutedNode("shadow_audit", "green", {
+        sub_spans: [
+          {
+            gateway: "sap_doc/get_sales_order",
+            started_at: "2026-05-01T12:00:00Z",
+            finished_at: "2026-05-01T12:00:00.054Z",
+            duration_ms: 54,
+            status: "ok",
+          },
+        ],
+      }),
+      makeExecutedNode("execute_recipe"),
+    ];
+    const { container, getByText } = render(
+      <PipelineDAG topology={topology} executedNodes={traceWithSubSpans} />,
+    );
+    const greenEdgeGroup = Array.from(
+      container.querySelectorAll("g[role='button']"),
+    ).find((g) =>
+      (g.getAttribute("aria-label") ?? "").includes("verdict green"),
+    );
+    fireEvent.click(greenEdgeGroup!);
+    expect(getByText(/Gateway calls/i)).toBeDefined();
+    expect(getByText(/sap_doc\/get_sales_order/)).toBeDefined();
+  });
+
+  it("shows the topology-only note when an un-taken edge is clicked", () => {
+    const { container, getByText } = render(
+      <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
+    );
+    const redEdgeGroup = Array.from(
+      container.querySelectorAll("g[role='button']"),
+    ).find((g) =>
+      (g.getAttribute("aria-label") ?? "").includes("verdict red"),
+    );
+    fireEvent.click(redEdgeGroup!);
+    expect(getByText(/not traversed in this attempt/i)).toBeDefined();
+  });
+
+  it("opens the detail panel on Enter keyboard activation (a11y)", () => {
+    const { container, queryByRole } = render(
+      <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
+    );
+    const greenEdgeGroup = Array.from(
+      container.querySelectorAll("g[role='button']"),
+    ).find((g) =>
+      (g.getAttribute("aria-label") ?? "").includes("verdict green"),
+    );
+    fireEvent.keyDown(greenEdgeGroup!, { key: "Enter" });
+    expect(queryByRole("region", { name: /Edge details/i })).not.toBeNull();
+  });
+
+  it("Close button dismisses the detail panel", () => {
+    const { container, getByLabelText, queryByRole } = render(
+      <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
+    );
+    const greenEdgeGroup = Array.from(
+      container.querySelectorAll("g[role='button']"),
+    ).find((g) =>
+      (g.getAttribute("aria-label") ?? "").includes("verdict green"),
+    );
+    fireEvent.click(greenEdgeGroup!);
+    fireEvent.click(getByLabelText("Close edge details"));
+    expect(queryByRole("region", { name: /Edge details/i })).toBeNull();
+  });
+
+  it("conditional edges have role='button' + aria-label for screen readers", () => {
+    const { container } = render(
+      <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
+    );
+    const buttons = Array.from(container.querySelectorAll("g[role='button']"));
+    const verdictsCovered = buttons
+      .map((g) => g.getAttribute("aria-label") ?? "")
+      .filter((label) => /verdict (red|yellow|green)/.test(label));
+    expect(verdictsCovered.length).toBe(3);
+  });
+
+  it("renders the click-to-inspect hint", () => {
     const { getByText } = render(
       <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
     );
-    expect(getByText(/Hover or focus any edge/i)).toBeDefined();
+    expect(getByText(/Click any edge/i)).toBeDefined();
   });
 });

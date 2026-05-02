@@ -186,23 +186,39 @@ export function PipelineDAG({
     () => new Set(executedNodes.map((n) => n.node)),
     [executedNodes],
   );
-  // Track which non-taken edge the user is inspecting (hover or
-  // keyboard focus). Verdict labels on un-taken edges are hidden by
-  // default — figure-ground discipline (Tufte / Munzner / Norman):
-  // the taken path is the figure, the topology shape is the ground,
-  // detailed annotations are deepest detail and surface on demand.
-  const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
+  // Click-to-select an edge: opens an inline detail panel below the
+  // SVG with the verdict, edge metadata, and (for taken edges) the
+  // source node's decision payload + policy hits + sub-spans — same
+  // shape the timeline reveals on row expand.
+  //
+  // Verdict labels stay visible on every edge so the topology reads
+  // as a complete graph; visual hierarchy (taken = brand pill, un-
+  // taken = quaternary-text only) does the figure-ground work that
+  // hover-reveal used to do. Per the Tufte/Munzner/Norman pass on
+  // 2026-05-02 — operator preference for "consistent graph + click
+  // for detail" overrides the hover-only design.
+  const [selectedEdgeKey, setSelectedEdgeKey] = useState<string | null>(null);
+  const selectedEdge = useMemo(() => {
+    if (!selectedEdgeKey) return null;
+    return layout.edges.find((e) => edgeKey(e) === selectedEdgeKey) ?? null;
+  }, [layout.edges, selectedEdgeKey]);
+  const selectedSourceNode = useMemo(() => {
+    if (!selectedEdge) return null;
+    if (!taken.has(edgeKey(selectedEdge))) return null;
+    return executedNodes.find((n) => n.node === selectedEdge.from_node) ?? null;
+  }, [selectedEdge, taken, executedNodes]);
 
   return (
-    <div className={cn("overflow-auto", className)}>
-      <svg
-        role="img"
-        aria-label="Pipeline DAG view"
-        width={layout.width}
-        height={layout.height}
-        viewBox={`0 0 ${layout.width} ${layout.height}`}
-        className="font-sans"
-      >
+    <div className={cn(className)}>
+      <div className="overflow-auto">
+        <svg
+          role="img"
+          aria-label="Pipeline DAG view"
+          width={layout.width}
+          height={layout.height}
+          viewBox={`0 0 ${layout.width} ${layout.height}`}
+          className="font-sans"
+        >
         <defs>
           <marker
             id="dag-arrow"
@@ -230,45 +246,46 @@ export function PipelineDAG({
         {layout.edges.map((edge, i) => {
           const key = edgeKey(edge);
           const isTaken = taken.has(key);
-          const isHovered = hoveredEdge === key;
+          const isSelected = selectedEdgeKey === key;
           const path = buildPath(edge.points);
           const mid = edge.points[Math.floor(edge.points.length / 2)] ?? edge.points[0];
-          // Verdict labels are visible on:
-          //   * the taken path (always, the answer to "which path?")
-          //   * an un-taken edge currently hovered/focused (audit
-          //     users can inspect any edge on demand).
-          // Hidden on un-taken edges by default — figure-ground.
-          const showLabel = edge.verdict_label && (isTaken || isHovered);
           const interactive = !!edge.verdict_label;
-          // Bump label weight on the taken path so it reads as the
-          // answer; hover-revealed labels match the taken style for
-          // legibility (auditors are inspecting on purpose, full
-          // contrast helps).
-          const labelEmphasis = isTaken || isHovered;
           const labelAria = edge.verdict_label
             ? `${edge.from_node} to ${edge.to_node}, verdict ${edge.verdict_label}`
             : `${edge.from_node} to ${edge.to_node}`;
+          // Hierarchy:
+          //   taken     → brand-coloured pill, bold, fontSize 10
+          //   un-taken  → no pill, quaternary text, regular weight,
+          //                fontSize 9 (low contrast on purpose)
+          //   selected  → either gets a 1px-thicker accent stroke so
+          //                the click target is visually anchored.
           return (
             <g
               key={`${edge.from_node}-${edge.to_node}-${i}`}
               {...(interactive
                 ? {
                     tabIndex: 0,
-                    role: "img",
-                    "aria-label": labelAria,
-                    onMouseEnter: () => setHoveredEdge(key),
-                    onMouseLeave: () =>
-                      setHoveredEdge((prev) => (prev === key ? null : prev)),
-                    onFocus: () => setHoveredEdge(key),
-                    onBlur: () =>
-                      setHoveredEdge((prev) => (prev === key ? null : prev)),
+                    role: "button",
+                    "aria-label": `${labelAria}. Click for details.`,
+                    "aria-pressed": isSelected,
+                    onClick: () =>
+                      setSelectedEdgeKey((prev) =>
+                        prev === key ? null : key,
+                      ),
+                    onKeyDown: (
+                      e: React.KeyboardEvent<SVGGElement>,
+                    ) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedEdgeKey((prev) =>
+                          prev === key ? null : key,
+                        );
+                      }
+                    },
                     style: { outline: "none", cursor: "pointer" },
                   }
                 : {})}
             >
-              {/* Invisible wider hit target — pointerEvents="stroke"
-                  so hovering anywhere along the curve, not just the
-                  thin visible line, reveals the label. */}
               {interactive && (
                 <path
                   d={path}
@@ -281,43 +298,61 @@ export function PipelineDAG({
               <path
                 d={path}
                 fill="none"
-                stroke={isTaken ? "var(--color-brand)" : "var(--color-border)"}
-                strokeWidth={isTaken ? 2 : isHovered ? 1.5 : 1}
+                stroke={
+                  isTaken
+                    ? "var(--color-brand)"
+                    : isSelected
+                    ? "var(--color-text-tertiary)"
+                    : "var(--color-border)"
+                }
+                strokeWidth={isTaken ? 2 : isSelected ? 1.5 : 1}
                 markerEnd={isTaken ? "url(#dag-arrow-taken)" : "url(#dag-arrow)"}
-                opacity={isTaken ? 1 : isHovered ? 0.85 : 0.45}
+                opacity={isTaken ? 1 : isSelected ? 0.85 : 0.5}
                 pointerEvents="none"
               />
-              {showLabel && (
+              {edge.verdict_label && (
                 <g pointerEvents="none">
-                  <rect
-                    x={mid.x - 30}
-                    y={mid.y - 9}
-                    width={60}
-                    height={18}
-                    rx={9}
-                    fill="var(--color-surface-primary)"
-                    stroke={
-                      isTaken
-                        ? "var(--color-brand)"
-                        : "var(--color-text-tertiary)"
-                    }
-                    strokeWidth={isTaken ? 1.5 : 1}
-                  />
-                  <text
-                    x={mid.x}
-                    y={mid.y + 3}
-                    textAnchor="middle"
-                    fontSize={10}
-                    fontFamily="ui-monospace, monospace"
-                    fontWeight={labelEmphasis ? 600 : 400}
-                    fill={
-                      isTaken
-                        ? "var(--color-brand)"
-                        : "var(--color-text-secondary)"
-                    }
-                  >
-                    {edge.verdict_label}
-                  </text>
+                  {isTaken ? (
+                    <>
+                      <rect
+                        x={mid.x - 30}
+                        y={mid.y - 9}
+                        width={60}
+                        height={18}
+                        rx={9}
+                        fill="var(--color-surface-primary)"
+                        stroke="var(--color-brand)"
+                        strokeWidth={isSelected ? 2 : 1.5}
+                      />
+                      <text
+                        x={mid.x}
+                        y={mid.y + 3}
+                        textAnchor="middle"
+                        fontSize={10}
+                        fontFamily="ui-monospace, monospace"
+                        fontWeight={600}
+                        fill="var(--color-brand)"
+                      >
+                        {edge.verdict_label}
+                      </text>
+                    </>
+                  ) : (
+                    <text
+                      x={mid.x}
+                      y={mid.y + 3}
+                      textAnchor="middle"
+                      fontSize={9}
+                      fontFamily="ui-monospace, monospace"
+                      fontWeight={isSelected ? 600 : 400}
+                      fill={
+                        isSelected
+                          ? "var(--color-text-secondary)"
+                          : "var(--color-text-quaternary)"
+                      }
+                    >
+                      {edge.verdict_label}
+                    </text>
+                  )}
                 </g>
               )}
             </g>
@@ -366,6 +401,7 @@ export function PipelineDAG({
           );
         })}
       </svg>
+      </div>
       <div className="mt-8 flex items-baseline gap-12 text-label text-text-tertiary flex-wrap">
         {finalStatus && (
           <span>
@@ -374,8 +410,223 @@ export function PipelineDAG({
           </span>
         )}
         <span className="text-text-quaternary">
-          Hover or focus any edge to see its verdict.
+          Click any edge to inspect its verdict and decision payload.
         </span>
+      </div>
+      {selectedEdge && (
+        <EdgeDetailPanel
+          edge={selectedEdge}
+          isTaken={taken.has(edgeKey(selectedEdge))}
+          sourceExecutedNode={selectedSourceNode}
+          onClose={() => setSelectedEdgeKey(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+
+/**
+ * Inline detail panel for a clicked edge. Renders below the SVG so
+ * the layout doesn't shift when it opens (Norman: predictable
+ * targets). For taken edges the panel projects the source node's
+ * ExecutedNode entry — same shape the timeline reveals on row
+ * expand, so the operator's mental model is consistent across views.
+ */
+function EdgeDetailPanel({
+  edge,
+  isTaken,
+  sourceExecutedNode,
+  onClose,
+}: {
+  edge: PipelineTopologyEdge;
+  isTaken: boolean;
+  sourceExecutedNode: ExecutedNode | null;
+  onClose: () => void;
+}) {
+  const verdictTone = isTaken
+    ? "bg-brand-subtle text-brand"
+    : "bg-surface-secondary text-text-tertiary";
+  return (
+    <div
+      className="mt-12 rounded-md bg-surface-primary border border-border p-12 flex flex-col gap-10"
+      role="region"
+      aria-label="Edge details"
+    >
+      <div className="flex items-baseline justify-between gap-10">
+        <div className="flex items-baseline gap-8 flex-wrap text-caption">
+          <span className="font-semibold text-text-primary">
+            {humanizeNode(edge.from_node)}
+          </span>
+          <span className="text-text-quaternary" aria-hidden="true">→</span>
+          <span className="font-semibold text-text-primary">
+            {humanizeNode(edge.to_node)}
+          </span>
+          {edge.verdict_label && (
+            <span
+              className={cn(
+                "text-label font-mono px-6 py-px rounded-full",
+                verdictTone,
+              )}
+            >
+              {edge.verdict_label}
+            </span>
+          )}
+          {!edge.conditional && (
+            <span className="text-label text-text-quaternary">
+              unconditional
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close edge details"
+          className="bg-transparent border-none cursor-pointer text-label text-text-tertiary hover:text-text-primary px-6 py-2 rounded-sm font-sans"
+        >
+          Close
+        </button>
+      </div>
+
+      {!isTaken && (
+        <div className="text-caption text-text-tertiary">
+          This edge was not traversed in this attempt. The graph shows
+          it for topology completeness; no decision payload was
+          recorded against it.
+        </div>
+      )}
+
+      {isTaken && !sourceExecutedNode && (
+        <div className="text-caption text-text-tertiary">
+          This edge is on the taken path, but no executed-node entry
+          was recorded for {humanizeNode(edge.from_node)}. (Trace may
+          predate Phase B per-node instrumentation.)
+        </div>
+      )}
+
+      {isTaken && sourceExecutedNode && (
+        <div className="flex flex-col gap-12 text-caption">
+          <div className="grid grid-cols-2 gap-8 text-label">
+            <Field label="Status" value={sourceExecutedNode.status} mono />
+            <Field
+              label="Duration"
+              value={
+                typeof sourceExecutedNode.duration_ms === "number"
+                  ? sourceExecutedNode.duration_ms < 1000
+                    ? `${sourceExecutedNode.duration_ms}ms`
+                    : `${(sourceExecutedNode.duration_ms / 1000).toFixed(2)}s`
+                  : null
+              }
+              mono
+            />
+            <Field
+              label="Entered"
+              value={sourceExecutedNode.entered_at}
+              mono
+            />
+            <Field
+              label="Completed"
+              value={sourceExecutedNode.completed_at ?? null}
+              mono
+            />
+          </div>
+
+          {Object.keys(sourceExecutedNode.decision).length > 0 && (
+            <div>
+              <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
+                Decision (from {humanizeNode(sourceExecutedNode.node)})
+              </div>
+              <pre className="m-0 px-10 py-6 rounded-sm bg-surface-secondary text-label font-mono text-text-secondary overflow-auto">
+                {JSON.stringify(sourceExecutedNode.decision, null, 2)}
+              </pre>
+            </div>
+          )}
+
+          {sourceExecutedNode.policy_hits.length > 0 && (
+            <div>
+              <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
+                Policy hits
+              </div>
+              <ul className="list-disc pl-20 m-0 flex flex-col gap-2">
+                {sourceExecutedNode.policy_hits.map((h, i) => (
+                  <li
+                    key={i}
+                    className="text-label text-text-secondary font-mono"
+                  >
+                    {h}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {sourceExecutedNode.sub_spans.length > 0 && (
+            <div>
+              <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
+                Gateway calls
+              </div>
+              <div className="flex flex-col gap-4 text-label">
+                {sourceExecutedNode.sub_spans.map((s, i) => (
+                  <div
+                    key={`${s.gateway}-${s.started_at}-${i}`}
+                    className="flex items-center gap-8"
+                  >
+                    <span className="font-mono text-text-secondary">
+                      {s.gateway}
+                    </span>
+                    {typeof s.duration_ms === "number" && (
+                      <span className="font-mono text-text-tertiary">
+                        {s.duration_ms < 1000
+                          ? `${s.duration_ms}ms`
+                          : `${(s.duration_ms / 1000).toFixed(2)}s`}
+                      </span>
+                    )}
+                    <span
+                      className={cn(
+                        "font-mono px-4 py-px rounded-full",
+                        s.status === "ok"
+                          ? "bg-success-subtle text-success"
+                          : s.status === "timeout"
+                          ? "bg-warning-subtle text-warning"
+                          : "bg-error-subtle text-error",
+                      )}
+                    >
+                      {s.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function Field({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string | null | undefined;
+  mono?: boolean;
+}) {
+  if (!value) return null;
+  return (
+    <div>
+      <span className="text-text-quaternary text-label uppercase tracking-wider">
+        {label}
+      </span>
+      <div
+        className={cn(
+          "mt-px text-text-secondary text-label break-all",
+          mono && "font-mono",
+        )}
+      >
+        {value}
       </div>
     </div>
   );
