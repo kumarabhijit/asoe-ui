@@ -14,7 +14,7 @@
  */
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import dagre from "dagre";
 import type { PipelineTopology, PipelineTopologyEdge, ExecutedNode } from "@/types/api";
 import { cn } from "@/lib/utils";
@@ -186,6 +186,12 @@ export function PipelineDAG({
     () => new Set(executedNodes.map((n) => n.node)),
     [executedNodes],
   );
+  // Track which non-taken edge the user is inspecting (hover or
+  // keyboard focus). Verdict labels on un-taken edges are hidden by
+  // default — figure-ground discipline (Tufte / Munzner / Norman):
+  // the taken path is the figure, the topology shape is the ground,
+  // detailed annotations are deepest detail and surface on demand.
+  const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
 
   return (
     <div className={cn("overflow-auto", className)}>
@@ -222,45 +228,92 @@ export function PipelineDAG({
           </marker>
         </defs>
         {layout.edges.map((edge, i) => {
-          const isTaken = taken.has(edgeKey(edge));
+          const key = edgeKey(edge);
+          const isTaken = taken.has(key);
+          const isHovered = hoveredEdge === key;
           const path = buildPath(edge.points);
           const mid = edge.points[Math.floor(edge.points.length / 2)] ?? edge.points[0];
+          // Verdict labels are visible on:
+          //   * the taken path (always, the answer to "which path?")
+          //   * an un-taken edge currently hovered/focused (audit
+          //     users can inspect any edge on demand).
+          // Hidden on un-taken edges by default — figure-ground.
+          const showLabel = edge.verdict_label && (isTaken || isHovered);
+          const interactive = !!edge.verdict_label;
+          // Bump label weight on the taken path so it reads as the
+          // answer; hover-revealed labels match the taken style for
+          // legibility (auditors are inspecting on purpose, full
+          // contrast helps).
+          const labelEmphasis = isTaken || isHovered;
+          const labelAria = edge.verdict_label
+            ? `${edge.from_node} to ${edge.to_node}, verdict ${edge.verdict_label}`
+            : `${edge.from_node} to ${edge.to_node}`;
           return (
-            <g key={`${edge.from_node}-${edge.to_node}-${i}`}>
+            <g
+              key={`${edge.from_node}-${edge.to_node}-${i}`}
+              {...(interactive
+                ? {
+                    tabIndex: 0,
+                    role: "img",
+                    "aria-label": labelAria,
+                    onMouseEnter: () => setHoveredEdge(key),
+                    onMouseLeave: () =>
+                      setHoveredEdge((prev) => (prev === key ? null : prev)),
+                    onFocus: () => setHoveredEdge(key),
+                    onBlur: () =>
+                      setHoveredEdge((prev) => (prev === key ? null : prev)),
+                    style: { outline: "none", cursor: "pointer" },
+                  }
+                : {})}
+            >
+              {/* Invisible wider hit target — pointerEvents="stroke"
+                  so hovering anywhere along the curve, not just the
+                  thin visible line, reveals the label. */}
+              {interactive && (
+                <path
+                  d={path}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={14}
+                  pointerEvents="stroke"
+                />
+              )}
               <path
                 d={path}
                 fill="none"
                 stroke={isTaken ? "var(--color-brand)" : "var(--color-border)"}
-                strokeWidth={isTaken ? 2 : 1}
+                strokeWidth={isTaken ? 2 : isHovered ? 1.5 : 1}
                 markerEnd={isTaken ? "url(#dag-arrow-taken)" : "url(#dag-arrow)"}
-                opacity={isTaken ? 1 : 0.6}
+                opacity={isTaken ? 1 : isHovered ? 0.85 : 0.45}
+                pointerEvents="none"
               />
-              {edge.verdict_label && (
-                <g>
+              {showLabel && (
+                <g pointerEvents="none">
                   <rect
-                    x={mid.x - 28}
-                    y={mid.y - 8}
-                    width={56}
-                    height={16}
-                    rx={8}
+                    x={mid.x - 30}
+                    y={mid.y - 9}
+                    width={60}
+                    height={18}
+                    rx={9}
                     fill="var(--color-surface-primary)"
                     stroke={
                       isTaken
                         ? "var(--color-brand)"
-                        : "var(--color-border)"
+                        : "var(--color-text-tertiary)"
                     }
-                    strokeWidth={1}
+                    strokeWidth={isTaken ? 1.5 : 1}
                   />
                   <text
                     x={mid.x}
                     y={mid.y + 3}
                     textAnchor="middle"
-                    fontSize={9}
+                    fontSize={10}
                     fontFamily="ui-monospace, monospace"
+                    fontWeight={labelEmphasis ? 600 : 400}
                     fill={
                       isTaken
                         ? "var(--color-brand)"
-                        : "var(--color-text-tertiary)"
+                        : "var(--color-text-secondary)"
                     }
                   >
                     {edge.verdict_label}
@@ -313,12 +366,17 @@ export function PipelineDAG({
           );
         })}
       </svg>
-      {finalStatus && (
-        <div className="mt-8 text-label text-text-tertiary">
-          Final status:{" "}
-          <span className="font-mono text-text-primary">{finalStatus}</span>
-        </div>
-      )}
+      <div className="mt-8 flex items-baseline gap-12 text-label text-text-tertiary flex-wrap">
+        {finalStatus && (
+          <span>
+            Final status:{" "}
+            <span className="font-mono text-text-primary">{finalStatus}</span>
+          </span>
+        )}
+        <span className="text-text-quaternary">
+          Hover or focus any edge to see its verdict.
+        </span>
+      </div>
     </div>
   );
 }
