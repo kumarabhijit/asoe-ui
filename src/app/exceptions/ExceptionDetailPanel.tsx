@@ -39,7 +39,7 @@ import type {
   OrderAnalysis,
 } from "@/types/exceptions";
 import type { TraceResponse } from "@/types/api";
-import { COSIGN_LIFECYCLE_STATE, CollapsibleSection } from "./shared";
+import { COSIGN_LIFECYCLE_STATE } from "./shared";
 import { HeaderRibbon } from "./HeaderRibbon";
 import { ContextStrip } from "./ContextStrip";
 import { AgentAnalysisSection } from "./AgentAnalysisSection";
@@ -643,73 +643,47 @@ export default function ExceptionDetailPanel({
           {/* These render ONLY when their data is present in the analysis.
               A new intent that populates these fields automatically gets
               their sections rendered — zero UI code changes needed.
-              Each is wrapped in CollapsibleSection. Default-open behaviour
-              follows PO request #4: when the operator is expected to take
-              action (HITL lifecycle states), the actionable enrichment
-              evidence is expanded so they don't hunt for it; otherwise
-              everything stays minimised under the Recommendation. The
-              wrapper mounts the child only when open so heavy renders
-              stay deferred. */}
-          {(() => {
-            const hitl = isHumanInTheLoopState(detail.lifecycle_state);
-            return (
-              <>
-                {analysis?.price_analysis && (
-                  <CollapsibleSection title="Price Analysis" defaultOpen={hitl}>
-                    <PriceAnalysisSection data={analysis.price_analysis} />
-                  </CollapsibleSection>
-                )}
-                {analysis?.duplicate_detection && (
-                  <CollapsibleSection title="Duplicate Detection" defaultOpen={hitl}>
-                    <DuplicateDetectionSection data={analysis.duplicate_detection} />
-                  </CollapsibleSection>
-                )}
-                {analysis?.order_comparison && (
-                  <CollapsibleSection title="Order Comparison" defaultOpen={hitl}>
-                    <OrderComparisonSection data={analysis.order_comparison} />
-                  </CollapsibleSection>
-                )}
-                {analysis?.backorder_analysis && (
-                  <CollapsibleSection title="Back-Order Analysis" defaultOpen={hitl}>
-                    <BackOrderSection
-                      data={analysis.backorder_analysis}
-                      resolvedAction={detail.resolved_action}
-                    />
-                  </CollapsibleSection>
-                )}
-                {analysis?.overmax_analysis && (
-                  <CollapsibleSection title="Over-Max Analysis" defaultOpen={hitl}>
-                    <OverMaxSection data={analysis.overmax_analysis} />
-                  </CollapsibleSection>
-                )}
-                {analysis?.moq_analysis && (
-                  <CollapsibleSection title="MOQ Analysis" defaultOpen={hitl}>
-                    <MOQSection data={analysis.moq_analysis} />
-                  </CollapsibleSection>
-                )}
-                {analysis?.pallet_analysis && (
-                  <CollapsibleSection title="Pallet Configuration" defaultOpen={hitl}>
-                    <PalletConfigSection data={analysis.pallet_analysis} />
-                  </CollapsibleSection>
-                )}
-                {analysis?.delivery_delay_analysis && (
-                  <CollapsibleSection title="Delivery Delay" defaultOpen={hitl}>
-                    <DeliveryDelaySection data={analysis.delivery_delay_analysis} />
-                  </CollapsibleSection>
-                )}
-                {analysis?.price_hold_analysis && (
-                  <CollapsibleSection title="Price Hold" defaultOpen={hitl}>
-                    <PriceHoldSection data={analysis.price_hold_analysis} />
-                  </CollapsibleSection>
-                )}
-                {analysis?.edi_mismatch_analysis && (
-                  <CollapsibleSection title="EDI Mismatch" defaultOpen={hitl}>
-                    <EdiMismatchSection data={analysis.edi_mismatch_analysis} />
-                  </CollapsibleSection>
-                )}
-              </>
-            );
-          })()}
+              Rendered inline (not behind a collapsible wrapper):
+              they're inline DATA CARDS — the variance, gap, mismatch
+              numbers that answer "why this recommendation?" — not
+              navigation panes. PO request #4 ("minimise panes other
+              than Recommendation") still holds for Entity Profile,
+              Agent Analysis, Evidence Grid, and Diagnostics; the
+              actionable evidence cards stay visible so operators
+              don't have to click to see what they came for. */}
+          {analysis?.price_analysis && (
+            <PriceAnalysisSection data={analysis.price_analysis} />
+          )}
+          {analysis?.duplicate_detection && (
+            <DuplicateDetectionSection data={analysis.duplicate_detection} />
+          )}
+          {analysis?.order_comparison && (
+            <OrderComparisonSection data={analysis.order_comparison} />
+          )}
+          {analysis?.backorder_analysis && (
+            <BackOrderSection
+              data={analysis.backorder_analysis}
+              resolvedAction={detail.resolved_action}
+            />
+          )}
+          {analysis?.overmax_analysis && (
+            <OverMaxSection data={analysis.overmax_analysis} />
+          )}
+          {analysis?.moq_analysis && (
+            <MOQSection data={analysis.moq_analysis} />
+          )}
+          {analysis?.pallet_analysis && (
+            <PalletConfigSection data={analysis.pallet_analysis} />
+          )}
+          {analysis?.delivery_delay_analysis && (
+            <DeliveryDelaySection data={analysis.delivery_delay_analysis} />
+          )}
+          {analysis?.price_hold_analysis && (
+            <PriceHoldSection data={analysis.price_hold_analysis} />
+          )}
+          {analysis?.edi_mismatch_analysis && (
+            <EdiMismatchSection data={analysis.edi_mismatch_analysis} />
+          )}
 
           {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           <EvidenceGrid
