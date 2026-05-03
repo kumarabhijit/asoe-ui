@@ -28,6 +28,7 @@ import { useErpProfile } from "@/hooks/useErpProfile";
 import type { ExceptionSummary, HealthResponse } from "@/types/exceptions";
 import type { StatsResponse } from "@/types/api";
 import { HITL_LIFECYCLE_STATES } from "./shared";
+import { parseQuery, stringifyTokens, type OperatorToken } from "./searchParser";
 
 interface ExceptionListPaneProps {
   exceptions: ExceptionSummary[];
@@ -48,6 +49,15 @@ interface ExceptionListPaneProps {
    *  future presets (this week, last 24h) can extend the union. */
   filterDate: "today" | null;
   onFilterDateChange: (d: "today" | null) => void;
+  /** Operator tokens parsed out of the search box (e.g. account:,
+   *  state:, since:). Rendered as removable chips in the active-filter
+   *  row so the operator can see what their query was decomposed into.
+   *  Removing a chip rewrites the search string with that operator
+   *  stripped — see `onRemoveSearchOperator` below. */
+  parsedSearchOperators: OperatorToken[];
+  /** Non-fatal parse warnings from the search parser. Surfaced as a
+   *  caption hint under the search box. */
+  searchWarnings: string[];
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
   health: HealthResponse | null;
@@ -83,6 +93,8 @@ export default function ExceptionListPane({
   onFilterIntentsChange,
   filterDate,
   onFilterDateChange,
+  parsedSearchOperators,
+  searchWarnings,
   hasActiveFilters,
   onClearFilters,
   health,
@@ -148,13 +160,30 @@ export default function ExceptionListPane({
           </div>
         )}
 
-        {/* Search */}
+        {/* Search — fuzzy multi-token + operator syntax (account:, state:,
+            intent:, verdict:, since:, before:). The placeholder hints
+            at one operator so newcomers discover the syntax; the full
+            list is documented in `searchParser.ts`. */}
         <Input
-          placeholder="Search by order ID, account, intent..."
+          placeholder='Search… try "account:walmart since:7d 1042"'
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           rightIcon={<Search size={14} />}
         />
+        {/* Parser warnings — surfaces unknown operators / unparseable
+            since: values without failing the query. Caption-styled and
+            non-blocking; the operator can edit and retry. */}
+        {searchWarnings.length > 0 && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mt-4 text-label text-warning"
+          >
+            {searchWarnings.map((w, i) => (
+              <div key={i}>{w}</div>
+            ))}
+          </div>
+        )}
 
         {/* Quick-filter pill bar — one-click presets that compose with
             the multi-select chips. Operators reach for these first;
@@ -242,10 +271,31 @@ export default function ExceptionListPane({
                   }
                 />
               ))}
-              {searchQuery && (
+              {/* Each parsed operator → its own chip. Removing the
+                  chip rewrites the search string via `stringifyTokens`
+                  so the operator can pare a complex query down one
+                  constraint at a time. */}
+              {parsedSearchOperators.map((op, idx) => (
                 <FilterChip
-                  label={`"${searchQuery}"`}
-                  onRemove={() => onSearchChange("")}
+                  key={`op-${op.key}-${idx}`}
+                  label={`${op.key}: ${op.rawValue}`}
+                  onRemove={() => {
+                    const tokens = parseQuery(searchQuery);
+                    tokens.operators.splice(idx, 1);
+                    onSearchChange(stringifyTokens(tokens));
+                  }}
+                />
+              ))}
+              {/* Any free-text portion that remains after operators
+                  are pulled out renders as a single quoted chip. */}
+              {parseQuery(searchQuery).freeText && (
+                <FilterChip
+                  label={`"${parseQuery(searchQuery).freeText}"`}
+                  onRemove={() => {
+                    const tokens = parseQuery(searchQuery);
+                    tokens.freeText = "";
+                    onSearchChange(stringifyTokens(tokens));
+                  }}
                 />
               )}
             </div>

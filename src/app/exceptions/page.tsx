@@ -34,6 +34,7 @@ import type { StatsResponse } from "@/types/api";
 import type { WSEvent } from "@/types/websocket";
 import ExceptionListPane from "./ExceptionListPane";
 import ExceptionDetailPanel from "./ExceptionDetailPanel";
+import { matchExceptions, parseQuery } from "./searchParser";
 
 /** Decode a comma-separated URL param into a deduped array of
  *  non-empty values. `null` / empty string → []. Used for the
@@ -281,16 +282,18 @@ function ExceptionQueueContent() {
   });
 
   /* ── Client-side filter pipeline (account scoping is server-side) ──
-   * Order: state → intent → date → search. Each filter is independent;
-   * empty arrays mean "no constraint." `filterDate === "today"`
-   * compares against the local timezone's start-of-day so the operator
-   * sees what they reasonably consider "today." */
+   * Order: chips/pill constraints first (state / intent / today), then
+   * the search box. The search box runs through `searchParser` so the
+   * operator can write `account:walmart since:7d 1042` and have it
+   * decomposed into operator predicates + a Fuse.js fuzzy free-term
+   * match. Operators AND with the multi-select chips — the operator
+   * may use either, and the result is the intersection. */
   const todayStart = (() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d.getTime();
   })();
-  const filtered = exceptions.filter((exc) => {
+  const chipFiltered = exceptions.filter((exc) => {
     if (filterStates.length > 0 && !filterStates.includes(exc.lifecycle_state)) {
       return false;
     }
@@ -301,18 +304,13 @@ function ExceptionQueueContent() {
       const t = Date.parse(exc.updated_at ?? exc.created_at);
       if (Number.isNaN(t) || t < todayStart) return false;
     }
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const hit =
-        exc.order_id.toLowerCase().includes(q) ||
-        exc.id.toLowerCase().includes(q) ||
-        (exc.intent?.toLowerCase().includes(q) ?? false) ||
-        exc.event_type.toLowerCase().includes(q) ||
-        (exc.account_name?.toLowerCase().includes(q) ?? false);
-      if (!hit) return false;
-    }
     return true;
   });
+  const parsedQuery = parseQuery(searchQuery);
+  const { matched: filtered, warnings: searchWarnings } = matchExceptions(
+    chipFiltered,
+    parsedQuery,
+  );
 
   /* ── Recency sort (Outlook-style: most-recent first) ───────────────
    * Sort by `updated_at` desc, with `created_at` desc as tiebreaker so
@@ -453,6 +451,8 @@ function ExceptionQueueContent() {
               onFilterIntentsChange={setFilterIntents}
               filterDate={filterDate}
               onFilterDateChange={setFilterDate}
+              parsedSearchOperators={parsedQuery.operators}
+              searchWarnings={searchWarnings}
               hasActiveFilters={hasActiveFilters}
               onClearFilters={clearAllFilters}
               health={health}
