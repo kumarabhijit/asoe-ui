@@ -29,6 +29,8 @@ import type { ExceptionSummary, HealthResponse } from "@/types/exceptions";
 import type { StatsResponse } from "@/types/api";
 import { HITL_LIFECYCLE_STATES } from "./shared";
 import { parseQuery, stringifyTokens, type OperatorToken } from "./searchParser";
+import { SavedViewsMenu } from "./SavedViewsMenu";
+import type { SavedView } from "@/hooks/useSavedViews";
 
 interface ExceptionListPaneProps {
   exceptions: ExceptionSummary[];
@@ -60,6 +62,9 @@ interface ExceptionListPaneProps {
   searchWarnings: string[];
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
+  /** Apply a saved view — replaces all four filter dimensions in one
+   *  render. Owned by `page.tsx` so the URL syncs in a single replace. */
+  onApplySavedView: (view: SavedView) => void;
   health: HealthResponse | null;
   onRefresh: () => void;
 }
@@ -97,6 +102,7 @@ export default function ExceptionListPane({
   searchWarnings,
   hasActiveFilters,
   onClearFilters,
+  onApplySavedView,
   health,
   onRefresh,
 }: ExceptionListPaneProps) {
@@ -135,9 +141,21 @@ export default function ExceptionListPane({
               {exceptions.length}
             </span>
           </div>
-          <Button variant="ghost" size="sm" onClick={onRefresh} loading={loading}>
-            <RefreshCw size={14} />
-          </Button>
+          <div className="flex items-center gap-4">
+            <SavedViewsMenu
+              currentFilters={{
+                filterStates,
+                filterIntents,
+                filterDate,
+                searchQuery,
+              }}
+              onApply={onApplySavedView}
+              hasActiveFilters={!!hasActiveFilters}
+            />
+            <Button variant="ghost" size="sm" onClick={onRefresh} loading={loading}>
+              <RefreshCw size={14} />
+            </Button>
+          </div>
         </div>
 
         {/* Compact inline metrics */}

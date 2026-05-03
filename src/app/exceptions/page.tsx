@@ -125,6 +125,23 @@ function ExceptionQueueContent() {
     setSearchQuery("");
   }
 
+  // Apply a saved view (Slice 3) — replaces all four filter dimensions
+  // in one render so the URL sync effect runs once. The cast below is
+  // safe: SavedView mirrors the four state slots exactly. We accept the
+  // shape inline rather than importing the type to keep page.tsx free
+  // of an extra hook-only dependency.
+  function applySavedView(view: {
+    filterStates: string[];
+    filterIntents: string[];
+    filterDate: "today" | null;
+    searchQuery: string;
+  }) {
+    setFilterStates(view.filterStates);
+    setFilterIntents(view.filterIntents);
+    setFilterDate(view.filterDate);
+    setSearchQuery(view.searchQuery);
+  }
+
   /* ── Data fetching ───────────────────────────────────────────────── */
   //
   // `silent: true` is used by the WebSocket event handler so an
@@ -455,6 +472,7 @@ function ExceptionQueueContent() {
               searchWarnings={searchWarnings}
               hasActiveFilters={hasActiveFilters}
               onClearFilters={clearAllFilters}
+              onApplySavedView={applySavedView}
               health={health}
               onRefresh={fetchData}
             />
