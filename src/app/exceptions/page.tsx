@@ -34,6 +34,15 @@ import type { StatsResponse } from "@/types/api";
 import type { WSEvent } from "@/types/websocket";
 import ExceptionListPane from "./ExceptionListPane";
 import ExceptionDetailPanel from "./ExceptionDetailPanel";
+import { matchExceptions, parseQuery } from "./searchParser";
+
+/** Decode a comma-separated URL param into a deduped array of
+ *  non-empty values. `null` / empty string → []. Used for the
+ *  state[] and intent[] filter URL params. */
+function parseCsvParam(raw: string | null): string[] {
+  if (!raw) return [];
+  return Array.from(new Set(raw.split(",").map((s) => s.trim()).filter(Boolean)));
+}
 
 const NAV_TABS = [
   { id: "inbox", label: "Customer Inbox", href: "/inbox" },
@@ -75,27 +84,62 @@ function ExceptionQueueContent() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   /* ── Filters (initialized from URL params) ───────────────────────── */
+  // Multi-value filters arrive as comma-separated lists in the URL
+  // (`?state=PENDING_REVIEW,ESCALATED&intent=DUPLICATE_PO,EDI_MISMATCH`).
+  // The `filterDate` quick-filter is a single-value preset today
+  // ("today" or null); the multi-select chip bar handles state/intent
+  // arrays.
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
-  const [filterState, setFilterState] = useState(searchParams.get("state") || "");
-  const [filterIntent, setFilterIntent] = useState(searchParams.get("intent") || "");
+  const [filterStates, setFilterStates] = useState<string[]>(
+    parseCsvParam(searchParams.get("state")),
+  );
+  const [filterIntents, setFilterIntents] = useState<string[]>(
+    parseCsvParam(searchParams.get("intent")),
+  );
+  const [filterDate, setFilterDate] = useState<"today" | null>(
+    searchParams.get("date") === "today" ? "today" : null,
+  );
 
   /* ── Sync filters to URL ─────────────────────────────────────────── */
   useEffect(() => {
     const params = new URLSearchParams();
-    if (filterState) params.set("state", filterState);
-    if (filterIntent) params.set("intent", filterIntent);
+    if (filterStates.length > 0) params.set("state", filterStates.join(","));
+    if (filterIntents.length > 0) params.set("intent", filterIntents.join(","));
+    if (filterDate) params.set("date", filterDate);
     if (searchQuery) params.set("q", searchQuery);
     const qs = params.toString();
     const url = qs ? `/exceptions?${qs}` : "/exceptions";
     router.replace(url, { scroll: false });
-  }, [filterState, filterIntent, searchQuery, router]);
+  }, [filterStates, filterIntents, filterDate, searchQuery, router]);
 
-  const hasActiveFilters = !!(filterState || filterIntent || searchQuery);
+  const hasActiveFilters =
+    filterStates.length > 0 ||
+    filterIntents.length > 0 ||
+    filterDate !== null ||
+    !!searchQuery;
 
   function clearAllFilters() {
-    setFilterState("");
-    setFilterIntent("");
+    setFilterStates([]);
+    setFilterIntents([]);
+    setFilterDate(null);
     setSearchQuery("");
+  }
+
+  // Apply a saved view (Slice 3) — replaces all four filter dimensions
+  // in one render so the URL sync effect runs once. The cast below is
+  // safe: SavedView mirrors the four state slots exactly. We accept the
+  // shape inline rather than importing the type to keep page.tsx free
+  // of an extra hook-only dependency.
+  function applySavedView(view: {
+    filterStates: string[];
+    filterIntents: string[];
+    filterDate: "today" | null;
+    searchQuery: string;
+  }) {
+    setFilterStates(view.filterStates);
+    setFilterIntents(view.filterIntents);
+    setFilterDate(view.filterDate);
+    setSearchQuery(view.searchQuery);
   }
 
   /* ── Data fetching ───────────────────────────────────────────────── */
@@ -125,11 +169,15 @@ function ExceptionQueueContent() {
       let cursor: string | undefined = undefined;
       let safety = 0;
       do {
-        const page = await exceptionsApi.list({
-          status: filterState || undefined,
-          intent: filterIntent || undefined,
-          cursor,
-        });
+        // Multi-value filters are applied client-side (see the
+        // `filtered` block below). The API accepts only a single
+        // status/intent today; passing a single value when several are
+        // selected would silently drop the others. Fetching unfiltered
+        // and filtering in the page keeps the UX consistent and is
+        // cheap given the current row volume; if the production list
+        // grows large enough that this matters, the API client should
+        // be extended to accept arrays.
+        const page = await exceptionsApi.list({ cursor });
         allRows.push(...page.data);
         cursor = page.has_more ? (page.cursor ?? undefined) : undefined;
         safety += 1;
@@ -152,7 +200,7 @@ function ExceptionQueueContent() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [filterState, filterIntent]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -250,17 +298,36 @@ function ExceptionQueueContent() {
     onPollFallback: handleWsReconnect,
   });
 
-  /* ── Client-side search filter (account scoping is server-side) ──── */
-  const filtered = exceptions.filter((exc) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      exc.order_id.toLowerCase().includes(q) ||
-      exc.id.toLowerCase().includes(q) ||
-      (exc.intent?.toLowerCase().includes(q) ?? false) ||
-      exc.event_type.toLowerCase().includes(q)
-    );
+  /* ── Client-side filter pipeline (account scoping is server-side) ──
+   * Order: chips/pill constraints first (state / intent / today), then
+   * the search box. The search box runs through `searchParser` so the
+   * operator can write `account:walmart since:7d 1042` and have it
+   * decomposed into operator predicates + a Fuse.js fuzzy free-term
+   * match. Operators AND with the multi-select chips — the operator
+   * may use either, and the result is the intersection. */
+  const todayStart = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  })();
+  const chipFiltered = exceptions.filter((exc) => {
+    if (filterStates.length > 0 && !filterStates.includes(exc.lifecycle_state)) {
+      return false;
+    }
+    if (filterIntents.length > 0 && !filterIntents.includes(exc.intent ?? "")) {
+      return false;
+    }
+    if (filterDate === "today") {
+      const t = Date.parse(exc.updated_at ?? exc.created_at);
+      if (Number.isNaN(t) || t < todayStart) return false;
+    }
+    return true;
   });
+  const parsedQuery = parseQuery(searchQuery);
+  const { matched: filtered, warnings: searchWarnings } = matchExceptions(
+    chipFiltered,
+    parsedQuery,
+  );
 
   /* ── Recency sort (Outlook-style: most-recent first) ───────────────
    * Sort by `updated_at` desc, with `created_at` desc as tiebreaker so
@@ -395,12 +462,17 @@ function ExceptionQueueContent() {
               onSelect={setSelectedId}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
-              filterState={filterState}
-              onFilterStateChange={setFilterState}
-              filterIntent={filterIntent}
-              onFilterIntentChange={setFilterIntent}
+              filterStates={filterStates}
+              onFilterStatesChange={setFilterStates}
+              filterIntents={filterIntents}
+              onFilterIntentsChange={setFilterIntents}
+              filterDate={filterDate}
+              onFilterDateChange={setFilterDate}
+              parsedSearchOperators={parsedQuery.operators}
+              searchWarnings={searchWarnings}
               hasActiveFilters={hasActiveFilters}
               onClearFilters={clearAllFilters}
+              onApplySavedView={applySavedView}
               health={health}
               onRefresh={fetchData}
             />
