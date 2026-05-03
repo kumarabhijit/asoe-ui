@@ -824,3 +824,76 @@ the 10 *AnalysisData sections. N5 closed.
 ### Logged: N8 — gstack 1.5.1.0 → 1.12.2.0
 External repo, out of scope here. Logged so the next dependency
 review has the ticket.
+
+---
+
+## Phase 8.13 — Exception-queue UX overhaul (closed 2026-05-03)
+
+PO requests on the Azure deployment, addressed in a paired cross-repo PR
+(asoe-ui PR #118 / #119; asoe2 PR #90 / SoD-relaxation paired commit).
+See drift register entries D22 / D23 / D24 in `ui_architecture.md` for
+the design rationale.
+
+### List pane (Outlook parity)
+- [x] Drop the shadow-verdict pill from `ExceptionListPane` cards
+      (lifecycle-state badge becomes the sole row chip; verdict moves
+      to the detail surface under `Audit Result:`).
+- [x] Sort exceptions by `updated_at desc, created_at desc` —
+      most-recent-first, stable across silent WS refreshes.
+- [x] Document-level keyboard navigation: ArrowUp/Down + j/k +
+      Home/End, with focus-follow so `:focus-visible` outline tracks
+      selection. Bails on inputs / selects / Radix popovers.
+
+### Detail pane (operator-first defaults)
+- [x] `HeaderRibbon` prefixes lifecycle and verdict badges with
+      `Current State:` and `Audit Result:` labels.
+- [x] `ContextStrip`, `AgentAnalysisSection`, `EvidenceGrid`,
+      `DiagnosticsSection` collapsed by default.
+- [x] `AgentAnalysisSection` auto-expands when `lifecycle_state ∈
+      HUMAN_IN_THE_LOOP_STATES = { PENDING_REVIEW, ESCALATED,
+      PENDING_ADMIN_REVIEW, PENDING_COSIGN, BLOCKED }`.
+- [x] Enrichment sections wrapped in `CollapsibleSection`
+      (always collapsed — operator drills in on demand). Helper
+      lives in `src/app/exceptions/shared.tsx`.
+- [x] Lazy-fetch: critical path is `detail` + `analysis` only on
+      first paint; `lineItems` background-warmed; `trace` lazy on
+      Diagnostics open. No re-fetch on collapse-then-reopen.
+- [x] Action-card heading renamed `Agent Analysis → Agent
+      Recommendation` (disambiguates from prose `AgentAnalysisSection`
+      pane). Same rename applied in `src/app/inbox/page.tsx`.
+- [x] Drop the `?? analysis?.diagnosis` fallback on
+      `AgentReasoningCard.explanation` so the diagnosis prose only
+      appears in the Agent Analysis pane, never duplicated.
+
+### Cross-repo backend (paired with asoe2 PR #90)
+- [x] `OrderAnalysis` type updated: `root_cause`, `recommendation`,
+      `entity_profile`, `impact_metrics` are now optional —
+      `api/profile_composer.py` returns None when backing data is
+      absent (Verdict 2026-04-22 partial-truth guard).
+- [x] `AgentAnalysisSection` renders each prose block individually
+      only when its field is populated (Guardrail #6 structural
+      omission, no empty colored bars).
+
+### Self-override allowance
+- [x] Playwright spec `tests/browser/override-and-sod.spec.ts`
+      flipped from "asserts SOD_VIOLATION toast" to "asserts
+      successful self-re-override + no SoD toast" — pairs with
+      asoe2 SoD self-block removal. Four-eyes cosign rule on
+      high-value overrides remains the SOX §404 control.
+
+### CI
+- [x] `.github/workflows/browser-e2e.yml` resolves the asoe2 ref
+      dynamically: prefer a same-named branch when one exists,
+      fall back to `main`. Avoids the cross-repo paired-PR dance
+      that previously broke CI on the merging side.
+- [x] Eight Playwright specs updated to call the new
+      `expandSection(page, /title/i)` helper before asserting
+      content inside collapsed enrichment sections.
+
+### Mock data (Vercel preview surface)
+- [x] Redistributed 25 mock exceptions across distinct dates
+      (2026-04-05 → 2026-04-29) so the recency-sorted top of the
+      queue shows a balanced rainbow of statuses instead of four
+      back-to-back FAILED records (the ADR-027 verdict-coverage
+      demos clustered on 2026-04-18 originally).
+

@@ -102,7 +102,7 @@ src/
 | `Sidebar` | Tailwind | 480px panel, escape-to-close, focus trap | (Available, not used in Outlook layout) |
 | `ActivityIndicator` | Tailwind | Node-specific domain-aware messages | WaterfallStepper |
 | `WaterfallStepper` | Tailwind | 11-node pipeline with per-node states (post-ADR-025) | ExceptionDetailPanel |
-| `AgentReasoningCard` | Tailwind | Layer 1 only (recommendation + actions), verdict × permission button matrix (Option A): `canApprove` / `canOverride` / `canEscalate` / `actionInFlight` / `recommendedAction` props. `Override…` + Approve-tooltip preview. | ExceptionDetailPanel |
+| `AgentReasoningCard` | Tailwind | Layer 1 only (recommendation + actions). Header reads **"Agent Recommendation"** (Phase 8.13 rename — disambiguates from the prose `AgentAnalysisSection` pane); verdict × permission button matrix (Option A): `canApprove` / `canOverride` / `canEscalate` / `actionInFlight` / `recommendedAction` props. `Override…` + Approve-tooltip preview. The `explanation` prop is sourced from `trace.explanation` only — no fallback to `analysis.diagnosis` (that prose lives in `AgentAnalysisSection` exclusively). | ExceptionDetailPanel |
 | `PricingWaterfall` | Tailwind | Pricing condition chain timeline | ExceptionDetailPanel |
 | `GapBar` | Tailwind | Horizontal bar: primary vs secondary qty, shortfall/excess mode, gap indicator | BackOrderSection, OverMaxSection, MOQSection |
 | `GravitationalOrbs` | Custom (canvas) | Canvas animated background | Login |
@@ -155,15 +155,27 @@ NavBar (sticky top, 56px)
 
 **Error handling:** Fetch errors tracked via `error` state. Distinct UI for error (retry button) vs empty (filter hint) vs loading (skeletons).
 
-**Data flow:** `exceptionsApi.list()` + `exceptionsApi.stats()` → list state → render. Filters trigger re-fetch. First item auto-selected and pre-fetched. Subsequent selections trigger on-demand fetch: `exceptionsApi.get(id)` + `exceptionsApi.trace(id)` + `exceptionsApi.lineItems(id)` + `exceptionsApi.orderAnalysis(id)`.
+**Data flow:** `exceptionsApi.list()` + `exceptionsApi.stats()` → list state → render. Filters trigger re-fetch. First item auto-selected and pre-fetched. Subsequent selections trigger on-demand fetch — but the critical path is `exceptionsApi.get(id)` + `exceptionsApi.orderAnalysis(id)` only (Phase 8.13). `lineItems` is background-warmed after first paint; `trace` is lazy-loaded the first time the operator opens the Diagnostics pane (`onFirstOpen` callback on `DiagnosticsSection`). Re-collapsing doesn't re-fetch.
+
+**Recency sort (Phase 8.13):** The list pane is sorted by `updated_at` descending with `created_at` desc as tiebreaker — most-recent-first, Outlook-style. Sort lives in `page.tsx` (not the API client) so the order stays stable across silent WebSocket refreshes.
+
+**Keyboard navigation (Phase 8.13 — Outlook parity):** A document-level `keydown` listener in `page.tsx` moves selection through the sorted+filtered list:
+- `ArrowDown` / `j` — next row
+- `ArrowUp` / `k` — previous row
+- `Home` — first row
+- `End` — last row
+
+Bails when the active element is an input / textarea / select / contenteditable / Radix popover, so search and filter selects keep their native key handling. After selection moves, focus also moves (`el.focus({ preventScroll: true })`) so the `:focus-visible` brand outline (`globals.css:56-58`) tracks selection — without this, the previously-clicked card kept the outline and looked "still highlighted." Cards carry a `data-exception-id={exc.id}` attribute so the handler can `scrollIntoView` + `focus` them.
+
+**Detail-pane header labels (Phase 8.13):** `HeaderRibbon` prefixes the lifecycle and shadow-verdict badges with explicit labels — `Current State: <lifecycle>` and `Audit Result: <verdict>` — so reviewers don't have to learn which colored pill maps to which thing. The list-card surface (`ExceptionListPane`) intentionally drops the verdict pill for density; the explicit `Audit Result:` label in the detail pane is what preserves the partial-truth guard.
 
 **Polymorphic detail view:** The right pane (`ExceptionDetailPanel.tsx`) orchestrates 13 sub-components decomposed along the **5-layer axis** (not the intent axis). Each sub-component is intent-agnostic — driven by data presence, not intent strings:
 
 | Layer | Sub-Component | File | Purpose |
 |---|---|---|---|
 | 1 | `HeaderRibbon` | `HeaderRibbon.tsx` | Breadcrumb context, lifecycle/verdict badges, total value |
-| 2 | `ContextStrip` | `ContextStrip.tsx` | Entity Profile + Impact Metrics (collapsible, default expanded) |
-| 3 | `AgentAnalysisSection` | `AgentAnalysisSection.tsx` | Problem / Root Cause / Recommendation narratives |
+| 2 | `ContextStrip` | `ContextStrip.tsx` | Entity Profile + Impact Metrics (collapsible, **default collapsed** — Phase 8.13). Renders nothing if both `analysis.entity_profile` and `analysis.impact_metrics` are absent. |
+| 3 | `AgentAnalysisSection` | `AgentAnalysisSection.tsx` | Problem / Root Cause / Recommendation narratives — **collapsible**, collapsed by default; auto-expands when `detail.lifecycle_state` is in `HUMAN_IN_THE_LOOP_STATES` (PENDING_REVIEW / ESCALATED / PENDING_ADMIN_REVIEW / PENDING_COSIGN / BLOCKED). Each prose block (Problem / Root Cause / Recommendation) renders only when the matching `OrderAnalysis` field is present (Guardrail #6 structural omission). |
 | 3+ | `DuplicateDetectionSection` | `DuplicateDetectionSection.tsx` | Data-presence enrichment: original vs duplicate order, detection method, confidence, autonomy |
 | 3+ | `OrderComparisonSection` | `OrderComparisonSection.tsx` | Data-presence enrichment: side-by-side order comparison with matching/differing field badges |
 | 3+ | `PriceAnalysisSection` | `PriceAnalysisSection.tsx` | Data-presence enrichment: price delta bars (ERP vs PO), metric tiles, collapsible SAP context card |
@@ -177,22 +189,33 @@ NavBar (sticky top, 56px)
 | 4 | `EvidenceGrid` | `EvidenceGrid.tsx` | Collapsed by default; line-item table + pricing waterfall |
 | 5 | `DiagnosticsSection` | `DiagnosticsSection.tsx` | Hidden behind "Show Diagnostics" toggle: Pipeline Progress (WaterfallStepper) + Trace Evidence tabs |
 
-**Data-presence enrichment sections** render only when their optional data is present in `OrderAnalysis`:
+**Data-presence enrichment sections** render only when their optional data is present in `OrderAnalysis`. Each is wrapped in a `CollapsibleSection` (collapsed by default — Phase 8.13 PO ruling: "operator scans the Recommendation card first and only drills into evidence panes when they need detail"):
 ```tsx
-{analysis?.price_analysis && <PriceAnalysisSection data={analysis.price_analysis} />}
-{analysis?.duplicate_detection && <DuplicateDetectionSection data={analysis.duplicate_detection} />}
-{analysis?.order_comparison && <OrderComparisonSection data={analysis.order_comparison} />}
-{analysis?.backorder_analysis && <BackOrderSection data={analysis.backorder_analysis} />}
-{analysis?.overmax_analysis && <OverMaxSection data={analysis.overmax_analysis} />}
-{analysis?.moq_analysis && <MOQSection data={analysis.moq_analysis} />}
-{analysis?.pallet_analysis && <PalletConfigSection data={analysis.pallet_analysis} />}
-{analysis?.delivery_delay_analysis && <DeliveryDelaySection data={analysis.delivery_delay_analysis} />}
-{analysis?.price_hold_analysis && <PriceHoldSection data={analysis.price_hold_analysis} />}
-{analysis?.edi_mismatch_analysis && <EdiMismatchSection data={analysis.edi_mismatch_analysis} />}
+{analysis?.price_analysis && (
+  <CollapsibleSection title="Price Analysis">
+    <PriceAnalysisSection data={analysis.price_analysis} />
+  </CollapsibleSection>
+)}
+{analysis?.duplicate_detection && (
+  <CollapsibleSection title="Duplicate Detection">
+    <DuplicateDetectionSection data={analysis.duplicate_detection} />
+  </CollapsibleSection>
+)}
+// …Order Comparison, Back-Order Analysis, Over-Max Analysis,
+// MOQ Analysis, Pallet Configuration, Delivery Delay, Price Hold,
+// EDI Mismatch — same wrapper.
 ```
-Adding a new enrichment section requires only: (1) add the type to `OrderAnalysis`, (2) create the section component, (3) add the conditional render — zero dispatch logic.
+The wrapper mounts its child only when open, so heavy renders (waterfalls, gateway tables) stay deferred until the operator expands the section.
 
-**Shared helpers** (`shared.tsx`): `CollapsibleHeader` (used by ContextStrip, DiagnosticsSection) and `fmtPrice` (used by HeaderRibbon, ContextStrip, EvidenceGrid, enrichment sections).
+Adding a new enrichment section requires only: (1) add the type to `OrderAnalysis`, (2) create the section component, (3) add the wrapped conditional render — zero dispatch logic.
+
+**Shared helpers** (`shared.tsx`):
+- `CollapsibleHeader` — used by ContextStrip, DiagnosticsSection
+- `CollapsibleSection` — generic wrapper used for every enrichment section in `ExceptionDetailPanel` (Phase 8.13). Accepts `title` and `defaultOpen` props; renders a card-styled header with chevron, lazy-mounts children on open.
+- `fmtPrice` — used by HeaderRibbon, ContextStrip, EvidenceGrid, enrichment sections
+- `COSIGN_LIFECYCLE_STATE` — the one business-rule lifecycle literal used in the panel (cosign-banner gate)
+
+**HITL auto-expand** (Phase 8.13): `ExceptionDetailPanel` exports an `isHumanInTheLoopState(state)` predicate keyed on `HUMAN_IN_THE_LOOP_STATES = { PENDING_REVIEW, ESCALATED, PENDING_ADMIN_REVIEW, PENDING_COSIGN, BLOCKED }`. The result drives `AgentAnalysisSection.defaultOpen`. Enrichment sections stay collapsed regardless — their content is data the operator opens on demand, not narrative the system prompts them to read.
 
 **RBAC permission gating:** Approve/Reject/Override…/Escalate action buttons are gated via `hasPermission()` — only users with the required `{resource}:{action}` RBAC permission see the buttons. Gates resolve to component props: `canApprove` (`exceptions:approve`), `canOverride` (`exceptions:override`), `canEscalate` (`exceptions:escalate`).
 
@@ -295,7 +318,7 @@ Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 | `PricingConditionType` | Pricing condition type enum (BASE/CONTRACT/TPR/UOM/RESULT/ERROR) | exceptions.ts |
 | `PricingWaterfallStep` | Single step in pricing waterfall visualization | exceptions.ts |
 | `LineItemAnalysis` | Per-line agent analysis with waterfall | exceptions.ts |
-| `OrderAnalysis` | Order-level agent analysis (drives detail panel). Extended with `root_cause`, `recommendation`, `entity_profile`, `impact_metrics`, `duplicate_detection?`, `order_comparison?`, `price_analysis?`, `backorder_analysis?`, `overmax_analysis?`, `moq_analysis?`, `pallet_analysis?` | exceptions.ts |
+| `OrderAnalysis` | Order-level agent analysis (drives detail panel). `root_cause?`, `recommendation?`, `entity_profile?`, `impact_metrics?` are **optional** as of Phase 8.13 — backend `api/profile_composer.py` returns `None` when the backing data is absent so the UI can structurally omit the surface (Verdict 2026-04-22 partial-truth guard). Plus `duplicate_detection?`, `order_comparison?`, `price_analysis?`, `backorder_analysis?`, `overmax_analysis?`, `moq_analysis?`, `pallet_analysis?`, `delivery_delay_analysis?`, `price_hold_analysis?`, `edi_mismatch_analysis?` enrichment fields. | exceptions.ts |
 | `EntityProfile` | Master data context for exception entity (customer name, BP number, tier, VIP, credit standing, location) | exceptions.ts |
 | `ImpactMetrics` | Quantitative "blast radius" (revenue at risk, delta, SLA priority, affected lines) | exceptions.ts |
 | `DuplicateDetectionData` | Duplicate detection summary: original/duplicate order snapshots, detection method, confidence, recommended action, autonomy level | exceptions.ts |
