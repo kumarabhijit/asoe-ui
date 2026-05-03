@@ -281,14 +281,24 @@ export interface OrderAnalysis {
   confidence: number;
   risk: "LOW" | "MEDIUM" | "HIGH";
   resolution: string;
-  /** Underlying deterministic root cause (e.g., "Promo Expired", "Duplicate ID within 48h") */
-  root_cause: string;
-  /** One-line specific action recommendation (e.g., "Adjust price to contract") */
-  recommendation: string;
-  /** Master data context for the exception entity */
-  entity_profile: EntityProfile;
-  /** Quantitative "blast radius" of the exception */
-  impact_metrics: ImpactMetrics;
+  /** Underlying deterministic root cause prose (e.g. "Promo Expired").
+   *  Optional on the backend contract — `compose_narrative` returns
+   *  None when no recipe / trace narrative carries it; the UI's
+   *  `AgentAnalysisSection` structurally omits the Root Cause block
+   *  in that case (Guardrail #6). */
+  root_cause?: string;
+  /** One-line specific action recommendation. Optional for the same
+   *  reason as `root_cause`. */
+  recommendation?: string;
+  /** Master data context for the exception entity. Optional —
+   *  backend `compose_entity_profile` returns None when the record
+   *  has no Account linkage. */
+  entity_profile?: EntityProfile;
+  /** Quantitative "blast radius" of the exception. Optional —
+   *  backend `compose_impact_metrics` returns None when the record
+   *  carries no line items (a zero-filled struct would imply
+   *  "verified zero impact" which is partial-truth). */
+  impact_metrics?: ImpactMetrics;
   lines: LineItemAnalysis[];
 
   /* ── Data-presence-driven enrichment fields ───────────────────────

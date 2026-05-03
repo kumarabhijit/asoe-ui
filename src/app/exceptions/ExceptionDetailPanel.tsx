@@ -548,10 +548,18 @@ export default function ExceptionDetailPanel({
               // Don't fall back to a success-sounding default when the pipeline
               // actually failed — leave the execution-error banner as the sole
               // narrative in that case.
+              //
+              // We deliberately do NOT fall back to `analysis?.diagnosis`
+              // here: the diagnosis is the long-form prose owned by the
+              // Agent Analysis pane (`AgentAnalysisSection`'s "Problem"
+              // block). Falling through duplicated the same paragraph in
+              // two cards on Azure (where `trace.explanation` is often
+              // absent), making the Recommendation card look like a clone
+              // of Agent Analysis. The Recommendation card now stays
+              // action-focused; when there is no policy explanation, the
+              // operator's eye goes straight to the action buttons.
               explanation={
-                executionError
-                  ? undefined
-                  : trace?.explanation ?? analysis?.diagnosis
+                executionError ? undefined : trace?.explanation
               }
               policyHits={trace?.shadow_policy_hits}
               onApprove={handleApprove}

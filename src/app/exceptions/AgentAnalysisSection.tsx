@@ -38,35 +38,46 @@ export function AgentAnalysisSection({
       />
       {open && (
         <div className="border-t border-border px-16 py-14">
-          {/* The Problem */}
-          <div className="mb-12">
-            <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
-              The Problem
+          {/* Each block renders only when its prose is present
+              (CLAUDE.md Guardrail #6 — structural omission, not a
+              "—" or empty colored bar). On Azure today, root_cause
+              and recommendation are populated by the asoe2
+              `profile_composer.compose_narrative` from
+              `record.resolution_data` / trace.narrative; when the
+              recipe / trace doesn't carry that prose, the operator
+              sees a smaller card rather than empty headings. */}
+          {analysis.diagnosis && (
+            <div className="mb-12 last:mb-0">
+              <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
+                The Problem
+              </div>
+              <p className="text-body text-text-secondary leading-relaxed m-0">
+                {analysis.diagnosis}
+              </p>
             </div>
-            <p className="text-body text-text-secondary leading-relaxed m-0">
-              {analysis.diagnosis}
-            </p>
-          </div>
+          )}
 
-          {/* Root Cause */}
-          <div className="mb-12">
-            <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
-              Root Cause
+          {analysis.root_cause && (
+            <div className="mb-12 last:mb-0">
+              <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
+                Root Cause
+              </div>
+              <div className="border-l-[3px] border-warning pl-10 text-body font-medium text-text-primary leading-normal">
+                {analysis.root_cause}
+              </div>
             </div>
-            <div className="border-l-[3px] border-warning pl-10 text-body font-medium text-text-primary leading-normal">
-              {analysis.root_cause}
-            </div>
-          </div>
+          )}
 
-          {/* Recommendation */}
-          <div>
-            <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
-              Recommendation
+          {analysis.recommendation && (
+            <div className="last:mb-0">
+              <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
+                Recommendation
+              </div>
+              <div className="border-l-[3px] border-brand pl-10 text-body font-semibold text-brand leading-normal">
+                {analysis.recommendation}
+              </div>
             </div>
-            <div className="border-l-[3px] border-brand pl-10 text-body font-semibold text-brand leading-normal">
-              {analysis.recommendation}
-            </div>
-          </div>
+          )}
         </div>
       )}
     </section>
