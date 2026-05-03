@@ -30,6 +30,7 @@ import { useCallback, useState, type MutableRefObject } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/Toast";
 import { exceptionsApi } from "@/lib/api";
+import { notesRequiredForReason } from "@/app/exceptions/reasonCodeClusters";
 import type { ActionInFlight } from "@/components/ui/AgentReasoningCard";
 import type { ExceptionDetail } from "@/types/exceptions";
 
@@ -172,6 +173,11 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
    * Submits the override chosen in the dialog. Server classifies
    * sub_type from the chosen action vs. the record's recommended_action
    * (chosen != recommended → OVERRIDE; four-eyes applies).
+   *
+   * Notes-required gate: per ADR-033 §D.3 free-text is mandatory only
+   * when the chosen reason is OTHER/other; optional otherwise. Same
+   * predicate the dialog uses (`notesRequiredForReason`) so the rule
+   * lives in exactly one place.
    */
   const submitOverride = useCallback(async () => {
     if (!overrideAction) {
@@ -182,8 +188,8 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       addToast("warning", "Select a reason category.");
       return;
     }
-    if (!overrideNotes.trim()) {
-      addToast("warning", "Notes are required (SOX audit trail).");
+    if (notesRequiredForReason(overrideReasonTag) && !overrideNotes.trim()) {
+      addToast("warning", "Notes are required when the reason is Other (SOX audit trail).");
       return;
     }
     setActionInFlight("override");
