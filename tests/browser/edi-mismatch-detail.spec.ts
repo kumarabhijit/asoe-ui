@@ -35,6 +35,7 @@ import {
   resetTenant,
   USERS,
   BACKEND_URL,
+  expandSection,
 } from "./_helpers";
 
 test.describe.configure({ mode: "serial" });
@@ -130,6 +131,9 @@ test("EdiMismatchSection renders sub_type + classification when backend populate
   const exceptionId = await createLineMismatchException(request, managerToken, "QTY_MISMATCH");
   await loginAs(page, USERS.MANAGER);
   await page.goto(`/exceptions/${exceptionId}`);
+  // EDI Mismatch pane is collapsed by default; expand it before
+  // looking inside (PO ruling 2026-05-03).
+  await expandSection(page, /EDI Mismatch/i);
   // Scope assertions to the EdiMismatchSection region so the
   // Layer-1 "Review Required" status badge doesn't collide with the
   // section's own "Review required" classification label under

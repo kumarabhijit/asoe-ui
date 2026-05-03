@@ -29,11 +29,39 @@ jobs:
         with:
           path: asoe-ui
 
+      # Cross-repo PRs frequently land paired changes (a UI test that
+      # asserts new backend behaviour, etc.). Always checking out
+      # asoe2/main means the UI CI runs against a backend that's still
+      # missing the matching change, breaking on legitimate work-in-
+      # progress. Resolve to a same-named feature branch on asoe2
+      # when one exists, fall back to main otherwise. github.head_ref
+      # is the source branch of the PR (empty on workflow_dispatch /
+      # push events, in which case we fall through to main).
+      - name: Resolve asoe2 ref (matching branch or main)
+        id: asoe2_ref
+        env:
+          GH_TOKEN: ${{ secrets.ASOE2_READ_TOKEN || github.token }}
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          REPO="${{ github.repository_owner }}/asoe2"
+          if [ -n "$BRANCH" ] \
+             && gh api "repos/$REPO/branches/$BRANCH" >/dev/null 2>&1; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "Using asoe2 branch '$BRANCH' (matched the PR head)."
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+            if [ -z "$BRANCH" ]; then
+              echo "No PR head_ref; using asoe2 'main'."
+            else
+              echo "asoe2 has no branch '$BRANCH'; falling back to 'main'."
+            fi
+          fi
+
       - name: Checkout asoe2 (sibling)
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/asoe2
-          ref: main
+          ref: ${{ steps.asoe2_ref.outputs.ref }}
           path: asoe2
           token: ${{ secrets.ASOE2_READ_TOKEN || github.token }}
 

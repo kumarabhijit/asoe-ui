@@ -175,6 +175,28 @@ export async function seedFinancialImpact(
   }
 }
 
+/**
+ * Click a collapsible enrichment section header to expand it.
+ *
+ * Per PO ruling 2026-05-03 the enrichment sections (Price Analysis,
+ * Back-Order Analysis, Price Hold, etc.) are collapsed by default —
+ * the operator scans the Recommendation card first and only drills
+ * in when they need detail. Specs that assert content INSIDE one of
+ * those sections must therefore expand it explicitly. Pass the
+ * section title exactly as shown on the header (case-insensitive
+ * regex matched here for resilience to small copy edits).
+ */
+export async function expandSection(
+  page: Page,
+  title: RegExp | string,
+): Promise<void> {
+  const header = page.getByRole("button", {
+    name: title instanceof RegExp ? title : new RegExp(title, "i"),
+  });
+  await expect(header.first()).toBeVisible({ timeout: 15_000 });
+  await header.first().click();
+}
+
 // Seed user logins (backend accepts any non-empty password — V1 stub).
 export const USERS = {
   // Admin — full permissions, all tabs visible.
