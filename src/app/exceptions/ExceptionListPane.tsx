@@ -114,7 +114,7 @@ export default function ExceptionListPane({
   const intentOptions = health?.allowed_intents ?? [];
   const hitlOptions = lifecycleOptions.filter((s) => HITL_LIFECYCLE_STATES.has(s));
   const failedOptions = lifecycleOptions.filter((s) => s === "FAILED");
-  const cosignOptions = lifecycleOptions.filter((s) => s === "PENDING_COSIGN");
+  const resolvedOptions = lifecycleOptions.filter((s) => s === "RESOLVED");
   const isPresetActive = (preset: readonly string[]) =>
     preset.length > 0 &&
     filterStates.length === preset.length &&
@@ -150,7 +150,6 @@ export default function ExceptionListPane({
                 searchQuery,
               }}
               onApply={onApplySavedView}
-              hasActiveFilters={!!hasActiveFilters}
             />
             <Button variant="ghost" size="sm" onClick={onRefresh} loading={loading}>
               <RefreshCw size={14} />
@@ -226,10 +225,10 @@ export default function ExceptionListPane({
             onClick={() => togglePreset(failedOptions)}
           />
           <QuickPill
-            label="Awaiting cosign"
-            active={isPresetActive(cosignOptions)}
-            disabled={cosignOptions.length === 0}
-            onClick={() => togglePreset(cosignOptions)}
+            label="Resolved"
+            active={isPresetActive(resolvedOptions)}
+            disabled={resolvedOptions.length === 0}
+            onClick={() => togglePreset(resolvedOptions)}
           />
         </div>
 

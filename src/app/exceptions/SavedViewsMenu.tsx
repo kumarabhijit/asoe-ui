@@ -51,16 +51,11 @@ interface SavedViewsMenuProps {
   /** Apply a saved view to the queue. Parent updates all four filter
    *  dimensions in one render so the URL syncs in a single replace. */
   onApply: (view: SavedView) => void;
-  /** Whether the parent currently has any filter active. Drives the
-   *  enabled state of the "Save current view…" entry — saving an empty
-   *  filter set has no practical use. */
-  hasActiveFilters: boolean;
 }
 
 export function SavedViewsMenu({
   currentFilters,
   onApply,
-  hasActiveFilters,
 }: SavedViewsMenuProps) {
   const { views, save, remove, hydrated } = useSavedViews();
   const [saveOpen, setSaveOpen] = useState(false);
@@ -109,18 +104,17 @@ export function SavedViewsMenu({
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            disabled={!hasActiveFilters}
+            // Always enabled — saving an "All exceptions" view (no
+            // filters) is a legitimate use case and the previous
+            // gate-on-active-filters made the item look broken when
+            // the operator opened the menu before setting any filter.
             // Suppress the auto-close-on-select; we open the Dialog
             // ourselves and need the focus to land in the name input.
             onSelect={(e) => {
               e.preventDefault();
-              if (!hasActiveFilters) return;
               setSaveOpen(true);
             }}
-            className={cn(
-              "flex items-center gap-6",
-              !hasActiveFilters && "cursor-not-allowed opacity-50",
-            )}
+            className="flex items-center gap-6"
           >
             <Plus size={11} />
             <span>Save current view…</span>
