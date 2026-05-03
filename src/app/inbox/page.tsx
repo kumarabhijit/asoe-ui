@@ -372,7 +372,7 @@ export default function InboxPage() {
               <div className="w-[28px] h-[28px] rounded-sm bg-surface-secondary flex items-center justify-center">
                 <Zap size={14} className="text-text-secondary" />
               </div>
-              <span className="font-semibold text-subhead text-text-primary">Agent Analysis</span>
+              <span className="font-semibold text-subhead text-text-primary">Agent Recommendation</span>
               <div className="flex-1" />
               {selected.agentConfidence && (
                 <div className="flex items-center gap-8">

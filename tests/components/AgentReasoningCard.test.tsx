@@ -20,9 +20,9 @@ import { intentLabelFor } from "@/config/erp-label-map";
 
 describe("AgentReasoningCard", () => {
   describe("Layer 1 — always visible", () => {
-    it("renders agent analysis header", () => {
+    it("renders agent recommendation header", () => {
       render(<AgentReasoningCard verdict="GREEN" />);
-      expect(screen.getByText("Agent Analysis")).toBeInTheDocument();
+      expect(screen.getByText("Agent Recommendation")).toBeInTheDocument();
     });
 
     it("renders confidence bar when provided", () => {

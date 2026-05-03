@@ -255,7 +255,7 @@ export function AgentReasoningCard({
         <div className="flex items-center justify-between mb-12">
           <div className="flex items-center gap-8">
             <Zap size={16} className="text-brand" />
-            <span className="text-subhead font-semibold text-text-primary">Agent Analysis</span>
+            <span className="text-subhead font-semibold text-text-primary">Agent Recommendation</span>
           </div>
           {isErrored ? (
             <Badge variant="error" icon={<XCircle size={14} />}>Execution Failed</Badge>
