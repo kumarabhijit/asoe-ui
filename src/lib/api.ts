@@ -393,8 +393,8 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     shadow_verdict: "GREEN",
     selected_recipe: "PriceAdjustmentRecipe.py",
     final_status: "COMPLETE",
-    created_at: "2026-04-11T08:12:00Z",
-    updated_at: "2026-04-11T08:20:00Z",
+    created_at: "2026-04-24T08:12:00Z",
+    updated_at: "2026-04-24T08:20:00Z",
     account_id: "acct-walmart", account_name: "Walmart",
   },
   {
@@ -407,8 +407,8 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     shadow_verdict: "YELLOW",
     selected_recipe: "DuplicatePORecipe.py",
     final_status: "MANUAL_REVIEW_REQUIRED",
-    created_at: "2026-04-11T09:05:00Z",
-    updated_at: "2026-04-11T09:13:00Z",
+    created_at: "2026-04-25T09:05:00Z",
+    updated_at: "2026-04-25T09:13:00Z",
     account_id: "acct-kroger", account_name: "Kroger",
   },
   {
@@ -421,8 +421,8 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     shadow_verdict: "RED",
     selected_recipe: undefined,
     final_status: "BLOCKED",
-    created_at: "2026-04-11T10:30:00Z",
-    updated_at: "2026-04-11T10:31:00Z",
+    created_at: "2026-04-19T10:30:00Z",
+    updated_at: "2026-04-19T10:31:00Z",
     account_id: "acct-target", account_name: "Target",
   },
   {
@@ -452,8 +452,8 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     shadow_verdict: "GREEN",
     selected_recipe: "PriceAdjustmentRecipe.py",
     final_status: "COMPLETE",
-    created_at: "2026-04-10T14:22:00Z",
-    updated_at: "2026-04-10T14:30:00Z",
+    created_at: "2026-04-21T14:22:00Z",
+    updated_at: "2026-04-21T14:30:00Z",
     account_id: "acct-walmart", account_name: "Walmart",
   },
   {
@@ -466,8 +466,8 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     shadow_verdict: "YELLOW",
     selected_recipe: "DuplicatePORecipe.py",
     final_status: "MANUAL_REVIEW_REQUIRED",
-    created_at: "2026-04-09T16:45:00Z",
-    updated_at: "2026-04-11T08:45:00Z",
+    created_at: "2026-04-06T16:45:00Z",
+    updated_at: "2026-04-08T08:45:00Z",
     account_id: "acct-kroger", account_name: "Kroger",
   },
   {
@@ -480,8 +480,8 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     shadow_verdict: "YELLOW",
     selected_recipe: "CreditHoldReleaseRecipe.py",
     final_status: "MANUAL_REVIEW_REQUIRED",
-    created_at: "2026-04-11T07:15:00Z",
-    updated_at: "2026-04-11T07:22:00Z",
+    created_at: "2026-04-22T07:15:00Z",
+    updated_at: "2026-04-22T07:22:00Z",
     account_id: "acct-target", account_name: "Target",
   },
   {
@@ -494,8 +494,8 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     shadow_verdict: "GREEN",
     selected_recipe: "PriceAdjustmentRecipe.py",
     final_status: "COMPLETE",
-    created_at: "2026-04-08T11:00:00Z",
-    updated_at: "2026-04-08T12:30:00Z",
+    created_at: "2026-04-09T11:00:00Z",
+    updated_at: "2026-04-09T12:30:00Z",
     account_id: "acct-costco", account_name: "Costco",
   },
   {
@@ -508,51 +508,51 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     shadow_verdict: "GREEN",
     selected_recipe: "DuplicatePORecipe.py",
     final_status: "COMPLETE",
-    created_at: "2026-04-11T06:20:00Z",
-    updated_at: "2026-04-11T06:22:00Z",
+    created_at: "2026-04-14T06:20:00Z",
+    updated_at: "2026-04-14T06:22:00Z",
     account_id: "acct-walmart", account_name: "Walmart",
   },
   {
-    id: "exc-010", tenant_id: "acme-corp", order_id: "SO-9200", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-12T10:15:00Z", updated_at: "2026-04-12T10:22:00Z", account_id: "acct-kroger", account_name: "Kroger",
+    id: "exc-010", tenant_id: "acme-corp", order_id: "SO-9200", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-10T10:15:00Z", updated_at: "2026-04-10T10:22:00Z", account_id: "acct-kroger", account_name: "Kroger",
   },
   {
-    id: "exc-011", tenant_id: "acme-corp", order_id: "SO-9450", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "COMPLETE", created_at: "2026-04-12T08:00:00Z", updated_at: "2026-04-12T08:05:00Z", account_id: "acct-target", account_name: "Target",
+    id: "exc-011", tenant_id: "acme-corp", order_id: "SO-9450", event_type: "BACK_ORDER_OOS", intent: "BACK_ORDER", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "BackOrderResolutionRecipe.py", final_status: "COMPLETE", created_at: "2026-04-17T08:00:00Z", updated_at: "2026-04-17T08:05:00Z", account_id: "acct-target", account_name: "Target",
   },
   {
-    id: "exc-012", tenant_id: "acme-corp", order_id: "SO-10100", event_type: "OVER_MAX_QTY", intent: "OVER_MAX", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "OverMaxTrimRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-13T09:30:00Z", updated_at: "2026-04-13T09:38:00Z", account_id: "acct-costco", account_name: "Costco",
+    id: "exc-012", tenant_id: "acme-corp", order_id: "SO-10100", event_type: "OVER_MAX_QTY", intent: "OVER_MAX", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "OverMaxTrimRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-07T09:30:00Z", updated_at: "2026-04-07T09:38:00Z", account_id: "acct-costco", account_name: "Costco",
   },
   {
-    id: "exc-013", tenant_id: "acme-corp", order_id: "SO-11200", event_type: "MIN_ORDER_QTY", intent: "MIN_ORDER_QTY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "MOQRoundUpRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T07:45:00Z", updated_at: "2026-04-14T07:52:00Z", account_id: "acct-walmart", account_name: "Walmart",
+    id: "exc-013", tenant_id: "acme-corp", order_id: "SO-11200", event_type: "MIN_ORDER_QTY", intent: "MIN_ORDER_QTY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "MOQRoundUpRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-15T07:45:00Z", updated_at: "2026-04-15T07:52:00Z", account_id: "acct-walmart", account_name: "Walmart",
   },
   {
-    id: "exc-014", tenant_id: "acme-corp", order_id: "SO-12300", event_type: "PALLET_CONFIG_VIOLATION", intent: "PALLET_CONFIG", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "PalletAlignmentRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-14T11:20:00Z", updated_at: "2026-04-14T11:28:00Z", account_id: "acct-kroger", account_name: "Kroger",
+    id: "exc-014", tenant_id: "acme-corp", order_id: "SO-12300", event_type: "PALLET_CONFIG_VIOLATION", intent: "PALLET_CONFIG", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "PalletAlignmentRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-12T11:20:00Z", updated_at: "2026-04-12T11:28:00Z", account_id: "acct-kroger", account_name: "Kroger",
   },
   // FAILED — pipeline crashed during recipe execution. Demonstrates the
   // execution-error surface distinct from compliance-blocked (RED verdict).
   {
-    id: "exc-015", tenant_id: "acme-corp", order_id: "SO-13400", event_type: "ORDER_RECEIVED", intent: "CONTRACTUAL_CORRECTION", lifecycle_state: "FAILED", shadow_verdict: "GREEN", selected_recipe: "PriceAdjustmentRecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-15T14:05:00Z", updated_at: "2026-04-15T14:05:42Z", account_id: "acct-walmart", account_name: "Walmart",
+    id: "exc-015", tenant_id: "acme-corp", order_id: "SO-13400", event_type: "ORDER_RECEIVED", intent: "CONTRACTUAL_CORRECTION", lifecycle_state: "FAILED", shadow_verdict: "GREEN", selected_recipe: "PriceAdjustmentRecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-13T14:05:00Z", updated_at: "2026-04-13T14:05:42Z", account_id: "acct-walmart", account_name: "Walmart",
   },
   // DELIVERY_DELAY — SD-DELAY-002 band (5+ days late). Dedicated section
   // renders from delivery_delay_analysis via data-presence pattern.
   {
-    id: "exc-016", tenant_id: "acme-corp", order_id: "SO-14200", event_type: "DELIVERY_DELAY", intent: "DELIVERY_DELAY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "DeliveryDelayResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-16T09:30:00Z", updated_at: "2026-04-16T09:35:00Z", account_id: "acct-target", account_name: "Target",
+    id: "exc-016", tenant_id: "acme-corp", order_id: "SO-14200", event_type: "DELIVERY_DELAY", intent: "DELIVERY_DELAY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "DeliveryDelayResolutionRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-18T09:30:00Z", updated_at: "2026-04-18T09:35:00Z", account_id: "acct-target", account_name: "Target",
   },
   // PRICE_HOLD_RELEASE — auto-release branch (variance within tolerance).
   // Renders PriceHoldSection via OrderAnalysis.price_hold_analysis.
   {
-    id: "exc-017", tenant_id: "acme-corp", order_id: "PO-PHR-001", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "COMPLETE", created_at: "2026-04-17T08:00:00Z", updated_at: "2026-04-17T08:01:00Z", account_id: "acct-walmart", account_name: "Walmart",
+    id: "exc-017", tenant_id: "acme-corp", order_id: "PO-PHR-001", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "COMPLETE", created_at: "2026-04-06T08:00:00Z", updated_at: "2026-04-06T08:01:00Z", account_id: "acct-walmart", account_name: "Walmart",
   },
   // PRICE_HOLD_RELEASE — escalate band (> tolerance, ≤ hard-block).
   {
-    id: "exc-018", tenant_id: "acme-corp", order_id: "PO-PHR-002", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-17T08:05:00Z", updated_at: "2026-04-17T08:06:00Z", account_id: "acct-kroger", account_name: "Kroger",
+    id: "exc-018", tenant_id: "acme-corp", order_id: "PO-PHR-002", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-28T08:05:00Z", updated_at: "2026-04-28T08:06:00Z", account_id: "acct-kroger", account_name: "Kroger",
   },
   // EDI_MISMATCH — SKU sub_type, hard reject.
   {
-    id: "exc-019", tenant_id: "acme-corp", order_id: "PO-EDM-SKU-001", event_type: "EDI_850_LINE_MISMATCH", intent: "EDI_MISMATCH", lifecycle_state: "BLOCKED", shadow_verdict: "RED", selected_recipe: "EdiMismatchRecipe.py", final_status: "BLOCKED", created_at: "2026-04-17T09:00:00Z", updated_at: "2026-04-17T09:01:00Z", account_id: "acct-target", account_name: "Target",
+    id: "exc-019", tenant_id: "acme-corp", order_id: "PO-EDM-SKU-001", event_type: "EDI_850_LINE_MISMATCH", intent: "EDI_MISMATCH", lifecycle_state: "BLOCKED", shadow_verdict: "RED", selected_recipe: "EdiMismatchRecipe.py", final_status: "BLOCKED", created_at: "2026-04-26T09:00:00Z", updated_at: "2026-04-26T09:01:00Z", account_id: "acct-target", account_name: "Target",
   },
   // EDI_MISMATCH — QTY sub_type, review required.
   {
-    id: "exc-020", tenant_id: "acme-corp", order_id: "PO-EDM-QTY-001", event_type: "EDI_850_LINE_MISMATCH", intent: "EDI_MISMATCH", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "EdiMismatchRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-17T09:05:00Z", updated_at: "2026-04-17T09:06:00Z", account_id: "acct-costco", account_name: "Costco",
+    id: "exc-020", tenant_id: "acme-corp", order_id: "PO-EDM-QTY-001", event_type: "EDI_850_LINE_MISMATCH", intent: "EDI_MISMATCH", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "EdiMismatchRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-05T09:05:00Z", updated_at: "2026-04-05T09:06:00Z", account_id: "acct-costco", account_name: "Costco",
   },
   // PRICE_MISMATCH routing fork: EDI_850_LINE_MISMATCH event whose
   // metadata.mismatch_sub_type=PRICE_MISMATCH lands as
@@ -561,7 +561,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   // mismatch panel — proves the single-source-of-truth invariant for
   // pricing (CLAUDE.md §1).
   {
-    id: "exc-021", tenant_id: "acme-corp", order_id: "PO-PM-ROUTING-001", event_type: "EDI_850_LINE_MISMATCH", intent: "CONTRACTUAL_CORRECTION", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "PriceAdjustmentRecipe.py", final_status: "COMPLETE", created_at: "2026-04-17T10:00:00Z", updated_at: "2026-04-17T10:01:00Z", account_id: "acct-walmart", account_name: "Walmart",
+    id: "exc-021", tenant_id: "acme-corp", order_id: "PO-PM-ROUTING-001", event_type: "EDI_850_LINE_MISMATCH", intent: "CONTRACTUAL_CORRECTION", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "PriceAdjustmentRecipe.py", final_status: "COMPLETE", created_at: "2026-04-27T10:00:00Z", updated_at: "2026-04-27T10:01:00Z", account_id: "acct-walmart", account_name: "Walmart",
   },
   // ADR-027 Phase A.0 verdict-coverage demos (FAILED-state records
   // exercising every conditional gate's terminal verdict). These
@@ -571,16 +571,16 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   // honestly rather than the linear stepper's misleading
   // "blocked at apply_effects" mapping.
   {
-    id: "exc-022", tenant_id: "acme-corp", order_id: "SO-CB-001", event_type: "MASS_PRICING_RECALC", intent: "MASS_PRICING_ERROR", lifecycle_state: "FAILED", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-18T07:00:00Z", updated_at: "2026-04-18T07:00:01Z", account_id: "acct-walmart", account_name: "Walmart",
+    id: "exc-022", tenant_id: "acme-corp", order_id: "SO-CB-001", event_type: "MASS_PRICING_RECALC", intent: "MASS_PRICING_ERROR", lifecycle_state: "FAILED", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-29T07:00:00Z", updated_at: "2026-04-29T07:00:01Z", account_id: "acct-walmart", account_name: "Walmart",
   },
   {
-    id: "exc-023", tenant_id: "acme-corp", order_id: "SO-NR-001", event_type: "MASS_PRICING_RECALC", intent: "MASS_PRICING_ERROR", lifecycle_state: "FAILED", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-18T07:30:00Z", updated_at: "2026-04-18T07:30:00Z", account_id: "acct-kroger", account_name: "Kroger",
+    id: "exc-023", tenant_id: "acme-corp", order_id: "SO-NR-001", event_type: "MASS_PRICING_RECALC", intent: "MASS_PRICING_ERROR", lifecycle_state: "FAILED", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-23T07:30:00Z", updated_at: "2026-04-23T07:30:00Z", account_id: "acct-kroger", account_name: "Kroger",
   },
   {
-    id: "exc-024", tenant_id: "acme-corp", order_id: "SO-GW-001", event_type: "DUPLICATE_PO_RECEIVED", intent: "DUPLICATE_PO", lifecycle_state: "FAILED", selected_recipe: "DuplicatePORecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-18T08:00:00Z", updated_at: "2026-04-18T08:00:02Z", account_id: "acct-target", account_name: "Target",
+    id: "exc-024", tenant_id: "acme-corp", order_id: "SO-GW-001", event_type: "DUPLICATE_PO_RECEIVED", intent: "DUPLICATE_PO", lifecycle_state: "FAILED", selected_recipe: "DuplicatePORecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-20T08:00:00Z", updated_at: "2026-04-20T08:00:02Z", account_id: "acct-target", account_name: "Target",
   },
   {
-    id: "exc-025", tenant_id: "acme-corp", order_id: "PO-PHR-BAD", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "FAILED", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-18T08:30:00Z", updated_at: "2026-04-18T08:30:00Z", account_id: "acct-costco", account_name: "Costco",
+    id: "exc-025", tenant_id: "acme-corp", order_id: "PO-PHR-BAD", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "FAILED", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-16T08:30:00Z", updated_at: "2026-04-16T08:30:00Z", account_id: "acct-costco", account_name: "Costco",
   },
 ];
 

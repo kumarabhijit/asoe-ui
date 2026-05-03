@@ -11,6 +11,7 @@
  */
 "use client";
 
+import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +62,42 @@ export function CollapsibleHeader({ title, open, onToggle, badge, badgeVariant =
         )}
       </div>
     </button>
+  );
+}
+
+/**
+ * CollapsibleSection — wraps an enrichment section in a collapsible
+ * card. Used to keep all panes other than the Recommendation
+ * minimised by default (TRB ruling on PO request #4). The wrapped
+ * children are mounted only when `open` is true so heavy renders
+ * (e.g., big tables, charts) don't run until the operator opens the
+ * pane.
+ */
+export function CollapsibleSection({
+  title,
+  defaultOpen = false,
+  badge,
+  badgeVariant,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  badge?: string;
+  badgeVariant?: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
+      <CollapsibleHeader
+        title={title}
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        badge={badge}
+        badgeVariant={badgeVariant}
+      />
+      {open && <div className="border-t border-border">{children}</div>}
+    </section>
   );
 }
 

@@ -262,6 +262,89 @@ function ExceptionQueueContent() {
     );
   });
 
+  /* ── Recency sort (Outlook-style: most-recent first) ───────────────
+   * Sort by `updated_at` desc, with `created_at` desc as tiebreaker so
+   * the order is deterministic when two rows share an updated timestamp.
+   * Pinning the sort here (not in the API client) keeps the list
+   * stable across silent WebSocket refreshes. */
+  const sorted = [...filtered].sort((a, b) => {
+    const ua = Date.parse(a.updated_at ?? a.created_at);
+    const ub = Date.parse(b.updated_at ?? b.created_at);
+    if (ub !== ua) return ub - ua;
+    return Date.parse(b.created_at) - Date.parse(a.created_at);
+  });
+
+  /* ── Arrow-key navigation (Outlook parity) ──────────────────────────
+   * ArrowUp / ArrowDown move the selection through the (sorted +
+   * filtered) list and open that exception in the detail pane via the
+   * existing setSelectedId pipeline. Home / End jump to first / last
+   * row. The handler binds at the document level so the keys work
+   * whenever the page is focused — not only when a list card has focus
+   * — matching Outlook inbox behaviour. We bail when the user is typing
+   * in an input, select, or contenteditable so the search field,
+   * filter selects, and the override-dialog textarea keep their native
+   * key handling. Selecting an item also scrolls it into view. */
+  useEffect(() => {
+    function isTypingTarget(t: EventTarget | null): boolean {
+      if (!(t instanceof HTMLElement)) return false;
+      const tag = t.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      if (t.isContentEditable) return true;
+      // Don't hijack keys while a Radix popover / dialog is open.
+      if (t.closest("[role='combobox'], [role='dialog']")) return true;
+      return false;
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (sorted.length === 0) return;
+      if (isTypingTarget(e.target)) return;
+      // Don't fire when modifier keys are held — those combinations
+      // belong to the browser / OS (e.g. Cmd+ArrowUp = scroll to top).
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const idx = sorted.findIndex((x) => x.id === selectedId);
+      let next = idx;
+      switch (e.key) {
+        case "ArrowDown":
+        case "j":
+          next = idx < 0 ? 0 : Math.min(idx + 1, sorted.length - 1);
+          break;
+        case "ArrowUp":
+        case "k":
+          next = idx < 0 ? 0 : Math.max(idx - 1, 0);
+          break;
+        case "Home":
+          next = 0;
+          break;
+        case "End":
+          next = sorted.length - 1;
+          break;
+        default:
+          return;
+      }
+      if (next !== idx) {
+        e.preventDefault();
+        const nextId = sorted[next].id;
+        setSelectedId(nextId);
+        requestAnimationFrame(() => {
+          const el = document.querySelector<HTMLElement>(
+            `[data-exception-id="${nextId}"]`,
+          );
+          el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          // Move DOM focus to the newly-selected card so the
+          // :focus-visible outline (globals.css:56-58) follows the
+          // selection. Without this the previously-clicked card
+          // retained focus and showed a 2px brand-coloured ring,
+          // making it look like the first card was "still
+          // highlighted" even though selection had moved on.
+          // preventScroll avoids fighting the smooth scrollIntoView
+          // we just queued above.
+          el?.focus({ preventScroll: true });
+        });
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [sorted, selectedId]);
+
   /*
    * Zoom strategy:
    *   At normal zoom the page fills exactly the viewport (no scroll).
@@ -304,7 +387,7 @@ function ExceptionQueueContent() {
           {/* ── Middle Pane: Exception List ──────────────────────────── */}
           <Panel defaultSize="35%" minSize="22%" maxSize="50%" id="list-pane">
             <ExceptionListPane
-              exceptions={filtered}
+              exceptions={sorted}
               stats={stats}
               loading={loading}
               error={error}

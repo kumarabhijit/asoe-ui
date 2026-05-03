@@ -39,7 +39,7 @@ import type {
   OrderAnalysis,
 } from "@/types/exceptions";
 import type { TraceResponse } from "@/types/api";
-import { COSIGN_LIFECYCLE_STATE } from "./shared";
+import { COSIGN_LIFECYCLE_STATE, CollapsibleSection } from "./shared";
 import { HeaderRibbon } from "./HeaderRibbon";
 import { ContextStrip } from "./ContextStrip";
 import { AgentAnalysisSection } from "./AgentAnalysisSection";
@@ -55,6 +55,23 @@ import { PriceHoldSection } from "./PriceHoldSection";
 import { EdiMismatchSection } from "./EdiMismatchSection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
+
+/**
+ * Lifecycle states where the system is waiting on the human reviewer.
+ * Drives the auto-expand of the Agent Analysis pane (PO request #4):
+ * the reviewer sees the diagnosis the moment they open a row that
+ * needs their decision, instead of having to click to reveal it.
+ */
+const HUMAN_IN_THE_LOOP_STATES: ReadonlySet<string> = new Set([
+  "PENDING_REVIEW",
+  "ESCALATED",
+  "PENDING_ADMIN_REVIEW",
+  "PENDING_COSIGN",
+]);
+
+function isHumanInTheLoopState(state: string): boolean {
+  return HUMAN_IN_THE_LOOP_STATES.has(state);
+}
 
 interface ExceptionDetailPanelProps {
   exceptionId: string;
@@ -116,18 +133,36 @@ export default function ExceptionDetailPanel({
     return { kind: "other" as const, message: msg };
   };
 
+  // Lazy-fetch state (PO request #4 — defer non-critical payloads until
+  // the operator expands the corresponding pane). On first paint we only
+  // fetch `detail` + `analysis` so the Recommendation card renders
+  // immediately. lineItems is loaded when the Evidence Detail pane is
+  // opened (or sooner, if the header totals are first observed in the
+  // viewport — handled below). Trace is loaded when the Diagnostics
+  // toggle is expanded.
+  const [lineItemsLoaded, setLineItemsLoaded] = useState(false);
+  const [traceLoaded, setTraceLoaded] = useState(false);
+
   const refreshDetail = useCallback(async () => {
     try {
-      const [excData, traceData, items, analysisData] = await Promise.all([
+      // Always re-fetch detail + analysis (the always-visible
+      // Recommendation pane reads from these). Re-fetch trace +
+      // lineItems only if we already loaded them once — otherwise
+      // they remain lazy.
+      const [excData, analysisData] = await Promise.all([
         exceptionsApi.get(exceptionId),
-        exceptionsApi.trace(exceptionId),
-        exceptionsApi.lineItems(exceptionId),
         exceptionsApi.orderAnalysis(exceptionId),
       ]);
       setDetail(excData);
-      setTrace(traceData);
-      setLineItems(items);
       setAnalysis(analysisData);
+      if (lineItemsLoaded) {
+        const items = await exceptionsApi.lineItems(exceptionId);
+        setLineItems(items);
+      }
+      if (traceLoaded) {
+        const traceData = await exceptionsApi.trace(exceptionId);
+        setTrace(traceData);
+      }
       setFetchError(null);
     } catch (err) {
       // Surface the failure so the panel can render an actionable
@@ -142,7 +177,7 @@ export default function ExceptionDetailPanel({
       );
       setFetchError(classified);
     }
-  }, [exceptionId]);
+  }, [exceptionId, lineItemsLoaded, traceLoaded]);
 
   /* ── Actions (RBAC-gated, toast-routed) ──────────────────────────────
    * All HITL handlers — approve / reject / escalate / override /
@@ -190,23 +225,27 @@ export default function ExceptionDetailPanel({
 
   useEffect(() => {
     let cancelled = false;
+    // Reset lazy-load flags when the exception switches so the next
+    // detail's heavy payloads are re-deferred until their pane opens.
+    setLineItemsLoaded(false);
+    setTraceLoaded(false);
+    setLineItems([]);
+    setTrace(null);
     async function fetchDetail() {
       setLoading(true);
       setFetchError(null);
       try {
-        const [excData, traceData, items, analysisData] = await Promise.all([
+        // Critical path only: detail + analysis. The Recommendation
+        // card renders from these. lineItems and trace are deferred to
+        // the pane-expansion handlers below.
+        const [excData, analysisData] = await Promise.all([
           exceptionsApi.get(exceptionId),
-          exceptionsApi.trace(exceptionId),
-          exceptionsApi.lineItems(exceptionId),
           exceptionsApi.orderAnalysis(exceptionId),
         ]);
         if (!cancelled) {
           setDetail(excData);
-          setTrace(traceData);
-          setLineItems(items);
           setAnalysis(analysisData);
           if (analysisData?.lines?.[0]) setSelectedLine(analysisData.lines[0].line_id);
-          else if (items[0]) setSelectedLine(items[0].line_id);
         }
       } catch (err) {
         const classified = classifyFetchError(err);
@@ -222,6 +261,47 @@ export default function ExceptionDetailPanel({
     fetchDetail();
     return () => { cancelled = true; };
   }, [exceptionId]);
+
+  // Lazy-load callbacks. Each pane fires its loader the first time it
+  // opens; subsequent opens are no-ops. The loaders are idempotent and
+  // safe to fire from multiple panes (e.g., Evidence Grid + header
+  // totals both rely on lineItems).
+  const ensureLineItemsLoaded = useCallback(async () => {
+    if (lineItemsLoaded) return;
+    setLineItemsLoaded(true); // optimistic — prevents double-fetch
+    try {
+      const items = await exceptionsApi.lineItems(exceptionId);
+      setLineItems(items);
+      setSelectedLine((cur) => cur ?? items[0]?.line_id ?? null);
+    } catch (err) {
+      console.error("Failed to fetch line items:", err);
+      setLineItemsLoaded(false); // allow retry
+    }
+  }, [exceptionId, lineItemsLoaded]);
+
+  const ensureTraceLoaded = useCallback(async () => {
+    if (traceLoaded) return;
+    setTraceLoaded(true);
+    try {
+      const traceData = await exceptionsApi.trace(exceptionId);
+      setTrace(traceData);
+    } catch (err) {
+      console.error("Failed to fetch trace:", err);
+      setTraceLoaded(false);
+    }
+  }, [exceptionId, traceLoaded]);
+
+  // Background warm-up after the critical path. The header ribbon
+  // shows total values that derive from lineItems; we kick this off
+  // post-paint so the figures populate quickly without blocking the
+  // first render. Trace stays fully lazy — it's only consumed in the
+  // Diagnostics pane (which is collapsed by default).
+  useEffect(() => {
+    if (loading || !detail) return;
+    if (!lineItemsLoaded) {
+      ensureLineItemsLoaded();
+    }
+  }, [loading, detail, lineItemsLoaded, ensureLineItemsLoaded]);
 
   /* ── Loading / Empty states ──────────────────────────────────────── */
 
@@ -444,10 +524,10 @@ export default function ExceptionDetailPanel({
             </div>
           )}
 
-          {/* Agent Analysis: Problem / Root Cause / Recommendation */}
-          {analysis && <AgentAnalysisSection analysis={analysis} />}
-
-          {/* Agent Reasoning Card (Layer 1/2 pattern) */}
+          {/* Agent Reasoning Card (Layer 1/2 pattern) — the
+              "Recommendation" pane (PO request #4: pane 2 after Entity
+              Profile). Always rendered expanded; this is the primary
+              decision surface the operator must always see. */}
           {detail.shadow_verdict ? (
             <AgentReasoningCard
               verdict={detail.shadow_verdict as ShadowVerdict}
@@ -468,10 +548,18 @@ export default function ExceptionDetailPanel({
               // Don't fall back to a success-sounding default when the pipeline
               // actually failed — leave the execution-error banner as the sole
               // narrative in that case.
+              //
+              // We deliberately do NOT fall back to `analysis?.diagnosis`
+              // here: the diagnosis is the long-form prose owned by the
+              // Agent Analysis pane (`AgentAnalysisSection`'s "Problem"
+              // block). Falling through duplicated the same paragraph in
+              // two cards on Azure (where `trace.explanation` is often
+              // absent), making the Recommendation card look like a clone
+              // of Agent Analysis. The Recommendation card now stays
+              // action-focused; when there is no policy explanation, the
+              // operator's eye goes straight to the action buttons.
               explanation={
-                executionError
-                  ? undefined
-                  : trace?.explanation ?? analysis?.diagnosis
+                executionError ? undefined : trace?.explanation
               }
               policyHits={trace?.shadow_policy_hits}
               onApprove={handleApprove}
@@ -530,42 +618,79 @@ export default function ExceptionDetailPanel({
             </div>
           )}
 
+          {/* Agent Analysis: Problem / Root Cause / Recommendation
+              narrative. Collapsed by default per the TRB ruling on PO
+              request #4. Auto-expands when the exception sits in a
+              Human-in-the-Loop state so the reviewer sees the full
+              narrative the moment they open a row that needs their
+              decision. */}
+          {analysis && (
+            <AgentAnalysisSection
+              analysis={analysis}
+              defaultOpen={isHumanInTheLoopState(detail.lifecycle_state)}
+            />
+          )}
+
           {/* ── Data-presence-driven enrichment sections ─────────────── */}
           {/* These render ONLY when their data is present in the analysis.
               A new intent that populates these fields automatically gets
-              their sections rendered — zero UI code changes needed. */}
+              their sections rendered — zero UI code changes needed.
+              Each is wrapped in CollapsibleSection (collapsed by
+              default) so the detail surface stays focused on the
+              Recommendation. The wrapper mounts the child only when
+              open so heavy renders stay deferred. */}
           {analysis?.price_analysis && (
-            <PriceAnalysisSection data={analysis.price_analysis} />
+            <CollapsibleSection title="Price Analysis">
+              <PriceAnalysisSection data={analysis.price_analysis} />
+            </CollapsibleSection>
           )}
           {analysis?.duplicate_detection && (
-            <DuplicateDetectionSection data={analysis.duplicate_detection} />
+            <CollapsibleSection title="Duplicate Detection">
+              <DuplicateDetectionSection data={analysis.duplicate_detection} />
+            </CollapsibleSection>
           )}
           {analysis?.order_comparison && (
-            <OrderComparisonSection data={analysis.order_comparison} />
+            <CollapsibleSection title="Order Comparison">
+              <OrderComparisonSection data={analysis.order_comparison} />
+            </CollapsibleSection>
           )}
           {analysis?.backorder_analysis && (
-            <BackOrderSection
-              data={analysis.backorder_analysis}
-              resolvedAction={detail.resolved_action}
-            />
+            <CollapsibleSection title="Back-Order Analysis">
+              <BackOrderSection
+                data={analysis.backorder_analysis}
+                resolvedAction={detail.resolved_action}
+              />
+            </CollapsibleSection>
           )}
           {analysis?.overmax_analysis && (
-            <OverMaxSection data={analysis.overmax_analysis} />
+            <CollapsibleSection title="Over-Max Analysis">
+              <OverMaxSection data={analysis.overmax_analysis} />
+            </CollapsibleSection>
           )}
           {analysis?.moq_analysis && (
-            <MOQSection data={analysis.moq_analysis} />
+            <CollapsibleSection title="MOQ Analysis">
+              <MOQSection data={analysis.moq_analysis} />
+            </CollapsibleSection>
           )}
           {analysis?.pallet_analysis && (
-            <PalletConfigSection data={analysis.pallet_analysis} />
+            <CollapsibleSection title="Pallet Configuration">
+              <PalletConfigSection data={analysis.pallet_analysis} />
+            </CollapsibleSection>
           )}
           {analysis?.delivery_delay_analysis && (
-            <DeliveryDelaySection data={analysis.delivery_delay_analysis} />
+            <CollapsibleSection title="Delivery Delay">
+              <DeliveryDelaySection data={analysis.delivery_delay_analysis} />
+            </CollapsibleSection>
           )}
           {analysis?.price_hold_analysis && (
-            <PriceHoldSection data={analysis.price_hold_analysis} />
+            <CollapsibleSection title="Price Hold">
+              <PriceHoldSection data={analysis.price_hold_analysis} />
+            </CollapsibleSection>
           )}
           {analysis?.edi_mismatch_analysis && (
-            <EdiMismatchSection data={analysis.edi_mismatch_analysis} />
+            <CollapsibleSection title="EDI Mismatch">
+              <EdiMismatchSection data={analysis.edi_mismatch_analysis} />
+            </CollapsibleSection>
           )}
 
           {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
@@ -577,6 +702,7 @@ export default function ExceptionDetailPanel({
             selectedAnalysis={selectedAnalysis}
             totalErp={totalErp}
             totalPo={totalPo}
+            onFirstOpen={ensureLineItemsLoaded}
           />
 
           {/* ━━ 5. Diagnostics ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
@@ -584,6 +710,7 @@ export default function ExceptionDetailPanel({
             detail={detail}
             trace={trace}
             showPreview={showPreview}
+            onFirstOpen={ensureTraceLoaded}
           />
 
           {/* ── Metadata ──────────────────────────────────────────────── */}
