@@ -635,63 +635,73 @@ export default function ExceptionDetailPanel({
           {/* These render ONLY when their data is present in the analysis.
               A new intent that populates these fields automatically gets
               their sections rendered — zero UI code changes needed.
-              Each is wrapped in CollapsibleSection (collapsed by
-              default) so the detail surface stays focused on the
-              Recommendation. The wrapper mounts the child only when
-              open so heavy renders stay deferred. */}
-          {analysis?.price_analysis && (
-            <CollapsibleSection title="Price Analysis">
-              <PriceAnalysisSection data={analysis.price_analysis} />
-            </CollapsibleSection>
-          )}
-          {analysis?.duplicate_detection && (
-            <CollapsibleSection title="Duplicate Detection">
-              <DuplicateDetectionSection data={analysis.duplicate_detection} />
-            </CollapsibleSection>
-          )}
-          {analysis?.order_comparison && (
-            <CollapsibleSection title="Order Comparison">
-              <OrderComparisonSection data={analysis.order_comparison} />
-            </CollapsibleSection>
-          )}
-          {analysis?.backorder_analysis && (
-            <CollapsibleSection title="Back-Order Analysis">
-              <BackOrderSection
-                data={analysis.backorder_analysis}
-                resolvedAction={detail.resolved_action}
-              />
-            </CollapsibleSection>
-          )}
-          {analysis?.overmax_analysis && (
-            <CollapsibleSection title="Over-Max Analysis">
-              <OverMaxSection data={analysis.overmax_analysis} />
-            </CollapsibleSection>
-          )}
-          {analysis?.moq_analysis && (
-            <CollapsibleSection title="MOQ Analysis">
-              <MOQSection data={analysis.moq_analysis} />
-            </CollapsibleSection>
-          )}
-          {analysis?.pallet_analysis && (
-            <CollapsibleSection title="Pallet Configuration">
-              <PalletConfigSection data={analysis.pallet_analysis} />
-            </CollapsibleSection>
-          )}
-          {analysis?.delivery_delay_analysis && (
-            <CollapsibleSection title="Delivery Delay">
-              <DeliveryDelaySection data={analysis.delivery_delay_analysis} />
-            </CollapsibleSection>
-          )}
-          {analysis?.price_hold_analysis && (
-            <CollapsibleSection title="Price Hold">
-              <PriceHoldSection data={analysis.price_hold_analysis} />
-            </CollapsibleSection>
-          )}
-          {analysis?.edi_mismatch_analysis && (
-            <CollapsibleSection title="EDI Mismatch">
-              <EdiMismatchSection data={analysis.edi_mismatch_analysis} />
-            </CollapsibleSection>
-          )}
+              Each is wrapped in CollapsibleSection. Default-open behaviour
+              follows PO request #4: when the operator is expected to take
+              action (HITL lifecycle states), the actionable enrichment
+              evidence is expanded so they don't hunt for it; otherwise
+              everything stays minimised under the Recommendation. The
+              wrapper mounts the child only when open so heavy renders
+              stay deferred. */}
+          {(() => {
+            const hitl = isHumanInTheLoopState(detail.lifecycle_state);
+            return (
+              <>
+                {analysis?.price_analysis && (
+                  <CollapsibleSection title="Price Analysis" defaultOpen={hitl}>
+                    <PriceAnalysisSection data={analysis.price_analysis} />
+                  </CollapsibleSection>
+                )}
+                {analysis?.duplicate_detection && (
+                  <CollapsibleSection title="Duplicate Detection" defaultOpen={hitl}>
+                    <DuplicateDetectionSection data={analysis.duplicate_detection} />
+                  </CollapsibleSection>
+                )}
+                {analysis?.order_comparison && (
+                  <CollapsibleSection title="Order Comparison" defaultOpen={hitl}>
+                    <OrderComparisonSection data={analysis.order_comparison} />
+                  </CollapsibleSection>
+                )}
+                {analysis?.backorder_analysis && (
+                  <CollapsibleSection title="Back-Order Analysis" defaultOpen={hitl}>
+                    <BackOrderSection
+                      data={analysis.backorder_analysis}
+                      resolvedAction={detail.resolved_action}
+                    />
+                  </CollapsibleSection>
+                )}
+                {analysis?.overmax_analysis && (
+                  <CollapsibleSection title="Over-Max Analysis" defaultOpen={hitl}>
+                    <OverMaxSection data={analysis.overmax_analysis} />
+                  </CollapsibleSection>
+                )}
+                {analysis?.moq_analysis && (
+                  <CollapsibleSection title="MOQ Analysis" defaultOpen={hitl}>
+                    <MOQSection data={analysis.moq_analysis} />
+                  </CollapsibleSection>
+                )}
+                {analysis?.pallet_analysis && (
+                  <CollapsibleSection title="Pallet Configuration" defaultOpen={hitl}>
+                    <PalletConfigSection data={analysis.pallet_analysis} />
+                  </CollapsibleSection>
+                )}
+                {analysis?.delivery_delay_analysis && (
+                  <CollapsibleSection title="Delivery Delay" defaultOpen={hitl}>
+                    <DeliveryDelaySection data={analysis.delivery_delay_analysis} />
+                  </CollapsibleSection>
+                )}
+                {analysis?.price_hold_analysis && (
+                  <CollapsibleSection title="Price Hold" defaultOpen={hitl}>
+                    <PriceHoldSection data={analysis.price_hold_analysis} />
+                  </CollapsibleSection>
+                )}
+                {analysis?.edi_mismatch_analysis && (
+                  <CollapsibleSection title="EDI Mismatch" defaultOpen={hitl}>
+                    <EdiMismatchSection data={analysis.edi_mismatch_analysis} />
+                  </CollapsibleSection>
+                )}
+              </>
+            );
+          })()}
 
           {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           <EvidenceGrid
