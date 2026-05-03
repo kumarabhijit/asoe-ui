@@ -30,6 +30,7 @@ import {
   resetTenant,
   USERS,
   BACKEND_URL,
+  expandSection,
 } from "./_helpers";
 
 test.describe.configure({ mode: "serial" });
@@ -106,6 +107,9 @@ test("PriceHoldSection renders variance + action when backend populates price_ho
   const exceptionId = await createPriceHoldException(request, managerToken, 0.05);
   await loginAs(page, USERS.MANAGER);
   await page.goto(`/exceptions/${exceptionId}`);
+  // Price Hold pane is collapsed by default; expand it before
+  // asserting the recipe-decision content lives inside.
+  await expandSection(page, /Price Hold/i);
   await expect(page.getByText(/Price Hold Analysis/i)).toBeVisible();
   await expect(page.getByText(/Recipe Decision/i)).toBeVisible();
   await expect(page.getByText(/PriceHoldReleaseRecipe\.py/)).toBeVisible();

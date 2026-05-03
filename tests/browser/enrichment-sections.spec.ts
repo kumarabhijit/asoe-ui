@@ -31,6 +31,7 @@ import {
   resetTenant,
   USERS,
   BACKEND_URL,
+  expandSection,
 } from "./_helpers";
 import type { APIRequestContext } from "@playwright/test";
 
@@ -81,6 +82,10 @@ test("BackOrder detail page renders primary_dc + alternate warehouses + substitu
   await loginAs(page, USERS.MANAGER);
   await page.goto(`/exceptions/${exceptionId}`);
 
+  // Enrichment sections are collapsed by default (PO ruling 2026-05-03);
+  // expand the Back-Order pane before asserting its inner content.
+  await expandSection(page, /Back-Order Analysis/i);
+
   // Inventory Gap heading lands once the BackOrderSection mounts.
   await expect(page.getByText(/Inventory Gap/i).first()).toBeVisible({
     timeout: 15_000,
@@ -119,6 +124,11 @@ test("DuplicatePO detail shows OrderSnapshot pair from matched_po_details gatewa
   await loginAs(page, USERS.MANAGER);
   await page.goto(`/exceptions/${exceptionId}`);
 
+  // Both Duplicate Detection and Order Comparison are collapsed by
+  // default; expand them before asserting their inner snapshots.
+  await expandSection(page, /Duplicate Detection/i);
+  await expandSection(page, /Order Comparison/i);
+
   // Both snapshot SO numbers (SO-DUP-001 / SO-DUP-002) should render
   // somewhere in the duplicate / comparison sections.
   await expect(page.getByText(/SO-DUP-001/).first()).toBeVisible({
@@ -150,6 +160,9 @@ test("DeliveryDelay detail shows projected_eta + at_risk from sla_contract gatew
 
   await loginAs(page, USERS.MANAGER);
   await page.goto(`/exceptions/${exceptionId}`);
+
+  // Delivery Delay pane is collapsed by default; expand it.
+  await expandSection(page, /Delivery Delay/i);
 
   // Recipe-output classification + gateway-fetched at_risk both show.
   await expect(page.getByText(/CARRIER_DELAY/i).first()).toBeVisible({
@@ -184,6 +197,9 @@ test("OverMax detail shows trim plan + contract / block context from gateway", a
   await loginAs(page, USERS.MANAGER);
   await page.goto(`/exceptions/${exceptionId}`);
 
+  // Over-Max pane is collapsed by default; expand it.
+  await expandSection(page, /Over-Max Analysis/i);
+
   // contract_ref from sap_contract stub renders.
   await expect(page.getByText(/KONA-CN-1001/i).first()).toBeVisible({
     timeout: 15_000,
@@ -213,6 +229,9 @@ test("MOQ detail shows moq_source + channel from sap_customer_master gateway", a
   await loginAs(page, USERS.MANAGER);
   await page.goto(`/exceptions/${exceptionId}`);
 
+  // MOQ pane is collapsed by default; expand it.
+  await expandSection(page, /MOQ Analysis/i);
+
   // Gateway-fetched moq_source ("KNMT-MINBM") or channel ("DIRECT")
   // populates the audit-bearing row.
   await expect(
@@ -239,6 +258,10 @@ test("PriceAnalysis detail shows variance summary + SAP Context with doc_number 
   await loginAs(page, USERS.MANAGER);
   await page.goto(`/exceptions/${exceptionId}`);
 
+  // Price Analysis pane is collapsed by default; expand it before
+  // looking at the variance summary that lives inside.
+  await expandSection(page, /Price Analysis/i);
+
   // Variance summary (top-level audit-bearing fields) renders first.
   await expect(page.getByText(/Variance/i).first()).toBeVisible({
     timeout: 15_000,
@@ -246,7 +269,8 @@ test("PriceAnalysis detail shows variance summary + SAP Context with doc_number 
   await expect(page.getByText(/At Risk/i).first()).toBeVisible();
 
   // SAP Context block holds the gateway-fetched doc_type / doc_number /
-  // contract_ref / promotion_ref. Expand it.
+  // contract_ref / promotion_ref. This is a nested disclosure inside
+  // PriceAnalysisSection — expand it second.
   await page.getByRole("button", { name: /SAP Context/i }).click();
 
   // doc_number from the sap_doc StubGateway response.
