@@ -22,6 +22,27 @@ import { cn } from "@/lib/utils";
  */
 export const COSIGN_LIFECYCLE_STATE = "PENDING_COSIGN" as const;
 
+/**
+ * UX-meaningful grouping of lifecycle states where the operator is
+ * expected to take action. Drives:
+ *   - `AgentAnalysisSection` auto-expand in `ExceptionDetailPanel`
+ *   - the "HITL queue" quick-filter pill in `ExceptionListPane`
+ *
+ * **Not** a backend enum gate — Guardrail #1 forbids hardcoding enum
+ * values for filter dropdowns or business logic. This is a UI-side
+ * classification (which states represent "human action expected") and
+ * the values themselves come from `health.lifecycle_states` at render
+ * time. Lives in `shared.tsx` so both detail panel and list pane
+ * share one definition.
+ */
+export const HITL_LIFECYCLE_STATES: ReadonlySet<string> = new Set([
+  "PENDING_REVIEW",
+  "ESCALATED",
+  "PENDING_ADMIN_REVIEW",
+  "PENDING_COSIGN",
+  "BLOCKED",
+]);
+
 /** Collapsible section header — matches Evidence Detail card pattern */
 export function CollapsibleHeader({ title, open, onToggle, badge, badgeVariant = "neutral" }: {
   title: string;

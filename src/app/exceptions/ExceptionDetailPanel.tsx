@@ -39,7 +39,7 @@ import type {
   OrderAnalysis,
 } from "@/types/exceptions";
 import type { TraceResponse } from "@/types/api";
-import { COSIGN_LIFECYCLE_STATE, CollapsibleSection } from "./shared";
+import { COSIGN_LIFECYCLE_STATE, CollapsibleSection, HITL_LIFECYCLE_STATES } from "./shared";
 import { HeaderRibbon } from "./HeaderRibbon";
 import { ContextStrip } from "./ContextStrip";
 import { AgentAnalysisSection } from "./AgentAnalysisSection";
@@ -57,28 +57,13 @@ import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
 /**
- * Lifecycle states where the system is waiting on the human reviewer.
- * Drives the auto-expand of the Agent Analysis pane and the actionable
- * enrichment sections (PO request #4): the reviewer sees the diagnosis
- * + evidence the moment they open a row that needs their decision,
- * instead of having to click to reveal it.
- *
- * Includes the four explicit "pending-on-human" states plus BLOCKED.
- * BLOCKED is added because manager+ can still take action on it
- * (override or admin-release per HITL_OVERRIDE_STATES on the asoe2
- * side); leaving its enrichment collapsed would force the operator to
- * hunt for the policy_hits / signals that drove the RED verdict.
+ * Convenience predicate over the shared `HITL_LIFECYCLE_STATES`
+ * (`shared.tsx`). Drives the auto-expand of the Agent Analysis pane —
+ * the reviewer sees the diagnosis the moment they open a row that
+ * needs their decision, instead of having to click to reveal it.
  */
-const HUMAN_IN_THE_LOOP_STATES: ReadonlySet<string> = new Set([
-  "PENDING_REVIEW",
-  "ESCALATED",
-  "PENDING_ADMIN_REVIEW",
-  "PENDING_COSIGN",
-  "BLOCKED",
-]);
-
 function isHumanInTheLoopState(state: string): boolean {
-  return HUMAN_IN_THE_LOOP_STATES.has(state);
+  return HITL_LIFECYCLE_STATES.has(state);
 }
 
 interface ExceptionDetailPanelProps {

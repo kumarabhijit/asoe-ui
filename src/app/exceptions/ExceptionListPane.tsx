@@ -16,16 +16,18 @@ import {
   Shield,
   CheckCircle,
   AlertTriangle,
+  X,
 } from "lucide-react";
 import { Badge, lifecycleVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/Select";
+import { MultiSelect } from "@/components/ui/MultiSelect";
 import { cn } from "@/lib/utils";
 import { intentLabelFor } from "@/config/erp-label-map";
 import { useErpProfile } from "@/hooks/useErpProfile";
 import type { ExceptionSummary, HealthResponse } from "@/types/exceptions";
 import type { StatsResponse } from "@/types/api";
+import { HITL_LIFECYCLE_STATES } from "./shared";
 
 interface ExceptionListPaneProps {
   exceptions: ExceptionSummary[];
@@ -36,10 +38,16 @@ interface ExceptionListPaneProps {
   onSelect: (id: string) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
-  filterState: string;
-  onFilterStateChange: (s: string) => void;
-  filterIntent: string;
-  onFilterIntentChange: (i: string) => void;
+  /** Multi-select lifecycle-state filter. Empty array = no constraint. */
+  filterStates: string[];
+  onFilterStatesChange: (s: string[]) => void;
+  /** Multi-select intent filter. Empty array = no constraint. */
+  filterIntents: string[];
+  onFilterIntentsChange: (i: string[]) => void;
+  /** Quick-filter date range. Today-only single value for now;
+   *  future presets (this week, last 24h) can extend the union. */
+  filterDate: "today" | null;
+  onFilterDateChange: (d: "today" | null) => void;
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
   health: HealthResponse | null;
@@ -69,16 +77,37 @@ export default function ExceptionListPane({
   onSelect,
   searchQuery,
   onSearchChange,
-  filterState,
-  onFilterStateChange,
-  filterIntent,
-  onFilterIntentChange,
+  filterStates,
+  onFilterStatesChange,
+  filterIntents,
+  onFilterIntentsChange,
+  filterDate,
+  onFilterDateChange,
   hasActiveFilters,
   onClearFilters,
   health,
   onRefresh,
 }: ExceptionListPaneProps) {
   const erp = useErpProfile();
+  // Quick-filter pills compose with the multi-select chips: clicking a
+  // state-set pill replaces the state filter with that preset's set,
+  // re-clicking clears it. The "Today" pill toggles `filterDate`.
+  const lifecycleOptions = health?.lifecycle_states ?? [];
+  const intentOptions = health?.allowed_intents ?? [];
+  const hitlOptions = lifecycleOptions.filter((s) => HITL_LIFECYCLE_STATES.has(s));
+  const failedOptions = lifecycleOptions.filter((s) => s === "FAILED");
+  const cosignOptions = lifecycleOptions.filter((s) => s === "PENDING_COSIGN");
+  const isPresetActive = (preset: readonly string[]) =>
+    preset.length > 0 &&
+    filterStates.length === preset.length &&
+    preset.every((s) => filterStates.includes(s));
+  function togglePreset(preset: readonly string[]) {
+    if (isPresetActive(preset)) {
+      onFilterStatesChange([]);
+    } else {
+      onFilterStatesChange([...preset]);
+    }
+  }
   return (
     <div className="h-full flex flex-col bg-surface-page min-w-0">
       {/* ── Pane Header ──────────────────────────────────────────────── */}
@@ -121,55 +150,108 @@ export default function ExceptionListPane({
 
         {/* Search */}
         <Input
-          placeholder="Search by order ID, exception..."
+          placeholder="Search by order ID, account, intent..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           rightIcon={<Search size={14} />}
         />
 
-        {/* Filter row */}
-        <div className="flex gap-6 mt-8">
-          <div className="flex items-center gap-4 flex-1">
-            <Filter size={12} className="text-text-tertiary" />
-            <Select value={filterState} onValueChange={(v) => onFilterStateChange(v === "__all__" ? "" : v)}>
-              <SelectTrigger aria-label="Filter by lifecycle state" className="flex-1">
-                <SelectValue placeholder="All States" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All States</SelectItem>
-                {(health?.lifecycle_states ?? []).map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s.replace(/_/g, " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Select value={filterIntent} onValueChange={(v) => onFilterIntentChange(v === "__all__" ? "" : v)}>
-            <SelectTrigger aria-label="Filter by intent" className="flex-1">
-              <SelectValue placeholder="All Exceptions" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All Exceptions</SelectItem>
-              {(health?.allowed_intents ?? []).map((i) => (
-                <SelectItem key={i} value={i}>
-                  {intentLabelFor(i, erp)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Quick-filter pill bar — one-click presets that compose with
+            the multi-select chips. Operators reach for these first;
+            the multi-selects exist for ad-hoc combinations the pills
+            don't cover. */}
+        <div role="group" aria-label="Quick filters" className="flex gap-4 flex-wrap mt-8">
+          <QuickPill
+            label="Today"
+            active={filterDate === "today"}
+            onClick={() => onFilterDateChange(filterDate === "today" ? null : "today")}
+          />
+          <QuickPill
+            label="HITL"
+            active={isPresetActive(hitlOptions)}
+            disabled={hitlOptions.length === 0}
+            onClick={() => togglePreset(hitlOptions)}
+          />
+          <QuickPill
+            label="Failed"
+            active={isPresetActive(failedOptions)}
+            disabled={failedOptions.length === 0}
+            onClick={() => togglePreset(failedOptions)}
+          />
+          <QuickPill
+            label="Awaiting cosign"
+            active={isPresetActive(cosignOptions)}
+            disabled={cosignOptions.length === 0}
+            onClick={() => togglePreset(cosignOptions)}
+          />
         </div>
 
-        {/* Active filter indicator */}
+        {/* Filter row — multi-select chips for state and intent.
+            Selected items show in the trigger label; the active-chip
+            row below summarises everything for one-click removal. */}
+        <div className="flex gap-6 mt-8">
+          <div className="flex items-center gap-4 flex-1">
+            <Filter size={12} className="text-text-tertiary shrink-0" />
+            <MultiSelect
+              ariaLabel="Filter by lifecycle state"
+              placeholder="All States"
+              options={lifecycleOptions}
+              value={filterStates}
+              onChange={onFilterStatesChange}
+              triggerClassName="flex-1"
+            />
+          </div>
+          <MultiSelect
+            ariaLabel="Filter by intent"
+            placeholder="All Exceptions"
+            options={intentOptions}
+            value={filterIntents}
+            onChange={onFilterIntentsChange}
+            formatLabel={(v) => intentLabelFor(v, erp)}
+            triggerClassName="flex-1"
+          />
+        </div>
+
+        {/* Active-filter chip row — every applied filter as a removable
+            chip. A "Clear all" link still appears on the right so the
+            operator has a single one-click escape hatch. */}
         {hasActiveFilters && (
-          <div className="flex items-center justify-between py-4">
-            <span className="text-label text-text-tertiary font-semibold uppercase tracking-wider">
-              <Filter size={10} className="mr-4 inline align-middle" />
-              Filters active
-            </span>
+          <div className="flex items-start justify-between gap-8 py-6">
+            <div className="flex items-center gap-4 flex-wrap">
+              {filterDate === "today" && (
+                <FilterChip
+                  label="Today"
+                  onRemove={() => onFilterDateChange(null)}
+                />
+              )}
+              {filterStates.map((s) => (
+                <FilterChip
+                  key={`state-${s}`}
+                  label={s.replace(/_/g, " ")}
+                  onRemove={() =>
+                    onFilterStatesChange(filterStates.filter((x) => x !== s))
+                  }
+                />
+              ))}
+              {filterIntents.map((i) => (
+                <FilterChip
+                  key={`intent-${i}`}
+                  label={intentLabelFor(i, erp)}
+                  onRemove={() =>
+                    onFilterIntentsChange(filterIntents.filter((x) => x !== i))
+                  }
+                />
+              ))}
+              {searchQuery && (
+                <FilterChip
+                  label={`"${searchQuery}"`}
+                  onRemove={() => onSearchChange("")}
+                />
+              )}
+            </div>
             <button
               onClick={onClearFilters}
-              className="bg-transparent border-none cursor-pointer text-label font-semibold text-brand font-sans p-0"
+              className="bg-transparent border-none cursor-pointer text-label font-semibold text-brand font-sans p-0 shrink-0 mt-1"
             >
               Clear all
             </button>
@@ -195,7 +277,7 @@ export default function ExceptionListPane({
           <div className="p-32 text-center text-text-quaternary">
             <CheckCircle size={24} className="mb-8" />
             <div className="text-body">No exceptions match your filters</div>
-            {(filterState || filterIntent || searchQuery) && (
+            {hasActiveFilters && (
               <div className="text-caption mt-4">
                 Try clearing your filters to see all exceptions.
               </div>
@@ -215,6 +297,57 @@ export default function ExceptionListPane({
         )}
       </div>
     </div>
+  );
+}
+
+/* ── Quick-filter pill ─────────────────────────────────────────────── */
+
+function QuickPill({
+  label,
+  active,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "px-10 py-4 rounded-full text-label font-semibold cursor-pointer font-sans border transition-colors duration-fast",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+        active
+          ? "bg-brand text-white border-brand"
+          : "bg-surface-primary text-text-secondary border-border hover:border-text-quaternary hover:text-text-primary",
+        disabled && "opacity-40 cursor-not-allowed pointer-events-none",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+/* ── Active-filter chip (label + × remover) ────────────────────────── */
+
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-4 px-8 py-2 rounded-full bg-brand-subtle text-label font-semibold text-brand">
+      {label}
+      <button
+        type="button"
+        aria-label={`Remove filter ${label}`}
+        onClick={onRemove}
+        className="bg-transparent border-none cursor-pointer text-brand p-0 leading-none flex items-center"
+      >
+        <X size={10} />
+      </button>
+    </span>
   );
 }
 
