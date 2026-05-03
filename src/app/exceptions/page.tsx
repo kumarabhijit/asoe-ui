@@ -329,6 +329,15 @@ function ExceptionQueueContent() {
             `[data-exception-id="${nextId}"]`,
           );
           el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          // Move DOM focus to the newly-selected card so the
+          // :focus-visible outline (globals.css:56-58) follows the
+          // selection. Without this the previously-clicked card
+          // retained focus and showed a 2px brand-coloured ring,
+          // making it look like the first card was "still
+          // highlighted" even though selection had moved on.
+          // preventScroll avoids fighting the smooth scrollIntoView
+          // we just queued above.
+          el?.focus({ preventScroll: true });
         });
       }
     }
