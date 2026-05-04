@@ -735,8 +735,11 @@ export default function ExceptionDetailPanel({
           Guardrail #2 — the UI never hardcodes enum values. The server
           may narrow the set per-exception via resolution_data.allowed_actions
           (prefer that narrower list). Reason-tag vocabulary is
-          per-intent when available, otherwise global. Notes are
-          mandatory (SOX). */}
+          per-intent when available, otherwise global.
+          The `intent` prop lets the dialog apply UI-side cluster
+          grouping per ADR-033 §D (DUPLICATE_PO renders 3 clusters;
+          other intents fall back to a flat list). Free-text notes are
+          required only when reason is OTHER (ADR-033 §D.3). */}
       {(() => {
         const narrowed = detail?.resolution_data
           && typeof detail.resolution_data === "object"
@@ -762,6 +765,7 @@ export default function ExceptionDetailPanel({
             submitting={actionInFlight === "override"}
             allowedActions={allowedActions}
             allowedReasonTags={allowedReasonTags}
+            intent={detail?.intent ?? undefined}
           />
         );
       })()}
