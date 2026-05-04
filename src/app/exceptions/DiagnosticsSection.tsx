@@ -416,13 +416,15 @@ function pipelineStatusBadge(
   preBackendInstrumentation: boolean,
   executedNodes: ExecutedNode[],
 ): { label: string; variant: string } {
-  if (preBackendInstrumentation) {
-    return { label: "no trace", variant: "neutral" };
-  }
-  // The error/halt status on a node ALWAYS implies a non-success
-  // outcome, but the operator-friendly label depends on which
-  // terminal status the backend wrote. Prefer that, only fall back
-  // to a generic indicator when final_status is missing.
+  // Prefer the terminal-status label when we have one — it's
+  // authoritative regardless of whether per-node trace evidence has
+  // loaded yet. The trace fetch is deferred behind the Diagnostics
+  // toggle (ExceptionDetailPanel.ensureTraceLoaded), so on first
+  // expansion `executedNodes` is briefly empty even though the
+  // backend has already written a final_status. Without this guard
+  // the badge flickers from "no trace" → real status as the trace
+  // arrives, which is what shows up to the operator as "the label
+  // only comes after clicking it" on the live deployment.
   if (finalStatus) {
     switch (finalStatus) {
       case "COMPLETE":
@@ -442,6 +444,13 @@ function pipelineStatusBadge(
     // Unknown final_status — the asoe2 vocabulary expanded; render
     // it raw rather than swallow.
     return { label: finalStatus.toLowerCase(), variant: "neutral" };
+  }
+  // Only fall through to "no trace" when we genuinely have neither
+  // a final_status nor any trace nodes — i.e. the record is
+  // pre-backend-instrumentation (legacy attempts that ran before
+  // ADR-027 Phase B's per-node tracking landed).
+  if (preBackendInstrumentation) {
+    return { label: "no trace", variant: "neutral" };
   }
   // No final_status yet (in-flight). Surface what we can from the
   // executed_nodes status field.
