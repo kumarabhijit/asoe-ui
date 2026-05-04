@@ -74,7 +74,14 @@ export type ResolutionAction =
   | "SUPERSEDE"
   | "ALLOW_BOTH"
   | "ESCALATE"
-  | "REQUEST_BUYER_CONFIRMATION";
+  | "REQUEST_BUYER_CONFIRMATION"
+  // ADR-034 — EmailOrderEntryRecipe outputs.
+  | "ONE_CLICK_APPROVE"
+  | "STANDARD_REVIEW"
+  | "LOW_CONFIDENCE_FLAG"
+  | "AUTO_CORRECT"
+  | "REQUEST_CLARIFICATION"
+  | "REJECT";
 
 /* ── Pipeline node names (11-node LangGraph state machine) ─────────────
  *
@@ -339,6 +346,12 @@ export interface OrderAnalysis {
   price_hold_analysis?: PriceHoldAnalysisData;
   /** Present when an EDI 850 line mismatch produces sub_type classification (asoe2 adapt_edi_mismatch). */
   edi_mismatch_analysis?: EdiMismatchAnalysisData;
+  /** preview-only — Present when the EmailOrderEntry recipe classifies a
+   *  non-EDI email-channel order envelope (ADR-034). Backend adapter +
+   *  audit_bearing_registry rows land in Phase B; until then this field
+   *  is preview-only and rendered under Pillar 3's "Context Not Required
+   *  for Resolution" placeholder where appropriate. */
+  email_order_entry_analysis?: EmailOrderEntryAnalysisData;
 }
 
 /* ── Price Hold Release enrichment types (UI-only, not backend contract) ── */
@@ -390,6 +403,60 @@ export interface EdiMismatchAnalysisData {
   autonomy_level: "L1" | "L2" | "L3";
   expected_value: unknown;
   received_value: unknown;
+  notification_template: string | null;
+}
+
+/* ── Email Order Entry enrichment types (ADR-034) ───────────────────── */
+
+/** Confidence-band classification produced by EmailOrderEntryRecipe. */
+export type EmailOrderEntryClassification =
+  | "ONE_CLICK_APPROVE"
+  | "STANDARD_REVIEW"
+  | "LOW_CONFIDENCE"
+  | "FATAL_REJECT";
+
+/** Closed reject-reason vocabulary mirrored from
+ *  recipes/EmailOrderEntryRecipe.py::ALLOWED_REJECT_REASONS. */
+export type EmailOrderEntryRejectReason =
+  | "sender_unauthorized"
+  | "customer_unresolved"
+  | "duplicate_po_confirmed"
+  | "credit_block"
+  | "corrupt_input"
+  | "policy_floor_breach";
+
+/**
+ * Email-channel order intake summary — present when EmailOrderEntryRecipe
+ * has classified a non-EDI order envelope (ADR-034).
+ *
+ * The four `floor_*` booleans surface the "non-disable-able floor" check
+ * results so the operator can see exactly which compliance precondition
+ * passed or failed. Per Pillar 3, missing keys are *not* permitted —
+ * the backend adapter must populate every floor field once Phase B's
+ * gateway evidence path is wired up. Until then the field is marked
+ * preview-only on `OrderAnalysis`.
+ */
+export interface EmailOrderEntryAnalysisData {
+  /** Composite extraction + resolution confidence in [0.0, 1.0]. */
+  composite_confidence: number;
+  classification: EmailOrderEntryClassification;
+  /** Recipe-recommended action — must be a member of ResolutionAction. */
+  recommended_action: ResolutionAction;
+  autonomy_level: "L1" | "L2" | "L3";
+  /** Typed validation-failure codes from the validation suite. */
+  validation_failures: string[];
+  /** Names of the floor checks that breached, if any. */
+  floor_breaches: string[];
+  /** Populated only when classification is FATAL_REJECT. */
+  reject_reason_code: EmailOrderEntryRejectReason | null;
+  /** The four non-disable-able floor checks. Adapter must populate every
+   *  field; absence is a coverage failure (audit_bearing_registry).  */
+  floor_status: {
+    sender_authorized: boolean;
+    customer_resolved: boolean;
+    duplicate_po_clear: boolean;
+    credit_clear: boolean;
+  };
   notification_template: string | null;
 }
 

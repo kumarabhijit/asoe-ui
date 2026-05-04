@@ -160,7 +160,7 @@ export const MOCK_HEALTH: HealthResponse = {
     "CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR",
     "DUPLICATE_PO", "PRICE_HOLD_RELEASE", "EDI_MISMATCH",
     "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY",
-    "PALLET_CONFIG", "DELIVERY_DELAY",
+    "PALLET_CONFIG", "DELIVERY_DELAY", "EMAIL_ORDER_ENTRY",
   ],
   lifecycle_states: [
     // `EXECUTING` retired in asoe2 Phase 19 — backend no longer emits it.
@@ -175,15 +175,21 @@ export const MOCK_HEALTH: HealthResponse = {
     "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py",
     "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py",
     "DeliveryDelayResolutionRecipe.py",
+    "EmailOrderEntryRecipe.py",
   ],
-  allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION"],
+  allowed_resolution_actions: [
+    "BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH",
+    "ESCALATE", "REQUEST_BUYER_CONFIRMATION",
+    "ONE_CLICK_APPROVE", "STANDARD_REVIEW", "LOW_CONFIDENCE_FLAG",
+    "AUTO_CORRECT", "REQUEST_CLARIFICATION", "REJECT",
+  ],
   allowed_override_reason_tags: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
   allowed_override_reason_tags_by_intent: Object.fromEntries(
     [
       "CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR",
       "DUPLICATE_PO", "PRICE_HOLD_RELEASE", "EDI_MISMATCH",
       "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY",
-      "PALLET_CONFIG", "DELIVERY_DELAY",
+      "PALLET_CONFIG", "DELIVERY_DELAY", "EMAIL_ORDER_ENTRY",
     ].map((intent) => [
       intent,
       ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
