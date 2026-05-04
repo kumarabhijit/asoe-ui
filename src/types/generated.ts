@@ -106,56 +106,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/_sandbox/seed/financial-impact": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Seed Financial Impact
-         * @description Stamp financial_impact_usd onto an exception's resolution_data.
-         *
-         *     Used by the Playwright four-eyes spec to push an existing record
-         *     past HIGH_VALUE_OVERRIDE_THRESHOLD_USD so the next /disposition
-         *     call stages to PENDING_COSIGN. No new audit event is emitted —
-         *     this is test fixture wiring, not a SOX-relevant state transition.
-         */
-        post: operations["seed_financial_impact_api_v1__sandbox_seed_financial_impact_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/_sandbox/tenant/reset": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reset Tenant
-         * @description Clear in-memory exception records for a tenant.
-         *
-         *     For the in-memory store (the default sandbox mode), this wipes all
-         *     exceptions belonging to the target tenant_id so the next spec starts
-         *     from a clean slate. For the DB-backed store, this is a no-op — tests
-         *     against a real DB spin up their own SQLite :memory: per run.
-         */
-        post: operations["reset_tenant_api_v1__sandbox_tenant_reset_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/accounts": {
         parameters: {
             query?: never;
@@ -176,6 +126,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/config/tenants/{tenant_id}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Audit
+         * @description List ConfigChange audit entries for the tenant, newest first.
+         *
+         *     Filtered by policy_key prefix ``duplicate_po.weights.`` so unrelated
+         *     audit rows (policy threshold tunings, exception lifecycle events)
+         *     don't leak into the config-admin view.
+         */
+        get: operations["list_audit_api_v1_config_tenants__tenant_id__audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/tenants/{tenant_id}/layers/{layer}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Layer */
+        get: operations["list_layer_api_v1_config_tenants__tenant_id__layers__layer__get"];
+        /** Upsert Layer */
+        put: operations["upsert_layer_api_v1_config_tenants__tenant_id__layers__layer__put"];
+        post?: never;
+        /** Delete Layer */
+        delete: operations["delete_layer_api_v1_config_tenants__tenant_id__layers__layer__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/tenants/{tenant_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve Config
+         * @description Resolve the full 5-layer hierarchy for the requested scope.
+         *
+         *     Delegates to the registered ``tenant_config`` gateway so the
+         *     resolver path is identical to what the orchestration node sees
+         *     on every event — the API surface and the runtime path can never
+         *     diverge.
+         */
+        get: operations["resolve_config_api_v1_config_tenants__tenant_id__resolve_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exceptions": {
         parameters: {
             query?: never;
@@ -185,6 +203,26 @@ export interface paths {
         };
         /** List Exceptions */
         get: operations["list_exceptions_api_v1_exceptions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exceptions/duplicates/{exception_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Duplicate Po Envelope
+         * @description ADR-028 Guard-rail 2 — canonical DUPLICATE_PO envelope.
+         */
+        get: operations["get_duplicate_po_envelope_api_v1_exceptions_duplicates__exception_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -685,6 +723,8 @@ export interface components {
             diagnosis: string;
             duplicate_detection?: components["schemas"]["DuplicateDetectionData"] | null;
             edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
+            entity_profile?: components["schemas"]["EntityProfile"] | null;
+            impact_metrics?: components["schemas"]["ImpactMetrics"] | null;
             /** Lines */
             lines?: components["schemas"]["LineAnalysis"][];
             moq_analysis?: components["schemas"]["MOQAnalysisData"] | null;
@@ -693,10 +733,14 @@ export interface components {
             pallet_analysis?: components["schemas"]["PalletAnalysisData"] | null;
             price_analysis?: components["schemas"]["PriceAnalysisData"] | null;
             price_hold_analysis?: components["schemas"]["PriceHoldAnalysisData"] | null;
+            /** Recommendation */
+            recommendation?: string | null;
             /** Resolution */
             resolution: string;
             /** Risk */
             risk: string;
+            /** Root Cause */
+            root_cause?: string | null;
         };
         /**
          * AsyncResolveResponse
@@ -710,6 +754,32 @@ export interface components {
             status: string;
             /** Task Id */
             task_id: string;
+        };
+        /**
+         * AuditTrailEntry
+         * @description One chronological audit-chain event for ADR-028 G2's
+         *     audit_trail. Mirrors policy_audit_log row shape, including the
+         *     SOX hash so a downstream verifier can attest to chain integrity
+         *     without re-querying the log table.
+         *
+         *     The composer filters the per-tenant audit log to entries whose
+         *     ``previous_value`` or ``new_value`` payload references the
+         *     record's exception_id. See ``_entry_relates_to_exception`` for
+         *     the predicate.
+         */
+        AuditTrailEntry: {
+            /** Actor */
+            actor: string;
+            /** Event Hash */
+            event_hash: string;
+            /** Event Type */
+            event_type: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Timestamp */
+            timestamp: string;
         };
         /**
          * AuthTokenResponse
@@ -831,6 +901,96 @@ export interface components {
             status: string;
             /** Total Value */
             total_value: number;
+        };
+        /** ConfigAuditEntry */
+        ConfigAuditEntry: {
+            /** Change Reason */
+            change_reason?: string | null;
+            /** Changed By */
+            changed_by: string;
+            /** Created At */
+            created_at: string;
+            /** Event Hash */
+            event_hash: string;
+            /** Id */
+            id: string;
+            /** New Value */
+            new_value: unknown;
+            /** Policy Key */
+            policy_key: string;
+            /** Prev Hash */
+            prev_hash: string;
+            /** Previous Value */
+            previous_value?: unknown | null;
+            /** Tenant Id */
+            tenant_id: string;
+        };
+        /** ConfigAuditResponse */
+        ConfigAuditResponse: {
+            /** Entries */
+            entries: components["schemas"]["ConfigAuditEntry"][];
+            /** Tenant Id */
+            tenant_id: string;
+        };
+        /** ConfigDeleteResponse */
+        ConfigDeleteResponse: {
+            /** Deleted */
+            deleted: boolean;
+            /** Layer */
+            layer: string;
+            /** Scope */
+            scope: {
+                [key: string]: unknown;
+            };
+            /** Tenant Id */
+            tenant_id: string;
+        };
+        /**
+         * ConfigLayerEntry
+         * @description One row of the ADR-029 per-layer config-resolution trace.
+         *
+         *     Surfaces in DuplicatePOEnvelope so the operator can see WHICH of
+         *     the 5 layers (platform → tenant → tier → customer → channel)
+         *     supplied each final weight value. Sourced from the
+         *     ``tenant_config`` gateway response's ``contribution_trace``.
+         */
+        ConfigLayerEntry: {
+            /** Signal */
+            signal: string;
+            /** Source Layer */
+            source_layer: string;
+            /** Value */
+            value: number;
+        };
+        /** ConfigLayerListResponse */
+        ConfigLayerListResponse: {
+            /** Layer */
+            layer: string;
+            /** Rows */
+            rows: components["schemas"]["TenantConfigRow"][];
+            /** Tenant Id */
+            tenant_id: string;
+        };
+        /** ConfigResolveResponse */
+        ConfigResolveResponse: {
+            /** Contribution Trace */
+            contribution_trace: {
+                [key: string]: unknown;
+            }[];
+            /** Scope */
+            scope: {
+                [key: string]: unknown;
+            };
+            /** Tenant Id */
+            tenant_id: string;
+            /** Validation Status */
+            validation_status: string;
+            /** Violation Reason */
+            violation_reason?: string | null;
+            /** Weights */
+            weights: {
+                [key: string]: number;
+            };
         };
         /**
          * CosignRequest
@@ -963,6 +1123,61 @@ export interface components {
             recommended_action: string;
         };
         /**
+         * DuplicatePOEnvelope
+         * @description ADR-028 Guard-rail 2 canonical envelope for DUPLICATE_PO records.
+         *
+         *     Returned by ``GET /api/v1/exceptions/duplicates/{id}``. The UI
+         *     consumes this single payload for both Layer 1 (recommendation +
+         *     action buttons) and Layer 2 (evidence — matched PO, signals,
+         *     config trace, audit + human-action history).
+         *
+         *     Audit-bearing classification: see
+         *     ``compliance/audit_bearing_registry.yaml::DuplicatePOEnvelope``.
+         */
+        DuplicatePOEnvelope: {
+            /** Agent Reasoning */
+            agent_reasoning?: string | null;
+            /** Audit Trail */
+            audit_trail?: components["schemas"]["AuditTrailEntry"][];
+            /** Autonomy Level */
+            autonomy_level?: string | null;
+            /** Classification */
+            classification: string;
+            /** Composite Score */
+            composite_score: number;
+            /** Config Layer Trace */
+            config_layer_trace?: components["schemas"]["ConfigLayerEntry"][] | null;
+            /** Created At */
+            created_at: string;
+            /** Exception Id */
+            exception_id: string;
+            /** Final Status */
+            final_status?: string | null;
+            /** Human Actions */
+            human_actions?: components["schemas"]["HumanActionEntry"][];
+            incoming_po: components["schemas"]["OrderSnapshot"];
+            /**
+             * Intent
+             * @constant
+             */
+            intent: "DUPLICATE_PO";
+            /** Lifecycle State */
+            lifecycle_state: string;
+            matched_po?: components["schemas"]["OrderSnapshot"] | null;
+            /** Recommended Action */
+            recommended_action: string;
+            /** Shadow Verdict */
+            shadow_verdict?: string | null;
+            /** Signal Breakdown */
+            signal_breakdown: {
+                [key: string]: number;
+            };
+            /** Tenant Id */
+            tenant_id: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
          * EdiMismatchAnalysisData
          * @description EdiMismatchRecipe → UI `edi_mismatch_analysis`.
          *
@@ -999,6 +1214,32 @@ export interface components {
             recommended_action: string;
             /** Sub Type */
             sub_type: string;
+        };
+        /**
+         * EntityProfile
+         * @description Master-data context for the exception's customer entity.
+         *
+         *     Mirrors `EntityProfile` in `asoe-ui/src/types/exceptions.ts`.
+         *     Composed by `api.profile_composer.compose_entity_profile` from a
+         *     seed `Account` lookup; tier / VIP / credit-standing fields are
+         *     optional today (no producer wired) and tracked under the
+         *     `EntityProfile` grandfather clause in the audit-bearing registry.
+         */
+        EntityProfile: {
+            /** Bp Number */
+            bp_number: string;
+            /** Credit Standing */
+            credit_standing?: string | null;
+            /** Customer Name */
+            customer_name: string;
+            /** Customer Tier */
+            customer_tier?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Region */
+            region?: string | null;
+            /** Vip Status */
+            vip_status?: boolean | null;
         };
         /**
          * EscalateRequest
@@ -1233,6 +1474,64 @@ export interface components {
             status: string;
             /** Version */
             version: string;
+        };
+        /**
+         * HumanActionEntry
+         * @description One chronological human-action entry for ADR-028 G2's
+         *     human_actions. Synthesised from ``record.resolved_*`` fields,
+         *     cosign metadata in ``resolution_data["cosign"]``, and the
+         *     ``pending_override`` snapshot when the record is mid-cosign.
+         *
+         *     Distinct from audit_trail: human_actions are domain-language
+         *     summaries (APPROVE / OVERRIDE / ESCALATE / COSIGN_APPROVE /
+         *     COSIGN_REJECT), audit_trail entries are the SOX log rows. The
+         *     two complement — operators read human_actions; auditors read
+         *     audit_trail.
+         */
+        HumanActionEntry: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "APPROVE" | "REJECT" | "OVERRIDE" | "ESCALATE" | "COSIGN_APPROVE" | "COSIGN_REJECT" | "REANALYZE";
+            /** Actor */
+            actor: string;
+            /** Notes */
+            notes?: string | null;
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            };
+            /** Reason Tag */
+            reason_tag?: string | null;
+            /** Timestamp */
+            timestamp: string;
+        };
+        /**
+         * ImpactMetrics
+         * @description Quantitative blast radius of the exception.
+         *
+         *     Mirrors `ImpactMetrics` in `asoe-ui/src/types/exceptions.ts`.
+         *     Composed deterministically from line-item totals and record
+         *     metadata. SLA-priority is rendered as a string so the UI can
+         *     map verdicts → display variants without a hardcoded enum
+         *     (Guardrail #2 on the UI side).
+         */
+        ImpactMetrics: {
+            /** Affected Lines */
+            affected_lines: number;
+            /** Delta Amount */
+            delta_amount: number;
+            /** Delta Percentage */
+            delta_percentage: number;
+            /** Fulfillment Gap Pct */
+            fulfillment_gap_pct?: number | null;
+            /** Revenue At Risk */
+            revenue_at_risk: number;
+            /** Sla Deadline */
+            sla_deadline?: string | null;
+            /** Sla Priority */
+            sla_priority: string;
         };
         /**
          * InboundOrder
@@ -1997,13 +2296,6 @@ export interface components {
             /** Transaction */
             transaction: string;
         };
-        /** SeedFinancialImpactRequest */
-        SeedFinancialImpactRequest: {
-            /** Exception Id */
-            exception_id: string;
-            /** Financial Impact Usd */
-            financial_impact_usd: number;
-        };
         /**
          * StatsResponse
          * @description GET /api/v1/exceptions/stats — dashboard metrics.
@@ -2084,10 +2376,52 @@ export interface components {
              */
             source: string;
         };
-        /** TenantResetRequest */
-        TenantResetRequest: {
+        /** TenantConfigDeleteRequest */
+        TenantConfigDeleteRequest: {
+            /** Change Reason */
+            change_reason?: string | null;
+            /** Scope */
+            scope?: {
+                [key: string]: unknown;
+            };
+        };
+        /** TenantConfigRow */
+        TenantConfigRow: {
+            /** Created At */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /** Id */
+            id: string;
+            /** Layer */
+            layer: string;
+            /** Scope */
+            scope: {
+                [key: string]: unknown;
+            };
+            /** Scope Hash */
+            scope_hash: string;
             /** Tenant Id */
-            tenant_id?: string | null;
+            tenant_id: string;
+            /** Updated At */
+            updated_at: string;
+            /** Weights */
+            weights: {
+                [key: string]: number;
+            };
+        };
+        /** TenantConfigUpsertRequest */
+        TenantConfigUpsertRequest: {
+            /** Change Reason */
+            change_reason?: string | null;
+            /** Scope */
+            scope?: {
+                [key: string]: unknown;
+            };
+            /** Weights */
+            weights: {
+                [key: string]: number;
+            };
         };
         /**
          * TraceResponse
@@ -2443,80 +2777,6 @@ export interface operations {
             };
         };
     };
-    seed_financial_impact_api_v1__sandbox_seed_financial_impact_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                Authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SeedFinancialImpactRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reset_tenant_api_v1__sandbox_tenant_reset_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                Authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TenantResetRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_accounts_api_v1_accounts_get: {
         parameters: {
             query?: never;
@@ -2535,6 +2795,189 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_audit_api_v1_config_tenants__tenant_id__audit_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigAuditResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_layer_api_v1_config_tenants__tenant_id__layers__layer__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                tenant_id: string;
+                layer: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigLayerListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_layer_api_v1_config_tenants__tenant_id__layers__layer__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                tenant_id: string;
+                layer: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantConfigUpsertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantConfigRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_layer_api_v1_config_tenants__tenant_id__layers__layer__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                tenant_id: string;
+                layer: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantConfigDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigDeleteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_config_api_v1_config_tenants__tenant_id__resolve_get: {
+        parameters: {
+            query?: {
+                customer_tier?: ("strategic" | "standard" | "smb") | null;
+                customer_id?: string | null;
+                channel?: string | null;
+                behavior_tag?: string | null;
+            };
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigResolveResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2574,6 +3017,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExceptionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_duplicate_po_envelope_api_v1_exceptions_duplicates__exception_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                exception_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicatePOEnvelope"];
                 };
             };
             /** @description Validation Error */
