@@ -1841,6 +1841,16 @@ export const exceptionsApi = {
   },
 
   async lineItems(id: string): Promise<LineItem[]> {
+    if (USE_REAL_API) {
+      // Real backend: GET /api/v1/exceptions/{id}/line-items returns
+      // `{data: LineItem[]}` per `api/schemas.py::LineItemsResponse`.
+      // Empty array is a legitimate response (the recipe emitted no
+      // per-line breakdown); the UI's EvidenceGrid handles that.
+      const resp = await http<{ data: LineItem[] }>(
+        `/api/v1/exceptions/${encodeURIComponent(id)}/line-items`,
+      );
+      return resp.data ?? [];
+    }
     await delay(MOCK_DELAY);
     return MOCK_LINE_ITEMS[id] ?? [];
   },
