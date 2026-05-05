@@ -53,6 +53,7 @@ import { PalletConfigSection } from "./PalletConfigSection";
 import { DeliveryDelaySection } from "./DeliveryDelaySection";
 import { PriceHoldSection } from "./PriceHoldSection";
 import { EdiMismatchSection } from "./EdiMismatchSection";
+import { EmailOrderEntrySection } from "./EmailOrderEntrySection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -687,6 +688,11 @@ export default function ExceptionDetailPanel({
           {analysis?.edi_mismatch_analysis && (
             <CollapsibleSection title="EDI Mismatch">
               <EdiMismatchSection data={analysis.edi_mismatch_analysis} />
+            </CollapsibleSection>
+          )}
+          {analysis?.email_order_entry_analysis && (
+            <CollapsibleSection title="Email Order Intake">
+              <EmailOrderEntrySection data={analysis.email_order_entry_analysis} />
             </CollapsibleSection>
           )}
 

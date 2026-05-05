@@ -582,6 +582,16 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-025", tenant_id: "acme-corp", order_id: "PO-PHR-BAD", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "FAILED", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-16T08:30:00Z", updated_at: "2026-04-16T08:30:00Z", account_id: "acct-costco", account_name: "Costco",
   },
+  // EMAIL_ORDER_ENTRY (ADR-034 Phase C) — STANDARD_REVIEW band record. The
+  // upstream email-intelligence-agent extracted a non-EDI PO from a regional
+  // distributor; composite_confidence 0.88 lands in the standard-review band
+  // (≥ 0.85, < 0.95). All four non-disable-able floor checks pass; one
+  // ambiguous ship-to triggers REQUEST_CLARIFICATION. Renders the
+  // EmailOrderEntrySection via OrderAnalysis.email_order_entry_analysis
+  // (data-presence dispatch — no per-intent page logic).
+  {
+    id: "exc-026", tenant_id: "acme-corp", order_id: "EML-PO-2026-0042", event_type: "EMAIL_ORDER_ENTRY_REQUEST", intent: "EMAIL_ORDER_ENTRY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "EmailOrderEntryRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-30T10:12:00Z", updated_at: "2026-04-30T10:13:30Z", account_id: "acct-southeast-distrib", account_name: "Southeast Beverage Distributors",
+  },
 ];
 
 /** Per-exception trace enrichment — optional Layer 2 fields demonstrated
@@ -1166,6 +1176,18 @@ const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
   // halt at validate_types (verdict: invocation_fail)
   "exc-025": {
     executed_nodes: _invocationFailTrace(),
+  },
+  // EMAIL_ORDER_ENTRY (ADR-034) — STANDARD_REVIEW band, REQUEST_CLARIFICATION
+  // action driven by ambiguous ship-to. Reuses the YELLOW-HITL trace shape;
+  // the recipe-specific decision detail lives on email_order_entry_analysis.
+  "exc-026": {
+    narrative:
+      "Inbound email from Southeast Beverage Distributors carried a non-EDI PO. The email-intelligence-agent extracted four line items at composite confidence 0.88 (review band). All four non-disable-able floor checks passed — sender authorised, customer resolved, no duplicate PO, credit clear. One ambiguous ship-to address ('Atlanta DC' matches two warehouses) routes the record to REQUEST_CLARIFICATION rather than auto-approve.",
+    resolution_steps: [
+      "Confirm the intended ship-to with the buyer (Atlanta-North or Atlanta-South DC).",
+      "Re-run validation with the resolved ship-to and approve.",
+    ],
+    executed_nodes: _yellowHitlTrace("EmailOrderEntryRecipe.py"),
   },
 };
 
@@ -2080,6 +2102,12 @@ const MOCK_LINE_ITEMS: Record<string, LineItem[]> = {
   ],
   "exc-021": [
     { line_id: "L1", sku: "SKU-PRICE-MM", description: "18oz Premium Juice 8pk (Q2 concession)", uom: "CS", quantity: 100, erp_price: 100.00, po_price: 95.00 },
+  ],
+  "exc-026": [
+    { line_id: "L1", sku: "SKU-1101", description: "12oz Cola 24pk", uom: "CS", quantity: 80, erp_price: 22.50, po_price: 22.50 },
+    { line_id: "L2", sku: "SKU-1102", description: "12oz Diet Cola 24pk", uom: "CS", quantity: 80, erp_price: 22.50, po_price: 22.50 },
+    { line_id: "L3", sku: "SKU-1108", description: "16oz Sparkling Water 12pk", uom: "CS", quantity: 60, erp_price: 18.40, po_price: 18.40 },
+    { line_id: "L4", sku: "SKU-1112", description: "20oz Sports Drink 12pk", uom: "CS", quantity: 100, erp_price: 26.00, po_price: 26.00 },
   ],
 };
 
@@ -3348,6 +3376,57 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       root_cause_category: "CUSTOMER_CONCESSION",
       contract_ref: "4600019910",
       promotion_ref: "ZCUST/404 (Q2 2026 concession)",
+    },
+  },
+  // EMAIL_ORDER_ENTRY (ADR-034 Phase C) — STANDARD_REVIEW band record.
+  // Renders EmailOrderEntrySection via OrderAnalysis.email_order_entry_analysis.
+  // The four floor checks all pass; one ambiguous ship-to triggers
+  // REQUEST_CLARIFICATION.
+  "exc-026": {
+    diagnosis: "Non-EDI PO from Southeast Beverage Distributors. Extracted four lines at composite confidence 0.88. All non-disable-able floor checks passed; ambiguous ship-to ('Atlanta DC' resolves to two warehouses) blocks one-click approve. Recipe recommends REQUEST_CLARIFICATION.",
+    confidence: 88,
+    risk: "LOW",
+    resolution: "REQUEST_CLARIFICATION",
+    root_cause: "Buyer's PDF cover letter listed ship-to as 'Atlanta DC' which matches two physical warehouses (Atlanta-North, Atlanta-South). Confidence on that single field dropped to 0.62, pulling composite below the 0.95 auto-approve threshold.",
+    recommendation: "Send the templated clarification email asking the buyer to confirm Atlanta-North vs Atlanta-South. Auto-approve once a single match is selected.",
+    entity_profile: {
+      customer_name: "Southeast Beverage Distributors",
+      bp_number: "BP-SBD-0042",
+      customer_tier: "Mid-Market",
+      vip_status: false,
+      credit_standing: "Good",
+      location: "Plant 2200 — Atlanta DC",
+      region: "Southeast",
+    },
+    impact_metrics: {
+      revenue_at_risk: 18_400.00,
+      delta_amount: 0,
+      delta_percentage: 0,
+      sla_priority: "MEDIUM",
+      sla_deadline: "2026-04-30T18:00:00Z",
+      affected_lines: 4,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "SKU-1101 — extracted at 0.97, customer SKU mapping confirmed.", resolution: "AUTO_APPROVE", risk: "LOW", waterfall: [] },
+      { line_id: "L2", diagnosis: "SKU-1102 — extracted at 0.96, customer SKU mapping confirmed.", resolution: "AUTO_APPROVE", risk: "LOW", waterfall: [] },
+      { line_id: "L3", diagnosis: "SKU-1108 — extracted at 0.91, fuzzy SKU match against customer master.", resolution: "AUTO_APPROVE", risk: "LOW", waterfall: [] },
+      { line_id: "L4", diagnosis: "Ship-to 'Atlanta DC' — confidence 0.62; matches two warehouses.", resolution: "REQUEST_CLARIFICATION", risk: "MEDIUM", waterfall: [] },
+    ],
+    email_order_entry_analysis: {
+      composite_confidence: 0.88,
+      classification: "STANDARD_REVIEW",
+      recommended_action: "REQUEST_CLARIFICATION",
+      autonomy_level: "L2",
+      validation_failures: ["ambiguous_ship_to"],
+      floor_breaches: [],
+      reject_reason_code: null,
+      floor_status: {
+        sender_authorized: true,
+        customer_resolved: true,
+        duplicate_po_clear: true,
+        credit_clear: true,
+      },
+      notification_template: "email_order_clarification_request",
     },
   },
 };
