@@ -773,6 +773,7 @@ export interface components {
             diagnosis: string;
             duplicate_detection?: components["schemas"]["DuplicateDetectionData"] | null;
             edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
+            email_order_entry_analysis?: components["schemas"]["EmailOrderEntryAnalysisData"] | null;
             entity_profile?: components["schemas"]["EntityProfile"] | null;
             impact_metrics?: components["schemas"]["ImpactMetrics"] | null;
             /** Lines */
@@ -1264,6 +1265,81 @@ export interface components {
             recommended_action: string;
             /** Sub Type */
             sub_type: string;
+        };
+        /**
+         * EmailOrderEntryAnalysisData
+         * @description EmailOrderEntryRecipe → UI `email_order_entry_analysis`
+         *     (ADR-034 Phase B).
+         *
+         *     Mirrors `asoe-ui/src/types/exceptions.ts::EmailOrderEntryAnalysisData`.
+         *     `classification` is the recipe's confidence-band output;
+         *     `recommended_action` is constrained by `AllowedResolutionAction`
+         *     on the wire (intentionally `str` here so the UI section can render
+         *     new actions added downstream without a contract bump — same pattern
+         *     as EdiMismatchAnalysisData).
+         *
+         *     `reject_reason_code` is conditional on classification == FATAL_REJECT;
+         *     None on every other classification (Pillar 3 conditional field —
+         *     rendered as "Context Not Required for Resolution" by EvidenceBlock
+         *     when the predicate doesn't hold).
+         */
+        EmailOrderEntryAnalysisData: {
+            /**
+             * Autonomy Level
+             * @enum {string}
+             */
+            autonomy_level: "L1" | "L2" | "L3" | "L4";
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "ONE_CLICK_APPROVE" | "STANDARD_REVIEW" | "LOW_CONFIDENCE" | "FATAL_REJECT";
+            /** Composite Confidence */
+            composite_confidence: number;
+            /**
+             * Floor Breaches
+             * @default []
+             */
+            floor_breaches: string[];
+            floor_status: components["schemas"]["EmailOrderEntryFloorStatus"];
+            /** Notification Template */
+            notification_template?: string | null;
+            /** Recommended Action */
+            recommended_action: string;
+            /** Reject Reason Code */
+            reject_reason_code?: ("sender_unauthorized" | "customer_unresolved" | "duplicate_po_confirmed" | "credit_block" | "corrupt_input" | "policy_floor_breach") | null;
+            /**
+             * Validation Failures
+             * @default []
+             */
+            validation_failures: string[];
+        };
+        /**
+         * EmailOrderEntryFloorStatus
+         * @description The four "non-disable-able floor" checks (ADR-034 §4).
+         *
+         *     Each boolean is the GREEN/RED gate evidence the operator reviews
+         *     when authorising an email-channel order. Adapter populates these
+         *     from `record.enrichment_context.{sender_auth_context,
+         *     customer_resolution_context, duplicate_po_pre_check_context,
+         *     credit_check_context}` — the four `email_intake` gateway
+         *     operations declared on the recipe spec — and falls back to
+         *     `event.metadata.non_disableable_floor` defensively when a
+         *     gateway response is empty.
+         *
+         *     Compliance Pillar 1: even on a RED-shadowed record these fields
+         *     must be populated (gateway READS run before shadow_audit per
+         *     ADR-025).
+         */
+        EmailOrderEntryFloorStatus: {
+            /** Credit Clear */
+            credit_clear: boolean;
+            /** Customer Resolved */
+            customer_resolved: boolean;
+            /** Duplicate Po Clear */
+            duplicate_po_clear: boolean;
+            /** Sender Authorized */
+            sender_authorized: boolean;
         };
         /**
          * EntityProfile

@@ -346,11 +346,14 @@ export interface OrderAnalysis {
   price_hold_analysis?: PriceHoldAnalysisData;
   /** Present when an EDI 850 line mismatch produces sub_type classification (asoe2 adapt_edi_mismatch). */
   edi_mismatch_analysis?: EdiMismatchAnalysisData;
-  /** preview-only — Present when the EmailOrderEntry recipe classifies a
-   *  non-EDI email-channel order envelope (ADR-034). Backend adapter +
-   *  audit_bearing_registry rows land in Phase B; until then this field
-   *  is preview-only and rendered under Pillar 3's "Context Not Required
-   *  for Resolution" placeholder where appropriate. */
+  /** Present when the EmailOrderEntry recipe classifies a non-EDI
+   *  email-channel order envelope (ADR-034). Backend-backed:
+   *  `asoe2/api/analysis_adapters.py::adapt_email_order_entry` +
+   *  audit_bearing_registry rows shipped in Phase B. Floor evidence
+   *  (the four non-disable-able booleans) is sourced from the
+   *  `email_intake` gateway's four required_for_audit=True operations
+   *  via `enrichment_context` (Pillar 1 — gateway READS run before
+   *  shadow_audit per ADR-025). */
   email_order_entry_analysis?: EmailOrderEntryAnalysisData;
 }
 
