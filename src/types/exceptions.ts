@@ -355,6 +355,17 @@ export interface OrderAnalysis {
    *  via `enrichment_context` (Pillar 1 — gateway READS run before
    *  shadow_audit per ADR-025). */
   email_order_entry_analysis?: EmailOrderEntryAnalysisData;
+  /** Inbound email source-of-truth substrate (ADR-034 Phase G —
+   *  PO-driven IA correction). Backend-backed:
+   *  `asoe2/api/analysis_adapters.py::adapt_email_source` (SECONDARY
+   *  adapter on EmailOrderEntryRecipe.py) + audit_bearing_registry
+   *  rows for from_address / received_at / subject / body_hash /
+   *  attachment_manifest. Sourced from the `email_intake/fetch_message`
+   *  gateway's required_for_audit=True response. Mounts above the
+   *  EmailOrderEntrySection on the Exception Queue detail page so the
+   *  CSA sees both the source email and the agent's recommendation
+   *  on a single detail surface. */
+  email_source?: EmailSourceData;
 }
 
 /* ── Price Hold Release enrichment types (UI-only, not backend contract) ── */
@@ -407,6 +418,46 @@ export interface EdiMismatchAnalysisData {
   expected_value: unknown;
   received_value: unknown;
   notification_template: string | null;
+}
+
+/* ── Email Source enrichment types (ADR-034 Phase G) ────────────────── */
+
+/** One row in `EmailSourceData.attachment_manifest`. */
+export interface EmailAttachmentManifestEntry {
+  name: string;
+  mime_type: string;
+  bytes: number;
+}
+
+/**
+ * Inbound email source-of-truth substrate — present when the
+ * EmailOrderEntryRecipe ran and the `email_intake/fetch_message`
+ * gateway returned the inbound email metadata.
+ *
+ * Mounts on the Exception Queue detail page above
+ * `EmailOrderEntrySection` via data-presence dispatch (no per-intent
+ * page-level branching — CLAUDE.md Guardrail #1). Per ADR-034 §6
+ * (PO-driven IA correction), the operator authorising an
+ * email-channel order needs both the agent's recommendation AND the
+ * source-of-truth for the order they're acting on, on the same
+ * detail page.
+ */
+export interface EmailSourceData {
+  from_address: string;
+  received_at: string;
+  subject: string;
+  /** SHA-256 of the canonicalised email body (tamper detection). */
+  body_hash: string;
+  attachment_manifest: EmailAttachmentManifestEntry[];
+  /** Optional human-readable excerpt of the body (typically first 240
+   *  chars after canonicalisation). Contextual: absent when redaction
+   *  policy strips PII or the body is unavailable. */
+  body_excerpt?: string | null;
+  /** Optional Inbox correlation id (ADR-034 Phase G). When present,
+   *  the Exception Queue detail page surfaces a "View source email"
+   *  back-link to /inbox?msg=<id>. Contextual: absent when the
+   *  upstream `email-intelligence-agent` integration hasn't shipped. */
+  source_email_id?: string | null;
 }
 
 /* ── Email Order Entry enrichment types (ADR-034) ───────────────────── */

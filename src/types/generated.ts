@@ -774,6 +774,7 @@ export interface components {
             duplicate_detection?: components["schemas"]["DuplicateDetectionData"] | null;
             edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
             email_order_entry_analysis?: components["schemas"]["EmailOrderEntryAnalysisData"] | null;
+            email_source?: components["schemas"]["EmailSourceData"] | null;
             entity_profile?: components["schemas"]["EntityProfile"] | null;
             impact_metrics?: components["schemas"]["ImpactMetrics"] | null;
             /** Lines */
@@ -1267,6 +1268,28 @@ export interface components {
             sub_type: string;
         };
         /**
+         * EmailAttachmentManifestEntry
+         * @description One row in `EmailSourceData.attachment_manifest`.
+         *
+         *     `name` and `mime_type` are sufficient for the operator to
+         *     triage what arrived; `bytes` lets the UI render a size hint
+         *     and lets the audit trail check tampering against the inbound
+         *     payload. `body_hash` for the email body lives on
+         *     `EmailSourceData`; per-attachment hashes are out of scope until
+         *     a real attachment-store gateway lands (Phase F / ADR-036).
+         */
+        EmailAttachmentManifestEntry: {
+            /**
+             * Bytes
+             * @default 0
+             */
+            bytes: number;
+            /** Mime Type */
+            mime_type: string;
+            /** Name */
+            name: string;
+        };
+        /**
          * EmailOrderEntryAnalysisData
          * @description EmailOrderEntryRecipe → UI `email_order_entry_analysis`
          *     (ADR-034 Phase B).
@@ -1340,6 +1363,49 @@ export interface components {
             duplicate_po_clear: boolean;
             /** Sender Authorized */
             sender_authorized: boolean;
+        };
+        /**
+         * EmailSourceData
+         * @description EmailOrderEntryRecipe → UI `email_source` (ADR-034 Phase G).
+         *
+         *     Email-channel order intake source-of-truth substrate, projected
+         *     by `adapt_email_source` from
+         *     `record.enrichment_context["email_source_context"]` (the
+         *     `email_intake/fetch_message` gateway response).
+         *
+         *     Mirrors `asoe-ui/src/types/exceptions.ts::EmailSourceData`. Mounts on
+         *     the Exception Queue detail page above `EmailOrderEntrySection`
+         *     via data-presence dispatch (no per-intent page-level branching —
+         *     CLAUDE.md Guardrail #1).
+         *
+         *     Compliance posture (Verdict 2026-04-22):
+         *       * `from_address`, `received_at`, `subject`, `body_hash`,
+         *         `attachment_manifest` are audit-bearing — the operator
+         *         authorising the order needs to see the source-of-truth
+         *         substrate the recipe acted on.
+         *       * `body_excerpt` is contextual — the full body is referenced by
+         *         `body_hash` for tamper-detection and may be redacted from the
+         *         excerpt for PII; absence is a structural omission, not an
+         *         audit gap.
+         */
+        EmailSourceData: {
+            /**
+             * Attachment Manifest
+             * @default []
+             */
+            attachment_manifest: components["schemas"]["EmailAttachmentManifestEntry"][];
+            /** Body Excerpt */
+            body_excerpt?: string | null;
+            /** Body Hash */
+            body_hash: string;
+            /** From Address */
+            from_address: string;
+            /** Received At */
+            received_at: string;
+            /** Source Email Id */
+            source_email_id?: string | null;
+            /** Subject */
+            subject: string;
         };
         /**
          * EntityProfile
