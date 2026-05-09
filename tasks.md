@@ -998,11 +998,15 @@ plan and `asoe2/tasks.md` Phase 27 for the backend-side tracking.
 - [ ] **`/cases` is not in `NavBar` / `Sidebar`.** Users can't
       reach the surface from the primary nav. The route works
       via direct URL only.
-- [ ] **`/api/v1/cases/*` backend route** — does not exist on
-      asoe2. `casesApi.list/get` only resolves against
-      `MOCK_CASES`. Until the backend route ships, the live
-      deployment of `/cases` surfaces zero data even when
-      `NEXT_PUBLIC_USE_REAL_API=1`.
+- [x] **`/api/v1/cases/*` backend route** — shipped in
+      `asoe2/api/routes/cases.py` (Phase H.6 priority gap closed).
+      `GET /api/v1/cases` (filters: source / status; sorted
+      newest-first) and `GET /api/v1/cases/{case_id}`. Tenant-
+      isolated; partner + assigned-account scoping derives in-
+      scope cases from their child `ExceptionRecord` rows. The
+      response shape (`{ items: OrderCase[]; total: number }`)
+      matches `casesApi.list`'s declared return type 1:1, so no
+      UI changes are needed when flipping `NEXT_PUBLIC_USE_REAL_API=1`.
 - [ ] **List-view-projection reframing** — ADR-038 §H.6 plans
       `/inbox` and `/exceptions` as filtered case-list views
       of `/cases`. They remain independent primaries today.
