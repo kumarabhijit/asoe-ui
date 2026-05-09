@@ -897,3 +897,130 @@ the design rationale.
       back-to-back FAILED records (the ADR-027 verdict-coverage
       demos clustered on 2026-04-18 originally).
 
+## Phase 14 — Case-centric direction notice + /cases surface
+##           (asoe2 ADR-038 Phase H.6, partial)
+
+Companion to `kumarabhijit/asoe2#114` — ADR-038 + ADR-039 + Phase
+H.1–H.7 on the backend. asoe-ui's slice is **§13 direction notice
++ Phase H.6 primitive `/cases` page**. See
+`asoe2/docs/plans/case-centric-rollout.md` for the full per-phase
+plan and `asoe2/tasks.md` Phase 27 for the backend-side tracking.
+
+### 14.1 ui_architecture.md §13 direction notice
+- [x] §13.1 — what changes for the UI in Phase H.6 (new `/cases`
+      primary surface, `CaseDetailPanel` reshape, existing
+      `*Section.tsx` mount unchanged via the data-presence
+      pattern, `/inbox` and `/exceptions` retained as filtered
+      case-list views).
+- [x] §13.2 — what stays unchanged (Guardrails #1, #6, #7 all
+      tighten with the case-centric model, not loosen).
+- [x] §13.3 — what's needed before Phase H.6 fully ships
+      (asoe2 Phase H.2 / H.3 data model first; design specs /
+      layout sketches / migration strategy are Frontend
+      Platform deliverables).
+- [x] §13.4 — what this notice does **not** do (no code, no
+      guardrail changes, no `ExceptionDetailPanel` deprecation,
+      no Phase G impact — Phase G's UI is what `CaseDetailPanel`
+      renders for Manual Orders).
+- [x] §13.5 — design discussion can start now.
+
+### 14.2 Phase H.6 primitive (`/cases` surface) — shipped
+- [x] `src/types/cases.ts` — `CaseSource`, `CaseStatus`,
+      `CaseTier`, `OrderCase`, `CaseEvent`, `SlaBand`,
+      `SlaSnapshot`. Mirrors asoe2's Pydantic types 1:1.
+- [x] `src/lib/api.ts` — `casesApi.list/get`, `MOCK_CASES`
+      (3 fixtures), `ALLOWED_CASE_SOURCES`. Mock-mode only
+      until the backend route ships (see 14.4 below).
+- [x] `src/app/cases/page.tsx` — list view with SLA-driven sort,
+      filter chips iterating `ALLOWED_CASE_SOURCES`,
+      `slaSnapshot()` helper with band thresholds (<2h
+      `at_risk`, 2–24h `today`, >24h `comfortable`).
+- [x] `src/app/cases/[id]/page.tsx` — thin wrapper loading
+      `OrderCase` + delegating to `CaseDetailPanel`.
+- [x] `src/app/cases/CaseDetailPanel.tsx` — case header with
+      `<EvidenceBlock>` for audit-bearing fields. Dumb
+      projector — does **not** dispatch on intent (Guardrail #1
+      / §13.2).
+- [x] `tests/architectural/cases_no_per_intent_dispatch.test.ts` —
+      locks the no-per-intent-dispatch invariant so future
+      contributors can never reintroduce intent-keyed branching
+      on the case detail surface.
+- [x] `tests/components/CasesPage.test.tsx` — 11 tests covering
+      sort, filter chips, SLA band, navigation.
+
+### 14.3 Review-finding fixes (#130)
+- [x] `src/types/exceptions.ts` `TerminalStatus` union extended
+      with `AUDIT_CONTEXT_MISSING` (the workshop-mandated
+      registry-enforced audit-gap status). Both runtime
+      consumers — `EventsTimeline.tsx::haltOutcomeLabel` and
+      `DiagnosticsSection.tsx::pipelineStatusBadge` — already
+      had explicit cases; the type union now matches.
+- [x] `tests/fixtures.ts::MOCK_STATS.by_lifecycle_state`
+      rebalanced — `EXECUTING: 1` removed (Phase 19 retired
+      the lifecycle), `RESOLVED 3 → 4` to keep the
+      `by_intent` / `by_lifecycle_state` roundtrip invariant
+      green.
+
+### 14.4 Type-safety baseline + CI gate (#131, #132)
+- [x] `tests/vitest-globals.d.ts` — wires vitest's runtime
+      globals (`describe` / `it` / `expect` / `vi` /
+      `beforeEach`) into tsc compilation via triple-slash
+      reference, plus `Matchers<T>` augmentation so
+      `toHaveNoViolations` from vitest-axe type-checks under
+      vitest 4.x's module-export model. Drops 757 of 791
+      previously-spurious tsc errors.
+- [x] `OverrideRequest` (deprecated) → `DispositionRequest`
+      across 3 test files; required `reason_tag` field added
+      to disposition payloads; `risk_acknowledgment: true`
+      added to `AdminReleaseRequest` payloads.
+- [x] `EXECUTING` lifecycle literal replaced with `RESOLVED`
+      across test fixtures (Phase 19 retirement; mirrors the
+      rebalance in `src/lib/api.ts:1849`).
+- [x] Non-null assertions on fixture-guaranteed-present
+      `analysis.entity_profile` / `analysis.impact_metrics`
+      (4 sites). The contract types these as `… | undefined`
+      because the analysis can run without enrichment; tests
+      know enrichment is present in their fixtures.
+- [x] `null` → `undefined` for `selected_recipe` / `execution_log`
+      on `ResolveResponse` / `ExceptionDetail`. The wire schema
+      returns `null`; the `api.ts` client normalises to
+      `undefined` before the typed contract sees it.
+- [x] `npm run typecheck` script + `.github/workflows/typecheck.yml`
+      gate. Runs `tsc --noEmit` on every PR touching `src/`,
+      `tests/`, `package*.json`, or `tsconfig.json`. Catches
+      drift `next build` cannot — `next build` only type-checks
+      the `src/` graph it actually compiles, so `tests/` was
+      invisible until this gate landed.
+- [x] `tsc --noEmit` baseline: **0 errors** (was 791 before
+      the trio of PRs).
+
+### 14.5 Phase H.6 — pending integration
+- [ ] **`/cases` is not in `NavBar` / `Sidebar`.** Users can't
+      reach the surface from the primary nav. The route works
+      via direct URL only.
+- [ ] **`/api/v1/cases/*` backend route** — does not exist on
+      asoe2. `casesApi.list/get` only resolves against
+      `MOCK_CASES`. Until the backend route ships, the live
+      deployment of `/cases` surfaces zero data even when
+      `NEXT_PUBLIC_USE_REAL_API=1`.
+- [ ] **List-view-projection reframing** — ADR-038 §H.6 plans
+      `/inbox` and `/exceptions` as filtered case-list views
+      of `/cases`. They remain independent primaries today.
+- [ ] **Playwright e2e for `/cases`** — no spec yet; would
+      need the asoe2 `/api/v1/cases/*` route in place first.
+- [ ] **Design fidelity polish** — current `/cases` ships the
+      architectural primitive. Frontend Platform + UX have
+      not yet finalised list-row anatomy, SLA-band visual
+      treatment, or the case-detail evidence layout.
+
+### 14.6 Open against ADR-038 (cross-ref `asoe2/tasks.md` Phase 27)
+- [ ] Spec relocation —
+      `docs/specs/order-entry-from-email-product-spec.md` →
+      `knowledge/skills/email-order-entry/specs/order_entry_spec.md`
+      (asoe2-side; touches 4 reference paths).
+- [ ] `MANUAL_ORDER_INTAKE` rename of `EMAIL_ORDER_ENTRY` —
+      optional channel-neutral cleanup, deferred until backend
+      Phase H.5 wire-up.
+- [ ] Compliance ratification of ADR-038 §7.4 (compaction)
+      and §8.5 (governance) — pending workshop.
+

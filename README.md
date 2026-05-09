@@ -15,6 +15,17 @@ npm run dev
 # Login: jane@acme.com / password
 ```
 
+### Useful npm scripts
+
+| Script | Purpose |
+|---|---|
+| `npm run dev` | Next.js dev server on port 3000 |
+| `npm run build` | Production build (type-checks the `src/` graph as a side-effect) |
+| `npm test` | Vitest unit + component + architectural suite (run all once) |
+| `npm run typecheck` | `tsc --noEmit` across the full project — **including `tests/`**. The `npm run build` type-check pass only sees `src/`; this is the gate that catches drift in fixtures and test contracts |
+| `npm run test:browser` | Playwright e2e (chromium); brings up asoe2 + asoe-ui dev servers via `playwright.config.ts::webServer` |
+| `npm run test:coverage` | Vitest with V8 coverage report |
+
 ---
 
 ## Demo flows (mock mode)
@@ -26,6 +37,7 @@ The mock API (`src/lib/api.ts`) is seeded so you can exercise every governance f
 - **Four-eyes cosign:** exception IDs `exc-001` and `exc-010` are seeded in `MOCK_FINANCIAL_IMPACT_USD` above the cosign threshold ($25K and $42.5K respectively). Sign in as one manager, click `Override…` and submit an override — the record transitions to `PENDING_COSIGN` and the cosign banner appears. Sign in as a **different** manager/admin (via the `UserSwitcher` in the nav) to see `[Approve cosign]` / `[Reject cosign]`. The initiator sees a read-only "Awaiting cosign" message (segregation of duties).
 - **Escalate:** available to analyst+ via the `exceptions:escalate` permission; wired to `exceptionsApi.escalate()`.
 - **Re-analyze:** YELLOW / RED / FAILED records show a `Re-analyze` button (manager+). Mandatory reason. Capped at 3 attempts.
+- **Case-centric primary surface (preview):** navigate directly to `/cases` (the route is not yet linked from the NavBar — it ships behind a direct URL until Phase H.6 fully integrates). Mock-mode lists 3 `OrderCase` fixtures with SLA-driven sort and filter chips per `CaseSource`. Mirrors asoe2's ADR-038 Phase H.6 primitive; the live deployment surfaces zero data until the asoe2 `/api/v1/cases/*` route lands.
 
 Every mutating call sends a client-generated `Idempotency-Key` (UUID v4) so repeated clicks are safe.
 
@@ -56,6 +68,7 @@ asoe-ui/
 │   │   ├── layout.tsx            # Root layout (skip-to-main, Providers wrapper)
 │   │   ├── providers.tsx         # Client-side providers (SessionProvider + ToastProvider)
 │   │   ├── exceptions/           # Exception Queue (three-pane Outlook) + 13 decomposed detail sub-components
+│   │   ├── cases/                # Case-centric primary surface (ADR-038 Phase H.6 primitive — mock-mode only until asoe2 /api/v1/cases/* lands)
 │   │   ├── dashboard/            # Analytics dashboard + recent activity feed
 │   │   ├── inbox/                # Customer Inbox (AI email triage, two-pane)
 │   │   ├── settings/             # Settings page (Phase 9 stub — admin, SSO, agent config)
