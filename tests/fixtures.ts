@@ -219,10 +219,15 @@ export const MOCK_STATS: StatsResponse = {
     EDI_MISMATCH: 2,
   },
   by_lifecycle_state: {
-    RESOLVED: 3,
+    // Counts rebalanced after asoe2 retired EXECUTING (Phase 19) —
+    // the previously-EXECUTING exception now lands RESOLVED, mirroring
+    // the same rebalance done in src/lib/api.ts MOCK_STATS. Sum stays
+    // at 12 so the roundtrip invariant
+    // (price_hold_release_data_flow.test.tsx::"totals across breakdowns
+    // stay consistent") holds.
+    RESOLVED: 4,
     PENDING_REVIEW: 4,
     BLOCKED: 2,
-    EXECUTING: 1,
     ESCALATED: 1,
     CLOSED: 1,
   },
