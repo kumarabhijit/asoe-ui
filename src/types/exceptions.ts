@@ -34,7 +34,14 @@ export type TerminalStatus =
   | "FAIL_TO_HUMAN"
   | "MANUAL_REVIEW_REQUIRED"
   | "BLOCKED"
-  | "REJECTED";
+  | "REJECTED"
+  // Registry-enforced audit gap. Emitted by `api/analysis_composer.py`
+  // when one or more audit-bearing fields declared in
+  // `compliance/audit_bearing_registry.yaml` cannot be populated. The
+  // UI runtime is fully wired (DiagnosticsSection, EventsTimeline,
+  // WaterfallStepper, EvidenceBlock all switch on this value); the
+  // type union just hadn't tracked the addition. Guardrail #3.
+  | "AUDIT_CONTEXT_MISSING";
 
 /**
  * Exception lifecycle state — persistence-level state machine
