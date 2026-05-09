@@ -15,6 +15,7 @@ import {
   Clock, FileText, AlertTriangle, RefreshCw,
 } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
+import { CaseViewBanner } from "@/components/ui/CaseViewBanner";
 import { MetricTile } from "@/components/ui/MetricTile";
 import { Badge, categoryVariant, inboxStatusVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -200,6 +201,13 @@ function InboxPageInner() {
         agentCount={health?.allowed_intents?.length || 0}
         onSignOut={() => signOut({ callbackUrl: "/login" })}
 
+      />
+
+      {/* ADR-038 §H.6 — banner makes the case-view relationship
+          explicit while the deeper data-hook swap is in flight. */}
+      <CaseViewBanner
+        scopeLabel="Manual Order Inbox"
+        casesHref="/cases?source=manual_order"
       />
 
       {/* ── PAGE HEADER ── */}
