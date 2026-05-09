@@ -25,7 +25,11 @@ import type {
 import type {
   ChallengeRequest,
   AdminReleaseRequest,
-  OverrideRequest,
+  // OverrideRequest was unified into DispositionRequest as part of
+  // Phase 19's /disposition consolidation. The override-style payload
+  // (action + mandatory notes) now travels through the disposition
+  // endpoint with an additional `reason_tag` for SOX traceability.
+  DispositionRequest,
 } from "@/types/api";
 
 import { lifecycleVariant } from "@/components/ui/Badge";
@@ -105,12 +109,13 @@ describe("GREEN tier — Challenge type contract", () => {
 // ---------------------------------------------------------------------------
 
 describe("YELLOW tier — Override type contract (updated)", () => {
-  it("OverrideRequest has mandatory notes (SOX)", () => {
+  it("override-style disposition has mandatory notes (SOX)", () => {
     // `resolved_by` was removed as part of the trust-boundary fix — backend
     // always uses the caller's identity, never a client-supplied value.
-    const req: OverrideRequest = {
+    const req: DispositionRequest = {
       action: "ALLOW_BOTH",
       notes: "Buyer confirmed both POs are intentional",
+      reason_tag: "INTENTIONAL_REORDER",
     };
     expect(typeof req.notes).toBe("string");
     // notes is now required, not optional
@@ -123,9 +128,10 @@ describe("YELLOW tier — Override type contract (updated)", () => {
       "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION",
     ];
     for (const action of validActions) {
-      const req: OverrideRequest = {
+      const req: DispositionRequest = {
         action,
         notes: `Testing ${action}`,
+        reason_tag: "OTHER",
       };
       expect(validActions).toContain(req.action);
     }
@@ -192,10 +198,13 @@ describe("RED tier — Admin Release type contract", () => {
     };
     const approved: ExceptionDetail = {
       ...released,
-      lifecycle_state: "EXECUTING",
+      // Phase 19 retired EXECUTING — the post-admin-release approve
+      // path now lands the record in RESOLVED, mirroring the rebalance
+      // documented in src/lib/api.ts:1849-1850.
+      lifecycle_state: "RESOLVED",
       resolved_by: "admin@example.com",
     };
-    expect(approved.lifecycle_state).toBe("EXECUTING");
+    expect(approved.lifecycle_state).toBe("RESOLVED");
     expect(approved.resolved_by).toBe("admin@example.com");
   });
 
@@ -221,7 +230,10 @@ describe("Three-tier state machine — valid source states", () => {
   it("challenge only from RESOLVED", () => {
     const validSources: LifecycleState[] = ["RESOLVED"];
     const invalidSources: LifecycleState[] = [
-      "PENDING_REVIEW", "BLOCKED", "EXECUTING", "ESCALATED",
+      // EXECUTING was retired in Phase 19; the prior "intermediate
+      // post-execute" lifecycle no longer exists, so the challenge
+      // gate's invalid-source list shrinks accordingly.
+      "PENDING_REVIEW", "BLOCKED", "ESCALATED",
     ];
     expect(validSources).toHaveLength(1);
     expect(invalidSources).not.toContain("RESOLVED");
@@ -291,10 +303,11 @@ describe("Backend ↔ Frontend alignment — three-tier schemas", () => {
     expect("risk_acknowledgment" in req).toBe(true);
   });
 
-  it("OverrideRequest notes is now mandatory (no longer optional)", () => {
-    const req: OverrideRequest = {
+  it("override-style disposition notes is now mandatory (no longer optional)", () => {
+    const req: DispositionRequest = {
       action: "ALLOW_BOTH",
       notes: "Mandatory for SOX",
+      reason_tag: "OTHER",
     };
     // TypeScript enforces non-optional notes
     expect(typeof req.notes).toBe("string");
@@ -326,9 +339,10 @@ describe("Three-tier HITL invariants — PRICE_HOLD_RELEASE", () => {
   });
 
   it("override on PHR HARD_BLOCK requires mandatory notes (SOX)", () => {
-    const req: OverrideRequest = {
+    const req: DispositionRequest = {
       action: "ALLOW_BOTH",
       notes: "Manager override: customer accepted current pricing.",
+      reason_tag: "policy_exception",
     };
     expect(req.notes.length).toBeGreaterThan(0);
   });
@@ -349,9 +363,10 @@ describe("Three-tier HITL invariants — EDI_MISMATCH", () => {
   });
 
   it("override on EDM SKU requires mandatory notes (SOX)", () => {
-    const req: OverrideRequest = {
+    const req: DispositionRequest = {
       action: "BLOCK_AND_NOTIFY",
       notes: "Manager confirms hard reject; notify buyer of SKU mismatch.",
+      reason_tag: "policy_exception",
     };
     expect(req.notes.length).toBeGreaterThan(0);
   });
