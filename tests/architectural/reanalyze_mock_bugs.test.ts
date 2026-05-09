@@ -102,7 +102,7 @@ describe("Mock write updated_at persistence (Bug #2 — covers every action)", (
     await assertUpdatedAtAdvances("exc-009", () =>
       exceptionsApi.disposition(
         "exc-009",
-        { action: "BLOCK_AND_NOTIFY", notes: "approving" },
+        { action: "BLOCK_AND_NOTIFY", notes: "approving", reason_tag: "OTHER" },
       ),
     );
   });
@@ -112,7 +112,7 @@ describe("Mock write updated_at persistence (Bug #2 — covers every action)", (
     await assertUpdatedAtAdvances("exc-014", () =>
       exceptionsApi.disposition(
         "exc-014",
-        { action: "NO_ACTION", notes: "rejecting" },
+        { action: "NO_ACTION", notes: "rejecting", reason_tag: "other" },
       ),
     );
   });
@@ -135,7 +135,7 @@ describe("Mock write updated_at persistence (Bug #2 — covers every action)", (
   it("adminRelease advances updated_at and persists to refetch", async () => {
     // exc-019 is RED EDI_MISMATCH BLOCKED — admin-release-eligible.
     await assertUpdatedAtAdvances("exc-019", () =>
-      exceptionsApi.adminRelease("exc-019", { release_reason: "false positive" }),
+      exceptionsApi.adminRelease("exc-019", { release_reason: "false positive", risk_acknowledgment: true }),
     );
   });
 });

@@ -332,7 +332,7 @@ describe("DUPLICATE_PO OrderAnalysis type contract", () => {
   });
 
   it("has entity profile for the customer", () => {
-    const ep: EntityProfile = dupPoAnalysis.entity_profile;
+    const ep: EntityProfile = dupPoAnalysis.entity_profile!;
     expect(ep.customer_name).toBe("QuickMart Distribution");
     expect(ep.bp_number).toBeDefined();
     expect(ep.customer_tier).toBeDefined();
@@ -341,7 +341,7 @@ describe("DUPLICATE_PO OrderAnalysis type contract", () => {
   });
 
   it("has impact metrics showing revenue at risk", () => {
-    const im: ImpactMetrics = dupPoAnalysis.impact_metrics;
+    const im: ImpactMetrics = dupPoAnalysis.impact_metrics!;
     expect(im.revenue_at_risk).toBe(6720.0);
     expect(im.delta_amount).toBe(0); // Duplicate PO has zero price delta
     expect(im.sla_priority).toBe("HIGH");
@@ -534,12 +534,15 @@ describe("DUPLICATE_PO lifecycle state transitions", () => {
     expect(lowConf.final_status).toBe("COMPLETE");
   });
 
-  it("after approve: PENDING_REVIEW → EXECUTING", () => {
+  it("after approve: PENDING_REVIEW → RESOLVED", () => {
+    // Phase 19 retired the EXECUTING intermediate state — approve from
+    // PENDING_REVIEW now lands directly in RESOLVED (mirrors the
+    // rebalance documented in src/lib/api.ts:1849-1850).
     const approved: ExceptionDetail = {
       ...makeExceptionDetail(YELLOW_EXCEPTION),
-      lifecycle_state: "EXECUTING",
+      lifecycle_state: "RESOLVED",
     };
-    expect(approved.lifecycle_state).toBe("EXECUTING");
+    expect(approved.lifecycle_state).toBe("RESOLVED");
   });
 
   it("after reject: PENDING_REVIEW → REJECTED", () => {

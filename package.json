@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
     "generate-types": "openapi-typescript ../asoe2/openapi/asoe2.openapi.json -o src/types/generated.ts",
     "verify-types": "openapi-typescript ../asoe2/openapi/asoe2.openapi.json -o /tmp/asoe-ui.generated.ts && diff -q src/types/generated.ts /tmp/asoe-ui.generated.ts",
     "test:browser": "playwright test",

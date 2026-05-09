@@ -27,7 +27,10 @@ import type {
   ResolveResponse,
   ChallengeRequest,
   AdminReleaseRequest,
-  OverrideRequest,
+  // OverrideRequest was unified into DispositionRequest in Phase 19's
+  // /disposition consolidation — see three_tier_hitl.test.tsx for the
+  // companion rename.
+  DispositionRequest,
 } from "@/types/api";
 
 import {
@@ -100,7 +103,9 @@ describe("CONTRACTUAL_CORRECTION type contracts", () => {
       effect_results: [],
     };
     expect(resp.final_status).toBe("COMPLETE");
-    expect(resp.execution_log?.outputs["applied_condition"]).toBe("YK07");
+    expect(
+      (resp.execution_log?.outputs as Record<string, unknown>)["applied_condition"],
+    ).toBe("YK07");
   });
 
   it("over-threshold pricing correction → FAIL_TO_HUMAN", () => {
@@ -192,13 +197,13 @@ describe("CONTRACTUAL_CORRECTION OrderAnalysis", () => {
   });
 
   it("entity profile has customer tier and credit standing", () => {
-    expect(analysis.entity_profile.customer_tier).toBe("Gold");
-    expect(analysis.entity_profile.credit_standing).toBe("Good");
+    expect(analysis.entity_profile!.customer_tier).toBe("Gold");
+    expect(analysis.entity_profile!.credit_standing).toBe("Good");
   });
 
   it("impact metrics show delta percentage for pricing", () => {
-    expect(analysis.impact_metrics.delta_percentage).toBe(11.3);
-    expect(analysis.impact_metrics.affected_lines).toBe(3);
+    expect(analysis.impact_metrics!.delta_percentage).toBe(11.3);
+    expect(analysis.impact_metrics!.affected_lines).toBe(3);
   });
 });
 
@@ -228,33 +233,39 @@ describe("CREDIT_BLOCK type contracts", () => {
     expect(exc.final_status).toBe("MANUAL_REVIEW_REQUIRED");
   });
 
-  it("YELLOW verdict halts before recipe — selected_recipe may be null from backend", () => {
-    // Backend: YELLOW shadow halts pipeline before recipe selection
+  it("YELLOW verdict halts before recipe — selected_recipe absent from backend", () => {
+    // Backend: YELLOW shadow halts pipeline before recipe selection.
+    // The wire response carries null; the api.ts client normalises
+    // null → undefined before it reaches the UI's typed contract,
+    // which is why ResolveResponse's recipe / execution_log fields
+    // are `string | undefined` / `Record<string, unknown> | undefined`.
     const backendResp: ResolveResponse = {
       exception_id: "exc-cb-001",
       trace_id: "trace-cb-001",
       intent: "CREDIT_BLOCK",
       shadow_verdict: "YELLOW",
-      selected_recipe: null,
+      selected_recipe: undefined,
       final_status: "MANUAL_REVIEW_REQUIRED",
       explanation: "Credit path requires manual review by policy.",
-      execution_log: null,
+      execution_log: undefined,
       effect_results: [],
     };
-    expect(backendResp.selected_recipe).toBeNull();
-    expect(backendResp.execution_log).toBeNull();
+    expect(backendResp.selected_recipe).toBeUndefined();
+    expect(backendResp.execution_log).toBeUndefined();
   });
 
-  it("credit block HITL: approve transitions to EXECUTING", () => {
+  it("credit block HITL: approve transitions to RESOLVED", () => {
+    // Phase 19 retired EXECUTING — manager-approved credit-block now
+    // lands directly in RESOLVED.
     const approved: ExceptionDetail = {
       id: "exc-cb-001",
       tenant_id: "tenant-a",
       order_id: "SO-CB-001",
       event_type: "CREDIT_LIMIT_BREACH",
       intent: "CREDIT_BLOCK",
-      lifecycle_state: "EXECUTING",
+      lifecycle_state: "RESOLVED",
       shadow_verdict: "YELLOW",
-      selected_recipe: null,
+      selected_recipe: undefined,
       final_status: "MANUAL_REVIEW_REQUIRED",
       created_at: "2026-04-12T10:00:00Z",
       updated_at: "2026-04-12T10:05:00Z",
@@ -263,7 +274,7 @@ describe("CREDIT_BLOCK type contracts", () => {
       resolved_action: undefined,
       resolution_notes: "Credit limit increase approved by Finance",
     };
-    expect(approved.lifecycle_state).toBe("EXECUTING");
+    expect(approved.lifecycle_state).toBe("RESOLVED");
     expect(approved.resolved_by).toBe("manager@example.com");
   });
 
@@ -276,7 +287,7 @@ describe("CREDIT_BLOCK type contracts", () => {
       intent: "CREDIT_BLOCK",
       lifecycle_state: "REJECTED",
       shadow_verdict: "YELLOW",
-      selected_recipe: null,
+      selected_recipe: undefined,
       final_status: "REJECTED",
       created_at: "2026-04-12T10:00:00Z",
       updated_at: "2026-04-12T10:05:00Z",
@@ -291,9 +302,10 @@ describe("CREDIT_BLOCK type contracts", () => {
   it("credit block can be overridden with a different action", () => {
     // `resolved_by` was removed as part of the trust-boundary fix — backend
     // always uses the caller's identity, never a client-supplied value.
-    const req: OverrideRequest = {
+    const req: DispositionRequest = {
       action: "ALLOW_BOTH",
       notes: "One-time exception — VIP customer with pending payment confirmed",
+      reason_tag: "customer_concession",
     };
     expect(req.action).toBe("ALLOW_BOTH");
     expect(typeof req.notes).toBe("string");
@@ -331,12 +343,12 @@ describe("CREDIT_BLOCK OrderAnalysis", () => {
   };
 
   it("credit-specific entity profile shows At Risk credit standing", () => {
-    expect(analysis.entity_profile.credit_standing).toBe("At Risk");
+    expect(analysis.entity_profile!.credit_standing).toBe("At Risk");
   });
 
   it("impact metrics show CRITICAL SLA priority", () => {
-    expect(analysis.impact_metrics.sla_priority).toBe("CRITICAL");
-    expect(analysis.impact_metrics.revenue_at_risk).toBe(13782.0);
+    expect(analysis.impact_metrics!.sla_priority).toBe("CRITICAL");
+    expect(analysis.impact_metrics!.revenue_at_risk).toBe(13782.0);
   });
 
   it("recommendation is to escalate", () => {
@@ -377,19 +389,22 @@ describe("MASS_PRICING_ERROR type contracts", () => {
   });
 
   it("RED verdict blocks — no recipe, no execution_log", () => {
+    // Backend wire: selected_recipe / execution_log are null. The
+    // api.ts client normalises to undefined before reaching
+    // ResolveResponse's typed contract.
     const resp: ResolveResponse = {
       exception_id: "exc-mp-001",
       trace_id: "trace-mp-001",
       intent: "MASS_PRICING_ERROR",
       shadow_verdict: "RED",
-      selected_recipe: null,
+      selected_recipe: undefined,
       final_status: "BLOCKED",
       explanation: "Systemic pricing failure requires human escalation.",
-      execution_log: null,
+      execution_log: undefined,
       effect_results: [],
     };
-    expect(resp.selected_recipe).toBeNull();
-    expect(resp.execution_log).toBeNull();
+    expect(resp.selected_recipe).toBeUndefined();
+    expect(resp.execution_log).toBeUndefined();
     expect(resp.final_status).toBe("BLOCKED");
   });
 
