@@ -822,3 +822,47 @@ Per-intent reason_tag vocabulary curation is deferred — tracked in `asoe2/task
 | Permission flags | `src/lib/roles.ts` (`exceptions:approve`, `exceptions:override`, `exceptions:escalate`) |
 | Request/response DTOs | `src/types/contracts.ts` (aliases from `generated.ts`) |
 | Lifecycle state union | `src/types/exceptions.ts` (`LifecycleState`) |
+
+---
+
+## 13. Pending architectural shift — case-centric direction (asoe2 ADR-038, Proposed)
+
+**Lineage hint for the next reader.** asoe2 has authored `ADR-038 — Case-Centric Order Intake (Five-Layer Agentic Architecture)` in *Proposed* status. When ratified, it shifts the user-facing primary surface from `/exceptions` (with `/inbox` as a peer) to `/cases` as a single CSR work surface, with `/exceptions` and `/inbox` retained as filtered case-list views.
+
+### 13.1 What changes for the UI (Phase H.6 of the rollout)
+
+* **`/cases` becomes the primary CSR surface.** A new top-level page with SLA-driven sort and filter chips for case `source` (Manual / Automated), tier, customer, lifecycle status.
+* **`CaseDetailPanel` reshapes the existing `ExceptionDetailPanel`.** The case header (source, source_channel, SLA deadline, lifecycle status) sits at the top; child records (one or more `ExceptionRecord` rows attached to the case via `parent_case_id`) stack below as section components.
+* **Existing `*Section.tsx` components mount unchanged** via the existing data-presence pattern (Guardrail #1 preserved — no per-intent dispatch). `EmailSourceSection`, `EmailOrderEntrySection`, `MOQSection`, etc., are projection-only and render the case's child analyses.
+* **`/inbox` and `/exceptions` retain** as filtered case-list views for ADR-034 §6 backward compatibility. `/exceptions` filters to cases with at least one open exception child; `/inbox` filters to cases with `source == "manual_order"` and a recent inbound channel event. Both routes redirect to `/cases?filter=...` under the hood after Phase H.6 lands.
+
+### 13.2 What stays unchanged
+
+* **Guardrail #1 (no hardcoded enum values).** The case-source vocabulary (`manual_order` / `automated_order`) is sourced from `useHealth.allowed_case_sources` — no hardcoded literals in the page code.
+* **Guardrail #6 (no frontend composition of enrichment payloads).** The case detail still consumes a backend-assembled payload; `OrderCase` + child records arrive from the API, and section components render `analysis.foo` as given.
+* **Guardrail #7 (rich UI types are a product commitment).** New `OrderCase` + `CaseEvent` interfaces in `src/types/cases.ts` (NEW; mirrors asoe2's Pydantic models) follow the same don't-prune-without-Compliance discipline as existing `*AnalysisData` types.
+
+### 13.3 What's needed before Phase H.6 starts
+
+* **`OrderCase` Pydantic model on the asoe2 side** must ship and be exposed via the API — that's asoe2's Phase H.2 / H.3 scope.
+* **Design specifications** for `/cases` list view layout, SLA visual treatment, breached-state surfacing, filter-chip semantics. Frontend Platform + UX deliverable.
+* **`CaseDetailPanel` layout sketch** — case header anatomy, child-stack ordering, action button placement.
+* **Migration strategy** for `/inbox` and `/exceptions` to redirect-or-filter without breaking existing user bookmarks and tests.
+
+### 13.4 What this notice does NOT do
+
+* **Does not commit any UI code.** Phase H.6 is weeks away on the rollout schedule; no code lands in this branch.
+* **Does not change Guardrails #1–#7.** They tighten with the case-centric model, not loosen.
+* **Does not deprecate `ExceptionDetailPanel`.** It evolves into `CaseDetailPanel`; existing component tests + lock tests stay green throughout.
+* **Does not affect Phase G work** (the in-flight `EmailSourceSection` above `EmailOrderEntrySection` on `claude/review-order-entry-architecture-RCIUa`). Phase G's UI work is correct under the case-centric model and is what `CaseDetailPanel` will render for Manual Orders.
+
+### 13.5 Design discussion can start now
+
+Even though the UI code lands in Phase H.6, the asoe2 Phase H.2 / H.3 work (case primitive + lazy materialisation) gives Frontend Platform a concrete data model to design against. Recommended early activities:
+
+1. Whiteboard `/cases` list view against the `OrderCase` Pydantic schema.
+2. Sketch the case-header layout: source chip, SLA countdown component, lifecycle status badge.
+3. Identify reusable patterns from existing `ExceptionDetailPanel` (saved-views menu, list pane, details pane) that translate directly.
+4. Define the `/inbox` and `/exceptions` redirect / filter rules so the migration story is owned by Frontend Platform from day one.
+
+For the current ADR-038 / ADR-039 review cycle, this section flags Frontend Platform's scope without committing schedule or code. The full Phase H.6 specification follows when asoe2's Phase H.3 ships.

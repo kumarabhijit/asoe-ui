@@ -53,6 +53,8 @@ import { PalletConfigSection } from "./PalletConfigSection";
 import { DeliveryDelaySection } from "./DeliveryDelaySection";
 import { PriceHoldSection } from "./PriceHoldSection";
 import { EdiMismatchSection } from "./EdiMismatchSection";
+import { EmailOrderEntrySection } from "./EmailOrderEntrySection";
+import { EmailSourceSection } from "./EmailSourceSection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -687,6 +689,20 @@ export default function ExceptionDetailPanel({
           {analysis?.edi_mismatch_analysis && (
             <CollapsibleSection title="EDI Mismatch">
               <EdiMismatchSection data={analysis.edi_mismatch_analysis} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-034 Phase G — EmailSourceSection mounts ABOVE the
+              recipe-recommendation section so the CSA sees the source
+              email substrate first, then the agent's recommendation.
+              Both gated by data-presence; no per-intent dispatch. */}
+          {analysis?.email_source && (
+            <CollapsibleSection title="Source Email">
+              <EmailSourceSection data={analysis.email_source} />
+            </CollapsibleSection>
+          )}
+          {analysis?.email_order_entry_analysis && (
+            <CollapsibleSection title="Email Order Intake">
+              <EmailOrderEntrySection data={analysis.email_order_entry_analysis} />
             </CollapsibleSection>
           )}
 

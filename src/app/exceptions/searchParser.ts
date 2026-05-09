@@ -74,12 +74,50 @@ const OPERATOR_KEYS: ReadonlySet<OperatorKey> = new Set([
  * spaces inside a value (e.g., `account:"acme corp"`). Quotes are
  * stripped from the parsed value.
  */
+/**
+ * SCREAMING_SNAKE_CASE single-token shortcut.
+ *
+ * When the entire query is one bare token shaped like an enum value
+ * (`/^[A-Z][A-Z0-9_]+$/` with at least one underscore, length ≥ 4),
+ * promote it to an `intent:` operator instead of letting it fall
+ * through to Fuse fuzzy matching.
+ *
+ * Why: Fuse with `threshold: 0.4` + `ignoreLocation: true` returns
+ * the *closest* row when no exact match exists. A user typing
+ * `EMAIL_ORDER_ENTRY` without any matching record would otherwise see
+ * an unrelated `MIN_ORDER_QTY` row surface (shared `_ORDER_`
+ * substring). Promoting to `intent:` yields zero matches when no
+ * record has that intent — surprising-but-correct rather than
+ * surprising-and-wrong.
+ *
+ * Trade-off: the promotion is silent (no warning) because typing an
+ * intent value is the obviously intended behaviour. Users who want a
+ * substring search for an enum-shaped string can wrap it in quotes —
+ * `"EMAIL_ORDER_ENTRY"` falls through to free-text.
+ */
+const ENUM_LIKE_RE = /^[A-Z][A-Z0-9_]{3,}$/;
+
+function isEnumLikeIntentQuery(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!ENUM_LIKE_RE.test(trimmed)) return false;
+  if (!trimmed.includes("_")) return false;
+  return true;
+}
+
 export function parseQuery(raw: string): SearchTokens {
   const operators: OperatorToken[] = [];
   const freeParts: string[] = [];
   const warnings: string[] = [];
 
   if (!raw.trim()) return { operators, freeText: "", warnings };
+
+  // SCREAMING_SNAKE_CASE shortcut — the whole query is treated as
+  // `intent:<value>`. Bypasses Fuse entirely; see helper above for
+  // rationale.
+  if (isEnumLikeIntentQuery(raw)) {
+    operators.push({ key: "intent", rawValue: raw.trim() });
+    return { operators, freeText: "", warnings };
+  }
 
   // Tokeniser — splits on whitespace but respects "double-quoted"
   // chunks. Three alternatives, in order:

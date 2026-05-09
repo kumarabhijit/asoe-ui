@@ -582,6 +582,16 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-025", tenant_id: "acme-corp", order_id: "PO-PHR-BAD", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "FAILED", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-16T08:30:00Z", updated_at: "2026-04-16T08:30:00Z", account_id: "acct-costco", account_name: "Costco",
   },
+  // EMAIL_ORDER_ENTRY (ADR-034 Phase C) — STANDARD_REVIEW band record. The
+  // upstream email-intelligence-agent extracted a non-EDI PO from a regional
+  // distributor; composite_confidence 0.88 lands in the standard-review band
+  // (≥ 0.85, < 0.95). All four non-disable-able floor checks pass; one
+  // ambiguous ship-to triggers REQUEST_CLARIFICATION. Renders the
+  // EmailOrderEntrySection via OrderAnalysis.email_order_entry_analysis
+  // (data-presence dispatch — no per-intent page logic).
+  {
+    id: "exc-026", tenant_id: "acme-corp", order_id: "EML-PO-2026-0042", event_type: "EMAIL_ORDER_ENTRY_REQUEST", intent: "EMAIL_ORDER_ENTRY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "EmailOrderEntryRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-30T10:12:00Z", updated_at: "2026-04-30T10:13:30Z", account_id: "acct-southeast-distrib", account_name: "Southeast Beverage Distributors",
+  },
 ];
 
 /** Per-exception trace enrichment — optional Layer 2 fields demonstrated
@@ -1167,6 +1177,18 @@ const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
   "exc-025": {
     executed_nodes: _invocationFailTrace(),
   },
+  // EMAIL_ORDER_ENTRY (ADR-034) — STANDARD_REVIEW band, REQUEST_CLARIFICATION
+  // action driven by ambiguous ship-to. Reuses the YELLOW-HITL trace shape;
+  // the recipe-specific decision detail lives on email_order_entry_analysis.
+  "exc-026": {
+    narrative:
+      "Inbound email from Southeast Beverage Distributors carried a non-EDI PO. The email-intelligence-agent extracted four line items at composite confidence 0.88 (review band). All four non-disable-able floor checks passed — sender authorised, customer resolved, no duplicate PO, credit clear. One ambiguous ship-to address ('Atlanta DC' matches two warehouses) routes the record to REQUEST_CLARIFICATION rather than auto-approve.",
+    resolution_steps: [
+      "Confirm the intended ship-to with the buyer (Atlanta-North or Atlanta-South DC).",
+      "Re-run validation with the resolved ship-to and approve.",
+    ],
+    executed_nodes: _yellowHitlTrace("EmailOrderEntryRecipe.py"),
+  },
 };
 
 
@@ -1175,24 +1197,24 @@ const MOCK_HEALTH: HealthResponse = {
   version: "0.3.2",
   kill_switch: false,
   explain_mode: false,
-  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY", "PRICE_HOLD_RELEASE", "EDI_MISMATCH"],
+  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY", "PRICE_HOLD_RELEASE", "EDI_MISMATCH", "EMAIL_ORDER_ENTRY"],
   lifecycle_states: [
     "INGESTED", "CLASSIFYING", "AUDITING", "PENDING_REVIEW",
     "ESCALATED", "PENDING_ADMIN_REVIEW", "PENDING_COSIGN", "RESOLVED",
     "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
-  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py", "DeliveryDelayResolutionRecipe.py", "PriceHoldReleaseRecipe.py", "EdiMismatchRecipe.py"],
+  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py", "DeliveryDelayResolutionRecipe.py", "PriceHoldReleaseRecipe.py", "EdiMismatchRecipe.py", "EmailOrderEntryRecipe.py"],
   // Mirrors asoe2/constraints/specs.py AllowedResolutionAction. Backend is
   // authoritative at runtime (/api/v1/health); this mock list exists only for
   // local development.
-  allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION"],
+  allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION", "ONE_CLICK_APPROVE", "STANDARD_REVIEW", "LOW_CONFIDENCE_FLAG", "AUTO_CORRECT", "REQUEST_CLARIFICATION", "REJECT"],
   // Mirrors asoe2/constraints/specs.py AllowedOverrideReasonTag.
   allowed_override_reason_tags: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
   // Per-intent narrowing (Phase 3 Option A framework). Mock currently
   // seeds every intent with the full global set — matches the backend's
   // behavior until real curation arrives.
   allowed_override_reason_tags_by_intent: Object.fromEntries(
-    ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY", "PRICE_HOLD_RELEASE", "EDI_MISMATCH"].map(
+    ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY", "PRICE_HOLD_RELEASE", "EDI_MISMATCH", "EMAIL_ORDER_ENTRY"].map(
       (intent) => [intent, ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"]],
     ),
   ),
@@ -2080,6 +2102,12 @@ const MOCK_LINE_ITEMS: Record<string, LineItem[]> = {
   ],
   "exc-021": [
     { line_id: "L1", sku: "SKU-PRICE-MM", description: "18oz Premium Juice 8pk (Q2 concession)", uom: "CS", quantity: 100, erp_price: 100.00, po_price: 95.00 },
+  ],
+  "exc-026": [
+    { line_id: "L1", sku: "SKU-1101", description: "12oz Cola 24pk", uom: "CS", quantity: 80, erp_price: 22.50, po_price: 22.50 },
+    { line_id: "L2", sku: "SKU-1102", description: "12oz Diet Cola 24pk", uom: "CS", quantity: 80, erp_price: 22.50, po_price: 22.50 },
+    { line_id: "L3", sku: "SKU-1108", description: "16oz Sparkling Water 12pk", uom: "CS", quantity: 60, erp_price: 18.40, po_price: 18.40 },
+    { line_id: "L4", sku: "SKU-1112", description: "20oz Sports Drink 12pk", uom: "CS", quantity: 100, erp_price: 26.00, po_price: 26.00 },
   ],
 };
 
@@ -3350,4 +3378,201 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       promotion_ref: "ZCUST/404 (Q2 2026 concession)",
     },
   },
+  // EMAIL_ORDER_ENTRY (ADR-034 Phase C) — STANDARD_REVIEW band record.
+  // Renders EmailOrderEntrySection via OrderAnalysis.email_order_entry_analysis.
+  // The four floor checks all pass; one ambiguous ship-to triggers
+  // REQUEST_CLARIFICATION.
+  "exc-026": {
+    diagnosis: "Non-EDI PO from Southeast Beverage Distributors. Extracted four lines at composite confidence 0.88. All non-disable-able floor checks passed; ambiguous ship-to ('Atlanta DC' resolves to two warehouses) blocks one-click approve. Recipe recommends REQUEST_CLARIFICATION.",
+    confidence: 88,
+    risk: "LOW",
+    resolution: "REQUEST_CLARIFICATION",
+    root_cause: "Buyer's PDF cover letter listed ship-to as 'Atlanta DC' which matches two physical warehouses (Atlanta-North, Atlanta-South). Confidence on that single field dropped to 0.62, pulling composite below the 0.95 auto-approve threshold.",
+    recommendation: "Send the templated clarification email asking the buyer to confirm Atlanta-North vs Atlanta-South. Auto-approve once a single match is selected.",
+    entity_profile: {
+      customer_name: "Southeast Beverage Distributors",
+      bp_number: "BP-SBD-0042",
+      customer_tier: "Mid-Market",
+      vip_status: false,
+      credit_standing: "Good",
+      location: "Plant 2200 — Atlanta DC",
+      region: "Southeast",
+    },
+    impact_metrics: {
+      revenue_at_risk: 18_400.00,
+      delta_amount: 0,
+      delta_percentage: 0,
+      sla_priority: "MEDIUM",
+      sla_deadline: "2026-04-30T18:00:00Z",
+      affected_lines: 4,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "SKU-1101 — extracted at 0.97, customer SKU mapping confirmed.", resolution: "AUTO_APPROVE", risk: "LOW", waterfall: [] },
+      { line_id: "L2", diagnosis: "SKU-1102 — extracted at 0.96, customer SKU mapping confirmed.", resolution: "AUTO_APPROVE", risk: "LOW", waterfall: [] },
+      { line_id: "L3", diagnosis: "SKU-1108 — extracted at 0.91, fuzzy SKU match against customer master.", resolution: "AUTO_APPROVE", risk: "LOW", waterfall: [] },
+      { line_id: "L4", diagnosis: "Ship-to 'Atlanta DC' — confidence 0.62; matches two warehouses.", resolution: "REQUEST_CLARIFICATION", risk: "MEDIUM", waterfall: [] },
+    ],
+    email_order_entry_analysis: {
+      composite_confidence: 0.88,
+      classification: "STANDARD_REVIEW",
+      recommended_action: "REQUEST_CLARIFICATION",
+      autonomy_level: "L2",
+      validation_failures: ["ambiguous_ship_to"],
+      floor_breaches: [],
+      reject_reason_code: null,
+      floor_status: {
+        sender_authorized: true,
+        customer_resolved: true,
+        duplicate_po_clear: true,
+        credit_clear: true,
+      },
+      notification_template: "email_order_clarification_request",
+    },
+    // ADR-034 Phase G — email source-of-truth substrate (PO-driven IA
+    // correction). Renders ABOVE the EmailOrderEntrySection on the
+    // detail page so the CSA sees both the source email AND the
+    // agent's recommendation on a single surface.
+    email_source: {
+      from_address: "buyer@southeast-distrib.example",
+      received_at: "2026-04-30T10:12:00Z",
+      subject: "PO 8842 — May allocation, ship to Atlanta DC",
+      body_hash:
+        "a7f5e3d1b9c0648f2a1e7c9b4d5e6f3c2a1b0d9e8f7c6b5a4938271605040301",
+      attachment_manifest: [
+        {
+          name: "PO_8842.pdf",
+          mime_type: "application/pdf",
+          bytes: 184_320,
+        },
+        {
+          name: "ship_to_addresses.csv",
+          mime_type: "text/csv",
+          bytes: 4_096,
+        },
+      ],
+      body_excerpt:
+        "Hi team,\n\nPlease process the attached PO 8842 for our May " +
+        "allocation. Ship to the Atlanta DC — full address in the " +
+        "CSV. Confirm by EOD Friday.\n\nThanks,\nMarcus Reed",
+      source_email_id: "4",
+    },
+  },
 };
+
+/* ============================================================
+ * ADR-038 Phase H.6 — case-centric API + mock data
+ * ============================================================ */
+
+import type { OrderCase } from "@/types/cases";
+
+/**
+ * Mock cases — stand-in until asoe2's V009 / case-store ships in the
+ * real backend. Each case parents one or more existing MOCK_EXCEPTIONS
+ * via `parent_case_id`. The case list view consumes these directly;
+ * detail view loads the case + its child exceptions.
+ *
+ * The IDs are stable across runs so tests can assert against them.
+ */
+const MOCK_CASES: OrderCase[] = [
+  {
+    case_id: "case-001",
+    tenant_id: "acme-corp",
+    customer_id: "acct-walmart",
+    source: "automated_order",
+    source_channel: "edi_x12_850",
+    customer_po_number: "PO-DUP-001",
+    sales_order_id: "SO-DUP-001",
+    edi_transaction_id: null,
+    source_email_id: null,
+    opened_at: "2026-04-21T08:00:00Z",
+    closed_at: null,
+    status: "OPEN_AWAITING_HUMAN",
+    sla_deadline: "2026-04-23T08:00:00Z",
+    tier: 2,
+    working_memory_summary: null,
+    last_compaction_at: null,
+    bundle_version_at_open: "duplicate-po@1.0.0",
+  },
+  {
+    case_id: "case-002",
+    tenant_id: "acme-corp",
+    customer_id: "acct-kroger",
+    source: "automated_order",
+    source_channel: "edi_x12_850",
+    customer_po_number: "PO-PRH-001",
+    sales_order_id: "SO-PRH-001",
+    edi_transaction_id: null,
+    source_email_id: null,
+    opened_at: "2026-04-22T10:15:00Z",
+    closed_at: null,
+    status: "OPEN_AWAITING_HUMAN",
+    sla_deadline: "2026-04-22T18:00:00Z",
+    tier: 2,
+    working_memory_summary: null,
+    last_compaction_at: null,
+    bundle_version_at_open: "price-hold-release@1.0.0",
+  },
+  {
+    case_id: "case-003",
+    tenant_id: "acme-corp",
+    customer_id: "acct-target",
+    source: "manual_order",
+    source_channel: "email",
+    customer_po_number: "EML-PO-2026-0042",
+    sales_order_id: null,
+    edi_transaction_id: null,
+    source_email_id: "msg-southeast-001",
+    opened_at: "2026-04-23T07:30:00Z",
+    closed_at: null,
+    status: "OPEN_AWAITING_BUYER",
+    sla_deadline: "2026-04-25T07:30:00Z",
+    tier: 2,
+    working_memory_summary: null,
+    last_compaction_at: null,
+    bundle_version_at_open: "email-order-entry@1.0.0",
+  },
+];
+
+/**
+ * Cases API (/api/v1/cases/*) — Phase H.6 surface. Mocked client-side
+ * until asoe2 lands the real endpoints in Phase H.7. Same `USE_REAL_API`
+ * cutover pattern as exceptionsApi.
+ */
+export const casesApi = {
+  async list(params?: {
+    source?: string;
+    status?: string;
+  }): Promise<{ items: OrderCase[]; total: number }> {
+    if (USE_REAL_API) {
+      return http<{ items: OrderCase[]; total: number }>("/api/v1/cases", {
+        query: {
+          source: params?.source,
+          status: params?.status,
+        },
+      });
+    }
+    await new Promise((r) => setTimeout(r, MOCK_DELAY));
+    let items = [...MOCK_CASES];
+    if (params?.source) items = items.filter((c) => c.source === params.source);
+    if (params?.status) items = items.filter((c) => c.status === params.status);
+    return { items, total: items.length };
+  },
+
+  async get(case_id: string): Promise<OrderCase | null> {
+    if (USE_REAL_API) {
+      return http<OrderCase>(`/api/v1/cases/${encodeURIComponent(case_id)}`);
+    }
+    await new Promise((r) => setTimeout(r, MOCK_DELAY));
+    return MOCK_CASES.find((c) => c.case_id === case_id) ?? null;
+  },
+};
+
+/**
+ * Visible to architectural-lock tests. The case-source vocabulary is
+ * sourced from this constant in the UI; backend `/api/v1/health`
+ * gains `allowed_case_sources` in Phase H.7. Until then this is the
+ * UI's stable list — but it lives in api.ts (the boundary layer)
+ * NOT in page code, preserving Guardrail #1.
+ */
+export const ALLOWED_CASE_SOURCES = ["manual_order", "automated_order"] as const;
+

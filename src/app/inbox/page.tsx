@@ -7,8 +7,8 @@
  */
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   Mail, ChevronRight, Search, Zap, CheckCircle2,
@@ -42,6 +42,14 @@ const STATUS_LABELS: Record<string, string> = {
 /* ── Data ─────────────────────────────────────────────────────────── */
 interface InboxItem {
   id: string;
+  /** ADR-034 Phase G — when this inbox item produced an Exception
+   *  Queue record (NEW_ORDER → EMAIL_ORDER_ENTRY exception),
+   *  `exception_id` is set and the row deep-links to
+   *  `/exceptions/{exception_id}` so the CSA reaches the unified
+   *  detail surface in one click (no tab-switch / no copy-paste).
+   *  Absent on inbox categories that don't become exceptions
+   *  (SHIPMENT_INQUIRY, INVOICE_QUERY, COMPLAINT). */
+  exception_id?: string;
   sender: string;
   initials: string;
   initialsColor: string;
@@ -92,7 +100,11 @@ const INBOX: InboxItem[] = [
     agentRecommendation: "Route to order entry queue",
   },
   {
-    id: "4", sender: "Marcus Reed", initials: "MR", initialsColor: "#E11D48",
+    // ADR-034 Phase G — wired to exc-026 (the EMAIL_ORDER_ENTRY
+    // STANDARD_REVIEW demo record) so clicking this inbox row jumps
+    // to the unified detail surface on the Exception Queue.
+    id: "4", exception_id: "exc-026",
+    sender: "Marcus Reed", initials: "MR", initialsColor: "#E11D48",
     subject: "Kroger PO KRO-2025-03-44821 — Bever...",
     preview: "Division 05 Southeast. 5 lines, 2,150 CS tota...",
     time: "07:31 AM", category: "NEW_ORDER", status: "IN_QUEUE",
@@ -127,12 +139,36 @@ const NAV_TABS = [
   { id: "settings", label: "Settings", href: "/settings" },
 ];
 
-/* ── Main Page ────────────────────────────────────────────────────── */
+/* ── Main Page ──────────────────────────────────────────────────────
+ *
+ * `useSearchParams` (read by InboxPageInner for the ADR-034 Phase G
+ * back-link round-trip) requires a Suspense boundary during static
+ * prerendering on Next.js App Router. The default export wraps the
+ * inner component so the page stays statically optimisable for the
+ * no-query-param visit while the search-param read is gated. */
 export default function InboxPage() {
+  return (
+    <Suspense fallback={null}>
+      <InboxPageInner />
+    </Suspense>
+  );
+}
+
+function InboxPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { health } = useHealth();
   const { user, visibleTabs } = useAuth();
-  const [selectedId, setSelectedId] = useState("1");
+  // ADR-034 Phase G — back-link from the Exception Queue detail page
+  // arrives with `?msg=<inbox-item-id>` so the inbox preselects the
+  // row that produced the exception. Falls back to the first item
+  // when no query param is present (or the id doesn't resolve).
+  const initialId =
+    searchParams.get("msg") &&
+    INBOX.some((i) => i.id === searchParams.get("msg"))
+      ? (searchParams.get("msg") as string)
+      : "1";
+  const [selectedId, setSelectedId] = useState(initialId);
   const [activeTab, setActiveTab] = useState("inbox");
   const [detailTab, setDetailTab] = useState("email");
 
@@ -261,13 +297,33 @@ export default function InboxPage() {
           <div className="max-h-[calc(100vh-370px)] overflow-y-auto">
             {INBOX.map((item) => {
               const isSelected = item.id === selectedId;
+              // ADR-034 Phase G — when the inbox item carries an
+              // exception_id, clicking the row jumps straight to the
+              // Exception Queue detail page so the CSA lands on the
+              // unified detail surface (source email + agent recommendation
+              // + resolution actions in one place). When absent the row
+              // selects locally as before — non-exception categories
+              // (SHIPMENT_INQUIRY, INVOICE_QUERY, COMPLAINT) keep their
+              // browse-inbound triage flow.
+              const handleActivate = () => {
+                if (item.exception_id) {
+                  router.push(`/exceptions/${item.exception_id}`);
+                  return;
+                }
+                setSelectedId(item.id);
+              };
               return (
                 <div
                   key={item.id}
-                  onClick={() => setSelectedId(item.id)}
+                  onClick={handleActivate}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === "Enter") setSelectedId(item.id); }}
+                  aria-label={
+                    item.exception_id
+                      ? `Open exception ${item.exception_id} for ${item.subject}`
+                      : `Select email from ${item.sender}: ${item.subject}`
+                  }
+                  onKeyDown={(e) => { if (e.key === "Enter") handleActivate(); }}
                   className={cn(
                     "px-16 py-12 cursor-pointer border-b border-border-subtle border-l-[3px] transition-colors duration-fast",
                     isSelected ? "bg-surface-secondary border-l-brand" : "bg-surface-primary border-l-transparent",

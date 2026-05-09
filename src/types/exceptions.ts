@@ -74,7 +74,14 @@ export type ResolutionAction =
   | "SUPERSEDE"
   | "ALLOW_BOTH"
   | "ESCALATE"
-  | "REQUEST_BUYER_CONFIRMATION";
+  | "REQUEST_BUYER_CONFIRMATION"
+  // ADR-034 — EmailOrderEntryRecipe outputs.
+  | "ONE_CLICK_APPROVE"
+  | "STANDARD_REVIEW"
+  | "LOW_CONFIDENCE_FLAG"
+  | "AUTO_CORRECT"
+  | "REQUEST_CLARIFICATION"
+  | "REJECT";
 
 /* ── Pipeline node names (11-node LangGraph state machine) ─────────────
  *
@@ -339,6 +346,26 @@ export interface OrderAnalysis {
   price_hold_analysis?: PriceHoldAnalysisData;
   /** Present when an EDI 850 line mismatch produces sub_type classification (asoe2 adapt_edi_mismatch). */
   edi_mismatch_analysis?: EdiMismatchAnalysisData;
+  /** Present when the EmailOrderEntry recipe classifies a non-EDI
+   *  email-channel order envelope (ADR-034). Backend-backed:
+   *  `asoe2/api/analysis_adapters.py::adapt_email_order_entry` +
+   *  audit_bearing_registry rows shipped in Phase B. Floor evidence
+   *  (the four non-disable-able booleans) is sourced from the
+   *  `email_intake` gateway's four required_for_audit=True operations
+   *  via `enrichment_context` (Pillar 1 — gateway READS run before
+   *  shadow_audit per ADR-025). */
+  email_order_entry_analysis?: EmailOrderEntryAnalysisData;
+  /** Inbound email source-of-truth substrate (ADR-034 Phase G —
+   *  PO-driven IA correction). Backend-backed:
+   *  `asoe2/api/analysis_adapters.py::adapt_email_source` (SECONDARY
+   *  adapter on EmailOrderEntryRecipe.py) + audit_bearing_registry
+   *  rows for from_address / received_at / subject / body_hash /
+   *  attachment_manifest. Sourced from the `email_intake/fetch_message`
+   *  gateway's required_for_audit=True response. Mounts above the
+   *  EmailOrderEntrySection on the Exception Queue detail page so the
+   *  CSA sees both the source email and the agent's recommendation
+   *  on a single detail surface. */
+  email_source?: EmailSourceData;
 }
 
 /* ── Price Hold Release enrichment types (UI-only, not backend contract) ── */
@@ -390,6 +417,100 @@ export interface EdiMismatchAnalysisData {
   autonomy_level: "L1" | "L2" | "L3";
   expected_value: unknown;
   received_value: unknown;
+  notification_template: string | null;
+}
+
+/* ── Email Source enrichment types (ADR-034 Phase G) ────────────────── */
+
+/** One row in `EmailSourceData.attachment_manifest`. */
+export interface EmailAttachmentManifestEntry {
+  name: string;
+  mime_type: string;
+  bytes: number;
+}
+
+/**
+ * Inbound email source-of-truth substrate — present when the
+ * EmailOrderEntryRecipe ran and the `email_intake/fetch_message`
+ * gateway returned the inbound email metadata.
+ *
+ * Mounts on the Exception Queue detail page above
+ * `EmailOrderEntrySection` via data-presence dispatch (no per-intent
+ * page-level branching — CLAUDE.md Guardrail #1). Per ADR-034 §6
+ * (PO-driven IA correction), the operator authorising an
+ * email-channel order needs both the agent's recommendation AND the
+ * source-of-truth for the order they're acting on, on the same
+ * detail page.
+ */
+export interface EmailSourceData {
+  from_address: string;
+  received_at: string;
+  subject: string;
+  /** SHA-256 of the canonicalised email body (tamper detection). */
+  body_hash: string;
+  attachment_manifest: EmailAttachmentManifestEntry[];
+  /** Optional human-readable excerpt of the body (typically first 240
+   *  chars after canonicalisation). Contextual: absent when redaction
+   *  policy strips PII or the body is unavailable. */
+  body_excerpt?: string | null;
+  /** Optional Inbox correlation id (ADR-034 Phase G). When present,
+   *  the Exception Queue detail page surfaces a "View source email"
+   *  back-link to /inbox?msg=<id>. Contextual: absent when the
+   *  upstream `email-intelligence-agent` integration hasn't shipped. */
+  source_email_id?: string | null;
+}
+
+/* ── Email Order Entry enrichment types (ADR-034) ───────────────────── */
+
+/** Confidence-band classification produced by EmailOrderEntryRecipe. */
+export type EmailOrderEntryClassification =
+  | "ONE_CLICK_APPROVE"
+  | "STANDARD_REVIEW"
+  | "LOW_CONFIDENCE"
+  | "FATAL_REJECT";
+
+/** Closed reject-reason vocabulary mirrored from
+ *  recipes/EmailOrderEntryRecipe.py::ALLOWED_REJECT_REASONS. */
+export type EmailOrderEntryRejectReason =
+  | "sender_unauthorized"
+  | "customer_unresolved"
+  | "duplicate_po_confirmed"
+  | "credit_block"
+  | "corrupt_input"
+  | "policy_floor_breach";
+
+/**
+ * Email-channel order intake summary — present when EmailOrderEntryRecipe
+ * has classified a non-EDI order envelope (ADR-034).
+ *
+ * The four `floor_*` booleans surface the "non-disable-able floor" check
+ * results so the operator can see exactly which compliance precondition
+ * passed or failed. Per Pillar 3, missing keys are *not* permitted —
+ * the backend adapter must populate every floor field once Phase B's
+ * gateway evidence path is wired up. Until then the field is marked
+ * preview-only on `OrderAnalysis`.
+ */
+export interface EmailOrderEntryAnalysisData {
+  /** Composite extraction + resolution confidence in [0.0, 1.0]. */
+  composite_confidence: number;
+  classification: EmailOrderEntryClassification;
+  /** Recipe-recommended action — must be a member of ResolutionAction. */
+  recommended_action: ResolutionAction;
+  autonomy_level: "L1" | "L2" | "L3";
+  /** Typed validation-failure codes from the validation suite. */
+  validation_failures: string[];
+  /** Names of the floor checks that breached, if any. */
+  floor_breaches: string[];
+  /** Populated only when classification is FATAL_REJECT. */
+  reject_reason_code: EmailOrderEntryRejectReason | null;
+  /** The four non-disable-able floor checks. Adapter must populate every
+   *  field; absence is a coverage failure (audit_bearing_registry).  */
+  floor_status: {
+    sender_authorized: boolean;
+    customer_resolved: boolean;
+    duplicate_po_clear: boolean;
+    credit_clear: boolean;
+  };
   notification_template: string | null;
 }
 

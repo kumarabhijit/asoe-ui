@@ -86,6 +86,56 @@ describe("parseQuery — tokeniser", () => {
     const r = parseQuery('"PO-DUP-001"');
     expect(r.freeText).toBe("PO-DUP-001");
   });
+
+  /**
+   * SCREAMING_SNAKE_CASE shortcut (ADR-034 §6 / Phase C). A bare
+   * single-token enum-shaped query promotes to `intent:` rather than
+   * being passed to Fuse fuzzy matching — fixes the surprise where
+   * "EMAIL_ORDER_ENTRY" was returning the closest-by-edit-distance
+   * row (MIN_ORDER_QTY) when no record had that intent.
+   */
+  it("auto-promotes a SCREAMING_SNAKE_CASE single token to intent:", () => {
+    const r = parseQuery("EMAIL_ORDER_ENTRY");
+    expect(r.operators).toEqual([
+      { key: "intent", rawValue: "EMAIL_ORDER_ENTRY" },
+    ]);
+    expect(r.freeText).toBe("");
+    expect(r.warnings).toEqual([]);
+  });
+
+  it("auto-promotes any enum-shaped intent value (DUPLICATE_PO)", () => {
+    const r = parseQuery("DUPLICATE_PO");
+    expect(r.operators).toEqual([{ key: "intent", rawValue: "DUPLICATE_PO" }]);
+    expect(r.freeText).toBe("");
+  });
+
+  it("does NOT promote tokens without an underscore", () => {
+    // "WALMART" is SCREAMING but has no underscore — could be an
+    // account name. Keep it on the free-text path.
+    const r = parseQuery("WALMART");
+    expect(r.operators).toEqual([]);
+    expect(r.freeText).toBe("WALMART");
+  });
+
+  it("does NOT promote multi-token queries", () => {
+    const r = parseQuery("EMAIL_ORDER_ENTRY foo");
+    expect(r.operators).toEqual([]);
+    expect(r.freeText).toContain("EMAIL_ORDER_ENTRY");
+  });
+
+  it("does NOT promote when wrapped in quotes (escape hatch)", () => {
+    // Quoted form lets the user opt back into free-text fuzzy matching
+    // for an enum-shaped string if they really want substring search.
+    const r = parseQuery('"EMAIL_ORDER_ENTRY"');
+    expect(r.operators).toEqual([]);
+    expect(r.freeText).toBe("EMAIL_ORDER_ENTRY");
+  });
+
+  it("does NOT promote lowercase or mixed-case tokens", () => {
+    const r = parseQuery("email_order_entry");
+    expect(r.operators).toEqual([]);
+    expect(r.freeText).toBe("email_order_entry");
+  });
 });
 
 describe("operatorToPredicate", () => {
