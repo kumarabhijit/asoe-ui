@@ -866,3 +866,28 @@ Even though the UI code lands in Phase H.6, the asoe2 Phase H.2 / H.3 work (case
 4. Define the `/inbox` and `/exceptions` redirect / filter rules so the migration story is owned by Frontend Platform from day one.
 
 For the current ADR-038 / ADR-039 review cycle, this section flags Frontend Platform's scope without committing schedule or code. The full Phase H.6 specification follows when asoe2's Phase H.3 ships.
+
+### 13.6 Status update (post-merge — Phase H.6 primitive shipped)
+
+asoe2 Phase H.2 + H.3 + H.7 primitives have **shipped on main** (`kumarabhijit/asoe2#114`); the UI's slice (Phase H.6 primitive) shipped via `kumarabhijit/asoe-ui#128`. Section §13 above is therefore mostly retrospective now; this subsection records the live state.
+
+**Shipped on main:**
+
+* `src/types/cases.ts` — `OrderCase`, `CaseEvent`, `CaseSource`, `CaseStatus`, `CaseTier`, `SlaSnapshot`, `SlaBand`. 1:1 mirrors of asoe2's Pydantic types.
+* `src/lib/api.ts::casesApi` — `list()` and `get(case_id)` plus `MOCK_CASES` and `ALLOWED_CASE_SOURCES`.
+* `src/app/cases/page.tsx` — list view with SLA-driven sort, filter chips, exported `slaSnapshot()` helper (band thresholds <2h `at_risk`, 2–24h `today`, >24h `comfortable`).
+* `src/app/cases/[id]/page.tsx` + `src/app/cases/CaseDetailPanel.tsx` — thin wrapper + dumb-projector detail panel.
+* `tests/architectural/cases_no_per_intent_dispatch.test.ts` — locks Guardrail #1 against per-intent dispatch on the case detail surface.
+* `tests/components/CasesPage.test.tsx` — 11 component tests (sort, filter chips, SLA badge, navigation).
+
+**Pending — still needed for Phase H.6 to be production-meaningful:**
+
+| Item | Status | Owner |
+|---|---|---|
+| `/api/v1/cases/*` backend route in asoe2 | **Pending** — `casesApi` works in mock mode only | asoe2 (see `asoe2/tasks.md` Phase 27.6) |
+| `/cases` listed in `NavBar` / `Sidebar` | **Pending** — direct URL only today | Frontend Platform |
+| `/inbox` and `/exceptions` reframed as filtered views of `/cases` | **Pending** — they remain independent primaries | Frontend Platform (sequenced after `/api/v1/cases/*`) |
+| Playwright e2e for `/cases` | **Pending** — no spec yet | Frontend Platform (sequenced after backend route) |
+| Design fidelity polish (list-row anatomy, SLA-band visual treatment, case-detail evidence layout) | **Pending** — primitive ships the architectural shape, not the final visual design | Frontend Platform + UX |
+
+**No drift register entry yet.** §13 is a *direction notice*, not a drift. The drift register at §9 will gain a "case-centric resolution" entry once `/api/v1/cases/*` lands and `/cases` becomes the primary CSR surface — that's when the existing `/inbox` + `/exceptions` framing genuinely changes shape and needs to be recorded as an evolved-pattern resolution.
