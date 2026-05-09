@@ -44,12 +44,20 @@ test.describe("/cases surface", () => {
   test("NavBar tab is reachable from /exceptions", async ({ page }) => {
     await loginAs(page, "marcus.webb@acme-corp.com");
     await page.goto("/exceptions");
-    // The "Cases" NavBar tab landed in UI E1. Click should navigate
-    // to /cases.
+    // /exceptions runs WebSocket subscriptions + periodic polling
+    // that re-renders the NavBar's surrounding tree; wait for the
+    // network to settle so the Cases tab isn't detached mid-click.
+    // `networkidle` covers both the initial load AND the first
+    // round of WS-triggered list refreshes.
+    await page.waitForLoadState("networkidle");
     const casesTab = page.getByRole("button", { name: /^cases$/i });
     await expect(casesTab).toBeVisible({ timeout: 15_000 });
-    await casesTab.click();
-    await page.waitForURL(/\/cases/, { timeout: 10_000 });
+    // Race the click with the URL change; explicit click timeout
+    // (>5s default) absorbs the re-render window.
+    await Promise.all([
+      page.waitForURL(/\/cases/, { timeout: 15_000 }),
+      casesTab.click({ timeout: 15_000 }),
+    ]);
     await expect(page.locator("h1")).toContainText(/cases/i);
   });
 
