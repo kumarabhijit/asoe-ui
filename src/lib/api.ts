@@ -3534,9 +3534,11 @@ const MOCK_CASES: OrderCase[] = [
 ];
 
 /**
- * Cases API (/api/v1/cases/*) — Phase H.6 surface. Mocked client-side
- * until asoe2 lands the real endpoints in Phase H.7. Same `USE_REAL_API`
- * cutover pattern as exceptionsApi.
+ * Cases API (/api/v1/cases/*) — Phase H.6 surface. Backend endpoints
+ * landed alongside this surface (asoe2 `api/routes/cases.py`); the
+ * `USE_REAL_API=1` branch hits them directly. The mock branch still
+ * serves local development and the `/cases` route's preview fixtures.
+ * Same `USE_REAL_API` cutover pattern as exceptionsApi.
  */
 export const casesApi = {
   async list(params?: {
