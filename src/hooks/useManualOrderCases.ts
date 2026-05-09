@@ -1,5 +1,5 @@
 /**
- * useManualOrderCases — fetch the manual-order subset of /api/v1/cases.
+ * useCases — fetch /api/v1/cases with an optional source filter.
  *
  * ADR-038 §H.6 commits `/inbox` and `/exceptions` to operating as
  * filtered case-list views of `/cases`. The deeper data-hook swap
@@ -8,29 +8,29 @@
  * Platform follow-up tracked separately (V5.1).
  *
  * This hook lands the scaffolding for that swap: callers can
- * surface the manual-order case count, pre-fetch the case rows
- * to seed the future projection, and deep-link from existing
- * legacy rows to their parent case.
+ * surface the case count, pre-fetch the case rows to seed the
+ * future projection, and deep-link from existing legacy rows to
+ * their parent case.
  *
- * Returns `{ cases, total, loading, error }`. Re-fetches when the
- * effect dependencies change (currently mount-only — refresh
- * lands when WebSocket-driven invalidation is wired in V5.1).
+ * Returns `{ cases, total, loading, error }`. Single fetch on
+ * mount (and on `source` change). WebSocket-driven invalidation
+ * lands with the V5.1 reshape.
  */
 "use client";
 
 import { useEffect, useState } from "react";
 
 import { casesApi } from "@/lib/api";
-import type { OrderCase } from "@/types/cases";
+import type { CaseSource, OrderCase } from "@/types/cases";
 
-interface UseManualOrderCasesReturn {
+interface UseCasesReturn {
   cases: OrderCase[];
   total: number;
   loading: boolean;
   error: string | null;
 }
 
-export function useManualOrderCases(): UseManualOrderCasesReturn {
+export function useCases(source?: CaseSource): UseCasesReturn {
   const [cases, setCases] = useState<OrderCase[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -40,7 +40,7 @@ export function useManualOrderCases(): UseManualOrderCasesReturn {
     let cancelled = false;
     setLoading(true);
     casesApi
-      .list({ source: "manual_order" })
+      .list(source ? { source } : undefined)
       .then((res) => {
         if (cancelled) return;
         setCases(res.items);
@@ -59,7 +59,15 @@ export function useManualOrderCases(): UseManualOrderCasesReturn {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [source]);
 
   return { cases, total, loading, error };
+}
+
+/**
+ * useManualOrderCases — convenience wrapper. Kept as the previous
+ * named export so callers in /inbox don't need to update.
+ */
+export function useManualOrderCases(): UseCasesReturn {
+  return useCases("manual_order");
 }

@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { Badge, lifecycleVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -496,6 +497,20 @@ function ExceptionCard({
         <Badge variant={lifecycleVariant(exc.lifecycle_state)} size="sm">
           {exc.lifecycle_state.replace(/_/g, " ")}
         </Badge>
+        {/* ADR-038 §H.6 — when this record is attached to a case,
+            surface a deeplink. The `<Link>` carries
+            `onClick={(e) => e.stopPropagation()}` so clicking the
+            badge follows the route instead of selecting the row. */}
+        {exc.parent_case_id ? (
+          <Link
+            href={`/cases/${exc.parent_case_id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-label text-brand underline underline-offset-2 hover:text-brand-hover"
+            aria-label={`View parent case ${exc.parent_case_id}`}
+          >
+            View case
+          </Link>
+        ) : null}
       </div>
     </div>
   );

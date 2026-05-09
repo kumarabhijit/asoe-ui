@@ -1672,6 +1672,8 @@ export interface components {
             lifecycle_state: string;
             /** Order Id */
             order_id: string;
+            /** Parent Case Id */
+            parent_case_id?: string | null;
             /** Selected Recipe */
             selected_recipe?: string | null;
             /** Shadow Verdict */
