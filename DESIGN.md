@@ -277,6 +277,32 @@ Page Content (max-width 1440px)
 
 Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 
+### Cases (`/cases`) — Case-Centric Primary Surface (ADR-038 Phase H.6, primitive)
+
+```
+NavBar (shared; /cases not yet listed in NavBar — direct URL only)
+Page Content (max-width 1440px)
+├── Page Header (case count + filter chips per source)
+├── List View
+│   ├── Filter chips iterating ALLOWED_CASE_SOURCES
+│   │   (manual_order, automated_order)
+│   ├── SLA-driven sort (default: nearest sla_deadline first)
+│   └── Case rows — case_id, source, source_channel,
+│       customer_po_number, sla_deadline, status, tier
+└── /cases/[id] — CaseDetailPanel (thin wrapper)
+    ├── Case header — source, source_channel, sla_deadline,
+    │   status, tier, bundle_version_at_open
+    └── EvidenceBlock per audit-bearing field
+```
+
+**Data flow:** `casesApi.list()` / `casesApi.get(case_id)` → state → render. **Mock-mode only** until the asoe2 `/api/v1/cases/*` route ships (see `asoe2/tasks.md` Phase 27.6).
+
+**Architectural locks:**
+* `tests/architectural/cases_no_per_intent_dispatch.test.ts` — `CaseDetailPanel` is a dumb projector (Guardrail #1 / Guardrail #6). It does **not** dispatch on intent; section components mount via the existing data-presence pattern, identical to `ExceptionDetailPanel`.
+* `slaSnapshot()` band thresholds (<2h `at_risk`, 2–24h `today`, >24h `comfortable`) are exported from `src/app/cases/page.tsx` as a pure helper so they can be reused by other surfaces (e.g., the dashboard's case-queue widget when that lands).
+
+**Direction notice for the broader rollout** — see `ui_architecture.md` §13.
+
 ---
 
 ## 4. Type System
@@ -285,7 +311,11 @@ Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 |---|---|---|
 | `Intent` | `Intent` enum (contracts/models.py) | exceptions.ts |
 | `ShadowVerdict` | `ShadowStatus` enum | exceptions.ts |
-| `TerminalStatus` | `TerminalStatus` enum | exceptions.ts |
+| `TerminalStatus` | `TerminalStatus` enum — 7 values; `AUDIT_CONTEXT_MISSING` is the registry-enforced audit-gap status emitted by `api/analysis_composer.py` | exceptions.ts |
+| `CaseSource` / `CaseStatus` / `CaseTier` | Mirrors of `OrderCase` Literals (asoe2 `contracts/models.py`) — case-level vocabulary (`manual_order` / `automated_order`, T1/T2/T3) | cases.ts |
+| `OrderCase` | `OrderCase` Pydantic model (asoe2 `contracts/models.py`) — case_id, source, source_channel, sla_deadline, tier, bundle_version_at_open, status, customer_po_number, sales_order_id, edi_transaction_id, source_email_id | cases.ts |
+| `CaseEvent` | Per-case event log entry (timestamp, event_type, actor, payload) | cases.ts |
+| `SlaSnapshot` / `SlaBand` | UI-only SLA computation (band thresholds <2h `at_risk`, 2–24h `today`, >24h `comfortable`) — derived from `OrderCase.sla_deadline` via `slaSnapshot()` exported from `src/app/cases/page.tsx` | cases.ts |
 | `LifecycleState` | `LIFECYCLE_STATES` list — `EXECUTING` removed, `PENDING_COSIGN` added (Phase 2 #5 four-eyes staging state) | exceptions.ts |
 | `PipelineNode` | 11 node names from orchestration/nodes.py (incl. build_analysis) | exceptions.ts |
 | `OrderEvent` | `OrderEvent` model | exceptions.ts |
@@ -369,6 +399,8 @@ Maps to Section 6.2 REST endpoints:
 | `exceptionsApi.stats()` | `GET /api/v1/exceptions/stats` | 6.2 |
 | `exceptionsApi.lineItems()` | Line items for an exception (UI mock) | — |
 | `exceptionsApi.orderAnalysis()` | Order-level agent analysis (UI mock) | — |
+| `casesApi.list()` | `GET /api/v1/cases` — case-centric list view (ADR-038 Phase H.6) | — (mock-mode only — backend route pending; see asoe2 tasks.md Phase 27.6) |
+| `casesApi.get()` | `GET /api/v1/cases/{case_id}` — case detail (ADR-038 Phase H.6) | — (mock-mode only — backend route pending) |
 
 **User management endpoints:** `usersApi.list()` returns 6 seed users for sandbox switching. `usersApi.switch(email)` triggers a `signIn("credentials")` round-trip to re-derive JWT with the target user's RBAC, `visible_tabs`, and `assigned_accounts`. `computeVisibleTabs()` derives tab visibility from the user's RBAC permissions.
 
