@@ -252,7 +252,7 @@ export function __resetMockIdempotencyCache(): void {
 function computeVisibleTabs(permissions: string[]): string[] {
   const ps = new Set(permissions);
   const tabs: string[] = [];
-  if (ps.has("exceptions:read")) { tabs.push("inbox", "exceptions"); }
+  if (ps.has("exceptions:read")) { tabs.push("inbox", "exceptions", "cases"); }
   if (ps.has("dashboard:read")) { tabs.push("dashboard"); }
   if (ps.has("rules:write") || ps.has("policy:write") || ps.has("users:manage")) { tabs.push("settings"); }
   return tabs;

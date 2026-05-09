@@ -47,6 +47,7 @@ function parseCsvParam(raw: string | null): string[] {
 const NAV_TABS = [
   { id: "inbox", label: "Customer Inbox", href: "/inbox" },
   { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
+  { id: "cases", label: "Cases", href: "/cases" },
   { id: "dashboard", label: "Dashboard", href: "/dashboard" },
   { id: "settings", label: "Settings", href: "/settings" },
 ];
