@@ -84,7 +84,7 @@ const OPERATOR_KEYS: ReadonlySet<OperatorKey> = new Set([
  *
  * Why: Fuse with `threshold: 0.4` + `ignoreLocation: true` returns
  * the *closest* row when no exact match exists. A user typing
- * `EMAIL_ORDER_ENTRY` without any matching record would otherwise see
+ * `MANUAL_ORDER_INTAKE` without any matching record would otherwise see
  * an unrelated `MIN_ORDER_QTY` row surface (shared `_ORDER_`
  * substring). Promoting to `intent:` yields zero matches when no
  * record has that intent — surprising-but-correct rather than
@@ -93,7 +93,7 @@ const OPERATOR_KEYS: ReadonlySet<OperatorKey> = new Set([
  * Trade-off: the promotion is silent (no warning) because typing an
  * intent value is the obviously intended behaviour. Users who want a
  * substring search for an enum-shaped string can wrap it in quotes —
- * `"EMAIL_ORDER_ENTRY"` falls through to free-text.
+ * `"MANUAL_ORDER_INTAKE"` falls through to free-text.
  */
 const ENUM_LIKE_RE = /^[A-Z][A-Z0-9_]{3,}$/;
 

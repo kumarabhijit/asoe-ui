@@ -43,7 +43,7 @@ const STATUS_LABELS: Record<string, string> = {
 interface InboxItem {
   id: string;
   /** ADR-034 Phase G — when this inbox item produced an Exception
-   *  Queue record (NEW_ORDER → EMAIL_ORDER_ENTRY exception),
+   *  Queue record (NEW_ORDER → MANUAL_ORDER_INTAKE exception),
    *  `exception_id` is set and the row deep-links to
    *  `/exceptions/{exception_id}` so the CSA reaches the unified
    *  detail surface in one click (no tab-switch / no copy-paste).
@@ -100,7 +100,7 @@ const INBOX: InboxItem[] = [
     agentRecommendation: "Route to order entry queue",
   },
   {
-    // ADR-034 Phase G — wired to exc-026 (the EMAIL_ORDER_ENTRY
+    // ADR-034 Phase G — wired to exc-026 (the MANUAL_ORDER_INTAKE
     // STANDARD_REVIEW demo record) so clicking this inbox row jumps
     // to the unified detail surface on the Exception Queue.
     id: "4", exception_id: "exc-026",
