@@ -3458,3 +3458,121 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
     },
   },
 };
+
+/* ============================================================
+ * ADR-038 Phase H.6 — case-centric API + mock data
+ * ============================================================ */
+
+import type { OrderCase } from "@/types/cases";
+
+/**
+ * Mock cases — stand-in until asoe2's V009 / case-store ships in the
+ * real backend. Each case parents one or more existing MOCK_EXCEPTIONS
+ * via `parent_case_id`. The case list view consumes these directly;
+ * detail view loads the case + its child exceptions.
+ *
+ * The IDs are stable across runs so tests can assert against them.
+ */
+const MOCK_CASES: OrderCase[] = [
+  {
+    case_id: "case-001",
+    tenant_id: "acme-corp",
+    customer_id: "acct-walmart",
+    source: "automated_order",
+    source_channel: "edi_x12_850",
+    customer_po_number: "PO-DUP-001",
+    sales_order_id: "SO-DUP-001",
+    edi_transaction_id: null,
+    source_email_id: null,
+    opened_at: "2026-04-21T08:00:00Z",
+    closed_at: null,
+    status: "OPEN_AWAITING_HUMAN",
+    sla_deadline: "2026-04-23T08:00:00Z",
+    tier: 2,
+    working_memory_summary: null,
+    last_compaction_at: null,
+    bundle_version_at_open: "duplicate-po@1.0.0",
+  },
+  {
+    case_id: "case-002",
+    tenant_id: "acme-corp",
+    customer_id: "acct-kroger",
+    source: "automated_order",
+    source_channel: "edi_x12_850",
+    customer_po_number: "PO-PRH-001",
+    sales_order_id: "SO-PRH-001",
+    edi_transaction_id: null,
+    source_email_id: null,
+    opened_at: "2026-04-22T10:15:00Z",
+    closed_at: null,
+    status: "OPEN_AWAITING_HUMAN",
+    sla_deadline: "2026-04-22T18:00:00Z",
+    tier: 2,
+    working_memory_summary: null,
+    last_compaction_at: null,
+    bundle_version_at_open: "price-hold-release@1.0.0",
+  },
+  {
+    case_id: "case-003",
+    tenant_id: "acme-corp",
+    customer_id: "acct-target",
+    source: "manual_order",
+    source_channel: "email",
+    customer_po_number: "EML-PO-2026-0042",
+    sales_order_id: null,
+    edi_transaction_id: null,
+    source_email_id: "msg-southeast-001",
+    opened_at: "2026-04-23T07:30:00Z",
+    closed_at: null,
+    status: "OPEN_AWAITING_BUYER",
+    sla_deadline: "2026-04-25T07:30:00Z",
+    tier: 2,
+    working_memory_summary: null,
+    last_compaction_at: null,
+    bundle_version_at_open: "email-order-entry@1.0.0",
+  },
+];
+
+/**
+ * Cases API (/api/v1/cases/*) — Phase H.6 surface. Mocked client-side
+ * until asoe2 lands the real endpoints in Phase H.7. Same `USE_REAL_API`
+ * cutover pattern as exceptionsApi.
+ */
+export const casesApi = {
+  async list(params?: {
+    source?: string;
+    status?: string;
+  }): Promise<{ items: OrderCase[]; total: number }> {
+    if (USE_REAL_API) {
+      return http<{ items: OrderCase[]; total: number }>("/api/v1/cases", {
+        query: {
+          source: params?.source,
+          status: params?.status,
+        },
+      });
+    }
+    await new Promise((r) => setTimeout(r, MOCK_DELAY));
+    let items = [...MOCK_CASES];
+    if (params?.source) items = items.filter((c) => c.source === params.source);
+    if (params?.status) items = items.filter((c) => c.status === params.status);
+    return { items, total: items.length };
+  },
+
+  async get(case_id: string): Promise<OrderCase | null> {
+    if (USE_REAL_API) {
+      return http<OrderCase>(`/api/v1/cases/${encodeURIComponent(case_id)}`);
+    }
+    await new Promise((r) => setTimeout(r, MOCK_DELAY));
+    return MOCK_CASES.find((c) => c.case_id === case_id) ?? null;
+  },
+};
+
+/**
+ * Visible to architectural-lock tests. The case-source vocabulary is
+ * sourced from this constant in the UI; backend `/api/v1/health`
+ * gains `allowed_case_sources` in Phase H.7. Until then this is the
+ * UI's stable list — but it lives in api.ts (the boundary layer)
+ * NOT in page code, preserving Guardrail #1.
+ */
+export const ALLOWED_CASE_SOURCES = ["manual_order", "automated_order"] as const;
+
