@@ -251,6 +251,10 @@ function ExceptionQueueContent() {
       setReanalyzing((cur) => (cur?.exceptionId === event.exception_id ? null : cur));
     } else if (event.type === "reanalysis_started") {
       // Surface the re-running state for the currently viewed exception.
+      // exception_id is always set on reanalysis_started; the null
+      // guard satisfies the union type after case_* events were
+      // added (Phase 28.5) — case events carry case_id instead.
+      if (event.exception_id == null) return;
       const payload = event.payload as {
         attempt: number; triggered_by: string; reason: string;
       };
