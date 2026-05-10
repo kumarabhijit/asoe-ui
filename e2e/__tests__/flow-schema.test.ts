@@ -169,13 +169,13 @@ describe("flow-schema — invalid inputs", () => {
   });
 
   it("rejects unknown action values (no escape hatch into free-form Playwright)", () => {
+    // safeParse takes `unknown`; the cast lets us pass an
+    // intentionally invalid `action` without a ts-expect-error
+    // that the typechecker rejects when zod's input type widens.
     const result = flowSchema.safeParse({
       ...baseValid,
-      steps: [
-        // @ts-expect-error — action is intentionally invalid
-        { action: "double_click", selector: ".x" },
-      ],
-    });
+      steps: [{ action: "double_click", selector: ".x" }],
+    } as unknown);
     expect(result.success).toBe(false);
   });
 
