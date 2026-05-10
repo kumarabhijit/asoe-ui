@@ -78,17 +78,19 @@ describe("useWebSocket: Section 8.4 polling fallback", () => {
   });
 });
 
-describe("ExceptionQueuePage: WS+polling unified silent refresh", () => {
+describe("ExceptionQueuePage (V5.1): WS+polling unified silent refresh", () => {
+  // Phase 28.5 — `/exceptions` projects from `useCases().refetch`.
+  // The page wires both `onReconnect` and `onPollFallback` to the
+  // same silent refresh so the visual behaviour is identical
+  // whether the trigger is a WS recovery or REST polling.
+
   it("passes onPollFallback to useWebSocket", () => {
     const src = readFileSync(PAGE_PATH, "utf-8");
-    expect(src).toMatch(/onPollFallback:\s*handleWsReconnect/);
+    expect(src).toMatch(/onPollFallback:\s*refetch/);
   });
 
   it("reuses the same silent-refresh handler for both onReconnect and onPollFallback", () => {
     const src = readFileSync(PAGE_PATH, "utf-8");
-    // Both options must point at handleWsReconnect — the visual
-    // behaviour shouldn't differ between WS-recovered refresh and
-    // polling-driven refresh.
-    expect(src).toMatch(/onReconnect:\s*handleWsReconnect[\s\S]{0,400}onPollFallback:\s*handleWsReconnect/);
+    expect(src).toMatch(/onReconnect:\s*refetch[\s\S]{0,400}onPollFallback:\s*refetch/);
   });
 });

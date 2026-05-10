@@ -1,49 +1,97 @@
 /**
- * Exception Queue — Three-pane "Outlook" layout (Master-Detail pattern).
+ * Exception Queue — case-projected master-detail view (V5.1).
  *
- * Architecture:
- *   Top Rail      — NavBar (56px sticky, existing global nav)
- *   Middle Pane   — Scrollable exception list with search/filters
- *   Right Pane    — Exception detail panel (sections A-D)
+ * Phase 28.5 §28.5 — `/exceptions` is now an "all cases" view of
+ * `/cases`: rows project from `casesApi.list()` (no source filter),
+ * not from `exceptionsApi.list`. Click-through goes to
+ * `/cases/{case_id}` — the canonical case detail surface.
  *
- * State management:
- *   selectedExceptionId is lifted to this parent layout.
- *   Selecting a card in the Middle Pane updates the Right Pane
- *   without a full page reload.
- *
- * Data fetching:
- *   First item is auto-selected and pre-fetched on initial load.
- *   Subsequent selections trigger on-demand fetching in the detail pane.
- *
- * Filter values sourced from health endpoint per Guardrail #2.
+ * Architectural notes:
+ *   * Pure list projector (CLAUDE.md Guardrail #6). No client-side
+ *     composition; every field comes from OrderCase as the backend
+ *     hands it.
+ *   * No per-intent / per-lifecycle dispatch (Guardrail #1).
+ *     A case is a case regardless of which intent its child
+ *     exceptions carry. The legacy ExceptionListPane (intent +
+ *     lifecycle filter chips, search, saved views) is unchanged
+ *     behind it but no longer mounted on this page; the
+ *     V5.1 follow-up is a CaseListPane that replays those
+ *     features against case-level fields.
+ *   * Direct exception detail (e.g. from a deeplink in a runbook,
+ *     or from `/inbox` legacy back-link) remains reachable at
+ *     `/exceptions/[id]` — that route still mounts
+ *     `ExceptionDetailPanel`.
+ *   * WS invalidation: `case_*` events trigger silent refetch via
+ *     `useCases().refetch()`; `pipeline_progress` /
+ *     `exception_update` / `task_complete` retain their existing
+ *     shape but no longer drive list re-fetches on this surface
+ *     (they are exception-keyed, not case-keyed).
  */
 "use client";
 
-import { Suspense, useState, useEffect, useCallback, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Group, Panel, Separator } from "react-resizable-panels";
-import { Inbox } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Mail,
+  PackageCheck,
+  RefreshCw,
+} from "lucide-react";
+
 import { NavBar } from "@/components/ui/NavBar";
 import { CaseViewBanner } from "@/components/ui/CaseViewBanner";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { MetricTile } from "@/components/ui/MetricTile";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { exceptionsApi } from "@/lib/api";
-import type { ExceptionSummary } from "@/types/exceptions";
-import type { StatsResponse } from "@/types/api";
+import {
+  useCases,
+  isCaseInvalidationEvent,
+} from "@/hooks/useManualOrderCases";
+import { ALLOWED_CASE_SOURCES } from "@/lib/api";
+import type { CaseSource, OrderCase, SlaBand } from "@/types/cases";
 import type { WSEvent } from "@/types/websocket";
-import ExceptionListPane from "./ExceptionListPane";
-import ExceptionDetailPanel from "./ExceptionDetailPanel";
-import { matchExceptions, parseQuery } from "./searchParser";
+import { cn } from "@/lib/utils";
 
-/** Decode a comma-separated URL param into a deduped array of
- *  non-empty values. `null` / empty string → []. Used for the
- *  state[] and intent[] filter URL params. */
-function parseCsvParam(raw: string | null): string[] {
-  if (!raw) return [];
-  return Array.from(new Set(raw.split(",").map((s) => s.trim()).filter(Boolean)));
-}
+import { slaSnapshot } from "@/app/cases/page";
+
+/* ── Visual mappings (Guardrail #1: default-fallback maps) ────────── */
+
+const SOURCE_LABEL: Record<CaseSource | "default", string> = {
+  manual_order: "Manual",
+  automated_order: "Automated",
+  default: "Unknown source",
+};
+
+const SOURCE_ICON: Record<CaseSource | "default", React.ReactNode> = {
+  manual_order: <Mail size={12} aria-hidden />,
+  automated_order: <PackageCheck size={12} aria-hidden />,
+  default: <Clock size={12} aria-hidden />,
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  OPEN_AGENT_PROCESSING: "Agent processing",
+  OPEN_AWAITING_HUMAN: "Awaiting review",
+  OPEN_AWAITING_BUYER: "Awaiting buyer",
+  OPEN_AWAITING_ERP: "Awaiting ERP",
+  RESOLVED: "Resolved",
+  FAILED: "Failed",
+  BLOCKED: "Blocked",
+};
+
+const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutral"> = {
+  breached: "error",
+  at_risk: "warning",
+  today: "warning",
+  comfortable: "success",
+  none: "neutral",
+};
 
 const NAV_TABS = [
   { id: "inbox", label: "Customer Inbox", href: "/inbox" },
@@ -52,6 +100,8 @@ const NAV_TABS = [
   { id: "dashboard", label: "Dashboard", href: "/dashboard" },
   { id: "settings", label: "Settings", href: "/settings" },
 ];
+
+/* ── Page ─────────────────────────────────────────────────────────── */
 
 export default function ExceptionQueuePage() {
   return (
@@ -63,381 +113,80 @@ export default function ExceptionQueuePage() {
 
 function ExceptionQueueContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { health } = useHealth();
   const { user, accessToken, visibleTabs } = useAuth();
-
-  useEffect(() => { document.title = "Exception Queue — ASOE"; }, []);
+  const { cases, total, loading, error, refetch } = useCases();
 
   const userName = user?.name || "User";
-  const userInitials = (user as { avatar_initials?: string })?.avatar_initials || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const userInitials =
+    (user as { avatar_initials?: string })?.avatar_initials
+    || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
   const userTitle = (user as { title?: string })?.title || "";
   const filteredTabs = visibleTabs.length > 0
     ? NAV_TABS.filter((t) => visibleTabs.includes(t.id))
     : NAV_TABS;
 
-  /* ── List state ──────────────────────────────────────────────────── */
-  const [exceptions, setExceptions] = useState<ExceptionSummary[]>([]);
-  const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  /* ── Lifted selection state ──────────────────────────────────────── */
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<CaseSource | null>(null);
 
-  /* ── Filters (initialized from URL params) ───────────────────────── */
-  // Multi-value filters arrive as comma-separated lists in the URL
-  // (`?state=PENDING_REVIEW,ESCALATED&intent=DUPLICATE_PO,EDI_MISMATCH`).
-  // The `filterDate` quick-filter is a single-value preset today
-  // ("today" or null); the multi-select chip bar handles state/intent
-  // arrays.
-  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
-  const [filterStates, setFilterStates] = useState<string[]>(
-    parseCsvParam(searchParams.get("state")),
-  );
-  const [filterIntents, setFilterIntents] = useState<string[]>(
-    parseCsvParam(searchParams.get("intent")),
-  );
-  const [filterDate, setFilterDate] = useState<"today" | null>(
-    searchParams.get("date") === "today" ? "today" : null,
-  );
-
-  /* ── Sync filters to URL ─────────────────────────────────────────── */
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (filterStates.length > 0) params.set("state", filterStates.join(","));
-    if (filterIntents.length > 0) params.set("intent", filterIntents.join(","));
-    if (filterDate) params.set("date", filterDate);
-    if (searchQuery) params.set("q", searchQuery);
-    const qs = params.toString();
-    const url = qs ? `/exceptions?${qs}` : "/exceptions";
-    router.replace(url, { scroll: false });
-  }, [filterStates, filterIntents, filterDate, searchQuery, router]);
-
-  const hasActiveFilters =
-    filterStates.length > 0 ||
-    filterIntents.length > 0 ||
-    filterDate !== null ||
-    !!searchQuery;
-
-  function clearAllFilters() {
-    setFilterStates([]);
-    setFilterIntents([]);
-    setFilterDate(null);
-    setSearchQuery("");
-  }
-
-  // Apply a saved view (Slice 3) — replaces all four filter dimensions
-  // in one render so the URL sync effect runs once. The cast below is
-  // safe: SavedView mirrors the four state slots exactly. We accept the
-  // shape inline rather than importing the type to keep page.tsx free
-  // of an extra hook-only dependency.
-  function applySavedView(view: {
-    filterStates: string[];
-    filterIntents: string[];
-    filterDate: "today" | null;
-    searchQuery: string;
-  }) {
-    setFilterStates(view.filterStates);
-    setFilterIntents(view.filterIntents);
-    setFilterDate(view.filterDate);
-    setSearchQuery(view.searchQuery);
-  }
-
-  /* ── Data fetching ───────────────────────────────────────────────── */
-  //
-  // `silent: true` is used by the WebSocket event handler so an
-  // exception_update / task_complete event refreshes the list without
-  // flashing the loading spinner — the user's scroll position and any
-  // hover state are preserved. The initial mount + filter changes
-  // pass silent=false so the first paint shows a proper loading
-  // indicator.
-  //
-  // We follow the cursor pagination contract on every refresh until
-  // `has_more === false`. Mock mode short-circuits with has_more=false
-  // on page 1, so the loop is a no-op there. Live mode currently
-  // returns ~10 rows in a single page (limit=50 default), so the loop
-  // is also short — but if the row count grows past one page, this is
-  // what makes the queue render the full result set instead of just
-  // the first page.
-  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
-    const silent = opts?.silent === true;
-    if (!silent) {
-      setLoading(true);
-      setError(null);
-    }
-    try {
-      const allRows: ExceptionSummary[] = [];
-      let cursor: string | undefined = undefined;
-      let safety = 0;
-      do {
-        // Multi-value filters are applied client-side (see the
-        // `filtered` block below). The API accepts only a single
-        // status/intent today; passing a single value when several are
-        // selected would silently drop the others. Fetching unfiltered
-        // and filtering in the page keeps the UX consistent and is
-        // cheap given the current row volume; if the production list
-        // grows large enough that this matters, the API client should
-        // be extended to accept arrays.
-        const page = await exceptionsApi.list({ cursor });
-        allRows.push(...page.data);
-        cursor = page.has_more ? (page.cursor ?? undefined) : undefined;
-        safety += 1;
-        if (safety > 50) {
-          // Defensive: never spin forever if the backend reports
-          // has_more=true without advancing the cursor.
-          console.warn("Pagination loop safety triggered after 50 pages");
-          break;
-        }
-      } while (cursor);
-
-      const statsRes = await exceptionsApi.stats();
-      setExceptions(allRows);
-      setStats(statsRes);
-    } catch (err) {
-      console.error("Failed to fetch exceptions:", err);
-      if (!silent) {
-        setError("Failed to load exceptions. Check your connection and try again.");
-      }
-    } finally {
-      if (!silent) setLoading(false);
-    }
+    document.title = "Exception Queue — ASOE";
   }, []);
 
+  // Auto-select first case on initial load; keep selection if still
+  // present after a refetch.
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  /* ── Auto-select first item for pre-fetching ─────────────────────── */
-  useEffect(() => {
-    if (exceptions.length > 0 && !selectedId) {
-      setSelectedId(exceptions[0].id);
+    if (cases.length === 0) {
+      setSelectedId(null);
+      return;
     }
-  }, [exceptions, selectedId]);
-
-  /* ── WebSocket — real-time pipeline updates ──────────────────────── */
-  const detailRefreshRef = useRef<(() => void) | null>(null);
-  // Tracks whether a reanalysis is mid-flight for the currently-viewed
-  // exception. Cleared on task_complete. Passed to the detail panel so it
-  // can show a live "Re-running…" banner while pipeline events stream in.
-  const [reanalyzing, setReanalyzing] = useState<{
-    exceptionId: string;
-    attempt: number;
-    reason: string;
-    triggeredBy: string;
-  } | null>(null);
+    setSelectedId((cur) => {
+      if (cur && cases.some((c) => c.case_id === cur)) return cur;
+      return cases[0].case_id;
+    });
+  }, [cases]);
 
   const handleWsEvent = useCallback((event: WSEvent) => {
-    if (event.type === "pipeline_progress") {
-      // Pipeline progress for currently viewed exception — notify detail panel
-      if (event.exception_id === selectedId) {
-        detailRefreshRef.current?.();
-      }
-    } else if (event.type === "exception_update") {
-      // Exception state changed — silently refresh list + detail if
-      // viewing this exception. silent=true avoids flashing the
-      // loading spinner / clearing the queue while the operator is
-      // mid-scroll on every state transition.
-      fetchData({ silent: true });
-      if (event.exception_id === selectedId) {
-        detailRefreshRef.current?.();
-      }
-    } else if (event.type === "task_complete") {
-      // Task finished — silently refresh and clear any reanalysis banner.
-      fetchData({ silent: true });
-      if (event.exception_id === selectedId) {
-        detailRefreshRef.current?.();
-      }
-      setReanalyzing((cur) => (cur?.exceptionId === event.exception_id ? null : cur));
-    } else if (event.type === "reanalysis_started") {
-      // Surface the re-running state for the currently viewed exception.
-      // exception_id is always set on reanalysis_started; the null
-      // guard satisfies the union type after case_* events were
-      // added (Phase 28.5) — case events carry case_id instead.
-      if (event.exception_id == null) return;
-      const payload = event.payload as {
-        attempt: number; triggered_by: string; reason: string;
-      };
-      if (event.exception_id === selectedId) {
-        setReanalyzing({
-          exceptionId: event.exception_id,
-          attempt: payload.attempt,
-          reason: payload.reason,
-          triggeredBy: payload.triggered_by,
-        });
-      }
+    if (isCaseInvalidationEvent(event)) {
+      refetch();
     }
-  }, [selectedId, fetchData]);
-
-  // After a WS reconnect, reconcile both the list and the currently-
-  // viewed detail. Container Apps drops idle sockets at ~4 minutes; if
-  // the operator was scrolling or reading a detail when the drop
-  // happened, the page would otherwise keep showing pre-disconnect
-  // data with no way to know it was stale. Silent refresh keeps the
-  // scroll position; detail refresh re-runs the panel's GET.
-  const handleWsReconnect = useCallback(() => {
-    fetchData({ silent: true });
-    detailRefreshRef.current?.();
-  }, [fetchData]);
+  }, [refetch]);
 
   useWebSocket({
-    // Pass the real backend-issued JWT so the WebSocket auth message
-    // (Section 8.1) carries a token the asoe2 ws_router can validate.
-    // The previous "mock-ws-token" placeholder authenticated only
-    // against the mock api; against the real backend the connection
-    // would close immediately on receipt of the auth frame and the
-    // exponential-backoff loop would reconnect-and-fail forever
-    // without ever delivering an event. We still gate on user (not
-    // accessToken) for the `enabled` flag so the hook waits for
-    // session hydration on first paint instead of flashing a
-    // disconnect+reconnect when accessToken arrives.
     token: accessToken,
     enabled: !!user && !!accessToken,
     onEvent: handleWsEvent,
-    onReconnect: handleWsReconnect,
-    // Section 8.4 polling fallback. When the WS has been unhealthy
-    // long enough that the hook gives up on real-time, fall back to
-    // refreshing the queue every ~5s so the operator's view doesn't
-    // go stale. Same silent-refresh path as the WS event handlers
-    // so the loading spinner doesn't flash. Auto-clears when WS
-    // recovers.
-    onPollFallback: handleWsReconnect,
+    onReconnect: refetch,
+    onPollFallback: refetch,
   });
 
-  /* ── Client-side filter pipeline (account scoping is server-side) ──
-   * Order: chips/pill constraints first (state / intent / today), then
-   * the search box. The search box runs through `searchParser` so the
-   * operator can write `account:walmart since:7d 1042` and have it
-   * decomposed into operator predicates + a Fuse.js fuzzy free-term
-   * match. Operators AND with the multi-select chips — the operator
-   * may use either, and the result is the intersection. */
-  const todayStart = (() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  })();
-  const chipFiltered = exceptions.filter((exc) => {
-    if (filterStates.length > 0 && !filterStates.includes(exc.lifecycle_state)) {
-      return false;
-    }
-    if (filterIntents.length > 0 && !filterIntents.includes(exc.intent ?? "")) {
-      return false;
-    }
-    if (filterDate === "today") {
-      const t = Date.parse(exc.updated_at ?? exc.created_at);
-      if (Number.isNaN(t) || t < todayStart) return false;
-    }
-    return true;
-  });
-  const parsedQuery = parseQuery(searchQuery);
-  const { matched: filtered, warnings: searchWarnings } = matchExceptions(
-    chipFiltered,
-    parsedQuery,
-  );
+  // Source-chip filtering happens client-side. Sort by SLA urgency.
+  const now = new Date();
+  const filtered = sourceFilter
+    ? cases.filter((c) => c.source === sourceFilter)
+    : cases;
+  const sorted = filtered
+    .map((c) => ({ case_: c, sla: slaSnapshot(c, now) }))
+    .sort((a, b) => {
+      const aMs = a.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
+      const bMs = b.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
+      return aMs - bMs;
+    });
 
-  /* ── Recency sort (Outlook-style: most-recent first) ───────────────
-   * Sort by `updated_at` desc, with `created_at` desc as tiebreaker so
-   * the order is deterministic when two rows share an updated timestamp.
-   * Pinning the sort here (not in the API client) keeps the list
-   * stable across silent WebSocket refreshes. */
-  const sorted = [...filtered].sort((a, b) => {
-    const ua = Date.parse(a.updated_at ?? a.created_at);
-    const ub = Date.parse(b.updated_at ?? b.created_at);
-    if (ub !== ua) return ub - ua;
-    return Date.parse(b.created_at) - Date.parse(a.created_at);
-  });
+  const selected = sorted.find((s) => s.case_.case_id === selectedId);
+  const breached = cases.filter((c) => {
+    const ms = c.sla_deadline
+      ? new Date(c.sla_deadline).getTime() - now.getTime()
+      : Number.POSITIVE_INFINITY;
+    return ms < 0;
+  }).length;
+  const awaitingHuman = cases.filter(
+    (c) => c.status === "OPEN_AWAITING_HUMAN",
+  ).length;
+  const resolved = cases.filter((c) => c.status === "RESOLVED").length;
 
-  /* ── Arrow-key navigation (Outlook parity) ──────────────────────────
-   * ArrowUp / ArrowDown move the selection through the (sorted +
-   * filtered) list and open that exception in the detail pane via the
-   * existing setSelectedId pipeline. Home / End jump to first / last
-   * row. The handler binds at the document level so the keys work
-   * whenever the page is focused — not only when a list card has focus
-   * — matching Outlook inbox behaviour. We bail when the user is typing
-   * in an input, select, or contenteditable so the search field,
-   * filter selects, and the override-dialog textarea keep their native
-   * key handling. Selecting an item also scrolls it into view. */
-  useEffect(() => {
-    function isTypingTarget(t: EventTarget | null): boolean {
-      if (!(t instanceof HTMLElement)) return false;
-      const tag = t.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-      if (t.isContentEditable) return true;
-      // Don't hijack keys while a Radix popover / dialog is open.
-      if (t.closest("[role='combobox'], [role='dialog']")) return true;
-      return false;
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (sorted.length === 0) return;
-      if (isTypingTarget(e.target)) return;
-      // Don't fire when modifier keys are held — those combinations
-      // belong to the browser / OS (e.g. Cmd+ArrowUp = scroll to top).
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const idx = sorted.findIndex((x) => x.id === selectedId);
-      let next = idx;
-      switch (e.key) {
-        case "ArrowDown":
-        case "j":
-          next = idx < 0 ? 0 : Math.min(idx + 1, sorted.length - 1);
-          break;
-        case "ArrowUp":
-        case "k":
-          next = idx < 0 ? 0 : Math.max(idx - 1, 0);
-          break;
-        case "Home":
-          next = 0;
-          break;
-        case "End":
-          next = sorted.length - 1;
-          break;
-        default:
-          return;
-      }
-      if (next !== idx) {
-        e.preventDefault();
-        const nextId = sorted[next].id;
-        setSelectedId(nextId);
-        requestAnimationFrame(() => {
-          const el = document.querySelector<HTMLElement>(
-            `[data-exception-id="${nextId}"]`,
-          );
-          el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-          // Move DOM focus to the newly-selected card so the
-          // :focus-visible outline (globals.css:56-58) follows the
-          // selection. Without this the previously-clicked card
-          // retained focus and showed a 2px brand-coloured ring,
-          // making it look like the first card was "still
-          // highlighted" even though selection had moved on.
-          // preventScroll avoids fighting the smooth scrollIntoView
-          // we just queued above.
-          el?.focus({ preventScroll: true });
-        });
-      }
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [sorted, selectedId]);
-
-  /*
-   * Zoom strategy:
-   *   At normal zoom the page fills exactly the viewport (no scroll).
-   *   When zoomed in, 100vh shrinks in CSS pixels but the min-height
-   *   of 576px keeps the panel area usable.  Because the combined
-   *   height (nav + panels) then exceeds 100vh, the browser shows a
-   *   native page-level scrollbar — the same behaviour as /inbox.
-   *   The nav-height token keeps the calc() in sync with NavBar.
-   *
-   *   react-resizable-panels sets touch-action: pan-y on Group/Panel
-   *   elements via inline styles, which blocks trackpad pinch-to-zoom.
-   *   The .panel-group-zoomable class in globals.css overrides this
-   *   with "pan-x pan-y pinch-zoom !important" to restore zoom while
-   *   preserving Separator drag.
-   */
-
-  /* ── Render ──────────────────────────────────────────────────────── */
   return (
-    <div className="bg-surface-page font-sans min-h-screen">
-      {/* ━━ Top Rail: Global Navigation ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+    <div className="min-h-screen bg-surface-page font-sans text-body text-text-primary leading-normal">
       <NavBar
         tabs={filteredTabs}
         activeTab="exceptions"
@@ -450,82 +199,377 @@ function ExceptionQueueContent() {
         userTitle={userTitle}
         agentCount={health?.allowed_intents?.length || 0}
         onSignOut={() => signOut({ callbackUrl: "/login" })}
-
       />
 
-      {/* ADR-038 §H.6 — banner makes the case-view relationship
-          explicit while the deeper data-hook swap is in flight. */}
       <CaseViewBanner scopeLabel="Exception Queue" />
 
-      {/* ━━ Two-pane Master-Detail Area ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <main id="main-content" className="h-[calc(100vh-var(--nav-height))] min-h-[576px]">
-        <Group orientation="horizontal" id="exception-queue-panels" className="panel-group-zoomable h-full">
-
-          {/* ── Middle Pane: Exception List ──────────────────────────── */}
-          <Panel defaultSize="35%" minSize="22%" maxSize="50%" id="list-pane">
-            <ExceptionListPane
-              exceptions={sorted}
-              stats={stats}
-              loading={loading}
-              error={error}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              filterStates={filterStates}
-              onFilterStatesChange={setFilterStates}
-              filterIntents={filterIntents}
-              onFilterIntentsChange={setFilterIntents}
-              filterDate={filterDate}
-              onFilterDateChange={setFilterDate}
-              parsedSearchOperators={parsedQuery.operators}
-              searchWarnings={searchWarnings}
-              hasActiveFilters={hasActiveFilters}
-              onClearFilters={clearAllFilters}
-              onApplySavedView={applySavedView}
-              health={health}
-              onRefresh={fetchData}
+      {/* ── PAGE HEADER ── */}
+      <div className="bg-surface-primary border-b border-border shadow-xs">
+        <div className="max-w-[1440px] mx-auto px-32">
+          <nav aria-label="Breadcrumb" className="py-8">
+            <span className="text-caption text-text-tertiary">Home</span>
+            <ChevronRight
+              size={10}
+              className="mx-4 text-text-tertiary align-middle inline"
             />
-          </Panel>
+            <span className="text-caption text-text-secondary">
+              Exception Queue
+            </span>
+          </nav>
+          <div className="flex items-center justify-between py-8 pb-16">
+            <div className="flex items-center gap-12">
+              <div className="w-[40px] h-[40px] rounded-md bg-text-primary flex items-center justify-center">
+                <AlertTriangle size={20} className="text-text-inverse" />
+              </div>
+              <div>
+                <h1 className="text-display font-bold leading-tight m-0">
+                  Exception Queue
+                </h1>
+                <span className="text-caption text-text-tertiary">
+                  All cases — sorted by SLA urgency
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-8">
+              <Button variant="neutral" size="md" onClick={refetch}>
+                <RefreshCw size={14} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-          {/* ── Resize Handle ────────────────────────────────────────── */}
-          <Separator className="w-[var(--pane-handle-width)] bg-border cursor-col-resize transition-colors duration-fast shrink-0 touch-none" />
+      <div id="main-content" />
 
-          {/* ── Right Pane: Exception Detail ─────────────────────────── */}
-          <Panel minSize="45%" id="detail-pane">
-            {selectedId ? (
-              <ExceptionDetailPanel
-                key={selectedId}
-                exceptionId={selectedId}
-                onActionComplete={fetchData}
-                onRefreshRef={detailRefreshRef}
-                reanalyzing={
-                  reanalyzing?.exceptionId === selectedId ? reanalyzing : null
-                }
+      {/* ── METRICS STRIP ── */}
+      <div className="max-w-[1440px] mx-auto px-32 py-16">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-16">
+          <MetricTile
+            icon={<AlertTriangle size={20} />}
+            label="Total cases"
+            value={String(total)}
+            subtitle="All sources"
+            tint="var(--color-cat-blue)"
+          />
+          <MetricTile
+            icon={<Clock size={20} />}
+            label="SLA breached"
+            value={String(breached)}
+            subtitle="Past deadline"
+            tint="var(--color-error)"
+          />
+          <MetricTile
+            icon={<AlertTriangle size={20} />}
+            label="Awaiting review"
+            value={String(awaitingHuman)}
+            subtitle="Operator action needed"
+            tint="var(--color-warning)"
+          />
+          <MetricTile
+            icon={<CheckCircle2 size={20} />}
+            label="Resolved"
+            value={String(resolved)}
+            subtitle="Closed in this window"
+            tint="var(--color-success)"
+          />
+        </div>
+      </div>
+
+      {/* ── SOURCE FILTER CHIPS ── */}
+      <div className="max-w-[1440px] mx-auto px-32 pb-8">
+        <div
+          role="toolbar"
+          aria-label="Case source filter"
+          className="flex items-center gap-8"
+        >
+          <span className="text-label uppercase tracking-wider text-text-quaternary">
+            Source:
+          </span>
+          <FilterChip
+            label="All"
+            active={sourceFilter === null}
+            onClick={() => setSourceFilter(null)}
+          />
+          {ALLOWED_CASE_SOURCES.map((src) => (
+            <FilterChip
+              key={src}
+              label={SOURCE_LABEL[src as CaseSource] ?? SOURCE_LABEL.default}
+              active={sourceFilter === src}
+              onClick={() =>
+                setSourceFilter((cur) =>
+                  cur === src ? null : (src as CaseSource),
+                )
+              }
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* ── CONTENT: QUEUE + DETAIL ── */}
+      <div className="max-w-[1440px] mx-auto px-32 py-16 flex gap-16">
+        {/* ── LEFT: case queue ── */}
+        <div className="w-[420px] shrink-0 bg-surface-primary rounded-md shadow-sm overflow-hidden">
+          <div className="px-16 py-12 border-b border-border-subtle flex items-center gap-8">
+            <span className="text-label font-bold tracking-widest text-text-tertiary uppercase">
+              Cases
+            </span>
+            <div className="flex-1" />
+            <span className="text-caption text-text-tertiary">
+              {sorted.length} of {total}
+            </span>
+          </div>
+
+          {loading && (
+            <div role="status" aria-live="polite" className="p-16 text-text-tertiary">
+              Loading cases…
+            </div>
+          )}
+          {!loading && error && (
+            <div role="alert" className="p-16 text-error">
+              {error}
+            </div>
+          )}
+          {!loading && !error && sorted.length === 0 && (
+            <div role="status" className="p-16 text-text-tertiary">
+              No cases match the current filter.
+            </div>
+          )}
+
+          <div className="max-h-[calc(100vh-440px)] overflow-y-auto">
+            {sorted.map(({ case_, sla }) => (
+              <CaseRow
+                key={case_.case_id}
+                case_={case_}
+                slaLabel={sla.label}
+                slaBand={sla.band}
+                isSelected={case_.case_id === selectedId}
+                onSelect={() => setSelectedId(case_.case_id)}
               />
-            ) : (
-              <EmptyDetailState />
-            )}
-          </Panel>
+            ))}
+          </div>
+        </div>
 
-        </Group>
-      </main>
+        {/* ── RIGHT: case detail summary ── */}
+        <div className="flex-1 flex flex-col gap-16">
+          {!selected && !loading && (
+            <div className="bg-surface-primary rounded-md shadow-sm p-32 text-text-tertiary text-center">
+              Select a case to view its summary.
+            </div>
+          )}
+
+          {selected && (
+            <>
+              <div className="bg-surface-primary rounded-md shadow-sm p-20">
+                <div className="flex items-center gap-8 mb-12">
+                  <Badge variant="neutral" size="sm">
+                    {SOURCE_ICON[selected.case_.source as CaseSource]
+                      ?? SOURCE_ICON.default}
+                    <span className="ml-4">
+                      {SOURCE_LABEL[selected.case_.source as CaseSource]
+                        ?? SOURCE_LABEL.default}
+                    </span>
+                  </Badge>
+                  <Badge variant="neutral" size="sm">
+                    {selected.case_.source_channel}
+                  </Badge>
+                  <Badge
+                    variant={SLA_BAND_VARIANT[selected.sla.band]}
+                    size="sm"
+                    aria-label={`SLA: ${selected.sla.label}`}
+                  >
+                    <Clock size={10} aria-hidden className="mr-4" />
+                    {selected.sla.label}
+                  </Badge>
+                  <span className="ml-auto text-caption text-text-tertiary uppercase tracking-wider">
+                    {STATUS_LABEL[selected.case_.status]
+                      ?? selected.case_.status}
+                  </span>
+                </div>
+                <h2 className="text-heading font-bold m-0 leading-snug mb-12">
+                  Case <code className="font-mono">{selected.case_.case_id}</code>
+                </h2>
+
+                <dl className="grid grid-cols-2 gap-x-24 gap-y-12 text-body">
+                  {selected.case_.customer_po_number && (
+                    <Field
+                      label="Customer PO"
+                      value={selected.case_.customer_po_number}
+                      mono
+                    />
+                  )}
+                  {selected.case_.sales_order_id && (
+                    <Field
+                      label="Sales order"
+                      value={selected.case_.sales_order_id}
+                      mono
+                    />
+                  )}
+                  {selected.case_.customer_id && (
+                    <Field
+                      label="Customer"
+                      value={selected.case_.customer_id}
+                    />
+                  )}
+                  <Field
+                    label="Opened"
+                    value={selected.case_.opened_at}
+                    mono
+                  />
+                  {selected.sla.deadline && (
+                    <Field
+                      label={`SLA · ${selected.sla.label}`}
+                      value={selected.sla.deadline}
+                      mono
+                    />
+                  )}
+                  {selected.case_.bundle_version_at_open && (
+                    <Field
+                      label="Skill bundle at open"
+                      value={selected.case_.bundle_version_at_open}
+                      mono
+                    />
+                  )}
+                </dl>
+              </div>
+
+              <div className="bg-surface-primary rounded-md shadow-sm p-20 flex items-center justify-between">
+                <div>
+                  <div className="text-label uppercase tracking-wider text-text-quaternary mb-2">
+                    Full case detail
+                  </div>
+                  <p className="text-body text-text-secondary leading-normal m-0">
+                    Open the case for attached records, agent reasoning,
+                    and resolution actions.
+                  </p>
+                </div>
+                <Button
+                  variant="brand"
+                  size="md"
+                  onClick={() =>
+                    router.push(`/cases/${selected.case_.case_id}`)
+                  }
+                >
+                  Open case
+                  <ChevronRight size={14} />
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-/* ── Empty state for detail pane when nothing is selected ─────────── */
+/* ── Case row ─────────────────────────────────────────────────────── */
 
-function EmptyDetailState() {
+interface CaseRowProps {
+  case_: OrderCase;
+  slaLabel: string;
+  slaBand: SlaBand;
+  isSelected: boolean;
+  onSelect: () => void;
+}
+
+function CaseRow({
+  case_,
+  slaLabel,
+  slaBand,
+  isSelected,
+  onSelect,
+}: CaseRowProps) {
+  const orderRef =
+    case_.customer_po_number || case_.sales_order_id || case_.case_id;
   return (
-    <div className="h-full flex flex-col items-center justify-center text-text-quaternary gap-8 bg-surface-page">
-      <Inbox size={32} />
-      <div className="text-body font-medium">
-        Select an exception to view details
+    <div
+      role="button"
+      tabIndex={0}
+      data-case-id={case_.case_id}
+      aria-label={`Select case ${orderRef}`}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onSelect();
+      }}
+      className={cn(
+        "px-16 py-12 cursor-pointer border-b border-border-subtle border-l-[3px] transition-colors duration-fast",
+        isSelected
+          ? "bg-surface-secondary border-l-brand"
+          : "bg-surface-primary border-l-transparent",
+      )}
+    >
+      <div className="flex items-center gap-8 mb-6">
+        <Badge variant="neutral" size="sm">
+          {SOURCE_ICON[case_.source as CaseSource] ?? SOURCE_ICON.default}
+          <span className="ml-4">{case_.source_channel}</span>
+        </Badge>
+        <Badge
+          variant={SLA_BAND_VARIANT[slaBand]}
+          size="sm"
+          aria-label={`SLA: ${slaLabel}`}
+        >
+          <Clock size={10} aria-hidden className="mr-4" />
+          {slaLabel}
+        </Badge>
       </div>
-      <div className="text-caption">
-        Click any item in the list to see the full analysis
+      <div className="font-mono text-body font-medium text-text-primary mb-2">
+        {orderRef}
       </div>
+      <div className="text-caption text-text-tertiary">
+        {STATUS_LABEL[case_.status] ?? case_.status}
+      </div>
+    </div>
+  );
+}
+
+/* ── Filter chip ──────────────────────────────────────────────────── */
+
+interface FilterChipProps {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}
+
+function FilterChip({ label, active, onClick }: FilterChipProps) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "px-12 py-4 rounded-full border text-caption transition-colors duration-fast",
+        active
+          ? "bg-brand-subtle border-brand text-brand font-semibold"
+          : "bg-surface-primary border-border text-text-secondary hover:bg-surface-secondary",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+/* ── Field ────────────────────────────────────────────────────────── */
+
+interface FieldProps {
+  label: string;
+  value: string;
+  mono?: boolean;
+}
+
+function Field({ label, value, mono = false }: FieldProps) {
+  return (
+    <div>
+      <dt className="text-label font-bold uppercase tracking-widest text-text-tertiary mb-px">
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          "m-0",
+          mono ? "font-mono text-text-primary" : "text-text-primary",
+        )}
+      >
+        {value}
+      </dd>
     </div>
   );
 }
