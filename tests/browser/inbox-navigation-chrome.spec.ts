@@ -5,12 +5,16 @@
  * Three scenarios the contract tests guard structurally; this spec
  * validates them end-to-end against the live app:
  *
- *   N1. Inbox row click on an Email-Order-Entry item (which carries
- *       an exception_id under ADR-034 Phase G) navigates straight to
- *       the exception detail page WITHOUT showing detail in the right
- *       pane. The detail surface that loads must show "Back to Inbox"
- *       (not "Back to Queue") because the operator's mental return
- *       path is /inbox.
+ *   N1. Inbox row click on ANY item (Email-Order-Entry or otherwise)
+ *       selects locally and updates the right-pane detail in place.
+ *       For items linked to an Exception Queue record, the right
+ *       pane renders an explicit "Open in Exception Queue" jump
+ *       button. Clicking it navigates to /exceptions/<id>?from=inbox
+ *       and the detail surface shows "Back to Inbox".
+ *
+ *       (ADR-034 §6.1, PO ruling 2026-05-10 — superseded the original
+ *        Phase G.3 deep-link dispatch in favour of consistent
+ *        master-detail UX + explicit jump button.)
  *
  *   N2. Both /exceptions/[id] and /cases/[id] keep the canonical
  *       NavBar with the Sign out menu item visible. Operators must
@@ -18,10 +22,9 @@
  *       dropped onSignOut and the menu item disappeared.
  *
  *   N3. Inbox rows WITHOUT an exception_id (SHIPMENT_INQUIRY,
- *       INVOICE_QUERY, COMPLAINT) keep the master-detail behaviour:
- *       click selects locally, right pane updates, no full-page
- *       navigation. This documents the ADR-034 divergence — if
- *       it ever changes, this spec fails and forces an ADR update.
+ *       INVOICE_QUERY, COMPLAINT) keep the same master-detail
+ *       behaviour as N1 but render NO jump button — the right pane
+ *       has no Exception Queue counterpart to open.
  */
 import { expect, test } from "@playwright/test";
 
@@ -29,39 +32,44 @@ import { loginAs, USERS } from "./_helpers";
 
 test.describe.configure({ mode: "serial" });
 
-test("N1 — Email Order Entry inbox row → exception detail with Back to Inbox", async ({
+test("N1 — inbox row selects locally; jump button opens exception detail with Back to Inbox", async ({
   page,
 }) => {
   await loginAs(page, USERS.MANAGER);
   await page.goto("/inbox");
 
   // The inbox is seeded from a static INBOX constant in
-  // src/app/inbox/page.tsx. The Email-Order-Entry items carry an
-  // `exception_id` and render with an aria-label of the form
-  // "Open exception <id> for <subject>". Pick the first such row.
-  const emailOrderRow = page
-    .locator('[role="button"][aria-label^="Open exception"]')
-    .first();
-  await expect(emailOrderRow).toBeVisible({ timeout: 10_000 });
+  // src/app/inbox/page.tsx. Per ADR-034 §6.1, every row's
+  // aria-label has the same shape now: "Select email from <sender>:
+  // <subject>". Pick the row whose detail will carry an
+  // `exception_id` — INBOX[3] (id="4", exception_id="exc-026") in
+  // the seed.
+  const targetSubject = INBOX_EXCEPTION_SUBJECT;
+  const exceptionRow = page.locator(
+    `[role="button"][aria-label*="${targetSubject}"]`,
+  );
+  await expect(exceptionRow).toBeVisible({ timeout: 10_000 });
 
-  // Capture the exception id embedded in the aria-label so we can
-  // assert the URL ends up where we expect.
-  const ariaLabel = (await emailOrderRow.getAttribute("aria-label")) ?? "";
-  const exceptionIdMatch = ariaLabel.match(/Open exception (\S+) /);
-  expect(
-    exceptionIdMatch,
-    `Could not parse exception_id from aria-label ${JSON.stringify(ariaLabel)}`,
-  ).not.toBeNull();
-  const exceptionId = exceptionIdMatch![1];
+  const beforeUrl = page.url();
+  await exceptionRow.click();
 
-  await emailOrderRow.click();
+  // ── Click stays on /inbox — master-detail, no full-page nav ────
+  // Give the route a chance to change if it's going to (it shouldn't).
+  await page.waitForTimeout(500);
+  expect(page.url()).toBe(beforeUrl);
+  expect(page.url()).toMatch(/\/inbox(\?|$)/);
 
-  // ── Click navigates AWAY from /inbox to the full-page detail ─
-  await page.waitForURL(/\/exceptions\/[^/?]+(\?|$)/, { timeout: 10_000 });
-  expect(page.url()).toContain(exceptionId);
-  // The referrer hint must be on the URL — the contract test guards
-  // the source code, this test guards the runtime behaviour.
-  expect(page.url()).toContain("from=inbox");
+  // ── Right-pane jump button is visible (selected.exception_id set) ─
+  const jumpBtn = page.getByRole("button", {
+    name: /open exception .* in exception queue/i,
+  });
+  await expect(jumpBtn).toBeVisible({ timeout: 5_000 });
+
+  // ── Click jump → navigates to /exceptions/<id>?from=inbox ──────
+  await jumpBtn.click();
+  await page.waitForURL(/\/exceptions\/[^/?]+\?from=inbox/, {
+    timeout: 10_000,
+  });
 
   // ── Detail surface renders "Back to Inbox" (not "Back to Queue") ─
   await expect(
@@ -82,11 +90,18 @@ test("N2a — /exceptions/[id] keeps Sign out in the user menu", async ({
 }) => {
   await loginAs(page, USERS.MANAGER);
   await page.goto("/inbox");
-  const emailOrderRow = page
-    .locator('[role="button"][aria-label^="Open exception"]')
-    .first();
-  await expect(emailOrderRow).toBeVisible({ timeout: 10_000 });
-  await emailOrderRow.click();
+  // Reach a detail page through the supersession flow: select the
+  // exception-bearing row, then click the jump button.
+  const exceptionRow = page.locator(
+    `[role="button"][aria-label*="${INBOX_EXCEPTION_SUBJECT}"]`,
+  );
+  await expect(exceptionRow).toBeVisible({ timeout: 10_000 });
+  await exceptionRow.click();
+  const jumpBtn = page.getByRole("button", {
+    name: /open exception .* in exception queue/i,
+  });
+  await expect(jumpBtn).toBeVisible({ timeout: 5_000 });
+  await jumpBtn.click();
   await page.waitForURL(/\/exceptions\/[^/?]+(\?|$)/, { timeout: 10_000 });
 
   // Open the user menu and assert Sign out is present.
@@ -102,12 +117,7 @@ test("N2b — /cases/[id] keeps NavBar with Sign out in the user menu", async ({
   request,
 }) => {
   await loginAs(page, USERS.MANAGER);
-  // Navigate to /cases first to discover a real case id; if no cases
-  // exist the test can't assert anything meaningful.
   await page.goto("/cases");
-  // Case rows render the case_id in their click handler; the easiest
-  // structural locator is the row click target. Fall back to skipping
-  // when the cases list is empty (fresh tenant).
   const firstCaseRow = page.locator("table tbody tr").first();
   if ((await firstCaseRow.count()) === 0) {
     test.skip(
@@ -132,34 +142,54 @@ test("N2b — /cases/[id] keeps NavBar with Sign out in the user menu", async ({
 });
 
 
-test("N3 — non-exception inbox row stays on /inbox (master-detail, no full-page navigation)", async ({
+test("N3 — non-exception inbox row stays on /inbox AND shows no jump button", async ({
   page,
 }) => {
   await loginAs(page, USERS.MANAGER);
   await page.goto("/inbox");
 
-  // Non-Email-Order-Entry items render with aria-label of the form
-  // "Select email from <sender>: <subject>" — no exception_id, the
-  // click branch invokes setSelectedId for local master-detail
-  // behaviour (no router.push).
-  const otherRow = page
-    .locator('[role="button"][aria-label^="Select email from"]')
-    .first();
-  if ((await otherRow.count()) === 0) {
-    test.skip(
-      true,
-      "Inbox seed contains only Email-Order-Entry rows; cannot " +
-        "exercise the non-exception branch.",
-    );
-    return;
-  }
+  // Pick any inbox row that does not have an exception_id (in the
+  // current seed: rows id=1, 2, 3, 5, 6 are non-exception). We use
+  // a structural selector rather than a hard subject string so the
+  // test survives seed edits — pick the FIRST row whose detail
+  // does NOT render the jump button.
+  const rows = page.locator('[role="button"][aria-label^="Select email from"]');
+  const rowCount = await rows.count();
+  expect(
+    rowCount,
+    "Expected at least one non-exception inbox row in the seed.",
+  ).toBeGreaterThan(0);
 
-  const beforeUrl = page.url();
-  await otherRow.click();
-  // After click the URL must be unchanged — the row selected locally,
-  // not navigated. If a future refactor unifies the inbox dispatch
-  // (e.g., wraps every item in an exception), this test fires and
-  // forces an ADR-034 review.
-  await page.waitForTimeout(500);
-  expect(page.url()).toBe(beforeUrl);
+  let foundNonException = false;
+  for (let i = 0; i < rowCount; i++) {
+    await rows.nth(i).click();
+    const jump = page.getByRole("button", {
+      name: /open exception .* in exception queue/i,
+    });
+    // A short timeout — if the button is not present after the
+    // selection settles, this is the row we want.
+    const visible = await jump.isVisible().catch(() => false);
+    if (!visible) {
+      foundNonException = true;
+      break;
+    }
+  }
+  expect(
+    foundNonException,
+    "Could not find a non-exception inbox row in the seed; the jump " +
+      "button rendered for every row, which contradicts ADR-034 §6.1.",
+  ).toBe(true);
+
+  // URL must remain on /inbox throughout.
+  expect(page.url()).toMatch(/\/inbox(\?|$)/);
 });
+
+
+// Subject prefix used to locate the exception-bearing inbox row. Maps
+// to INBOX[3] (id="4", exception_id="exc-026") in src/app/inbox/page.tsx
+// — the MANUAL_ORDER_INTAKE STANDARD_REVIEW demo record. Match a prefix,
+// not the full string, since the seed truncates with an ellipsis
+// (e.g. "Kroger PO KRO-2025-03-44821 — Bever..."). If the seed for
+// exc-026 changes, update this constant and the comment so the spec
+// doesn't silently start matching the wrong row.
+const INBOX_EXCEPTION_SUBJECT = "Kroger PO KRO-2025-03-44821";

@@ -118,55 +118,67 @@ describe("Exception detail page honours ?from referrer (R2)", () => {
   });
 });
 
-describe("Inbox dispatch threads ?from=inbox into the URL (R3)", () => {
+describe("Inbox row dispatch is consistent master-detail (R3 — ADR-034 §6.1)", () => {
   const rel = "src/app/inbox/page.tsx";
 
-  it("inbox row navigation includes ?from=inbox when an exception_id is present", () => {
+  it("inbox handleActivate selects locally for every row (no router.push in the row dispatch)", () => {
     const src = read(rel);
-    // Match the router.push call that opens an exception from the
-    // inbox row. The pairing is: handleActivate → router.push with
-    // the exception_id AND the referrer hint.
-    const pushExceptionRe =
-      /router\.push\(\s*[`'"]\s*\/exceptions\/\$\{[^}]+\}\?from=inbox/;
+    // Capture the body of handleActivate. ADR-034 §6.1 (PO ruling
+    // 2026-05-10) requires a single, branch-free dispatch:
+    //   const handleActivate = () => { setSelectedId(item.id); };
+    // No router.push, no exception_id branch — the right-pane jump
+    // button is the only place that navigates off the inbox surface.
+    const m = src.match(
+      /const\s+handleActivate\s*=\s*\(\)\s*=>\s*\{([\s\S]*?)\};/,
+    );
+    expect(m, `${rel} must declare a handleActivate row handler`).not.toBeNull();
+    const body = m![1];
     expect(
-      pushExceptionRe.test(src),
-      `${rel} inbox-row dispatch must push to /exceptions/<id>?from=inbox so ` +
-        `the detail page renders "Back to Inbox". Today the row jumps to ` +
-        `/exceptions/<id> with no referrer and the operator can only get ` +
-        `back to the queue, not back to the inbox.`,
-    ).toBe(true);
-  });
-});
-
-describe("ADR-034 inbox dispatch divergence is documented in code", () => {
-  const rel = "src/app/inbox/page.tsx";
-
-  it("inbox handler dispatches differently based on item.exception_id (intentional, ADR-034)", () => {
-    const src = read(rel);
-    // Two branches: with exception_id → router.push; without → setSelectedId.
-    expect(
-      /if\s*\(\s*item\.exception_id\s*\)\s*\{[\s\S]{0,400}router\.push/.test(src),
-      `${rel} inbox dispatch must branch on item.exception_id and call ` +
-        `router.push for items that carry one (ADR-034 Phase G).`,
+      /setSelectedId\s*\(\s*item\.id\s*\)/.test(body),
+      `${rel} handleActivate must call setSelectedId(item.id) — the ` +
+        `consistent master-detail dispatch decided in ADR-034 §6.1.`,
     ).toBe(true);
     expect(
-      /setSelectedId\s*\(\s*item\.id\s*\)/.test(src),
-      `${rel} inbox dispatch must fall through to local selection ` +
-        `(setSelectedId) for items without exception_id — that's the ` +
-        `master-detail branch that keeps SHIPMENT_INQUIRY / ` +
-        `INVOICE_QUERY / COMPLAINT items rendering in the right pane.`,
-    ).toBe(true);
+      /router\.push/.test(body),
+      `${rel} handleActivate must NOT call router.push. Per ADR-034 §6.1 ` +
+        `(2026-05-10 PO ruling), navigation off the inbox surface is an ` +
+        `explicit operator action via the "Open in Exception Queue" jump ` +
+        `button on the right pane — not a side effect of clicking a row.`,
+    ).toBe(false);
   });
 
-  it("the divergence is justified by an explicit ADR-034 reference", () => {
+  it("right-pane detail renders an Open-in-Exception-Queue jump button when selected.exception_id is set", () => {
     const src = read(rel);
-    // Operators reading the file should immediately see WHY the two
-    // inbox row clicks diverge. If a future refactor unifies them,
-    // this test fails and forces an ADR update in the same PR.
+    // The jump button is gated on selected.exception_id and pushes
+    // /exceptions/<id>?from=inbox so the detail page back-targets
+    // "/inbox" via the BACK_TARGETS whitelist.
+    expect(
+      /selected\.exception_id\s*&&/.test(src),
+      `${rel} right pane must conditionally render content gated on ` +
+        `selected.exception_id (the jump-button section).`,
+    ).toBe(true);
+    expect(
+      /Open\s+in\s+Exception\s+Queue/i.test(src),
+      `${rel} right pane must render an "Open in Exception Queue" button ` +
+        `label so the operator has an explicit jump affordance.`,
+    ).toBe(true);
+    expect(
+      /router\.push\(\s*[`'"]\s*\/exceptions\/\$\{\s*selected\.exception_id\s*\}\?from=inbox/.test(
+        src,
+      ),
+      `${rel} the jump button must push /exceptions/<id>?from=inbox so ` +
+        `the detail page renders "Back to Inbox" via BACK_TARGETS in ` +
+        `src/app/exceptions/[id]/page.tsx.`,
+    ).toBe(true);
+  });
+
+  it("the supersession is justified by an explicit ADR-034 reference", () => {
+    const src = read(rel);
     expect(
       /ADR-034/.test(src),
-      `${rel} must cite ADR-034 next to the divergent dispatch handler. ` +
-        `If you're unifying the behaviour, update the ADR + this test.`,
+      `${rel} must cite ADR-034 next to the inbox dispatch + jump button. ` +
+        `If you're changing the behaviour, update the ADR + this test in ` +
+        `the same PR.`,
     ).toBe(true);
   });
 });
