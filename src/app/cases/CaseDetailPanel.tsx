@@ -21,10 +21,11 @@
 
 "use client";
 
-import { Mail, PackageCheck, Clock } from "lucide-react";
+import { Mail, PackageCheck, Clock, ShieldAlert } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
+import { PolicyHitBadge } from "@/components/ui/PolicyHitBadge";
 import type { CaseSource, OrderCase } from "@/types/cases";
 
 import { slaSnapshot } from "./page";
@@ -55,10 +56,30 @@ const STATUS_LABEL: Record<string, string> = {
 
 export interface CaseDetailPanelProps {
   orderCase: OrderCase;
+  /**
+   * Compliance Shadow policy hits surfaced on this case, in
+   * `combine_verdicts` form (ADR-039 §4.5). Strings prefixed with
+   * `LLM_SHADOW:` are L2-LLM-derived; bare strings are L1
+   * deterministic rule names. The `PolicyHitBadge` component
+   * distinguishes the two visually.
+   *
+   * Today the case-aware compliance surface is plumbed through
+   * the per-attached-record stack (Phase H.6 iteration target);
+   * this prop accepts the aggregated set so the badge wiring
+   * lands ahead of the full data-hook swap and `/cases/[id]` can
+   * populate it as soon as the attached-record loader ships.
+   * Empty / undefined hides the section entirely (Guardrail #6 —
+   * no synthesised "no hits" placeholder).
+   */
+  policyHits?: string[];
 }
 
-export function CaseDetailPanel({ orderCase }: CaseDetailPanelProps) {
+export function CaseDetailPanel({
+  orderCase,
+  policyHits,
+}: CaseDetailPanelProps) {
   const sla = slaSnapshot(orderCase);
+  const hasPolicyHits = (policyHits ?? []).length > 0;
 
   return (
     <div className="space-y-24">
@@ -117,6 +138,35 @@ export function CaseDetailPanel({ orderCase }: CaseDetailPanelProps) {
           </EvidenceBlock>
         </dl>
       </header>
+
+      {/* ── Compliance hits (ADR-039 §4.5 — L1 vs L2 distinction) ── */}
+      {hasPolicyHits && (
+        <section
+          aria-label="Compliance Shadow hits"
+          className="bg-surface-primary border border-border rounded-md p-16 shadow-xs"
+        >
+          <div className="flex items-center gap-8 mb-12">
+            <ShieldAlert size={16} aria-hidden className="text-text-secondary" />
+            <h2 className="text-heading font-semibold text-text-primary m-0">
+              Compliance hits
+            </h2>
+            <span className="ml-auto text-caption text-text-tertiary">
+              {(policyHits ?? []).length}
+            </span>
+          </div>
+          <p className="text-caption text-text-tertiary leading-normal mb-12">
+            L1 rule names render plain; L2 LLM-derived concerns
+            (ADR-039 §4.5) carry the AI badge.
+          </p>
+          <ul className="flex flex-wrap gap-8 m-0 p-0 list-none">
+            {(policyHits ?? []).map((hit) => (
+              <li key={hit}>
+                <PolicyHitBadge hit={hit} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* ── Children placeholder (Phase H.6 iteration target) ────── */}
       <section
