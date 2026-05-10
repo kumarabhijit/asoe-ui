@@ -56,24 +56,36 @@ test("W1 — queue → detail → override → return → next item dispatches e
   request,
 }) => {
   // ── Seed: backend creates two PENDING_REVIEW exceptions ─────────
+  // Track BOTH the visible order_id (rendered as text in the row) and
+  // the underlying exception UUID (used for `data-exception-id` and
+  // backend lookups). The exception_id is a UUID returned by
+  // `/resolve/explain` and is NOT visible in the queue list — only
+  // the operator-facing `order_id` is.
   const token = await backendToken(request, USERS.MANAGER);
-  const idA = await createPendingReviewException(request, token, `PO-W1-A-${Date.now()}`);
-  const idB = await createPendingReviewException(request, token, `PO-W1-B-${Date.now()}`);
+  const seedTs = Date.now();
+  const orderIdA = `PO-W1-A-${seedTs}`;
+  const orderIdB = `PO-W1-B-${seedTs}`;
+  const idA = await createPendingReviewException(request, token, orderIdA);
+  const idB = await createPendingReviewException(request, token, orderIdB);
 
   // ── Click 1: log in, click on the first exception in the queue ──
   await loginAs(page, USERS.MANAGER);
   await page.goto("/exceptions");
-  // Wait for the list to load (exception IDs appear as links / rows).
-  await expect(page.getByText(idA, { exact: false })).toBeVisible({
-    timeout: 15_000,
-  });
-  // Click the row for record A — exception lists in this app render
-  // the order_id as a clickable element. Match by partial text.
-  await page.getByText(idA, { exact: false }).first().click();
-  await page.waitForURL(new RegExp(`/exceptions/${idA}$`), { timeout: 10_000 });
+  // The list pane renders each row with `data-exception-id={exc.id}`
+  // and the visible `order_id`. Wait for record A's row to mount.
+  const rowA = page.locator(`[data-exception-id="${idA}"]`);
+  await expect(rowA).toBeVisible({ timeout: 15_000 });
+  await expect(rowA).toContainText(orderIdA);
+  await rowA.click();
+
+  // The /exceptions page is master-detail with state-based selection
+  // (no URL change); detail content renders into the third pane.
+  // Wait for the override affordance instead of waitForURL.
 
   // ── Click 2: open Override dialog, submit ─────────────────────
-  const openOverride = page.getByRole("button", { name: /choose different action/i });
+  const openOverride = page.getByRole("button", {
+    name: /choose different action/i,
+  });
   await expect(openOverride).toBeVisible({ timeout: 15_000 });
   await openOverride.click();
   const dialog = page.getByRole("dialog", { name: /override resolution/i });
@@ -98,17 +110,17 @@ test("W1 — queue → detail → override → return → next item dispatches e
     )
     .toBe("RESOLVED");
 
-  // ── Click 3: navigate back to the queue ──────────────────────
+  // ── Click 3: navigate back to the queue, click record B's row ──
   await page.goto("/exceptions");
-  // Record B is still PENDING_REVIEW; click it.
-  await expect(page.getByText(idB, { exact: false })).toBeVisible({
-    timeout: 15_000,
-  });
-  await page.getByText(idB, { exact: false }).first().click();
-  await page.waitForURL(new RegExp(`/exceptions/${idB}$`), { timeout: 10_000 });
+  const rowB = page.locator(`[data-exception-id="${idB}"]`);
+  await expect(rowB).toBeVisible({ timeout: 15_000 });
+  await expect(rowB).toContainText(orderIdB);
+  await rowB.click();
 
   // ── Click 4: Override dialog must NOT carry stale state from A ─
-  const openOverrideB = page.getByRole("button", { name: /choose different action/i });
+  const openOverrideB = page.getByRole("button", {
+    name: /choose different action/i,
+  });
   await expect(openOverrideB).toBeVisible({ timeout: 15_000 });
   await openOverrideB.click();
   const dialogB = page.getByRole("dialog", { name: /override resolution/i });
@@ -227,33 +239,32 @@ test("W3 — multi-record disposition workflow: 3 distinct resolutions from the 
 }) => {
   const token = await backendToken(request, USERS.MANAGER);
   // Three independent records, three different resolution actions.
+  // Track BOTH the visible order_id and the underlying exception UUID.
   const seedTs = Date.now();
-  const records: Array<{ id: string; action: string; reason: string }> = [
-    { id: await createPendingReviewException(request, token, `PO-W3-1-${seedTs}`),
-      action: "ALLOW_BOTH",
-      reason: "policy_exception" },
-    { id: await createPendingReviewException(request, token, `PO-W3-2-${seedTs}`),
-      action: "MERGE",
-      reason: "data_error" },
-    { id: await createPendingReviewException(request, token, `PO-W3-3-${seedTs}`),
-      action: "SUPERSEDE",
-      reason: "customer_concession" },
-  ];
+  const seeds = [
+    { orderId: `PO-W3-1-${seedTs}`, action: "ALLOW_BOTH", reason: "policy_exception" },
+    { orderId: `PO-W3-2-${seedTs}`, action: "MERGE", reason: "data_error" },
+    { orderId: `PO-W3-3-${seedTs}`, action: "SUPERSEDE", reason: "customer_concession" },
+  ] as const;
+  const records = await Promise.all(
+    seeds.map(async (s) => ({
+      ...s,
+      id: await createPendingReviewException(request, token, s.orderId),
+    })),
+  );
 
   await loginAs(page, USERS.MANAGER);
 
   for (const rec of records) {
-    // Click 1: navigate from /exceptions to /exceptions/<id>
+    // Click 1: navigate to the queue and click the row for this record
     await page.goto("/exceptions");
-    await expect(page.getByText(rec.id, { exact: false })).toBeVisible({
-      timeout: 15_000,
-    });
-    await page.getByText(rec.id, { exact: false }).first().click();
-    await page.waitForURL(new RegExp(`/exceptions/${rec.id}$`), {
-      timeout: 10_000,
-    });
+    const row = page.locator(`[data-exception-id="${rec.id}"]`);
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    await expect(row).toContainText(rec.orderId);
+    await row.click();
 
-    // Click 2: open Override dialog
+    // Click 2: open Override dialog (detail panel renders into the
+    // master-detail third pane; no URL change on the /exceptions route)
     const openBtn = page.getByRole("button", {
       name: /choose different action/i,
     });
@@ -267,7 +278,7 @@ test("W3 — multi-record disposition workflow: 3 distinct resolutions from the 
     await expect(dialog).toBeVisible({ timeout: 5_000 });
     await dialog.getByLabel(/^resolution action$/i).selectOption(rec.action);
     await dialog.getByLabel(/^override reason category$/i).selectOption(rec.reason);
-    await dialog.getByLabel(/^override notes$/i).fill(`W3 disposition for ${rec.id}`);
+    await dialog.getByLabel(/^override notes$/i).fill(`W3 disposition for ${rec.orderId}`);
     await dialog.getByRole("button", { name: /confirm override/i }).click();
     await expect(dialog).toBeHidden({ timeout: 10_000 });
   }
@@ -278,10 +289,10 @@ test("W3 — multi-record disposition workflow: 3 distinct resolutions from the 
       `${BACKEND_URL}/api/v1/exceptions/${rec.id}`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
-    expect(res.ok(), `GET ${rec.id} ok`).toBe(true);
+    expect(res.ok(), `GET ${rec.orderId} ok`).toBe(true);
     const body = await res.json();
-    expect(body.lifecycle_state, `${rec.id} lifecycle`).toBe("RESOLVED");
-    expect(body.resolved_action, `${rec.id} action`).toBe(rec.action);
+    expect(body.lifecycle_state, `${rec.orderId} lifecycle`).toBe("RESOLVED");
+    expect(body.resolved_action, `${rec.orderId} action`).toBe(rec.action);
   }
 });
 
