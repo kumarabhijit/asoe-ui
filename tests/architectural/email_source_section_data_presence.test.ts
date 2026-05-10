@@ -10,7 +10,7 @@
  *      the operator's first frame of reference, the recommendation
  *      sits below it.
  *   3. No file under `src/app/` does runtime dispatch on
- *      `intent === "EMAIL_ORDER_ENTRY"` for mounting the source
+ *      `intent === "MANUAL_ORDER_INTAKE"` for mounting the source
  *      section (CLAUDE.md Guardrail #1 — adding/removing the intent
  *      requires zero UI page-level changes).
  *   4. Section import wired exactly once in ExceptionDetailPanel.
@@ -51,7 +51,7 @@ describe("EmailSourceSection — data-presence dispatch lock (ADR-034 Phase G)",
 
   it("no file under src/app/ dispatches on intent literal to mount the source section", () => {
     // Walk src/app/ and confirm the source section is never wrapped in
-    // intent === / case "EMAIL_ORDER_ENTRY" branches. Mounting must be
+    // intent === / case "MANUAL_ORDER_INTAKE" branches. Mounting must be
     // data-presence-only (Guardrail #1).
     function walk(dir: string): string[] {
       if (!fs.existsSync(dir)) return [];
@@ -72,15 +72,15 @@ describe("EmailSourceSection — data-presence dispatch lock (ADR-034 Phase G)",
       // The ONLY allowed pattern is import + <EmailSourceSection ... />
       // inside `analysis?.email_source &&`. Reject any intent-keyed
       // dispatch nearby.
-      if (/intent\s*[!=]==\s*["']EMAIL_ORDER_ENTRY["']/.test(content)) {
+      if (/intent\s*[!=]==\s*["']MANUAL_ORDER_INTAKE["']/.test(content)) {
         offenders.push(
-          `${path.relative(ROOT, file)}: equality check on EMAIL_ORDER_ENTRY ` +
+          `${path.relative(ROOT, file)}: equality check on MANUAL_ORDER_INTAKE ` +
             "near the source section",
         );
       }
-      if (/case\s+["']EMAIL_ORDER_ENTRY["']\s*:/.test(content)) {
+      if (/case\s+["']MANUAL_ORDER_INTAKE["']\s*:/.test(content)) {
         offenders.push(
-          `${path.relative(ROOT, file)}: switch case on EMAIL_ORDER_ENTRY ` +
+          `${path.relative(ROOT, file)}: switch case on MANUAL_ORDER_INTAKE ` +
             "near the source section",
         );
       }

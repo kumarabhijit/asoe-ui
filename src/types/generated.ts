@@ -176,6 +176,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Cases */
+        get: operations["list_cases_api_v1_cases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cases/{case_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Case */
+        get: operations["get_case_api_v1_cases__case_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cases/{case_id}/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Initiate Case Override
+         * @description Initiate a case-level override. ADR-040 §2.1: above the
+         *     threshold the case enters PENDING_COSIGN with a recorded
+         *     `pending_override`; below the threshold it would be applied
+         *     immediately, but the immediate-apply path is X.2 work — for
+         *     X.0 the endpoint always parks the override in PENDING_COSIGN.
+         */
+        post: operations["initiate_case_override_api_v1_cases__case_id__override_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cases/{case_id}/override/cosign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cosign Case Override
+         * @description ADR-040 §2.2 — second-reviewer decision on a case-level
+         *     override.
+         *
+         *     Outcomes:
+         *       * `approve=True`  → clear `pending_override`, transition
+         *                           status → RESOLVED.
+         *       * `approve=False` → clear `pending_override`, restore status
+         *                           → OPEN_AGENT_PROCESSING.
+         *
+         *     SoD: cosigner must not be the initiator. Notes mandatory.
+         */
+        post: operations["cosign_case_override_api_v1_cases__case_id__override_cosign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/config/tenants/{tenant_id}/audit": {
         parameters: {
             query?: never;
@@ -910,6 +997,56 @@ export interface components {
             uom: string;
         };
         /**
+         * CaseCosignRequest
+         * @description POST /api/v1/cases/{id}/override/cosign — second-reviewer
+         *     decision.
+         */
+        CaseCosignRequest: {
+            /** Approve */
+            approve: boolean;
+            /** Notes */
+            notes: string;
+        };
+        /**
+         * CaseListResponse
+         * @description GET /api/v1/cases — list response.
+         *
+         *     Shape matches `asoe-ui/src/lib/api.ts::casesApi.list`'s declared
+         *     return type (`{ items: OrderCase[]; total: number }`). Items are
+         *     serialised from `contracts.models.OrderCase`.
+         */
+        CaseListResponse: {
+            /** Items */
+            items?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
+        /**
+         * CaseOverrideInitRequest
+         * @description POST /api/v1/cases/{id}/override — initiate a case-level
+         *     override that may require a cosigner.
+         */
+        CaseOverrideInitRequest: {
+            /**
+             * Aggregate Financial Impact Usd
+             * @default 0
+             */
+            aggregate_financial_impact_usd: number;
+            /** Child Exception Ids */
+            child_exception_ids?: string[];
+            /** Notes */
+            notes?: string | null;
+            /** Pending Action */
+            pending_action: string;
+            /** Pending Reason Tag */
+            pending_reason_tag?: string | null;
+        };
+        /**
          * ChallengeRequest
          * @description POST /api/v1/exceptions/{id}/challenge — post-execution challenge.
          *
@@ -1535,6 +1672,8 @@ export interface components {
             lifecycle_state: string;
             /** Order Id */
             order_id: string;
+            /** Parent Case Id */
+            parent_case_id?: string | null;
             /** Selected Recipe */
             selected_recipe?: string | null;
             /** Shadow Verdict */
@@ -3073,6 +3212,156 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cases_api_v1_cases_get: {
+        parameters: {
+            query?: {
+                /** @description Filter by case source (manual_order | automated_order) */
+                source?: string | null;
+                /** @description Filter by case status (CaseStatus literal) */
+                status?: string | null;
+                limit?: number;
+            };
+            header?: {
+                Authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_case_api_v1_cases__case_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    initiate_case_override_api_v1_cases__case_id__override_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseOverrideInitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cosign_case_override_api_v1_cases__case_id__override_cosign_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseCosignRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

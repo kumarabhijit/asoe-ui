@@ -189,6 +189,10 @@ export interface ExceptionSummary {
   account_id?: string;
   /** Account name — display label for the retail customer (e.g., "Walmart"). */
   account_name?: string;
+  /** ADR-038 §H.6 — parent OrderCase id when the record is attached
+   *  to a case. None on Tier-1 stateless records and pre-Phase-H.3
+   *  legacy rows. UI uses this for the "View case" deeplink. */
+  parent_case_id?: string | null;
 }
 
 /** One append-only entry in an exception's reanalysis audit trail.

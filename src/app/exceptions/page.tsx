@@ -25,6 +25,7 @@ import { signOut } from "next-auth/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { Inbox } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
+import { CaseViewBanner } from "@/components/ui/CaseViewBanner";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -47,6 +48,7 @@ function parseCsvParam(raw: string | null): string[] {
 const NAV_TABS = [
   { id: "inbox", label: "Customer Inbox", href: "/inbox" },
   { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
+  { id: "cases", label: "Cases", href: "/cases" },
   { id: "dashboard", label: "Dashboard", href: "/dashboard" },
   { id: "settings", label: "Settings", href: "/settings" },
 ];
@@ -446,6 +448,10 @@ function ExceptionQueueContent() {
         onSignOut={() => signOut({ callbackUrl: "/login" })}
 
       />
+
+      {/* ADR-038 §H.6 — banner makes the case-view relationship
+          explicit while the deeper data-hook swap is in flight. */}
+      <CaseViewBanner scopeLabel="Exception Queue" />
 
       {/* ━━ Two-pane Master-Detail Area ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <main id="main-content" className="h-[calc(100vh-var(--nav-height))] min-h-[576px]">

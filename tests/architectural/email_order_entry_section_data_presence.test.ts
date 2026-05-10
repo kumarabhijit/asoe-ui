@@ -4,20 +4,20 @@
  *
  * The IA decision recorded in `asoe2/docs/adr/ADR-034-email-order-entry-skill.md`
  * §6 commits us to NOT introducing intent-keyed page-level dispatch
- * for EMAIL_ORDER_ENTRY. The section mounts when the backend's
+ * for MANUAL_ORDER_INTAKE. The section mounts when the backend's
  * `OrderAnalysis.email_order_entry_analysis` is populated, exactly the
  * same way every other enrichment section mounts (data-presence
  * pattern). This is a CLAUDE.md Guardrail #1 lock — adding or removing
- * the EMAIL_ORDER_ENTRY intent in asoe2 must require zero UI page-level
+ * the MANUAL_ORDER_INTAKE intent in asoe2 must require zero UI page-level
  * changes.
  *
  * Asserts:
  *   1. ExceptionDetailPanel mounts EmailOrderEntrySection only inside
  *      `analysis?.email_order_entry_analysis &&` data-presence guard —
- *      no `intent === "EMAIL_ORDER_ENTRY"` dispatch.
+ *      no `intent === "MANUAL_ORDER_INTAKE"` dispatch.
  *   2. No file under `src/app/` contains a hard string-literal check
- *      against `"EMAIL_ORDER_ENTRY"` (e.g. `intent === "EMAIL_ORDER_ENTRY"`,
- *      `<option value="EMAIL_ORDER_ENTRY">`, `case "EMAIL_ORDER_ENTRY":`).
+ *      against `"MANUAL_ORDER_INTAKE"` (e.g. `intent === "MANUAL_ORDER_INTAKE"`,
+ *      `<option value="MANUAL_ORDER_INTAKE">`, `case "MANUAL_ORDER_INTAKE":`).
  *      Type definitions in `src/types/` are exempt — those are
  *      compile-time safety, not runtime dispatch (CLAUDE.md Guardrail #1).
  *   3. The intent literal does appear in `MOCK_HEALTH.allowed_intents`
@@ -65,29 +65,29 @@ describe("EmailOrderEntrySection — data-presence dispatch lock (ADR-034 §6)",
 
     // Exclude any intent-keyed dispatch for the EmailOrderEntry intent.
     expect(content).not.toMatch(
-      /intent\s*===\s*["']EMAIL_ORDER_ENTRY["']/,
+      /intent\s*===\s*["']MANUAL_ORDER_INTAKE["']/,
     );
     expect(content).not.toMatch(
-      /case\s+["']EMAIL_ORDER_ENTRY["']\s*:/,
+      /case\s+["']MANUAL_ORDER_INTAKE["']\s*:/,
     );
   });
 
-  it("no .tsx/.ts file under src/app/ does runtime dispatch on the EMAIL_ORDER_ENTRY literal", () => {
+  it("no .tsx/.ts file under src/app/ does runtime dispatch on the MANUAL_ORDER_INTAKE literal", () => {
     const files = findTsxFiles(path.join(ROOT, "src/app"));
     const offenders: string[] = [];
 
     for (const file of files) {
       const content = stripComments(fs.readFileSync(file, "utf-8"));
-      // intent === "EMAIL_ORDER_ENTRY" — page-level conditional.
-      if (/intent\s*[!=]==\s*["']EMAIL_ORDER_ENTRY["']/.test(content)) {
+      // intent === "MANUAL_ORDER_INTAKE" — page-level conditional.
+      if (/intent\s*[!=]==\s*["']MANUAL_ORDER_INTAKE["']/.test(content)) {
         offenders.push(`${path.relative(ROOT, file)}: equality check on intent literal`);
       }
-      // switch (intent) { case "EMAIL_ORDER_ENTRY": } — switch dispatch.
-      if (/case\s+["']EMAIL_ORDER_ENTRY["']\s*:/.test(content)) {
+      // switch (intent) { case "MANUAL_ORDER_INTAKE": } — switch dispatch.
+      if (/case\s+["']MANUAL_ORDER_INTAKE["']\s*:/.test(content)) {
         offenders.push(`${path.relative(ROOT, file)}: switch case on intent literal`);
       }
-      // <option value="EMAIL_ORDER_ENTRY"> — hardcoded filter option.
-      if (/<option[^>]*value=["']EMAIL_ORDER_ENTRY["']/.test(content)) {
+      // <option value="MANUAL_ORDER_INTAKE"> — hardcoded filter option.
+      if (/<option[^>]*value=["']MANUAL_ORDER_INTAKE["']/.test(content)) {
         offenders.push(`${path.relative(ROOT, file)}: hardcoded <option> for the intent`);
       }
     }
@@ -108,8 +108,8 @@ describe("EmailOrderEntrySection — data-presence dispatch lock (ADR-034 §6)",
     const apiContent = fs.readFileSync(apiPath, "utf-8");
     const labelMapContent = fs.readFileSync(labelMapPath, "utf-8");
 
-    expect(apiContent).toContain('"EMAIL_ORDER_ENTRY"');
-    expect(labelMapContent).toContain("EMAIL_ORDER_ENTRY:");
+    expect(apiContent).toContain('"MANUAL_ORDER_INTAKE"');
+    expect(labelMapContent).toContain("MANUAL_ORDER_INTAKE:");
   });
 
   it("the section import is wired in ExceptionDetailPanel exactly once", () => {

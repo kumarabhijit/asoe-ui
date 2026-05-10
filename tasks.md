@@ -995,9 +995,15 @@ plan and `asoe2/tasks.md` Phase 27 for the backend-side tracking.
       the trio of PRs).
 
 ### 14.5 Phase H.6 — pending integration
-- [ ] **`/cases` is not in `NavBar` / `Sidebar`.** Users can't
-      reach the surface from the primary nav. The route works
-      via direct URL only.
+- [x] **`/cases` in NavBar.** UI E1 — `NAV_TABS` arrays across
+      inbox / exceptions / exceptions/[id] / dashboard / settings
+      gain `{ id: "cases", label: "Cases", href: "/cases" }`.
+      The `/cases` page itself wires NavBar with
+      `activeTab="cases"`. `computeVisibleTabs` (UI) +
+      `compute_visible_tabs` (asoe2 `api/users.py`) emit the
+      `cases` tab when the user has `exceptions:read` (same RBAC
+      gate as the existing `inbox` / `exceptions` tabs since the
+      case detail panel renders the same audit-bearing evidence).
 - [x] **`/api/v1/cases/*` backend route** — shipped in
       `asoe2/api/routes/cases.py` (Phase H.6 priority gap closed).
       `GET /api/v1/cases` (filters: source / status; sorted
@@ -1007,11 +1013,24 @@ plan and `asoe2/tasks.md` Phase 27 for the backend-side tracking.
       response shape (`{ items: OrderCase[]; total: number }`)
       matches `casesApi.list`'s declared return type 1:1, so no
       UI changes are needed when flipping `NEXT_PUBLIC_USE_REAL_API=1`.
-- [ ] **List-view-projection reframing** — ADR-038 §H.6 plans
-      `/inbox` and `/exceptions` as filtered case-list views
-      of `/cases`. They remain independent primaries today.
-- [ ] **Playwright e2e for `/cases`** — no spec yet; would
-      need the asoe2 `/api/v1/cases/*` route in place first.
+- [x] **List-view-projection reframing — iterative.** UI E2 —
+      `/inbox` and `/exceptions` each render a `CaseViewBanner`
+      directly under the page header that identifies the page
+      as a filtered view of `/cases` and links through with the
+      appropriate filter pre-applied (`?source=manual_order`
+      for /inbox; no filter for /exceptions). The deeper data-
+      hook swap (replacing the inbox's INBOX mock + the
+      exception queue's `exceptionsApi.list` with
+      `casesApi.list`) is a separate Frontend Platform effort —
+      blocked on detail-panel reshape for `OrderCase` (vs
+      `ExceptionDetail`).
+- [x] **Playwright e2e for `/cases`** — UI E3.
+      `tests/browser/cases-e2e.spec.ts` — 4 scenarios: login →
+      /cases loads from live backend, NavBar Cases tab is
+      reachable from /exceptions, CaseViewBanner on /inbox
+      links through with `?source=manual_order`, filter-chip
+      interaction survives. Same Playwright stack the existing
+      browser tests use (Next dev on :3100 + uvicorn :8000).
 - [ ] **Design fidelity polish** — current `/cases` ships the
       architectural primitive. Frontend Platform + UX have
       not yet finalised list-row anatomy, SLA-band visual

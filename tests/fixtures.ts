@@ -160,7 +160,7 @@ export const MOCK_HEALTH: HealthResponse = {
     "CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR",
     "DUPLICATE_PO", "PRICE_HOLD_RELEASE", "EDI_MISMATCH",
     "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY",
-    "PALLET_CONFIG", "DELIVERY_DELAY", "EMAIL_ORDER_ENTRY",
+    "PALLET_CONFIG", "DELIVERY_DELAY", "MANUAL_ORDER_INTAKE",
   ],
   lifecycle_states: [
     // `EXECUTING` retired in asoe2 Phase 19 — backend no longer emits it.
@@ -189,7 +189,7 @@ export const MOCK_HEALTH: HealthResponse = {
       "CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR",
       "DUPLICATE_PO", "PRICE_HOLD_RELEASE", "EDI_MISMATCH",
       "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY",
-      "PALLET_CONFIG", "DELIVERY_DELAY", "EMAIL_ORDER_ENTRY",
+      "PALLET_CONFIG", "DELIVERY_DELAY", "MANUAL_ORDER_INTAKE",
     ].map((intent) => [
       intent,
       ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],

@@ -252,7 +252,7 @@ export function __resetMockIdempotencyCache(): void {
 function computeVisibleTabs(permissions: string[]): string[] {
   const ps = new Set(permissions);
   const tabs: string[] = [];
-  if (ps.has("exceptions:read")) { tabs.push("inbox", "exceptions"); }
+  if (ps.has("exceptions:read")) { tabs.push("inbox", "exceptions", "cases"); }
   if (ps.has("dashboard:read")) { tabs.push("dashboard"); }
   if (ps.has("rules:write") || ps.has("policy:write") || ps.has("users:manage")) { tabs.push("settings"); }
   return tabs;
@@ -582,7 +582,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-025", tenant_id: "acme-corp", order_id: "PO-PHR-BAD", event_type: "EDI_850_PRICE_HOLD", intent: "PRICE_HOLD_RELEASE", lifecycle_state: "FAILED", selected_recipe: "PriceHoldReleaseRecipe.py", final_status: "FAIL_TO_HUMAN", created_at: "2026-04-16T08:30:00Z", updated_at: "2026-04-16T08:30:00Z", account_id: "acct-costco", account_name: "Costco",
   },
-  // EMAIL_ORDER_ENTRY (ADR-034 Phase C) — STANDARD_REVIEW band record. The
+  // MANUAL_ORDER_INTAKE (ADR-034 Phase C) — STANDARD_REVIEW band record. The
   // upstream email-intelligence-agent extracted a non-EDI PO from a regional
   // distributor; composite_confidence 0.88 lands in the standard-review band
   // (≥ 0.85, < 0.95). All four non-disable-able floor checks pass; one
@@ -590,7 +590,7 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   // EmailOrderEntrySection via OrderAnalysis.email_order_entry_analysis
   // (data-presence dispatch — no per-intent page logic).
   {
-    id: "exc-026", tenant_id: "acme-corp", order_id: "EML-PO-2026-0042", event_type: "EMAIL_ORDER_ENTRY_REQUEST", intent: "EMAIL_ORDER_ENTRY", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "EmailOrderEntryRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-30T10:12:00Z", updated_at: "2026-04-30T10:13:30Z", account_id: "acct-southeast-distrib", account_name: "Southeast Beverage Distributors",
+    id: "exc-026", tenant_id: "acme-corp", order_id: "EML-PO-2026-0042", event_type: "EMAIL_ORDER_ENTRY_REQUEST", intent: "MANUAL_ORDER_INTAKE", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "EmailOrderEntryRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-30T10:12:00Z", updated_at: "2026-04-30T10:13:30Z", account_id: "acct-southeast-distrib", account_name: "Southeast Beverage Distributors",
   },
 ];
 
@@ -1177,7 +1177,7 @@ const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
   "exc-025": {
     executed_nodes: _invocationFailTrace(),
   },
-  // EMAIL_ORDER_ENTRY (ADR-034) — STANDARD_REVIEW band, REQUEST_CLARIFICATION
+  // MANUAL_ORDER_INTAKE (ADR-034) — STANDARD_REVIEW band, REQUEST_CLARIFICATION
   // action driven by ambiguous ship-to. Reuses the YELLOW-HITL trace shape;
   // the recipe-specific decision detail lives on email_order_entry_analysis.
   "exc-026": {
@@ -1197,7 +1197,7 @@ const MOCK_HEALTH: HealthResponse = {
   version: "0.3.2",
   kill_switch: false,
   explain_mode: false,
-  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY", "PRICE_HOLD_RELEASE", "EDI_MISMATCH", "EMAIL_ORDER_ENTRY"],
+  allowed_intents: ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY", "PRICE_HOLD_RELEASE", "EDI_MISMATCH", "MANUAL_ORDER_INTAKE"],
   lifecycle_states: [
     "INGESTED", "CLASSIFYING", "AUDITING", "PENDING_REVIEW",
     "ESCALATED", "PENDING_ADMIN_REVIEW", "PENDING_COSIGN", "RESOLVED",
@@ -1214,7 +1214,7 @@ const MOCK_HEALTH: HealthResponse = {
   // seeds every intent with the full global set — matches the backend's
   // behavior until real curation arrives.
   allowed_override_reason_tags_by_intent: Object.fromEntries(
-    ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY", "PRICE_HOLD_RELEASE", "EDI_MISMATCH", "EMAIL_ORDER_ENTRY"].map(
+    ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY", "PRICE_HOLD_RELEASE", "EDI_MISMATCH", "MANUAL_ORDER_INTAKE"].map(
       (intent) => [intent, ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"]],
     ),
   ),
@@ -3378,7 +3378,7 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       promotion_ref: "ZCUST/404 (Q2 2026 concession)",
     },
   },
-  // EMAIL_ORDER_ENTRY (ADR-034 Phase C) — STANDARD_REVIEW band record.
+  // MANUAL_ORDER_INTAKE (ADR-034 Phase C) — STANDARD_REVIEW band record.
   // Renders EmailOrderEntrySection via OrderAnalysis.email_order_entry_analysis.
   // The four floor checks all pass; one ambiguous ship-to triggers
   // REQUEST_CLARIFICATION.

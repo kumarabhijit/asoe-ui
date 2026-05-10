@@ -12,9 +12,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   Mail, ChevronRight, Search, Zap, CheckCircle2,
-  Clock, FileText, AlertTriangle, RefreshCw,
+  Clock, FileText, AlertTriangle, RefreshCw, LayoutList,
 } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
+import { CaseViewBanner } from "@/components/ui/CaseViewBanner";
+import { useManualOrderCases } from "@/hooks/useManualOrderCases";
 import { MetricTile } from "@/components/ui/MetricTile";
 import { Badge, categoryVariant, inboxStatusVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -43,7 +45,7 @@ const STATUS_LABELS: Record<string, string> = {
 interface InboxItem {
   id: string;
   /** ADR-034 Phase G — when this inbox item produced an Exception
-   *  Queue record (NEW_ORDER → EMAIL_ORDER_ENTRY exception),
+   *  Queue record (NEW_ORDER → MANUAL_ORDER_INTAKE exception),
    *  `exception_id` is set and the row deep-links to
    *  `/exceptions/{exception_id}` so the CSA reaches the unified
    *  detail surface in one click (no tab-switch / no copy-paste).
@@ -100,7 +102,7 @@ const INBOX: InboxItem[] = [
     agentRecommendation: "Route to order entry queue",
   },
   {
-    // ADR-034 Phase G — wired to exc-026 (the EMAIL_ORDER_ENTRY
+    // ADR-034 Phase G — wired to exc-026 (the MANUAL_ORDER_INTAKE
     // STANDARD_REVIEW demo record) so clicking this inbox row jumps
     // to the unified detail surface on the Exception Queue.
     id: "4", exception_id: "exc-026",
@@ -135,6 +137,7 @@ const INBOX: InboxItem[] = [
 const NAV_TABS = [
   { id: "inbox", label: "Customer Inbox", href: "/inbox" },
   { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
+  { id: "cases", label: "Cases", href: "/cases" },
   { id: "dashboard", label: "Dashboard", href: "/dashboard" },
   { id: "settings", label: "Settings", href: "/settings" },
 ];
@@ -171,6 +174,11 @@ function InboxPageInner() {
   const [selectedId, setSelectedId] = useState(initialId);
   const [activeTab, setActiveTab] = useState("inbox");
   const [detailTab, setDetailTab] = useState("email");
+  // ADR-038 §H.6 — surface the manual-order-case count alongside
+  // the legacy INBOX metrics. Full data-hook swap (cases-projected
+  // rows) is V5.1; this hook is the scaffolding callers use to
+  // pre-fetch the case data.
+  const { total: manualCaseCount } = useManualOrderCases();
 
   const userName = user?.name || "User";
   const userInitials = (user as { avatar_initials?: string })?.avatar_initials || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -199,6 +207,13 @@ function InboxPageInner() {
         agentCount={health?.allowed_intents?.length || 0}
         onSignOut={() => signOut({ callbackUrl: "/login" })}
 
+      />
+
+      {/* ADR-038 §H.6 — banner makes the case-view relationship
+          explicit while the deeper data-hook swap is in flight. */}
+      <CaseViewBanner
+        scopeLabel="Manual Order Inbox"
+        casesHref="/cases?source=manual_order"
       />
 
       {/* ── PAGE HEADER ── */}
@@ -243,6 +258,7 @@ function InboxPageInner() {
       <div className="max-w-[1440px] mx-auto px-32 py-16">
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-16">
           <MetricTile icon={<Mail size={20} />} label="Total Inbound" value={String(INBOX.length)} subtitle="Last 24 hours" tint="var(--color-cat-blue)" />
+          <MetricTile icon={<LayoutList size={20} />} label="Manual Cases" value={String(manualCaseCount)} subtitle="Open in /cases" tint="var(--color-brand)" />
           <MetricTile icon={<AlertTriangle size={20} />} label="Need Attention" value={String(needsAttention)} subtitle="Approval or escalation" tint="var(--color-warning)" />
           <MetricTile icon={<CheckCircle2 size={20} />} label="Auto-Resolved" value={String(autoResolved)} subtitle="No human action needed" tint="var(--color-success)" />
           <MetricTile icon={<Zap size={20} />} label="Avg Response" value="< 2m" subtitle="Agent classification time" tint="var(--color-cat-teal)" />

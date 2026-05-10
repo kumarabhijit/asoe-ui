@@ -152,7 +152,7 @@ export const ERP_LABEL_MAPS: Record<ErpVendor, ErpLabelMap> = {
       MIN_ORDER_QTY:          "Min Order Qty",
       PALLET_CONFIG:          "Pallet Config",
       DELIVERY_DELAY:         "Delivery Delay",
-      EMAIL_ORDER_ENTRY:      "Email Order Intake",
+      MANUAL_ORDER_INTAKE:      "Email Order Intake",
     },
     sub_types: {
       SKU_MISMATCH:     "SKU Mismatch",

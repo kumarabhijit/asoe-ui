@@ -42,7 +42,7 @@ const FORBIDDEN_INTENT_LITERALS = [
   "CONTRACTUAL_CORRECTION",
   "CREDIT_BLOCK",
   "MASS_PRICING_ERROR",
-  "EMAIL_ORDER_ENTRY",
+  "MANUAL_ORDER_INTAKE",
 ];
 
 function findFiles(dir: string, exts: string[]): string[] {

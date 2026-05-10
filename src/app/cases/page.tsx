@@ -29,8 +29,12 @@ import {
   PackageCheck,
 } from "lucide-react";
 
+import { signOut } from "next-auth/react";
 import { Badge } from "@/components/ui/Badge";
+import { NavBar } from "@/components/ui/NavBar";
 import { ALLOWED_CASE_SOURCES, casesApi } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
+import { useHealth } from "@/hooks/useHealth";
 import { cn } from "@/lib/utils";
 import type {
   CaseSource,
@@ -136,14 +140,35 @@ interface CasesFilters {
 
 /* ── Page ───────────────────────────────────────────────────────── */
 
+const NAV_TABS = [
+  { id: "inbox", label: "Customer Inbox", href: "/inbox" },
+  { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
+  { id: "cases", label: "Cases", href: "/cases" },
+  { id: "dashboard", label: "Dashboard", href: "/dashboard" },
+  { id: "settings", label: "Settings", href: "/settings" },
+];
+
+
 export default function CasesPage() {
   const router = useRouter();
+  const { user, visibleTabs } = useAuth();
+  const { health } = useHealth();
   const [cases, setCases] = useState<OrderCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<CasesFilters>({
     source: null,
     status: null,
   });
+
+  const userName = user?.name || "User";
+  const userInitials = (
+    (user as { avatar_initials?: string } | null)?.avatar_initials
+    || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+  );
+  const userTitle = (user as { title?: string } | null)?.title || "";
+  const filteredTabs = visibleTabs.length > 0
+    ? NAV_TABS.filter((t) => visibleTabs.includes(t.id))
+    : NAV_TABS;
 
   useEffect(() => {
     let cancelled = false;
@@ -178,6 +203,20 @@ export default function CasesPage() {
   }, [cases]);
 
   return (
+    <div className="min-h-screen bg-surface-page font-sans text-body text-text-primary leading-normal">
+      <NavBar
+        tabs={filteredTabs}
+        activeTab="cases"
+        onTabChange={(id) => {
+          const tab = NAV_TABS.find((t) => t.id === id);
+          if (tab?.href) router.push(tab.href);
+        }}
+        userName={userName}
+        userInitials={userInitials}
+        userTitle={userTitle}
+        agentCount={health?.allowed_intents?.length || 0}
+        onSignOut={() => signOut({ callbackUrl: "/login" })}
+      />
     <main className="p-32 max-w-[1280px] mx-auto">
       <header className="mb-24">
         <h1 className="text-display font-bold text-text-primary mb-4">
@@ -288,6 +327,7 @@ export default function CasesPage() {
         </ul>
       )}
     </main>
+    </div>
   );
 }
 
