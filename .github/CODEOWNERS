@@ -1,0 +1,98 @@
+# CODEOWNERS — automatic review assignment for path-sensitive
+# files in the asoe-ui repo.
+#
+# Format: <path-pattern> <@user-or-team> [<@user-or-team> ...]
+#
+# Companion to `asoe2/.github/CODEOWNERS`. The two files together
+# enforce the ADR-038 §8.5 five-layer review chain across the
+# backend + frontend halves of the system.
+
+# =====================================================================
+# Type contracts mirror asoe2 Pydantic models — Compliance + Frontend
+# =====================================================================
+#
+# Per CLAUDE.md Guardrail #3, types in `src/types/` must match the
+# asoe2 backend contracts field-for-field. A drift here is the same
+# audit-trail issue an asoe2 contract drift would be — partial-truth
+# state that Compliance veto holder rejects.
+
+/src/types/                    @compliance-team @frontend-team
+/src/types/**                  @compliance-team @frontend-team
+/src/types/exceptions.ts       @compliance-team @frontend-team
+/src/types/cases.ts            @compliance-team @frontend-team
+/src/types/api.ts              @compliance-team @frontend-team
+/src/types/auth.ts             @compliance-team @frontend-team @platform-team
+/src/types/generated.ts        @frontend-team
+
+# =====================================================================
+# API client — boundary layer between UI and asoe2 backend
+# =====================================================================
+
+/src/lib/api.ts                @frontend-team @backend-team
+
+# =====================================================================
+# /cases primary CSR surface — ADR-038 Phase H.6
+# =====================================================================
+#
+# The case detail surface renders the same audit-bearing evidence
+# the per-exception detail does. Compliance reviews any structural
+# change to the case detail panel since the rendering decisions
+# determine what an operator sees when authorising a financially
+# binding action (CLAUDE.md Guardrail #6).
+
+/src/app/cases/                @compliance-team @frontend-team
+/src/app/cases/**              @compliance-team @frontend-team
+/src/app/cases/CaseDetailPanel.tsx  @compliance-team @frontend-team
+
+# =====================================================================
+# Per-section components that render audit-bearing evidence
+# =====================================================================
+#
+# *AnalysisData rendering. CLAUDE.md Guardrail #6 — these are dumb
+# projectors of backend-authoritative payloads; any structural
+# change goes through Compliance to confirm we're not introducing
+# partial-truth states or frontend composition.
+
+/src/components/ui/EvidenceBlock.tsx     @compliance-team @frontend-team
+/src/components/ui/AgentReasoningCard.tsx @compliance-team @frontend-team
+
+# =====================================================================
+# Architectural lock tests — guard the design invariants
+# =====================================================================
+#
+# These tests fail the build if a contributor reintroduces an
+# anti-pattern (per-intent dispatch in /cases; hardcoded enum
+# strings; partial-truth fallback chains). Architect + Compliance
+# co-review every change so the lock-test contracts don't drift.
+
+/tests/architectural/          @architect @compliance-team @frontend-team
+/tests/architectural/**        @architect @compliance-team @frontend-team
+
+# =====================================================================
+# UI architecture spec + design system
+# =====================================================================
+
+/ui_architecture.md            @architect @frontend-team
+/DESIGN.md                     @frontend-team @platform-team
+/skills/asoe-ui-design/        @frontend-team @platform-team
+/skills/asoe-ui-design/**      @frontend-team @platform-team
+
+# =====================================================================
+# Visual design tokens — single source of truth for brand + spacing
+# =====================================================================
+
+/src/styles/design-tokens.css  @frontend-team @platform-team
+
+# =====================================================================
+# tasks.md — project state, mirrors asoe2 cadence
+# =====================================================================
+
+/tasks.md                      @frontend-team @architect
+
+# =====================================================================
+# Auth / NextAuth wiring — touches Compliance (RBAC enforcement)
+# =====================================================================
+
+/src/app/api/auth/             @compliance-team @frontend-team
+/src/app/api/auth/**           @compliance-team @frontend-team
+/src/hooks/useAuth.ts          @compliance-team @frontend-team

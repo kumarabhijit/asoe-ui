@@ -34,6 +34,7 @@ import { useState, type ReactNode } from "react";
 import { Zap, Check, AlertTriangle, ShieldX, MessageSquare, XCircle, RotateCcw } from "lucide-react";
 import { Badge, verdictVariant } from "./Badge";
 import { Button } from "./Button";
+import { PolicyHitBadge } from "./PolicyHitBadge";
 import { cn } from "@/lib/utils";
 import { useIntentLabel } from "@/hooks/useErpProfile";
 import type { ShadowVerdict } from "@/types/exceptions";
@@ -327,13 +328,16 @@ export function AgentReasoningCard({
           </p>
         )}
 
-        {/* Policy hits for RED */}
+        {/* Policy hits for RED — distinguishes L1 (rule-based) from L2
+            (LLM-based) sources via PolicyHitBadge per ADR-039 §4.5. */}
         {verdict === "RED" && policyHits && policyHits.length > 0 && (
           <div className="px-12 py-8 bg-error-subtle rounded-sm mb-12">
             <span className="text-label text-error font-semibold">Blocking Policy Rules</span>
-            <ul className="mt-4 mb-0 pl-16 text-caption text-error">
+            <ul className="mt-4 mb-0 pl-0 list-none flex flex-col gap-4">
               {policyHits.map((hit) => (
-                <li key={hit}>{hit}</li>
+                <li key={hit}>
+                  <PolicyHitBadge hit={hit} />
+                </li>
               ))}
             </ul>
           </div>
