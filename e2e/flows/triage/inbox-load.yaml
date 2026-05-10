@@ -1,0 +1,35 @@
+# triage/inbox-load.yaml — golden, J1 + J2.
+#
+# The inbox is the single most-loaded surface; this flow protects
+# the full state matrix. State opt-outs require justification per
+# decision A8.
+name: inbox-load
+kind: golden
+journey: [J1, J2]
+entry: /inbox
+states:
+  - loading
+  - empty
+  - error
+  # `partial_failure` and `stale` opt-out: the inbox list endpoint
+  # is a single GET — there is no per-row failure mode and no mid-
+  # view status-change channel today. When the WebSocket-driven
+  # inbox lands those become meaningful and must be added.
+state_fixtures:
+  loading:
+    route: /api/v1/exceptions
+    delay_ms: 2000
+    assert_visible: '[data-testid="inbox-skeleton"]'
+  empty:
+    route: /api/v1/exceptions
+    body: []
+    assert_visible: '[data-testid="inbox-empty-cta"]'
+    assert_text_contains:
+      - "You're caught up"
+  error:
+    route: /api/v1/exceptions
+    status: 500
+    assert_visible: '[data-testid="inbox-error-retry"]'
+steps:
+  - action: assert_visible
+    selector: '[data-testid="inbox-row"]'
