@@ -18,6 +18,7 @@
 import { Check, AlertTriangle, AlertOctagon, ChevronDown, Server } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { PolicyHitBadge } from "@/components/ui/PolicyHitBadge";
 import type { ExecutedNode } from "@/types/api";
 
 interface EventsTimelineProps {
@@ -281,13 +282,10 @@ function PolicyHits({ hits }: { hits: string[] }) {
       <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
         Policy hits
       </div>
-      <ul className="list-disc pl-20 m-0 flex flex-col gap-2">
+      <ul className="list-none pl-0 m-0 flex flex-col gap-4">
         {hits.map((h, i) => (
-          <li
-            key={i}
-            className="text-label text-text-secondary font-mono"
-          >
-            {h}
+          <li key={i}>
+            <PolicyHitBadge hit={h} />
           </li>
         ))}
       </ul>
