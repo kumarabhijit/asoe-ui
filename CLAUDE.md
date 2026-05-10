@@ -170,6 +170,23 @@ populate a field today:
 - `role="dialog"` and `aria-modal="true"` on Sidebar
 - `jest-axe` tests on all status-related components (Phase 10)
 
+### Comments and JSDoc
+
+vitest 4 uses `vite:oxc` as its transformer. Empirically, oxc's
+JSDoc parser closes a `/** ... */` block at the first `**/`
+sequence inside the body — even though tsc, prettier, and the LSP
+all walk past it as comment content. The trap surfaces commonly
+when a JSDoc references a glob like `src/app/**/page.tsx` or
+embeds a Markdown-style code fence.
+
+Rule: do not put `**/` inside a `/** ... */` block. Use a `//`
+line comment for that block, or rewrite the glob without the
+consecutive `**` sequence (e.g. `src/app/<route>/page.tsx`).
+
+A CI lint guard at `tests/architectural/jsdoc_parser_traps.test.ts`
+fails the build if the pattern reappears. Backticks, single
+quotes, and em-dashes inside JSDoc are NOT traps and are allowed.
+
 ---
 
 ## Working Style
