@@ -6,6 +6,26 @@
 # Companion to `asoe2/.github/CODEOWNERS`. The two files together
 # enforce the ADR-038 §8.5 five-layer review chain across the
 # backend + frontend halves of the system.
+#
+# ─────────────────────────────────────────────────────────────────────
+# Reviewer resolution (2026-05-09)
+# ─────────────────────────────────────────────────────────────────────
+#
+# The path-to-reviewer map below was authored with team-handle
+# placeholders (`@compliance-team`, `@frontend-team`,
+# `@architect`, `@platform-team`). At present the repo has two
+# human contributors besides Claude:
+#
+#   * @kumarabhijit  — primary maintainer / Architect / Compliance lens
+#   * @linkinrustle  — secondary maintainer
+#
+# Every placeholder is therefore resolved to both handles so review
+# load is shared and the file actually enforces assignment. The
+# layered structure is preserved verbatim in the comments so the
+# reviewer-mapping can re-fan-out when GitHub teams are created.
+# When that happens, reverse the resolution by replacing
+# `@kumarabhijit @linkinrustle` with the appropriate `@org/team`
+# handle per layer; the path patterns stay unchanged.
 
 # =====================================================================
 # Type contracts mirror asoe2 Pydantic models — Compliance + Frontend
@@ -16,19 +36,19 @@
 # audit-trail issue an asoe2 contract drift would be — partial-truth
 # state that Compliance veto holder rejects.
 
-/src/types/                    @compliance-team @frontend-team
-/src/types/**                  @compliance-team @frontend-team
-/src/types/exceptions.ts       @compliance-team @frontend-team
-/src/types/cases.ts            @compliance-team @frontend-team
-/src/types/api.ts              @compliance-team @frontend-team
-/src/types/auth.ts             @compliance-team @frontend-team @platform-team
-/src/types/generated.ts        @frontend-team
+/src/types/                            @kumarabhijit @linkinrustle
+/src/types/**                          @kumarabhijit @linkinrustle
+/src/types/exceptions.ts               @kumarabhijit @linkinrustle
+/src/types/cases.ts                    @kumarabhijit @linkinrustle
+/src/types/api.ts                      @kumarabhijit @linkinrustle
+/src/types/auth.ts                     @kumarabhijit @linkinrustle
+/src/types/generated.ts                @kumarabhijit @linkinrustle
 
 # =====================================================================
 # API client — boundary layer between UI and asoe2 backend
 # =====================================================================
 
-/src/lib/api.ts                @frontend-team @backend-team
+/src/lib/api.ts                        @kumarabhijit @linkinrustle
 
 # =====================================================================
 # /cases primary CSR surface — ADR-038 Phase H.6
@@ -40,9 +60,9 @@
 # determine what an operator sees when authorising a financially
 # binding action (CLAUDE.md Guardrail #6).
 
-/src/app/cases/                @compliance-team @frontend-team
-/src/app/cases/**              @compliance-team @frontend-team
-/src/app/cases/CaseDetailPanel.tsx  @compliance-team @frontend-team
+/src/app/cases/                        @kumarabhijit @linkinrustle
+/src/app/cases/**                      @kumarabhijit @linkinrustle
+/src/app/cases/CaseDetailPanel.tsx     @kumarabhijit @linkinrustle
 
 # =====================================================================
 # Per-section components that render audit-bearing evidence
@@ -53,8 +73,8 @@
 # change goes through Compliance to confirm we're not introducing
 # partial-truth states or frontend composition.
 
-/src/components/ui/EvidenceBlock.tsx     @compliance-team @frontend-team
-/src/components/ui/AgentReasoningCard.tsx @compliance-team @frontend-team
+/src/components/ui/EvidenceBlock.tsx   @kumarabhijit @linkinrustle
+/src/components/ui/AgentReasoningCard.tsx @kumarabhijit @linkinrustle
 
 # =====================================================================
 # Architectural lock tests — guard the design invariants
@@ -65,34 +85,34 @@
 # strings; partial-truth fallback chains). Architect + Compliance
 # co-review every change so the lock-test contracts don't drift.
 
-/tests/architectural/          @architect @compliance-team @frontend-team
-/tests/architectural/**        @architect @compliance-team @frontend-team
+/tests/architectural/                  @kumarabhijit @linkinrustle
+/tests/architectural/**                @kumarabhijit @linkinrustle
 
 # =====================================================================
 # UI architecture spec + design system
 # =====================================================================
 
-/ui_architecture.md            @architect @frontend-team
-/DESIGN.md                     @frontend-team @platform-team
-/skills/asoe-ui-design/        @frontend-team @platform-team
-/skills/asoe-ui-design/**      @frontend-team @platform-team
+/ui_architecture.md                    @kumarabhijit @linkinrustle
+/DESIGN.md                             @kumarabhijit @linkinrustle
+/skills/asoe-ui-design/                @kumarabhijit @linkinrustle
+/skills/asoe-ui-design/**              @kumarabhijit @linkinrustle
 
 # =====================================================================
 # Visual design tokens — single source of truth for brand + spacing
 # =====================================================================
 
-/src/styles/design-tokens.css  @frontend-team @platform-team
+/src/styles/design-tokens.css          @kumarabhijit @linkinrustle
 
 # =====================================================================
 # tasks.md — project state, mirrors asoe2 cadence
 # =====================================================================
 
-/tasks.md                      @frontend-team @architect
+/tasks.md                              @kumarabhijit @linkinrustle
 
 # =====================================================================
 # Auth / NextAuth wiring — touches Compliance (RBAC enforcement)
 # =====================================================================
 
-/src/app/api/auth/             @compliance-team @frontend-team
-/src/app/api/auth/**           @compliance-team @frontend-team
-/src/hooks/useAuth.ts          @compliance-team @frontend-team
+/src/app/api/auth/                     @kumarabhijit @linkinrustle
+/src/app/api/auth/**                   @kumarabhijit @linkinrustle
+/src/hooks/useAuth.ts                  @kumarabhijit @linkinrustle
