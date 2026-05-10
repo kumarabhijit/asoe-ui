@@ -1,0 +1,40 @@
+# Flow registry — back-target rules + route -> entry-path map.
+#
+# Per decision D1 (docs/test-strategy/e2e-flow-plan.md):
+#   The registry declares back-target rules generally —
+#   destination's back-target = entry-path's parent route — so
+#   the next "back button to wrong place" bug can't surface as
+#   V4 from a missing per-flow declaration. Per-flow override
+#   wins over registry rule (most-specific-precedence).
+
+# Default back-target rules. The codegen + chrome-invariant runner
+# uses these to compute the expected back-href for any detail
+# page reached via a flow's `entry`.
+back_target_rules:
+  # Detail pages reached from /inbox return to /inbox.
+  - entry_pattern: ^/inbox$
+    detail_pattern: ^/exceptions/[^/]+$
+    back_href: /inbox
+    back_label: Back to Inbox
+
+  # Detail pages reached from /exceptions return to the queue.
+  - entry_pattern: ^/exceptions$
+    detail_pattern: ^/exceptions/[^/]+$
+    back_href: /exceptions
+    back_label: Back to Queue
+
+  # Cases detail follows the same parent-route rule.
+  - entry_pattern: ^/cases$
+    detail_pattern: ^/cases/[^/]+$
+    back_href: /cases
+    back_label: Back to Cases
+
+# Categories — for organisation; codegen uses the directory name
+# rather than this list, but it keeps reviewers in sync with what
+# the registry expects to grow into.
+categories:
+  - onboard
+  - triage
+  - resolve
+  - signout
+  - recover
