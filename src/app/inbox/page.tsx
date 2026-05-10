@@ -323,7 +323,14 @@ function InboxPageInner() {
               // browse-inbound triage flow.
               const handleActivate = () => {
                 if (item.exception_id) {
-                  router.push(`/exceptions/${item.exception_id}`);
+                  // ?from=inbox so the exception detail page renders
+                  // "Back to Inbox" instead of the default "Back to
+                  // Queue" — preserves the operator's mental return
+                  // path. Whitelisted in
+                  // src/app/exceptions/[id]/page.tsx::BACK_TARGETS.
+                  router.push(
+                    `/exceptions/${item.exception_id}?from=inbox`,
+                  );
                   return;
                 }
                 setSelectedId(item.id);
