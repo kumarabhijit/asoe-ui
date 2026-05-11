@@ -3567,6 +3567,47 @@ export const casesApi = {
     await new Promise((r) => setTimeout(r, MOCK_DELAY));
     return MOCK_CASES.find((c) => c.case_id === case_id) ?? null;
   },
+
+  /**
+   * GET /api/v1/cases/{id}/records — attached-record loader
+   * (Phase 28.5.x §28.5 follow-up).
+   *
+   * Returns the list of ExceptionDetail-shaped child records
+   * (most-recently-updated first) plus a deduped
+   * `aggregated_policy_hits` union the CaseDetailPanel feeds into
+   * the L1/L2 PolicyHitBadge surface.
+   *
+   * Mock branch returns the children of the mock case via the
+   * pre-existing MOCK_EXCEPTIONS list filtered by parent_case_id;
+   * keeps the /cases/[id] preview path working without a live
+   * backend.
+   */
+  async getRecords(case_id: string): Promise<{
+    items: ExceptionDetailResponse[];
+    total: number;
+    aggregated_policy_hits: string[];
+  }> {
+    if (USE_REAL_API) {
+      return http<{
+        items: ExceptionDetailResponse[];
+        total: number;
+        aggregated_policy_hits: string[];
+      }>(`/api/v1/cases/${encodeURIComponent(case_id)}/records`);
+    }
+    await new Promise((r) => setTimeout(r, MOCK_DELAY));
+    const items: ExceptionDetailResponse[] = MOCK_EXCEPTIONS
+      .filter((e) => e.parent_case_id === case_id)
+      .map((summary) => ({
+        ...summary,
+        resolution_data: {},
+        reanalysis_history: [],
+      }));
+    // Mock doesn't carry persisted traces, so the aggregated set is
+    // empty in mock mode. The UI hides the section on empty arrays
+    // (Guardrail #6); preview-mode operators see the records stack
+    // without the policy-hits panel until they hit the live API.
+    return { items, total: items.length, aggregated_policy_hits: [] };
+  },
 };
 
 /**

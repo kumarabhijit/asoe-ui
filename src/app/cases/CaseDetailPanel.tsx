@@ -21,12 +21,14 @@
 
 "use client";
 
-import { Mail, PackageCheck, Clock, ShieldAlert } from "lucide-react";
+import Link from "next/link";
+import { Mail, PackageCheck, Clock, ShieldAlert, ChevronRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { PolicyHitBadge } from "@/components/ui/PolicyHitBadge";
 import type { CaseSource, OrderCase } from "@/types/cases";
+import type { ExceptionDetailResponse } from "@/types/api";
 
 import { slaSnapshot } from "./page";
 
@@ -63,23 +65,30 @@ export interface CaseDetailPanelProps {
    * deterministic rule names. The `PolicyHitBadge` component
    * distinguishes the two visually.
    *
-   * Today the case-aware compliance surface is plumbed through
-   * the per-attached-record stack (Phase H.6 iteration target);
-   * this prop accepts the aggregated set so the badge wiring
-   * lands ahead of the full data-hook swap and `/cases/[id]` can
-   * populate it as soon as the attached-record loader ships.
-   * Empty / undefined hides the section entirely (Guardrail #6 —
-   * no synthesised "no hits" placeholder).
+   * Sourced from `casesApi.getRecords(case_id).aggregated_policy_hits`
+   * — the backend dedupes across child records so the UI never has
+   * to recompute. Empty / undefined hides the section entirely
+   * (Guardrail #6 — no synthesised "no hits" placeholder).
    */
   policyHits?: string[];
+  /**
+   * The child `ExceptionRecord`s attached to this case
+   * (Phase 28.5.x §28.5 follow-up). Sourced from
+   * `casesApi.getRecords(case_id).items`. Each row deep-links to
+   * `/exceptions/{id}` for the full per-event detail. Empty array
+   * hides the section entirely (Guardrail #6).
+   */
+  attachedRecords?: ExceptionDetailResponse[];
 }
 
 export function CaseDetailPanel({
   orderCase,
   policyHits,
+  attachedRecords,
 }: CaseDetailPanelProps) {
   const sla = slaSnapshot(orderCase);
   const hasPolicyHits = (policyHits ?? []).length > 0;
+  const hasAttachedRecords = (attachedRecords ?? []).length > 0;
 
   return (
     <div className="space-y-24">
@@ -168,23 +177,50 @@ export function CaseDetailPanel({
         </section>
       )}
 
-      {/* ── Children placeholder (Phase H.6 iteration target) ────── */}
-      <section
-        aria-label="Children"
-        className="bg-surface-primary border border-border rounded-md p-16 shadow-xs"
-      >
-        <h2 className="text-heading font-semibold text-text-primary mb-8">
-          Attached records
-        </h2>
-        <p className="text-text-secondary text-body leading-normal">
-          Per-event records (extraction, validation findings, agent
-          decisions) attach to this case and render via the existing
-          enrichment-section components. The next Phase H.6 iteration
-          wires the case → child-record join so this section stacks
-          one entry per <code className="font-mono">ExceptionRecord</code>{" "}
-          attached to <code className="font-mono">{orderCase.case_id}</code>.
-        </p>
-      </section>
+      {/* ── Attached records stack (Phase 28.5.x §28.5) ──────────── */}
+      {hasAttachedRecords && (
+        <section
+          aria-label="Attached records"
+          className="bg-surface-primary border border-border rounded-md p-16 shadow-xs"
+        >
+          <div className="flex items-center gap-8 mb-12">
+            <h2 className="text-heading font-semibold text-text-primary m-0">
+              Attached records
+            </h2>
+            <span className="ml-auto text-caption text-text-tertiary">
+              {(attachedRecords ?? []).length}
+            </span>
+          </div>
+          <p className="text-caption text-text-tertiary leading-normal mb-12">
+            Per-event records (extraction, validation findings, agent
+            decisions) attached to{" "}
+            <code className="font-mono">{orderCase.case_id}</code>.
+            Open one for the full enrichment + reasoning surface.
+          </p>
+          <ul role="list" className="m-0 p-0 list-none divide-y divide-border-subtle">
+            {(attachedRecords ?? []).map((record) => (
+              <li key={record.id}>
+                <Link
+                  href={`/exceptions/${record.id}`}
+                  className="flex items-center gap-12 py-12 hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                  aria-label={`Open exception ${record.order_id ?? record.id}`}
+                >
+                  <Badge variant="neutral" size="sm">
+                    {record.intent ?? "UNCLASSIFIED"}
+                  </Badge>
+                  <span className="font-mono text-body text-text-primary">
+                    {record.order_id ?? record.id}
+                  </span>
+                  <span className="ml-auto text-caption text-text-tertiary">
+                    {record.lifecycle_state}
+                  </span>
+                  <ChevronRight size={14} aria-hidden className="text-text-tertiary" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

@@ -263,6 +263,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cases/{case_id}/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Case Records */
+        get: operations["list_case_records_api_v1_cases__case_id__records_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/config/tenants/{tenant_id}/audit": {
         parameters: {
             query?: never;
@@ -1045,6 +1062,46 @@ export interface components {
             pending_action: string;
             /** Pending Reason Tag */
             pending_reason_tag?: string | null;
+        };
+        /**
+         * CaseRecordsResponse
+         * @description GET /api/v1/cases/{id}/records — attached-record loader response
+         *     (Phase 28.5.x §28.5 follow-up).
+         *
+         *     `items` is the list of `ExceptionDetail`-shaped child records
+         *     attached to the case (`ExceptionRecord.parent_case_id == case_id`).
+         *     The UI's CaseDetailPanel uses this both to render the stack of
+         *     per-event sections and to aggregate `aggregated_policy_hits` into
+         *     the L1/L2 PolicyHitBadge surface (ADR-039 §4.5).
+         *
+         *     Why a separate field for the aggregate (rather than re-deriving it
+         *     client-side):
+         *
+         *       * Authoritative: the backend already has the deduped union with
+         *         the LLM_SHADOW: prefix preserved; making the client recompute
+         *         it from `items[*].shadow_policy_hits` invites drift.
+         *       * Empty-set distinction: the UI hides the section when the
+         *         aggregate is empty (Guardrail #6 — no synthesised "no hits"
+         *         placeholder); we want one place that decides "no hits".
+         *       * Telemetry surface: a future SLI on case-level disagreement
+         *         rate reads off the same aggregate without re-iterating
+         *         children.
+         */
+        CaseRecordsResponse: {
+            /**
+             * Aggregated Policy Hits
+             * @description Deduped union of `shadow_policy_hits` across all attached records. L1 rule names (bare strings) and L2 LLM-derived concerns (LLM_SHADOW: prefix) are preserved; the UI's PolicyHitBadge distinguishes the two visually.
+             */
+            aggregated_policy_hits?: string[];
+            /** Items */
+            items?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
         };
         /**
          * ChallengeRequest
@@ -3362,6 +3419,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_case_records_api_v1_cases__case_id__records_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseRecordsResponse"];
                 };
             };
             /** @description Validation Error */
