@@ -4,16 +4,19 @@
  *
  * Two scenarios this spec validates end-to-end against the live app:
  *
- *   N1. Inbox row click selects locally and updates the right-pane
- *       case-header detail in place. The right pane renders an
- *       explicit "Open case" jump button that navigates to
- *       /cases/{case_id} — the canonical case detail surface.
+ *   N1. Issue #133, PO #9 — `/inbox` is now a server redirect into
+ *       `/cases?source=manual_order`. Operators hitting the legacy
+ *       URL (from notification emails, browser history, runbooks)
+ *       land on the case-list view filtered to manual orders.
+ *       Clicking a row navigates directly to `/cases/{case_id}` —
+ *       the canonical case detail surface.
  *
- *       (ADR-038 §H.6 / Phase 28.5 V5.1 — supersedes the ADR-034
- *        §6.1 inbox-row → /exceptions/{id}?from=inbox jump. The
- *        master-detail dispatch is unchanged; only the off-surface
- *        target moves from per-event exception detail to canonical
- *        case detail.)
+ *       (The previous V5.1 anatomy hosted a master-detail surface
+ *        on /inbox where row clicks selected locally and a separate
+ *        "Open case" jump button navigated off-surface. The PO
+ *        review retired the parallel surface — see issue #133 and
+ *        the redirect-only contract test at
+ *        tests/contract/test_navigation_chrome.test.ts.)
  *
  *   N2. /cases/[id] keeps the canonical NavBar with the Sign out
  *       menu item visible. Operators must always have the exit
@@ -30,39 +33,36 @@ import { loginAs, USERS } from "./_helpers";
 test.describe.configure({ mode: "serial" });
 
 
-test("N1 — inbox row selects locally; Open case button navigates to /cases/{id}", async ({
+test("N1 — /inbox redirects to /cases?source=manual_order; row click navigates to /cases/{id}", async ({
   page,
 }) => {
   await loginAs(page, USERS.MANAGER);
-  await page.goto("/inbox");
 
-  // V5.1.1 — rows project from `useManualOrderCases()` and now
-  // render with `role="option"` inside a `role="listbox"` parent
-  // (Phase 28.5.x §D5 a11y swap). Aria-label shape:
-  // `Select case <PO-or-SO-or-case_id>`. Skip when no
-  // manual-order cases are visible (clean tenant); the assertion is
-  // meaningful only against a seeded backend.
-  const rows = page.locator('[role="option"][aria-label^="Select case"]');
+  // ── /inbox is a server redirect; the operator lands on /cases ──
+  // The URL after `goto` is the redirect destination, including the
+  // source-filter query string the CaseListPane reads.
+  await page.goto("/inbox");
+  await page.waitForURL(/\/cases(\?|$)/, { timeout: 10_000 });
+  expect(page.url()).toMatch(/\/cases\?[^?]*source=manual_order/);
+
+  // ── Case-list rows on /cases ───────────────────────────────────
+  // /cases/page.tsx renders each row as a `<button>` with an
+  // `aria-label="Open case <case_id>"`. The surface does NOT use
+  // the V5.1.1 master-detail listbox pattern (that was specific to
+  // the retired /inbox surface). Skip when no manual-order cases
+  // are seeded — the assertion is meaningful only against a seeded
+  // backend.
+  const rows = page.getByRole("button", { name: /^Open case / });
   const rowCount = await rows.count();
   if (rowCount === 0) {
     test.skip(true, "No manual-order cases seeded — skip until backend has cases.");
     return;
   }
 
-  const beforeUrl = page.url();
+  // ── Row click → navigates directly to /cases/{case_id} ─────────
+  // The /cases surface clicks straight through to the case detail;
+  // there is no intermediate master-detail step.
   await rows.first().click();
-
-  // ── Click stays on /inbox — master-detail, no full-page nav ────
-  await page.waitForTimeout(500);
-  expect(page.url()).toBe(beforeUrl);
-  expect(page.url()).toMatch(/\/inbox(\?|$)/);
-
-  // ── Right-pane "Open case" button visible after row selection ─
-  const openCaseBtn = page.getByRole("button", { name: /open case/i });
-  await expect(openCaseBtn).toBeVisible({ timeout: 5_000 });
-
-  // ── Click → navigates to /cases/{case_id} ──────────────────────
-  await openCaseBtn.click();
   await page.waitForURL(/\/cases\/[^/?]+(\?|$)/, { timeout: 10_000 });
 });
 

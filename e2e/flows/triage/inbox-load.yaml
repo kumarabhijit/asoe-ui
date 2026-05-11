@@ -1,12 +1,15 @@
 # triage/inbox-load.yaml — golden, J1 + J2.
 #
-# The inbox is the single most-loaded surface; this flow protects
-# the full state matrix. State opt-outs require justification per
-# decision A8.
+# Issue #133, PO #9 — the `/inbox` master-detail surface was retired
+# and replaced by a server redirect into `/cases?source=manual_order`.
+# This flow continues to exercise the same operator journey
+# (load → see manual-order cases → handle the loading / empty /
+# error states) but enters through the case-list filtered view.
+# Filename kept for historical continuity; rename in a follow-up.
 name: inbox-load
 kind: golden
 journey: [J1, J2]
-entry: /inbox
+entry: /cases?source=manual_order
 states:
   - loading
   - empty
