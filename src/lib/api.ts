@@ -431,6 +431,51 @@ interface MockPendingOverride {
 }
 const MOCK_PENDING_OVERRIDES: Record<string, MockPendingOverride> = {};
 
+// S10: in-process event log for mock state changes. Disposition,
+// escalate, cosign, and reanalyze each append a `case_*` event
+// here on success. The log is the testable surface for the
+// "mock matches live event emission" contract — pages don't yet
+// consume it through useWebSocket (that's a future ticket), but
+// tests can drain the log and assert the right type / case_id /
+// payload landed for each mock state change.
+interface MockEmittedEvent {
+  type: "case_open" | "case_update" | "case_close";
+  case_id: string;
+  exception_id: string;
+  tenant_id: string;
+  timestamp: string;
+  trigger: "disposition" | "escalate" | "cosign" | "reanalyze";
+}
+
+const _mockEmittedEvents: MockEmittedEvent[] = [];
+
+function emitMockCaseEvent(event: MockEmittedEvent): void {
+  _mockEmittedEvents.push(event);
+}
+
+export function drainMockCaseEvents(): MockEmittedEvent[] {
+  return _mockEmittedEvents.splice(0, _mockEmittedEvents.length);
+}
+
+export function peekMockCaseEvents(): readonly MockEmittedEvent[] {
+  return [..._mockEmittedEvents];
+}
+
+export type { MockEmittedEvent };
+
+// `case_close` is the right type when the disposition or cosign
+// transitions to a terminal state; `case_update` is the right type
+// for non-terminal mutations (escalate, reanalyze, in-flight
+// changes). Mirrors asoe2 case-events emission rules at
+// asoe2/api/case_events.py.
+function caseEventTypeForLifecycle(
+  state: string | undefined,
+): "case_close" | "case_update" {
+  return state && TERMINAL_LIFECYCLE_STATES.includes(state)
+    ? "case_close"
+    : "case_update";
+}
+
 const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-001",
@@ -1537,6 +1582,14 @@ export const exceptionsApi = {
       };
     }
     delete MOCK_PENDING_OVERRIDES[id];
+    emitMockCaseEvent({
+      type: caseEventTypeForLifecycle(response.lifecycle_state),
+      case_id: `case-for-${exc.id}`,
+      exception_id: exc.id,
+      tenant_id: exc.tenant_id,
+      timestamp: ts,
+      trigger: "cosign",
+    });
     idempotencyStore(`cosign:${id}`, idempotencyKey, request, response);
     return response;
   },
@@ -1623,6 +1676,14 @@ export const exceptionsApi = {
     // reverts — matches pre-fix behaviour for everything except
     // the timestamp.
     exc.updated_at = ts;
+    emitMockCaseEvent({
+      type: caseEventTypeForLifecycle(newLifecycle),
+      case_id: `case-for-${exc.id}`,
+      exception_id: exc.id,
+      tenant_id: exc.tenant_id,
+      timestamp: ts,
+      trigger: "disposition",
+    });
     idempotencyStore(`disposition:${id}`, idempotencyKey, request, response);
     return response;
   },
@@ -1668,6 +1729,14 @@ export const exceptionsApi = {
       resolution_notes: `ESCALATED: ${request.reason}`,
       updated_at: ts,
     };
+    emitMockCaseEvent({
+      type: "case_update",
+      case_id: `case-for-${exc.id}`,
+      exception_id: exc.id,
+      tenant_id: exc.tenant_id,
+      timestamp: ts,
+      trigger: "escalate",
+    });
     idempotencyStore(`escalate:${id}`, idempotencyKey, request, response);
     return response;
   },
@@ -1778,6 +1847,14 @@ export const exceptionsApi = {
     // the mock detail() doesn't return it for summary-derived records
     // anyway.)
     exc.updated_at = ts;
+    emitMockCaseEvent({
+      type: "case_update",
+      case_id: `case-for-${exc.id}`,
+      exception_id: exc.id,
+      tenant_id: exc.tenant_id,
+      timestamp: ts,
+      trigger: "reanalyze",
+    });
 
     return {
       ...exc,
