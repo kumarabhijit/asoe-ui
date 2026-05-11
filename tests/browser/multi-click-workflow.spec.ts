@@ -51,16 +51,18 @@ test.beforeEach(async ({ request }) => {
 });
 
 
-test("W1 — queue → detail → override → return → next item dispatches each via the full pipeline", async ({
+test("W1 — detail → override → next record dispatches each via the full pipeline", async ({
   page,
   request,
 }) => {
   // ── Seed: backend creates two PENDING_REVIEW exceptions ─────────
-  // Track BOTH the visible order_id (rendered as text in the row) and
-  // the underlying exception UUID (used for `data-exception-id` and
-  // backend lookups). The exception_id is a UUID returned by
-  // `/resolve/explain` and is NOT visible in the queue list — only
-  // the operator-facing `order_id` is.
+  // V5.1 (Phase 28.5) — the `/exceptions` queue list now projects
+  // from `casesApi.list()` and routes clicks to /cases/{id}; the
+  // per-exception override flow lives at /exceptions/[id] reached
+  // by direct navigation. This test exercises the override flow
+  // and cross-record state isolation; we drive each record via
+  // its /exceptions/{id} deeplink rather than via the queue row
+  // (which no longer carries `data-exception-id`).
   const token = await backendToken(request, USERS.MANAGER);
   const seedTs = Date.now();
   const orderIdA = `PO-W1-A-${seedTs}`;
@@ -68,19 +70,9 @@ test("W1 — queue → detail → override → return → next item dispatches e
   const idA = await createPendingReviewException(request, token, orderIdA);
   const idB = await createPendingReviewException(request, token, orderIdB);
 
-  // ── Click 1: log in, click on the first exception in the queue ──
+  // ── Click 1: log in, open record A's detail page ─────────────
   await loginAs(page, USERS.MANAGER);
-  await page.goto("/exceptions");
-  // The list pane renders each row with `data-exception-id={exc.id}`
-  // and the visible `order_id`. Wait for record A's row to mount.
-  const rowA = page.locator(`[data-exception-id="${idA}"]`);
-  await expect(rowA).toBeVisible({ timeout: 15_000 });
-  await expect(rowA).toContainText(orderIdA);
-  await rowA.click();
-
-  // The /exceptions page is master-detail with state-based selection
-  // (no URL change); detail content renders into the third pane.
-  // Wait for the override affordance instead of waitForURL.
+  await page.goto(`/exceptions/${idA}`);
 
   // ── Click 2: open Override dialog, submit ─────────────────────
   const openOverride = page.getByRole("button", {
@@ -110,12 +102,8 @@ test("W1 — queue → detail → override → return → next item dispatches e
     )
     .toBe("RESOLVED");
 
-  // ── Click 3: navigate back to the queue, click record B's row ──
-  await page.goto("/exceptions");
-  const rowB = page.locator(`[data-exception-id="${idB}"]`);
-  await expect(rowB).toBeVisible({ timeout: 15_000 });
-  await expect(rowB).toContainText(orderIdB);
-  await rowB.click();
+  // ── Click 3: navigate to record B's detail page ───────────────
+  await page.goto(`/exceptions/${idB}`);
 
   // ── Click 4: Override dialog must NOT carry stale state from A ─
   const openOverrideB = page.getByRole("button", {
@@ -233,13 +221,16 @@ test("W2 — override → re-override on the same record (PO ruling 2026-05-03)"
 });
 
 
-test("W3 — multi-record disposition workflow: 3 distinct resolutions from the queue", async ({
+test("W3 — multi-record disposition workflow: 3 distinct resolutions across detail pages", async ({
   page,
   request,
 }) => {
+  // V5.1 (Phase 28.5) — same supersession as W1: the /exceptions
+  // queue list now routes clicks to /cases/{id}; per-record
+  // override lives at /exceptions/[id] reached by direct
+  // navigation. Test value (cross-record state isolation across
+  // three distinct resolutions) is preserved.
   const token = await backendToken(request, USERS.MANAGER);
-  // Three independent records, three different resolution actions.
-  // Track BOTH the visible order_id and the underlying exception UUID.
   const seedTs = Date.now();
   const seeds = [
     { orderId: `PO-W3-1-${seedTs}`, action: "ALLOW_BOTH", reason: "policy_exception" },
@@ -256,15 +247,10 @@ test("W3 — multi-record disposition workflow: 3 distinct resolutions from the 
   await loginAs(page, USERS.MANAGER);
 
   for (const rec of records) {
-    // Click 1: navigate to the queue and click the row for this record
-    await page.goto("/exceptions");
-    const row = page.locator(`[data-exception-id="${rec.id}"]`);
-    await expect(row).toBeVisible({ timeout: 15_000 });
-    await expect(row).toContainText(rec.orderId);
-    await row.click();
+    // Click 1: open this record's detail page directly
+    await page.goto(`/exceptions/${rec.id}`);
 
-    // Click 2: open Override dialog (detail panel renders into the
-    // master-detail third pane; no URL change on the /exceptions route)
+    // Click 2: open Override dialog
     const openBtn = page.getByRole("button", {
       name: /choose different action/i,
     });
