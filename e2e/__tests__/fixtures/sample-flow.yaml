@@ -1,0 +1,39 @@
+# Sample flow used by the codegen golden-output test.
+# DO NOT modify without updating the snapshot.
+name: sample-flow
+kind: golden
+journey: J1
+entry: /inbox
+states:
+  - loading
+  - empty
+  - error
+state_fixtures:
+  loading:
+    route: /api/v1/exceptions
+    delay_ms: 2000
+    assert_visible: '[data-testid="inbox-skeleton"]'
+  empty:
+    route: /api/v1/exceptions
+    body: []
+    assert_visible: '[data-testid="inbox-empty-cta"]'
+    assert_text_contains:
+      - "You're caught up"
+  error:
+    route: /api/v1/exceptions
+    status: 500
+    assert_visible: '[data-testid="inbox-error-retry"]'
+steps:
+  - action: assert_visible
+    selector: '[data-testid="inbox-row"]'
+  - action: click
+    selector: '[data-testid="inbox-row-3"]'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: '[data-testid="inbox-row-3"]'
+  - action: assert_focus_on
+    selector: '[data-testid="exception-detail-heading"]'
+  - action: assert_url_equals
+    url: /exceptions/exc-001?from=inbox
+  - action: assert_announcement_text
+    text: Exception loaded
