@@ -19,6 +19,7 @@ src/
 │   ├── exceptions/
 │   │   ├── page.tsx              # Exception Queue — three-pane Outlook master-detail layout + WebSocket wiring
 │   │   ├── ExceptionListPane.tsx # Middle pane: compact card list with search + filters + left border indicators
+│   │   ├── CaseListPane.tsx      # V5.1.1 (Phase 28.5.x) — case-projected master-detail queue. Cluster filter chips (Live / Waiting / Terminal) + intent multi-select + source filter + URL-synced search + sort toggle + role="listbox" rows. Replaces the V5.1 inline source-only queue on /exceptions.
 │   │   ├── ExceptionDetailPanel.tsx  # Right pane: orchestrator composing 13 layer sub-components
 │   │   ├── HeaderRibbon.tsx      # Layer 1: breadcrumb context, lifecycle/verdict badges, total value
 │   │   ├── ContextStrip.tsx      # Layer 2: Entity Profile + Impact Metrics (collapsible)
@@ -62,12 +63,16 @@ src/
 │   ├── useAuth.ts                # Wraps NextAuth session with typed user + visibleTabs, assignedAccounts
 │   ├── useErpProfile.ts          # ERP-vendor-aware label resolver (useIntentLabel, useSubTypeLabel)
 │   ├── useHealth.ts              # Fetches runtime enums from /api/v1/health
+│   ├── useKeyboardListNav.ts     # V5.1.1 (Phase 28.5.x §D5) — ArrowUp/Down + j/k + Home/End on a sorted single-select listbox. Consumed by CaseListPane + ExceptionListPane.
+│   ├── useManualOrderCases.ts    # `useCases` + `useManualOrderCases` — fetch /api/v1/cases with WS-driven invalidation; exposes refetch() and isCaseInvalidationEvent helper
+│   ├── useSavedViews.ts          # v2 storage shape (Phase 28.5.x §D4) with `surface` discriminator and one-shot v1→v2 migration on first read
 │   └── useWebSocket.ts           # Section 8 protocol with reconnection backoff
 ├── config/
 │   └── erp-label-map.ts          # Per-vendor (SAP / Oracle / Salesforce / GENERIC) display-label maps for intents + EDI sub_types
 ├── lib/
-│   ├── api.ts                    # API client: auth + health + exceptions + line items
+│   ├── api.ts                    # API client: auth + health + exceptions + line items + cases (with V5.1.1 query params)
 │   ├── auth.ts                   # NextAuth options (credentials provider, JWT callbacks)
+│   ├── cases.ts                  # V5.1.1 (Phase 28.5.x §D1) — single STATUS_LABEL + CASE_STATUS_CLUSTERS + isAwaitingHuman / clusterFor helpers. Retires four duplicate maps + two hardcoded literal comparisons.
 │   ├── roles.ts                  # RBAC permissions aligned with asoe2/api/deps.py
 │   └── utils.ts                  # cn() — Tailwind class merge utility (clsx + tailwind-merge)
 ├── types/
@@ -295,13 +300,49 @@ Page Content (max-width 1440px)
     └── EvidenceBlock per audit-bearing field
 ```
 
-**Data flow:** `casesApi.list()` / `casesApi.get(case_id)` → state → render. **Mock-mode only** until the asoe2 `/api/v1/cases/*` route ships (see `asoe2/tasks.md` Phase 27.6).
+**Data flow:** `casesApi.list()` / `casesApi.get(case_id)` / `casesApi.getRecords(case_id)` → state → render. `getRecords` is the Phase 28.5.x §28.5 attached-record loader; `/cases/[id]` Promise.all-loads the case header + records list and hands the aggregated `policy_hits` to `CaseDetailPanel` for the L1/L2 PolicyHitBadge surface.
 
 **Architectural locks:**
 * `tests/architectural/cases_no_per_intent_dispatch.test.ts` — `CaseDetailPanel` is a dumb projector (Guardrail #1 / Guardrail #6). It does **not** dispatch on intent; section components mount via the existing data-presence pattern, identical to `ExceptionDetailPanel`.
 * `slaSnapshot()` band thresholds (<2h `at_risk`, 2–24h `today`, >24h `comfortable`) are exported from `src/app/cases/page.tsx` as a pure helper so they can be reused by other surfaces (e.g., the dashboard's case-queue widget when that lands).
 
 **Direction notice for the broader rollout** — see `ui_architecture.md` §13.
+
+### Exception Queue V5.1.1 (`/exceptions` mounts `CaseListPane`)
+
+V5.1.1 (Phase 28.5.x Item 3) ships `CaseListPane` on `/exceptions` to replace the V5.1 source-only inline queue. Binding decisions doc: `asoe2/docs/workshops/2026-05-11-case-list-pane-decisions.md`.
+
+```
+NavBar (shared component)
+Page Header (breadcrumb, refresh button)
+Metrics strip (total / SLA breached / awaiting review / resolved)
+Two-Pane Content
+├── Left (460px): CaseListPane
+│   ├── Header (title + count + saved-views menu + refresh)
+│   ├── Search box (URL-synced `?q=`)
+│   ├── Cluster filter chips (Live / Waiting / Terminal),
+│   │   per-status sub-chips on demand
+│   ├── Source filter chip (single-value, manual_order / automated_order)
+│   ├── Intent multi-select chips (from useHealth().allowed_intents)
+│   ├── Sort toggle (SLA urgency / Recently opened)
+│   └── Case rows — role="option" inside role="listbox", with
+│       data-keyboard-nav-id for useKeyboardListNav drive
+└── Right (flex): Case header summary + "Open case" → /cases/{id}
+```
+
+**Filter pipeline:** Backend evaluates `source / status / intents / since / q` query params (PR #137 asoe2). The UI ALSO applies them client-side (idempotent — both sides are pure subset operations) so chip toggles repaint immediately without waiting for the refetch round-trip.
+
+**Saved views:** `useSavedViews("cases")` returns surface-scoped views. "My queue" is opt-in via the "Save current as default" tile (operator-resolved D4 product call — no auto-apply on first login).
+
+**Keyboard nav:** `useKeyboardListNav` is mounted with the sorted row list + `selectedId` setter + the listbox container ref. ArrowUp / ArrowDown / j / k / Home / End drive selection; the row that takes selection scrolls into view + receives DOM focus so `:focus-visible` tracks.
+
+**A11y:** `role="listbox"` on the container, `role="option"` on each row with `aria-selected`. The `<input type="search">` carries `aria-label="Search cases"`. vitest-axe locks at `tests/accessibility/case_list_pane.test.tsx`.
+
+**URL sync:** Filter + sort state sync to `?status=A,B&intents=X,Y&source=manual_order&since=7d&q=needle&sort=recent` so shared URLs preserve the operator's view (Compliance ask from D2).
+
+**Architectural locks:**
+* `tests/architectural/openapi_drift.test.ts` — `casesApi.list`'s declared query params match the backend OpenAPI artifact.
+* `tests/contract/test_navigation_chrome.test.ts` — the role swap (`role="option"` inside `role="listbox"`) is asserted via file-scan on both `CaseListPane.tsx` and `inbox/page.tsx`.
 
 ---
 

@@ -147,13 +147,15 @@ Intent values, lifecycle states, recipe names, and shadow verdicts are **never h
 
 | What | Source | UI File |
 |---|---|---|
-| Intent filter options | `health.allowed_intents[]` | `src/app/exceptions/page.tsx` |
-| Lifecycle state filter options | `health.lifecycle_states[]` | `src/app/exceptions/page.tsx` |
+| Intent filter options | `health.allowed_intents[]` | `src/app/exceptions/CaseListPane.tsx` (V5.1.1) |
+| Lifecycle state filter options | `health.lifecycle_states[]` | `src/app/exceptions/ExceptionListPane.tsx` (legacy detail-route consumer) |
+| Case status filter options | `health.allowed_case_statuses[]` (Phase 28.5.x §D1) | `src/app/exceptions/CaseListPane.tsx`; cluster grouping + STATUS_LABEL consolidated in `src/lib/cases.ts` |
+| Case source filter options | `health.allowed_case_sources[]` (Phase 28.5.x §D1) | `src/app/exceptions/CaseListPane.tsx` + `src/app/inbox/page.tsx` |
 | Badge variant mapping | Default fallback for unknown values | `src/components/ui/Badge.tsx` |
 
 **Test:** Adding a new intent or lifecycle state in `asoe2` requires **zero** UI code changes.
 
-**How to verify:** Check `src/hooks/useHealth.ts`, filter dropdowns in `src/app/exceptions/page.tsx`, `Badge.tsx` default cases.
+**How to verify:** Check `src/hooks/useHealth.ts`, the consolidated `src/lib/cases.ts` (the single STATUS_LABEL + cluster grouping + `isAwaitingHuman` helper that retired four duplicate maps + two hardcoded `OPEN_AWAITING_HUMAN` comparisons during Phase 28.5.x §D1), `Badge.tsx` default cases.
 
 **CI enforcement (Phase 10):** ESLint custom rule `no-hardcoded-enums` flags string literals matching known intent or lifecycle patterns in `.tsx` files.
 
