@@ -15,6 +15,8 @@
     "verify-types": "openapi-typescript ../asoe2/openapi/asoe2.openapi.json -o /tmp/asoe-ui.generated.ts && diff -q src/types/generated.ts /tmp/asoe-ui.generated.ts",
     "sync:reason-tags": "node scripts/sync-reason-tag-snapshot.mjs",
     "verify:reason-tags": "node scripts/sync-reason-tag-snapshot.mjs && git diff --exit-code -- tests/contract/snapshots/curated_reason_tags.json src/lib/__generated__/curated_reason_tags.ts",
+    "sync:ui-routes": "node scripts/extract-ui-routes.mjs",
+    "verify:ui-routes": "node scripts/extract-ui-routes.mjs && git diff --exit-code -- tests/contract/snapshots/ui_route_surface.json",
     "test:browser": "playwright test",
     "test:browser:ui": "playwright test --ui",
     "test:browser:headed": "playwright test --headed"
