@@ -16,6 +16,7 @@ import { render, screen } from "@testing-library/react";
 
 import { CaseDetailPanel } from "@/app/cases/CaseDetailPanel";
 import type { OrderCase } from "@/types/cases";
+import type { ExceptionDetail } from "@/types/exceptions";
 
 
 function mockCase(over: Partial<OrderCase> = {}): OrderCase {
@@ -87,5 +88,68 @@ describe("CaseDetailPanel — Compliance hits section", () => {
     expect(
       screen.getByText("CUSTOMER_OPT_OUT_VIOLATION"),
     ).toBeInTheDocument();
+  });
+});
+
+
+describe("CaseDetailPanel — Attached records stack (Phase 28.5.x)", () => {
+  function mockRecord(over: Partial<{ id: string; order_id: string; intent: string }> = {}): ExceptionDetail {
+    return {
+      id: over.id ?? "exc-A",
+      tenant_id: "acme-corp",
+      order_id: over.order_id ?? "PO-A",
+      event_type: "EDI_850_PRICE_MISMATCH",
+      intent: over.intent ?? "CONTRACTUAL_CORRECTION",
+      lifecycle_state: "PENDING_REVIEW",
+      shadow_verdict: "GREEN",
+      selected_recipe: "PriceAdjustmentRecipe",
+      resolution_data: {},
+      reanalysis_history: [],
+      created_at: "2026-05-10T08:00:00Z",
+      updated_at: "2026-05-10T08:00:00Z",
+    };
+  }
+
+  it("hides the section when no attached records are passed", () => {
+    render(<CaseDetailPanel orderCase={mockCase()} />);
+    expect(
+      screen.queryByRole("region", { name: /attached records/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the section when attached records is empty", () => {
+    render(<CaseDetailPanel orderCase={mockCase()} attachedRecords={[]} />);
+    expect(
+      screen.queryByRole("region", { name: /attached records/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders one row per record with a deep-link to /exceptions/{id}", () => {
+    render(
+      <CaseDetailPanel
+        orderCase={mockCase()}
+        attachedRecords={[
+          mockRecord({ id: "exc-A", order_id: "PO-A" }),
+          {
+            ...mockRecord({
+              id: "exc-B", order_id: "PO-B", intent: "DUPLICATE_PO",
+            }),
+            lifecycle_state: "RESOLVED",
+          },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByRole("region", { name: /attached records/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("PO-A")).toBeInTheDocument();
+    expect(screen.getByText("PO-B")).toBeInTheDocument();
+    expect(screen.getByText("CONTRACTUAL_CORRECTION")).toBeInTheDocument();
+    expect(screen.getByText("DUPLICATE_PO")).toBeInTheDocument();
+    // Both rows are Links to the per-event detail surface.
+    const linkA = screen.getByRole("link", { name: /open exception po-a/i });
+    expect(linkA).toHaveAttribute("href", "/exceptions/exc-A");
+    const linkB = screen.getByRole("link", { name: /open exception po-b/i });
+    expect(linkB).toHaveAttribute("href", "/exceptions/exc-B");
   });
 });

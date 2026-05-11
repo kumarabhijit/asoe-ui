@@ -21,6 +21,7 @@ import { NavBar } from "@/components/ui/NavBar";
 import { useAuth } from "@/hooks/useAuth";
 import { casesApi } from "@/lib/api";
 import type { OrderCase } from "@/types/cases";
+import type { ExceptionDetailResponse } from "@/types/api";
 
 import { CaseDetailPanel } from "../CaseDetailPanel";
 
@@ -40,6 +41,12 @@ export default function CaseDetailPage() {
   const [orderCase, setOrderCase] = useState<OrderCase | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  // Phase 28.5.x §28.5 — attached records load on mount alongside
+  // the case header so the "Attached records" placeholder section
+  // can render concrete data (and so `aggregated_policy_hits`
+  // populates the L1/L2 PolicyHitBadge surface).
+  const [records, setRecords] = useState<ExceptionDetailResponse[]>([]);
+  const [policyHits, setPolicyHits] = useState<string[]>([]);
 
   const userName = user?.name || "User";
   const userInitials =
@@ -52,12 +59,29 @@ export default function CaseDetailPage() {
     let cancelled = false;
     setLoading(true);
     setNotFound(false);
-    casesApi
-      .get(caseId)
-      .then((c) => {
+    // Two parallel fetches — case header + attached-record stack.
+    // We Promise.all so the UI flips out of `loading` only when both
+    // settle, which avoids a flicker where the header renders without
+    // the policy-hits section.
+    Promise.all([
+      casesApi.get(caseId),
+      casesApi
+        .getRecords(caseId)
+        .catch(() => ({
+          items: [] as ExceptionDetailResponse[],
+          total: 0,
+          aggregated_policy_hits: [] as string[],
+        })),
+    ])
+      .then(([c, r]) => {
         if (cancelled) return;
-        if (c) setOrderCase(c);
-        else setNotFound(true);
+        if (c) {
+          setOrderCase(c);
+          setRecords(r.items);
+          setPolicyHits(r.aggregated_policy_hits);
+        } else {
+          setNotFound(true);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -105,7 +129,13 @@ export default function CaseDetailPage() {
           </div>
         )}
 
-        {!loading && orderCase && <CaseDetailPanel orderCase={orderCase} />}
+        {!loading && orderCase && (
+          <CaseDetailPanel
+            orderCase={orderCase}
+            attachedRecords={records}
+            policyHits={policyHits}
+          />
+        )}
       </main>
     </div>
   );
