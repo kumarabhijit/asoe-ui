@@ -14,12 +14,22 @@ export type WSEventType =
   | "exception_update"
   | "task_complete"
   | "error"
-  | "reanalysis_started";
+  | "reanalysis_started"
+  // ADR-038 §H.6 / Phase 28.5 — case-level events. `useCases` invalidates
+  // the case list on these. Carry `case_id` rather than `exception_id`.
+  | "case_open"
+  | "case_update"
+  | "case_close";
 
 export interface WSEvent {
   type: WSEventType;
   trace_id: string;
-  exception_id: string;
+  /** Set on per-event subjects (pipeline_progress, exception_update,
+   *  task_complete, error, reanalysis_started). Null on case_* events. */
+  exception_id: string | null;
+  /** Set on case-level events (case_open, case_update, case_close).
+   *  Null on per-event subjects. */
+  case_id: string | null;
   tenant_id: string;
   timestamp: string;
   payload:
@@ -27,7 +37,10 @@ export interface WSEvent {
     | ExceptionUpdatePayload
     | TaskCompletePayload
     | WSErrorPayload
-    | ReanalysisStartedPayload;
+    | ReanalysisStartedPayload
+    | CaseOpenedPayload
+    | CaseUpdatedPayload
+    | CaseClosedPayload;
 }
 
 /* ── Payload types ─────────────────────────────────────────────────── */
@@ -73,6 +86,28 @@ export interface ReanalysisStartedPayload {
   prior_trace_id?: string;
   prior_shadow_verdict?: string;
   prior_final_status?: string;
+}
+
+/* ── Case-level events (ADR-038 §H.6 / Phase 28.5) ─────────────────── */
+
+export interface CaseOpenedPayload {
+  source: string;
+  source_channel: string;
+  status: string;
+  sla_deadline?: string;
+  customer_po_number?: string;
+  sales_order_id?: string;
+}
+
+export interface CaseUpdatedPayload {
+  status: string;
+  updated_fields: string[];
+  sla_deadline?: string;
+}
+
+export interface CaseClosedPayload {
+  status: string;
+  closed_at: string;
 }
 
 /* ── Auth message (first message after connect) ────────────────────── */

@@ -48,53 +48,40 @@ describe("ExceptionDetailPanel: unauthorized-fetch surfacing", () => {
   });
 });
 
-describe("ExceptionQueuePage: WS reconnect refreshes both list and detail", () => {
+// V5.1 (Phase 28.5) — `/exceptions` is a case-projected list view of
+// `casesApi.list()`. The previous architectural locks pinned the
+// exceptionsApi-driven master-detail (cursor pagination, silent
+// `exception_update` refresh, `handleWsReconnect`). Those are gone;
+// the new locks assert the case-list shape.
+
+describe("ExceptionQueuePage (V5.1): case-projected data source", () => {
   const PAGE_PATH = path.resolve(
     __dirname,
     "../../src/app/exceptions/page.tsx",
   );
 
-  it("passes onReconnect to useWebSocket", () => {
+  it("fetches via useCases (not exceptionsApi.list)", () => {
     const src = readFileSync(PAGE_PATH, "utf-8");
-    expect(src).toMatch(/onReconnect:\s*handleWsReconnect/);
+    expect(src).toMatch(/useCases\b/);
+    expect(src).not.toMatch(/exceptionsApi\.list\(/);
   });
 
-  it("handleWsReconnect refreshes both list (silent) and detail", () => {
+  it("does not call useCases with a source filter (all sources)", () => {
     const src = readFileSync(PAGE_PATH, "utf-8");
-    const reconnectFnMatch = src.match(
-      /const handleWsReconnect = useCallback[\s\S]*?\}, \[fetchData\]\)/,
-    );
-    expect(reconnectFnMatch, "handleWsReconnect block not found").toBeTruthy();
-    expect(reconnectFnMatch![0]).toMatch(/fetchData\(\{\s*silent:\s*true\s*\}\)/);
-    expect(reconnectFnMatch![0]).toMatch(/detailRefreshRef\.current\?\.\(\)/);
-  });
-});
-
-describe("ExceptionQueuePage: list pagination follows cursor", () => {
-  const PAGE_PATH = path.resolve(
-    __dirname,
-    "../../src/app/exceptions/page.tsx",
-  );
-
-  it("loops on cursor until has_more=false", () => {
-    const src = readFileSync(PAGE_PATH, "utf-8");
-    // The cursor-loop pattern: do ... while(cursor) with has_more guarding
-    // the next-cursor assignment.
-    expect(src).toMatch(/do\s*\{[\s\S]*has_more[\s\S]*\}\s*while\s*\(cursor\)/);
+    // /exceptions is the no-filter view; the manual_order subset
+    // lives on /inbox.
+    expect(src).toMatch(/useCases\(\s*\)/);
   });
 
-  it("WS event handlers use silent refresh, not the loading-flicker path", () => {
+  it("subscribes to case_* events via isCaseInvalidationEvent + refetch", () => {
     const src = readFileSync(PAGE_PATH, "utf-8");
-    // exception_update + task_complete paths must pass silent: true.
-    const exceptionUpdateBlock = src.match(
-      /event\.type === "exception_update"[\s\S]*?(?=\}\s*else if)/,
-    );
-    expect(exceptionUpdateBlock, "exception_update branch not found").toBeTruthy();
-    expect(exceptionUpdateBlock![0]).toMatch(/silent:\s*true/);
-    const taskCompleteBlock = src.match(
-      /event\.type === "task_complete"[\s\S]*?(?=\}\s*else if)/,
-    );
-    expect(taskCompleteBlock, "task_complete branch not found").toBeTruthy();
-    expect(taskCompleteBlock![0]).toMatch(/silent:\s*true/);
+    expect(src).toMatch(/isCaseInvalidationEvent/);
+    expect(src).toMatch(/refetch\(\)/);
+  });
+
+  it("wires onReconnect and onPollFallback to refetch (silent live refresh)", () => {
+    const src = readFileSync(PAGE_PATH, "utf-8");
+    expect(src).toMatch(/onReconnect:\s*refetch/);
+    expect(src).toMatch(/onPollFallback:\s*refetch/);
   });
 });

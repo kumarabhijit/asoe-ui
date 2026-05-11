@@ -1,142 +1,96 @@
 /**
- * Customer Inbox — AI-powered email triage and classification.
+ * Customer Inbox — manual_order case-projected list view.
  *
- * Rich two-pane layout: 380px inbox queue + detail panel.
- * Refactored to use shared component library while preserving
- * the original visual design.
+ * Phase 28.5 (Frontend Platform V5.1, per ADR-038 §H.6) — `/inbox`
+ * is now a filtered case-list view of `/cases`. The legacy `INBOX`
+ * mock has been retired; rows project from `useManualOrderCases()`
+ * (`casesApi.list({ source: "manual_order" })`). Row click selects
+ * locally on `case_.case_id` (master-detail in place); the
+ * right-pane "Open case" jump button is the only path off this
+ * surface and routes to `/cases/{case_id}` — the canonical
+ * detail surface.
+ *
+ * V5.1 supersedes the ADR-034 §6.1 inbox-row → /exceptions/{id}
+ * jump pattern. The CSR's "exit point off the inbox" is now the
+ * canonical case detail, not a per-event exception detail.
+ *
+ * Architecturally:
+ *   * Pure list projector (CLAUDE.md Guardrail #6) — every field
+ *     comes from OrderCase as the backend hands it. No client-side
+ *     composition with event metadata.
+ *   * No per-intent dispatch (Guardrail #1) — a manual-order case
+ *     is a manual-order case regardless of which intent its child
+ *     exceptions carry.
+ *   * Status / source labels use default-fallback maps, mirroring
+ *     `/cases` (Guardrail #1).
+ *   * WS-driven invalidation: `case_*` events trigger a silent
+ *     refetch via `useCases().refetch()`.
  */
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
-  Mail, ChevronRight, Search, Zap, CheckCircle2,
-  Clock, FileText, AlertTriangle, RefreshCw, LayoutList,
-  ExternalLink,
+  Mail,
+  ChevronRight,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  RefreshCw,
+  PackageCheck,
+  Inbox as InboxIcon,
 } from "lucide-react";
+
 import { NavBar } from "@/components/ui/NavBar";
 import { CaseViewBanner } from "@/components/ui/CaseViewBanner";
-import { useManualOrderCases } from "@/hooks/useManualOrderCases";
 import { MetricTile } from "@/components/ui/MetricTile";
-import { Badge, categoryVariant, inboxStatusVariant } from "@/components/ui/Badge";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import {
+  useManualOrderCases,
+  isCaseInvalidationEvent,
+} from "@/hooks/useManualOrderCases";
+import type { CaseSource, OrderCase, SlaBand } from "@/types/cases";
+import type { WSEvent } from "@/types/websocket";
 import { cn } from "@/lib/utils";
 
-/* ── Display label maps (visual mapping with default fallback) ────── */
-const CATEGORY_LABELS: Record<string, string> = {
-  ORDER_CHANGE: "Order Change",
-  SHIPMENT_INQUIRY: "Shipment Inquiry",
-  NEW_ORDER: "New Order",
-  COMPLAINT: "Complaint",
-  INVOICE_QUERY: "Invoice Query",
+import { slaSnapshot } from "@/app/cases/page";
+
+/* ── Visual mappings (Guardrail #1: default-fallback maps) ────────── */
+
+const SOURCE_LABEL: Record<CaseSource | "default", string> = {
+  manual_order: "Manual",
+  automated_order: "Automated",
+  default: "Unknown source",
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  NEEDS_APPROVAL: "Needs Approval",
-  IN_QUEUE: "In Queue",
-  AUTO_RESOLVED: "Auto-Resolved",
-  ESCALATED: "Escalated",
-  ANALYZING: "Agent Analyzing",
+const SOURCE_ICON: Record<CaseSource | "default", React.ReactNode> = {
+  manual_order: <Mail size={12} aria-hidden />,
+  automated_order: <PackageCheck size={12} aria-hidden />,
+  default: <Clock size={12} aria-hidden />,
 };
 
-/* ── Data ─────────────────────────────────────────────────────────── */
-interface InboxItem {
-  id: string;
-  /** ADR-034 Phase G (PO supersession 2026-05-10) — when this inbox
-   *  item produced an Exception Queue record (NEW_ORDER →
-   *  MANUAL_ORDER_INTAKE exception), `exception_id` is set. The row
-   *  click NO LONGER navigates straight to /exceptions/{id};
-   *  every inbox row selects locally for a consistent master-detail
-   *  UX. The right-pane detail surfaces an "Open in Exception Queue"
-   *  jump button when this field is present, so the operator chooses
-   *  when to leave the inbox surface. Absent on categories that
-   *  don't become exceptions (SHIPMENT_INQUIRY, INVOICE_QUERY,
-   *  COMPLAINT). */
-  exception_id?: string;
-  sender: string;
-  initials: string;
-  initialsColor: string;
-  subject: string;
-  preview: string;
-  time: string;
-  category: string;
-  status: string;
-  amount?: string;
-  lineCount?: number;
-  agentConfidence?: number;
-  agentSummary?: string;
-  agentRecommendation?: string;
-  email?: { from: string; org: string; mailbox: string; received: string; body: string };
-}
+const STATUS_LABEL: Record<string, string> = {
+  OPEN_AGENT_PROCESSING: "Agent processing",
+  OPEN_AWAITING_HUMAN: "Awaiting review",
+  OPEN_AWAITING_BUYER: "Awaiting buyer",
+  OPEN_AWAITING_ERP: "Awaiting ERP",
+  RESOLVED: "Resolved",
+  FAILED: "Failed",
+  BLOCKED: "Blocked",
+};
 
-const INBOX: InboxItem[] = [
-  {
-    id: "1", sender: "John Smith", initials: "JS", initialsColor: "#3B82F6",
-    subject: "Change request — SO 4500023421",
-    preview: "Hi, I need to change order 4500023421 — re...",
-    time: "09:14 AM", category: "ORDER_CHANGE", status: "NEEDS_APPROVAL",
-    amount: "$45,200", lineCount: 2, agentConfidence: 94,
-    agentSummary: "Qty reduction on item 000010 (500→300) and delivery date push to Mar 15. No pricing impact. Within approval threshold.",
-    agentRecommendation: "Approve — L3 authority required",
-    email: {
-      from: "jsmith@acmecorp.com", org: "Acme Corp", mailbox: "orders@stratumlabs.ai",
-      received: "09:14 AM",
-      body: "Hi team,\n\nI need to make a change to order 4500023421.\n\n1. Reduce quantity on item 000010 from 500 to 300 units\n2. Push delivery date to March 15, 2025\n\nAlso, is item 000020 on back order?\n\nThanks,\nJohn Smith\nProcurement Manager",
-    },
-  },
-  {
-    id: "2", sender: "Lisa Park", initials: "LP", initialsColor: "#7C3AED",
-    subject: "Where is my shipment? SO 4500019882",
-    preview: "We placed order 4500019882 two weeks ag...",
-    time: "08:47 AM", category: "SHIPMENT_INQUIRY", status: "AUTO_RESOLVED",
-    agentConfidence: 98,
-    agentSummary: "Tracking confirmed: shipped via FedEx #7742881. ETA 2 business days. Auto-response sent.",
-    agentRecommendation: "No action needed — auto-resolved",
-  },
-  {
-    id: "3", sender: "Jennifer Walsh", initials: "JW", initialsColor: "#0D9488",
-    subject: "PO# 0093847612 — Beverages Dept 005...",
-    preview: "Vendor 0076421. Dept 0058 Beverages. 3 li...",
-    time: "08:52 AM", category: "NEW_ORDER", status: "IN_QUEUE",
-    lineCount: 3, agentConfidence: 87,
-    agentSummary: "New PO with 3 line items for Beverages dept. Vendor 0076421 active. Credit check passed.",
-    agentRecommendation: "Route to order entry queue",
-  },
-  {
-    // ADR-034 Phase G — wired to exc-026 (the MANUAL_ORDER_INTAKE
-    // STANDARD_REVIEW demo record) so clicking this inbox row jumps
-    // to the unified detail surface on the Exception Queue.
-    id: "4", exception_id: "exc-026",
-    sender: "Marcus Reed", initials: "MR", initialsColor: "#E11D48",
-    subject: "Kroger PO KRO-2025-03-44821 — Bever...",
-    preview: "Division 05 Southeast. 5 lines, 2,150 CS tota...",
-    time: "07:31 AM", category: "NEW_ORDER", status: "IN_QUEUE",
-    lineCount: 5, amount: "$18,400", agentConfidence: 91,
-    agentSummary: "Kroger PO, Div 05 Southeast. 5 lines, 2,150 CS. Price validation passed. ATP check pending.",
-    agentRecommendation: "Route to order entry — ATP check needed",
-  },
-  {
-    id: "5", sender: "Margaret Chen", initials: "MC", initialsColor: "#DC2626",
-    subject: "URGENT: Critical delivery failure — escal...",
-    preview: "This is the third time our order has been del...",
-    time: "07:55 AM", category: "COMPLAINT", status: "ESCALATED",
-    agentConfidence: 96,
-    agentSummary: "Third delivery failure for this customer. Pattern detected: carrier issue on Southeast route. High churn risk.",
-    agentRecommendation: "Escalate to CS manager — high churn risk",
-  },
-  {
-    id: "6", sender: "David Okafor", initials: "DO", initialsColor: "#D97706",
-    subject: "Invoice question — INV-20240892",
-    preview: "We received invoice INV-20240892 for $8,4...",
-    time: "Yesterday", category: "INVOICE_QUERY", status: "AUTO_RESOLVED",
-    amount: "$8,400", agentConfidence: 99,
-    agentSummary: "Invoice matches PO and delivery. No discrepancy. Auto-response with breakdown sent.",
-    agentRecommendation: "No action needed — auto-resolved",
-  },
-];
+const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutral"> = {
+  breached: "error",
+  at_risk: "warning",
+  today: "warning",
+  comfortable: "success",
+  none: "neutral",
+};
 
 const NAV_TABS = [
   { id: "inbox", label: "Customer Inbox", href: "/inbox" },
@@ -146,13 +100,8 @@ const NAV_TABS = [
   { id: "settings", label: "Settings", href: "/settings" },
 ];
 
-/* ── Main Page ──────────────────────────────────────────────────────
- *
- * `useSearchParams` (read by InboxPageInner for the ADR-034 Phase G
- * back-link round-trip) requires a Suspense boundary during static
- * prerendering on Next.js App Router. The default export wraps the
- * inner component so the page stays statically optimisable for the
- * no-query-param visit while the search-param read is gated. */
+/* ── Page ─────────────────────────────────────────────────────────── */
+
 export default function InboxPage() {
   return (
     <Suspense fallback={null}>
@@ -163,41 +112,85 @@ export default function InboxPage() {
 
 function InboxPageInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { health } = useHealth();
-  const { user, visibleTabs } = useAuth();
-  // ADR-034 Phase G — back-link from the Exception Queue detail page
-  // arrives with `?msg=<inbox-item-id>` so the inbox preselects the
-  // row that produced the exception. Falls back to the first item
-  // when no query param is present (or the id doesn't resolve).
-  const initialId =
-    searchParams.get("msg") &&
-    INBOX.some((i) => i.id === searchParams.get("msg"))
-      ? (searchParams.get("msg") as string)
-      : "1";
-  const [selectedId, setSelectedId] = useState(initialId);
-  const [activeTab, setActiveTab] = useState("inbox");
-  const [detailTab, setDetailTab] = useState("email");
-  // ADR-038 §H.6 — surface the manual-order-case count alongside
-  // the legacy INBOX metrics. Full data-hook swap (cases-projected
-  // rows) is V5.1; this hook is the scaffolding callers use to
-  // pre-fetch the case data.
-  const { total: manualCaseCount } = useManualOrderCases();
+  const { user, accessToken, visibleTabs } = useAuth();
+  const {
+    cases,
+    total,
+    loading,
+    error,
+    refetch,
+  } = useManualOrderCases();
 
   const userName = user?.name || "User";
-  const userInitials = (user as { avatar_initials?: string })?.avatar_initials || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const userInitials =
+    (user as { avatar_initials?: string })?.avatar_initials
+    || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
   const userTitle = (user as { title?: string })?.title || "";
-  const filteredTabs = visibleTabs.length > 0 ? NAV_TABS.filter((t) => visibleTabs.includes(t.id)) : NAV_TABS;
+  const filteredTabs = visibleTabs.length > 0
+    ? NAV_TABS.filter((t) => visibleTabs.includes(t.id))
+    : NAV_TABS;
 
-  useEffect(() => { document.title = "Customer Inbox — ASOE"; }, []);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const selected = INBOX.find((i) => i.id === selectedId) || INBOX[0];
-  const needsAttention = INBOX.filter((i) => i.status === "NEEDS_APPROVAL" || i.status === "ESCALATED").length;
-  const autoResolved = INBOX.filter((i) => i.status === "AUTO_RESOLVED").length;
+  useEffect(() => {
+    document.title = "Customer Inbox — ASOE";
+  }, []);
+
+  // Auto-select first case on initial load. Re-runs when the list
+  // refreshes; we keep the selection if the previously-selected case
+  // is still present, otherwise fall through to the first.
+  useEffect(() => {
+    if (cases.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    setSelectedId((cur) => {
+      if (cur && cases.some((c) => c.case_id === cur)) return cur;
+      return cases[0].case_id;
+    });
+  }, [cases]);
+
+  // WS-driven invalidation: refetch on every case_* event so the
+  // inbox stays live without a page refresh. Per
+  // `useManualOrderCases` contract — the hook itself doesn't
+  // subscribe; the page composes its own useWebSocket and routes
+  // case_* events through `refetch`.
+  const handleWsEvent = useCallback((event: WSEvent) => {
+    if (isCaseInvalidationEvent(event)) {
+      refetch();
+    }
+  }, [refetch]);
+
+  useWebSocket({
+    token: accessToken,
+    enabled: !!user && !!accessToken,
+    onEvent: handleWsEvent,
+    onReconnect: refetch,
+    onPollFallback: refetch,
+  });
+
+  // SLA-driven sort — most-urgent first, mirrors /cases.
+  const now = new Date();
+  const sorted = [...cases]
+    .map((c) => ({ case_: c, sla: slaSnapshot(c, now) }))
+    .sort((a, b) => {
+      const aMs = a.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
+      const bMs = b.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
+      return aMs - bMs;
+    });
+
+  const selected = sorted.find((s) => s.case_.case_id === selectedId);
+  const needsReview = cases.filter(
+    (c) => c.status === "OPEN_AWAITING_HUMAN",
+  ).length;
+  const awaitingBuyer = cases.filter(
+    (c) => c.status === "OPEN_AWAITING_BUYER",
+  ).length;
+  const resolved = cases.filter((c) => c.status === "RESOLVED").length;
 
   return (
     <div className="min-h-screen bg-surface-page font-sans text-body text-text-primary leading-normal">
-      {/* ── NAV BAR (shared component) ── */}
       <NavBar
         tabs={filteredTabs}
         activeTab="inbox"
@@ -210,11 +203,8 @@ function InboxPageInner() {
         userTitle={userTitle}
         agentCount={health?.allowed_intents?.length || 0}
         onSignOut={() => signOut({ callbackUrl: "/login" })}
-
       />
 
-      {/* ADR-038 §H.6 — banner makes the case-view relationship
-          explicit while the deeper data-hook swap is in flight. */}
       <CaseViewBanner
         scopeLabel="Manual Order Inbox"
         casesHref="/cases?source=manual_order"
@@ -223,11 +213,15 @@ function InboxPageInner() {
       {/* ── PAGE HEADER ── */}
       <div className="bg-surface-primary border-b border-border shadow-xs">
         <div className="max-w-[1440px] mx-auto px-32">
-          {/* Breadcrumb */}
           <nav aria-label="Breadcrumb" className="py-8">
             <span className="text-caption text-text-tertiary">Home</span>
-            <ChevronRight size={10} className="mx-4 text-text-tertiary align-middle inline" />
-            <span className="text-caption text-text-secondary">Customer Inbox</span>
+            <ChevronRight
+              size={10}
+              className="mx-4 text-text-tertiary align-middle inline"
+            />
+            <span className="text-caption text-text-secondary">
+              Customer Inbox
+            </span>
           </nav>
           <div className="flex items-center justify-between py-8 pb-16">
             <div className="flex items-center gap-12">
@@ -239,18 +233,14 @@ function InboxPageInner() {
                   Customer Inbox
                 </h1>
                 <span className="text-caption text-text-tertiary">
-                  AI-powered email triage and classification
+                  Manual-order cases — email, phone, fax intake
                 </span>
               </div>
             </div>
             <div className="flex gap-8">
-              <Button variant="neutral" size="md">
+              <Button variant="neutral" size="md" onClick={refetch}>
                 <RefreshCw size={14} />
                 Refresh
-              </Button>
-              <Button variant="brand" size="md">
-                <Zap size={14} />
-                Process All
               </Button>
             </div>
           </div>
@@ -258,123 +248,118 @@ function InboxPageInner() {
       </div>
 
       <div id="main-content" />
+
       {/* ── METRICS STRIP ── */}
       <div className="max-w-[1440px] mx-auto px-32 py-16">
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-16">
-          <MetricTile icon={<Mail size={20} />} label="Total Inbound" value={String(INBOX.length)} subtitle="Last 24 hours" tint="var(--color-cat-blue)" />
-          <MetricTile icon={<LayoutList size={20} />} label="Manual Cases" value={String(manualCaseCount)} subtitle="Open in /cases" tint="var(--color-brand)" />
-          <MetricTile icon={<AlertTriangle size={20} />} label="Need Attention" value={String(needsAttention)} subtitle="Approval or escalation" tint="var(--color-warning)" />
-          <MetricTile icon={<CheckCircle2 size={20} />} label="Auto-Resolved" value={String(autoResolved)} subtitle="No human action needed" tint="var(--color-success)" />
-          <MetricTile icon={<Zap size={20} />} label="Avg Response" value="< 2m" subtitle="Agent classification time" tint="var(--color-cat-teal)" />
+          <MetricTile
+            icon={<InboxIcon size={20} />}
+            label="Total cases"
+            value={String(total)}
+            subtitle="Manual-order intake"
+            tint="var(--color-cat-blue)"
+          />
+          <MetricTile
+            icon={<AlertTriangle size={20} />}
+            label="Awaiting review"
+            value={String(needsReview)}
+            subtitle="Open · operator action needed"
+            tint="var(--color-warning)"
+          />
+          <MetricTile
+            icon={<Clock size={20} />}
+            label="Awaiting buyer"
+            value={String(awaitingBuyer)}
+            subtitle="Outbound clarification"
+            tint="var(--color-cat-teal)"
+          />
+          <MetricTile
+            icon={<CheckCircle2 size={20} />}
+            label="Resolved"
+            value={String(resolved)}
+            subtitle="Closed in this window"
+            tint="var(--color-success)"
+          />
         </div>
       </div>
 
-      {/* ── TAB BAR ── */}
-      <div className="max-w-[1440px] mx-auto px-32">
-        <div className="border-b border-border flex">
-          {[
-            { id: "inbox", label: "Inbox", count: INBOX.length },
-            { id: "ai-flow", label: "AI Intake Flow", count: undefined },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "px-16 py-10 border-none bg-transparent cursor-pointer font-sans text-body -mb-px flex items-center gap-6 transition-all duration-fast",
-                activeTab === tab.id
-                  ? "font-bold text-text-primary border-b-2 border-brand"
-                  : "font-semibold text-text-tertiary border-b-2 border-transparent",
-              )}
-            >
-              {tab.label}
-              {tab.count != null && (
-                <span className="text-caption font-semibold text-text-tertiary bg-surface-secondary px-1.5 py-px rounded-full">
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── CONTENT: QUEUE + DETAIL PANEL ── */}
+      {/* ── CONTENT: QUEUE + DETAIL ── */}
       <div className="max-w-[1440px] mx-auto px-32 py-16 flex gap-16">
-        {/* ── LEFT: Inbox Queue ── */}
+        {/* ── LEFT: case queue ── */}
         <div className="w-[380px] shrink-0 bg-surface-primary rounded-md shadow-sm overflow-hidden">
-          {/* Search */}
           <div className="px-16 py-12 border-b border-border-subtle flex items-center gap-8">
-            <Search size={16} className="text-text-tertiary shrink-0" />
-            <span className="text-body text-text-tertiary">
-              Search inbox...
+            <span className="text-label font-bold tracking-widest text-text-tertiary uppercase">
+              Manual Order Cases
             </span>
             <div className="flex-1" />
-            <span className="text-label font-bold tracking-widest text-text-tertiary uppercase">
-              All Inboxes
+            <span className="text-caption text-text-tertiary">
+              {total}
             </span>
           </div>
 
-          {/* Inbox items */}
+          {loading && (
+            <div role="status" aria-live="polite" className="p-16 text-text-tertiary">
+              Loading cases…
+            </div>
+          )}
+          {!loading && error && (
+            <div role="alert" className="p-16 text-error">
+              {error}
+            </div>
+          )}
+          {!loading && !error && sorted.length === 0 && (
+            <div role="status" className="p-16 text-text-tertiary">
+              No manual-order cases.
+            </div>
+          )}
+
           <div className="max-h-[calc(100vh-370px)] overflow-y-auto">
-            {INBOX.map((item) => {
-              const isSelected = item.id === selectedId;
-              // ADR-034 Phase G (PO supersession 2026-05-10) — every
-              // inbox row selects locally so the right-pane detail
-              // updates in place. Operators see a consistent
-              // master-detail UX regardless of category. For rows
-              // that have an `exception_id`, the right pane renders
-              // an explicit "Open in Exception Queue" jump button —
-              // navigation off the inbox surface is now an explicit
-              // operator action, not a side effect of clicking a row.
-              const handleActivate = () => {
-                setSelectedId(item.id);
-              };
+            {sorted.map(({ case_, sla }) => {
+              const isSelected = case_.case_id === selectedId;
+              const handleActivate = () => setSelectedId(case_.case_id);
+              const orderRef =
+                case_.customer_po_number
+                || case_.sales_order_id
+                || case_.case_id;
               return (
                 <div
-                  key={item.id}
-                  onClick={handleActivate}
+                  key={case_.case_id}
                   role="button"
                   tabIndex={0}
-                  aria-label={`Select email from ${item.sender}: ${item.subject}`}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleActivate(); }}
+                  aria-label={`Select case ${orderRef}`}
+                  onClick={handleActivate}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleActivate();
+                  }}
                   className={cn(
                     "px-16 py-12 cursor-pointer border-b border-border-subtle border-l-[3px] transition-colors duration-fast",
-                    isSelected ? "bg-surface-secondary border-l-brand" : "bg-surface-primary border-l-transparent",
+                    isSelected
+                      ? "bg-surface-secondary border-l-brand"
+                      : "bg-surface-primary border-l-transparent",
                   )}
                 >
-                  <div className="flex gap-10">
-                    {/* Avatar — dynamic color from data, inline style is correct */}
-                    <div
-                      className="w-[36px] h-[36px] rounded-full shrink-0 flex items-center justify-center text-caption font-bold"
-                      style={{ background: `color-mix(in srgb, ${item.initialsColor} 15%, white)`, color: item.initialsColor }}
+                  <div className="flex items-center gap-8 mb-6">
+                    <Badge variant="neutral" size="sm">
+                      {SOURCE_ICON[case_.source as CaseSource]
+                        ?? SOURCE_ICON.default}
+                      <span className="ml-4">
+                        {case_.source_channel}
+                      </span>
+                    </Badge>
+                    <Badge
+                      variant={SLA_BAND_VARIANT[sla.band]}
+                      size="sm"
+                      aria-label={`SLA: ${sla.label}`}
                     >
-                      {item.initials}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-baseline mb-px">
-                        <span className="font-semibold text-body text-text-primary">{item.sender}</span>
-                        <span className="text-caption text-text-tertiary font-mono shrink-0">{item.time}</span>
-                      </div>
-                      <div className="text-body font-medium text-text-primary whitespace-nowrap overflow-hidden text-ellipsis mb-4">
-                        {item.subject}
-                      </div>
-                      <div className="text-caption text-text-tertiary whitespace-nowrap overflow-hidden text-ellipsis mb-8">
-                        {item.preview}
-                      </div>
-                      <div className="flex gap-4 flex-wrap items-center">
-                        <Badge variant={categoryVariant(item.category)} size="sm" icon={null}>
-                          {CATEGORY_LABELS[item.category] ?? item.category}
-                        </Badge>
-                        <Badge variant={inboxStatusVariant(item.status)} size="sm">
-                          {STATUS_LABELS[item.status] ?? item.status}
-                        </Badge>
-                        {item.lineCount && (
-                          <span className="text-label text-text-tertiary flex items-center gap-[3px]">
-                            <FileText size={10} />
-                            {item.lineCount}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                      <Clock size={10} aria-hidden className="mr-4" />
+                      {sla.label}
+                    </Badge>
+                  </div>
+                  <div className="font-mono text-body font-medium text-text-primary mb-2">
+                    {orderRef}
+                  </div>
+                  <div className="text-caption text-text-tertiary">
+                    {STATUS_LABEL[case_.status] ?? case_.status}
                   </div>
                 </div>
               );
@@ -382,174 +367,104 @@ function InboxPageInner() {
           </div>
         </div>
 
-        {/* ── RIGHT: Detail Panel ── */}
+        {/* ── RIGHT: case detail summary ── */}
         <div className="flex-1 flex flex-col gap-16">
-          {/* Email Header Card */}
-          <div className="bg-surface-primary rounded-md shadow-sm p-20">
-            <div className="flex gap-12 mb-16">
-              <div
-                className="w-[44px] h-[44px] rounded-full shrink-0 flex items-center justify-center text-subhead font-bold"
-                style={{ background: `color-mix(in srgb, ${selected.initialsColor} 15%, white)`, color: selected.initialsColor }}
-              >
-                {selected.initials}
-              </div>
-              <div className="flex-1">
-                <h2 className="text-heading font-bold m-0 leading-snug">{selected.subject}</h2>
-                <div className="text-caption text-text-secondary mt-px">
-                  {selected.sender}{" "}
-                  {selected.email && (
-                    <span className="text-text-tertiary">
-                      &lt;{selected.email.from}&gt; · {selected.email.org} · {selected.email.received}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-6 flex-wrap items-center">
-              <Badge variant={categoryVariant(selected.category)} size="sm" icon={null}>
-                {CATEGORY_LABELS[selected.category] ?? selected.category}
-              </Badge>
-              <Badge variant={inboxStatusVariant(selected.status)} size="sm">
-                {STATUS_LABELS[selected.status] ?? selected.status}
-              </Badge>
-              {selected.amount && (
-                <span className="font-mono text-body font-semibold text-text-primary">{selected.amount}</span>
-              )}
-            </div>
-            {selected.email && (
-              <div className="flex gap-32 mt-16 px-16 py-12 bg-surface-secondary rounded-sm">
-                <MetaField label="Source Mailbox">
-                  <span className="flex items-center gap-4">
-                    <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />
-                    {selected.email.mailbox}
-                  </span>
-                </MetaField>
-                <MetaField label="Received">
-                  <span className="font-mono">{selected.email.received}</span>
-                </MetaField>
-                <MetaField label="Attachments">
-                  <span className="text-text-tertiary">None</span>
-                </MetaField>
-              </div>
-            )}
-          </div>
-
-          {/* ── ADR-034 PO supersession (2026-05-10) — Open in
-                Exception Queue jump button. Renders only when the
-                selected inbox item carries an `exception_id`. The
-                row click stays a local master-detail selection
-                (consistent UX across categories); navigation off
-                the inbox surface is now an explicit operator action.
-                `?from=inbox` is whitelisted in
-                src/app/exceptions/[id]/page.tsx::BACK_TARGETS so the
-                detail page renders "Back to Inbox". */}
-          {selected.exception_id && (
-            <div className="bg-surface-primary rounded-md shadow-sm p-16 flex items-center justify-between gap-12">
-              <div className="flex flex-col gap-2">
-                <span className="text-caption font-semibold text-text-primary">
-                  Linked to Exception Queue
-                </span>
-                <span className="text-caption text-text-tertiary font-mono">
-                  {selected.exception_id}
-                </span>
-              </div>
-              <Button
-                variant="brand"
-                size="sm"
-                onClick={() =>
-                  router.push(
-                    `/exceptions/${selected.exception_id}?from=inbox`,
-                  )
-                }
-                aria-label={`Open exception ${selected.exception_id} in Exception Queue`}
-              >
-                <ExternalLink size={12} />
-                Open in Exception Queue
-              </Button>
+          {!selected && !loading && (
+            <div className="bg-surface-primary rounded-md shadow-sm p-32 text-text-tertiary text-center">
+              Select a case to view its summary.
             </div>
           )}
 
-          {/* ── AGENT REASONING CARD (Layer 1 — always visible) ── */}
-          <div className="bg-surface-primary rounded-md shadow-md p-20">
-            <div className="flex items-center gap-8 mb-12">
-              <div className="w-[28px] h-[28px] rounded-sm bg-surface-secondary flex items-center justify-center">
-                <Zap size={14} className="text-text-secondary" />
-              </div>
-              <span className="font-semibold text-subhead text-text-primary">Agent Recommendation</span>
-              <div className="flex-1" />
-              {selected.agentConfidence && (
-                <div className="flex items-center gap-8">
-                  <div className="w-[80px] h-[4px] rounded-full bg-surface-secondary overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-text-secondary"
-                      style={{ width: `${selected.agentConfidence}%` }}
-                    />
-                  </div>
-                  <span className="font-mono text-caption font-semibold text-text-primary">
-                    {selected.agentConfidence}%
+          {selected && (
+            <>
+              <div className="bg-surface-primary rounded-md shadow-sm p-20">
+                <div className="flex items-center gap-8 mb-12">
+                  <Badge variant="neutral" size="sm">
+                    {SOURCE_ICON[selected.case_.source as CaseSource]
+                      ?? SOURCE_ICON.default}
+                    <span className="ml-4">
+                      {SOURCE_LABEL[selected.case_.source as CaseSource]
+                        ?? SOURCE_LABEL.default}
+                    </span>
+                  </Badge>
+                  <Badge variant="neutral" size="sm">
+                    {selected.case_.source_channel}
+                  </Badge>
+                  <span className="ml-auto text-caption text-text-tertiary uppercase tracking-wider">
+                    {STATUS_LABEL[selected.case_.status]
+                      ?? selected.case_.status}
                   </span>
                 </div>
-              )}
-            </div>
-            <p className="text-body text-text-secondary leading-relaxed m-0 mb-12">
-              {selected.agentSummary}
-            </p>
-            <div className="flex gap-8 items-center">
-              <div className="px-10 py-4 rounded-sm bg-surface-secondary text-caption font-semibold text-text-secondary">
-                {selected.agentRecommendation}
-              </div>
-              <div className="flex-1" />
-              {selected.status === "NEEDS_APPROVAL" && (
-                <>
-                  <Button variant="brand" size="sm">
-                    <CheckCircle2 size={12} />
-                    Approve
-                  </Button>
-                  <Button variant="neutral" size="sm">Override</Button>
-                  <Button variant="ghost" size="sm">Escalate</Button>
-                </>
-              )}
-            </div>
-            {/* Layer 2 trigger */}
-            <button className="mt-12 w-full py-8 border-none bg-transparent cursor-pointer text-caption text-text-tertiary font-sans font-medium border-t border-border-subtle pt-12 flex items-center justify-center gap-4">
-              <ChevronRight size={12} />
-              View Evidence & Reasoning
-            </button>
-          </div>
+                <h2 className="text-heading font-bold m-0 leading-snug mb-12">
+                  Case <code className="font-mono">{selected.case_.case_id}</code>
+                </h2>
 
-          {/* ── DETAIL TABS ── */}
-          <div className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
-            <div className="border-b border-border-subtle flex px-16">
-              {[
-                { id: "email", label: "Email" },
-                { id: "entities", label: "Entities" },
-                { id: "sap-data", label: "SAP Data" },
-                { id: "change-analysis", label: "Change Analysis" },
-                { id: "knowledge-graph", label: "Knowledge Graph" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setDetailTab(tab.id)}
-                  className={cn(
-                    "px-12 py-10 border-none bg-transparent cursor-pointer font-sans text-caption -mb-px",
-                    detailTab === tab.id
-                      ? "font-bold text-text-primary border-b-2 border-brand"
-                      : "font-medium text-text-tertiary border-b-2 border-transparent",
+                <dl className="grid grid-cols-2 gap-x-24 gap-y-12 text-body">
+                  {selected.case_.customer_po_number && (
+                    <Field
+                      label="Customer PO"
+                      value={selected.case_.customer_po_number}
+                      mono
+                    />
                   )}
+                  {selected.case_.sales_order_id && (
+                    <Field
+                      label="Sales order"
+                      value={selected.case_.sales_order_id}
+                      mono
+                    />
+                  )}
+                  {selected.case_.customer_id && (
+                    <Field
+                      label="Customer"
+                      value={selected.case_.customer_id}
+                    />
+                  )}
+                  <Field
+                    label="Opened"
+                    value={selected.case_.opened_at}
+                    mono
+                  />
+                  {selected.sla.deadline && (
+                    <Field
+                      label={`SLA · ${selected.sla.label}`}
+                      value={selected.sla.deadline}
+                      mono
+                    />
+                  )}
+                  {selected.case_.bundle_version_at_open && (
+                    <Field
+                      label="Skill bundle at open"
+                      value={selected.case_.bundle_version_at_open}
+                      mono
+                    />
+                  )}
+                </dl>
+              </div>
+
+              <div className="bg-surface-primary rounded-md shadow-sm p-20 flex items-center justify-between">
+                <div>
+                  <div className="text-label uppercase tracking-wider text-text-quaternary mb-2">
+                    Full case detail
+                  </div>
+                  <p className="text-body text-text-secondary leading-normal m-0">
+                    Open the case to see attached records, agent
+                    reasoning, and resolution actions.
+                  </p>
+                </div>
+                <Button
+                  variant="brand"
+                  size="md"
+                  onClick={() =>
+                    router.push(`/cases/${selected.case_.case_id}`)
+                  }
                 >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            <div className="p-20 text-body text-text-secondary leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto">
-              {detailTab === "email"
-                ? (selected.email?.body || "Email content not available. Agent processed this item automatically.")
-                : `${
-                    { entities: "Entities", "sap-data": "SAP Data", "change-analysis": "Change Analysis", "knowledge-graph": "Knowledge Graph" }[detailTab] ?? detailTab
-                  } — coming soon.`
-              }
-            </div>
-          </div>
+                  Open case
+                  <ChevronRight size={14} />
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -558,15 +473,26 @@ function InboxPageInner() {
 
 /* ── Helper components ────────────────────────────────────────────── */
 
-function MetaField({ label, children }: { label: string; children: React.ReactNode }) {
+interface FieldProps {
+  label: string;
+  value: string;
+  mono?: boolean;
+}
+
+function Field({ label, value, mono = false }: FieldProps) {
   return (
     <div>
-      <div className="text-label font-bold uppercase tracking-widest text-text-tertiary mb-px">
+      <dt className="text-label font-bold uppercase tracking-widest text-text-tertiary mb-px">
         {label}
-      </div>
-      <div className="text-caption font-medium text-text-secondary">
-        {children}
-      </div>
+      </dt>
+      <dd
+        className={cn(
+          "m-0",
+          mono ? "font-mono text-text-primary" : "text-text-primary",
+        )}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

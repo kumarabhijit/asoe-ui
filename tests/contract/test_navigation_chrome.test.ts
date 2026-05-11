@@ -118,67 +118,70 @@ describe("Exception detail page honours ?from referrer (R2)", () => {
   });
 });
 
-describe("Inbox row dispatch is consistent master-detail (R3 — ADR-034 §6.1)", () => {
+describe("Inbox row dispatch is consistent master-detail (R3 — ADR-038 §H.6, supersedes ADR-034 §6.1)", () => {
   const rel = "src/app/inbox/page.tsx";
+
+  // Phase 28.5 (V5.1) — `/inbox` is now a case-projected list view of
+  // `/cases` per ADR-038 §H.6. The legacy ADR-034 §6.1 inbox-row →
+  // /exceptions/{id} jump pattern is retired; clicks select locally
+  // on the case_id, and the "Open case" jump button on the right
+  // pane navigates to `/cases/{case_id}`. The CSR's "exit point off
+  // the inbox surface" is the canonical case detail.
 
   it("inbox handleActivate selects locally for every row (no router.push in the row dispatch)", () => {
     const src = read(rel);
-    // Capture the body of handleActivate. ADR-034 §6.1 (PO ruling
-    // 2026-05-10) requires a single, branch-free dispatch:
-    //   const handleActivate = () => { setSelectedId(item.id); };
-    // No router.push, no exception_id branch — the right-pane jump
-    // button is the only place that navigates off the inbox surface.
     const m = src.match(
-      /const\s+handleActivate\s*=\s*\(\)\s*=>\s*\{([\s\S]*?)\};/,
+      /const\s+handleActivate\s*=\s*\(\)\s*=>\s*(?:\{([\s\S]*?)\}|setSelectedId\(\s*case_\.case_id\s*\))/,
     );
     expect(m, `${rel} must declare a handleActivate row handler`).not.toBeNull();
-    const body = m![1];
+    // ADR-038 §H.6 — every row's onclick goes through
+    // setSelectedId(case_.case_id) and never invokes router.push.
+    // Off-surface navigation is explicit (the "Open case" jump
+    // button on the right pane).
+    const matched = m![0];
     expect(
-      /setSelectedId\s*\(\s*item\.id\s*\)/.test(body),
-      `${rel} handleActivate must call setSelectedId(item.id) — the ` +
-        `consistent master-detail dispatch decided in ADR-034 §6.1.`,
+      /setSelectedId\(\s*case_\.case_id\s*\)/.test(matched),
+      `${rel} handleActivate must call setSelectedId(case_.case_id) — ` +
+        `the consistent master-detail dispatch per ADR-038 §H.6 / V5.1.`,
     ).toBe(true);
     expect(
-      /router\.push/.test(body),
-      `${rel} handleActivate must NOT call router.push. Per ADR-034 §6.1 ` +
-        `(2026-05-10 PO ruling), navigation off the inbox surface is an ` +
-        `explicit operator action via the "Open in Exception Queue" jump ` +
-        `button on the right pane — not a side effect of clicking a row.`,
+      /router\.push/.test(matched),
+      `${rel} handleActivate must NOT call router.push. Per ADR-038 §H.6 ` +
+        `(V5.1, supersedes ADR-034 §6.1), navigation off the inbox surface ` +
+        `is an explicit operator action via the "Open case" jump button on ` +
+        `the right pane — not a side effect of clicking a row.`,
     ).toBe(false);
   });
 
-  it("right-pane detail renders an Open-in-Exception-Queue jump button when selected.exception_id is set", () => {
+  it("right-pane detail renders an Open-case jump button when a row is selected", () => {
     const src = read(rel);
-    // The jump button is gated on selected.exception_id and pushes
-    // /exceptions/<id>?from=inbox so the detail page back-targets
-    // "/inbox" via the BACK_TARGETS whitelist.
+    // V5.1 — the right pane shows the case-header summary when a row
+    // is selected and exposes an "Open case" button that pushes
+    // /cases/{case_id} (the canonical case detail surface).
     expect(
-      /selected\.exception_id\s*&&/.test(src),
+      /selected\s*&&/.test(src),
       `${rel} right pane must conditionally render content gated on ` +
-        `selected.exception_id (the jump-button section).`,
+        `the selected case (the jump-button section).`,
     ).toBe(true);
     expect(
-      /Open\s+in\s+Exception\s+Queue/i.test(src),
-      `${rel} right pane must render an "Open in Exception Queue" button ` +
-        `label so the operator has an explicit jump affordance.`,
+      /Open\s+case/i.test(src),
+      `${rel} right pane must render an "Open case" button label so ` +
+        `the operator has an explicit jump affordance.`,
     ).toBe(true);
     expect(
-      /router\.push\(\s*[`'"]\s*\/exceptions\/\$\{\s*selected\.exception_id\s*\}\?from=inbox/.test(
-        src,
-      ),
-      `${rel} the jump button must push /exceptions/<id>?from=inbox so ` +
-        `the detail page renders "Back to Inbox" via BACK_TARGETS in ` +
-        `src/app/exceptions/[id]/page.tsx.`,
+      /router\.push\(\s*[`'"]?\/cases\/\$\{[^}]*case_id[^}]*\}/.test(src),
+      `${rel} the jump button must push /cases/{case_id} — the ` +
+        `canonical case detail surface per ADR-038 §H.6.`,
     ).toBe(true);
   });
 
-  it("the supersession is justified by an explicit ADR-034 reference", () => {
+  it("the supersession is justified by an explicit ADR-038 reference", () => {
     const src = read(rel);
     expect(
-      /ADR-034/.test(src),
-      `${rel} must cite ADR-034 next to the inbox dispatch + jump button. ` +
-        `If you're changing the behaviour, update the ADR + this test in ` +
-        `the same PR.`,
+      /ADR-038/.test(src),
+      `${rel} must cite ADR-038 next to the inbox dispatch + jump button. ` +
+        `V5.1 supersedes the ADR-034 §6.1 pattern; if you're changing the ` +
+        `behaviour again, update the ADR + this test in the same PR.`,
     ).toBe(true);
   });
 });

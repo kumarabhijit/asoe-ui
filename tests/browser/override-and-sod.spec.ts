@@ -60,7 +60,7 @@ test("manager overrides → self-re-override is allowed (PO ruling 2026-05-03)",
   // APPROVE (chosen == recommended). SUPERSEDE is a DUPLICATE_PO
   // action that never matches a CONTRACTUAL_CORRECTION recommendation.
   await dialog.getByLabel(/^resolution action$/i).selectOption("SUPERSEDE");
-  await dialog.getByLabel(/^override reason category$/i).selectOption("policy_exception");
+  await dialog.getByLabel(/^override reason category$/i).selectOption("BAND_REVIEW_OVERRIDDEN");
   await dialog.getByLabel(/^override notes$/i).fill("first override by manager — SoD test");
   await dialog.getByRole("button", { name: /confirm override/i }).click();
 
@@ -88,7 +88,7 @@ test("manager overrides → self-re-override is allowed (PO ruling 2026-05-03)",
   await openOverride.click();
   await expect(dialog).toBeVisible({ timeout: 5_000 });
   await dialog.getByLabel(/^resolution action$/i).selectOption("ALLOW_BOTH");
-  await dialog.getByLabel(/^override reason category$/i).selectOption("other");
+  await dialog.getByLabel(/^override reason category$/i).selectOption("OTHER");
   await dialog.getByLabel(/^override notes$/i).fill("self-correction of prior override");
   await dialog.getByRole("button", { name: /confirm override/i }).click();
 

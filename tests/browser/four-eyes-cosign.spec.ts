@@ -58,7 +58,7 @@ test("high-value override stages PENDING_COSIGN; different manager cosigns → R
   const dialog = page.getByRole("dialog", { name: /override resolution/i });
   await expect(dialog).toBeVisible({ timeout: 5_000 });
   await dialog.getByLabel(/^resolution action$/i).selectOption("ALLOW_BOTH");
-  await dialog.getByLabel(/^override reason category$/i).selectOption("customer_concession");
+  await dialog.getByLabel(/^override reason category$/i).selectOption("CUSTOMER_CONCESSION_LOW");
   await dialog.getByLabel(/^override notes$/i).fill(
     "buyer confirmed concession per email 2026-04-16",
   );
