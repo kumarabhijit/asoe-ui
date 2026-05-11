@@ -83,7 +83,7 @@ test("W1 — detail → override → next record dispatches each via the full pi
   const dialog = page.getByRole("dialog", { name: /override resolution/i });
   await expect(dialog).toBeVisible({ timeout: 5_000 });
   await dialog.getByLabel(/^resolution action$/i).selectOption("ALLOW_BOTH");
-  await dialog.getByLabel(/^override reason category$/i).selectOption("policy_exception");
+  await dialog.getByLabel(/^override reason category$/i).selectOption("BAND_REVIEW_OVERRIDDEN");
   await dialog.getByLabel(/^override notes$/i).fill("W1 first record override");
   await dialog.getByRole("button", { name: /confirm override/i }).click();
   await expect(dialog).toBeHidden({ timeout: 10_000 });
@@ -121,7 +121,7 @@ test("W1 — detail → override → next record dispatches each via the full pi
   // Submit a different action so the assertion downstream
   // distinguishes A from B.
   await dialogB.getByLabel(/^resolution action$/i).selectOption("SUPERSEDE");
-  await dialogB.getByLabel(/^override reason category$/i).selectOption("data_error");
+  await dialogB.getByLabel(/^override reason category$/i).selectOption("SAP_MASTER_PRICE_ERROR");
   await notesB.fill("W1 second record override");
   await dialogB.getByRole("button", { name: /confirm override/i }).click();
   await expect(dialogB).toBeHidden({ timeout: 10_000 });
@@ -167,7 +167,7 @@ test("W2 — override → re-override on the same record (PO ruling 2026-05-03)"
   await openOverride.click();
   let dialog = page.getByRole("dialog", { name: /override resolution/i });
   await dialog.getByLabel(/^resolution action$/i).selectOption("MERGE");
-  await dialog.getByLabel(/^override reason category$/i).selectOption("policy_exception");
+  await dialog.getByLabel(/^override reason category$/i).selectOption("BAND_REVIEW_OVERRIDDEN");
   await dialog.getByLabel(/^override notes$/i).fill("W2 first override");
   await dialog.getByRole("button", { name: /confirm override/i }).click();
   await expect(dialog).toBeHidden({ timeout: 10_000 });
@@ -197,7 +197,7 @@ test("W2 — override → re-override on the same record (PO ruling 2026-05-03)"
   // previously-submitted MERGE — it should default to whatever the
   // dialog's initial state is (recipe-recommended action).
   await dialog.getByLabel(/^resolution action$/i).selectOption("ALLOW_BOTH");
-  await dialog.getByLabel(/^override reason category$/i).selectOption("other");
+  await dialog.getByLabel(/^override reason category$/i).selectOption("OTHER");
   await dialog.getByLabel(/^override notes$/i).fill("W2 self-correction");
   await dialog.getByRole("button", { name: /confirm override/i }).click();
 
@@ -233,9 +233,9 @@ test("W3 — multi-record disposition workflow: 3 distinct resolutions across de
   const token = await backendToken(request, USERS.MANAGER);
   const seedTs = Date.now();
   const seeds = [
-    { orderId: `PO-W3-1-${seedTs}`, action: "ALLOW_BOTH", reason: "policy_exception" },
-    { orderId: `PO-W3-2-${seedTs}`, action: "MERGE", reason: "data_error" },
-    { orderId: `PO-W3-3-${seedTs}`, action: "SUPERSEDE", reason: "customer_concession" },
+    { orderId: `PO-W3-1-${seedTs}`, action: "ALLOW_BOTH", reason: "BAND_REVIEW_OVERRIDDEN" },
+    { orderId: `PO-W3-2-${seedTs}`, action: "MERGE", reason: "SAP_MASTER_PRICE_ERROR" },
+    { orderId: `PO-W3-3-${seedTs}`, action: "SUPERSEDE", reason: "CUSTOMER_CONCESSION_LOW" },
   ] as const;
   const records = await Promise.all(
     seeds.map(async (s) => ({
@@ -329,7 +329,7 @@ test("W4 — override dialog cancel → reopen → submit (no stale form state)"
 
   // ── Click 3: complete the override successfully ───────────────
   await dialog.getByLabel(/^resolution action$/i).selectOption("ESCALATE");
-  await dialog.getByLabel(/^override reason category$/i).selectOption("policy_exception");
+  await dialog.getByLabel(/^override reason category$/i).selectOption("BAND_REVIEW_OVERRIDDEN");
   await dialog.getByLabel(/^override notes$/i).fill("W4 final submission after cancel");
   await dialog.getByRole("button", { name: /confirm override/i }).click();
   await expect(dialog).toBeHidden({ timeout: 10_000 });
