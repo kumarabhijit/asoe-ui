@@ -1,11 +1,18 @@
 /**
  * Customer Inbox — manual_order case-projected list view.
  *
- * Phase 28.5 (Frontend Platform V5.1) — `/inbox` is now a filtered
- * case-list view of `/cases`. The legacy `INBOX` mock has been
- * retired; rows project from `useManualOrderCases()`
- * (`casesApi.list({ source: "manual_order" })`). Click-through goes
- * to `/cases/{id}` which is the canonical detail surface.
+ * Phase 28.5 (Frontend Platform V5.1, per ADR-038 §H.6) — `/inbox`
+ * is now a filtered case-list view of `/cases`. The legacy `INBOX`
+ * mock has been retired; rows project from `useManualOrderCases()`
+ * (`casesApi.list({ source: "manual_order" })`). Row click selects
+ * locally on `case_.case_id` (master-detail in place); the
+ * right-pane "Open case" jump button is the only path off this
+ * surface and routes to `/cases/{case_id}` — the canonical
+ * detail surface.
+ *
+ * V5.1 supersedes the ADR-034 §6.1 inbox-row → /exceptions/{id}
+ * jump pattern. The CSR's "exit point off the inbox" is now the
+ * canonical case detail, not a per-event exception detail.
  *
  * Architecturally:
  *   * Pure list projector (CLAUDE.md Guardrail #6) — every field
@@ -25,9 +32,14 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
-  Mail, ChevronRight, Search, Zap, CheckCircle2,
-  Clock, FileText, AlertTriangle, RefreshCw, LayoutList,
-  ExternalLink,
+  Mail,
+  ChevronRight,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  RefreshCw,
+  PackageCheck,
+  Inbox as InboxIcon,
 } from "lucide-react";
 
 import { NavBar } from "@/components/ui/NavBar";
@@ -62,35 +74,15 @@ const SOURCE_ICON: Record<CaseSource | "default", React.ReactNode> = {
   default: <Clock size={12} aria-hidden />,
 };
 
-/* ── Data ─────────────────────────────────────────────────────────── */
-interface InboxItem {
-  id: string;
-  /** ADR-034 Phase G (PO supersession 2026-05-10) — when this inbox
-   *  item produced an Exception Queue record (NEW_ORDER →
-   *  MANUAL_ORDER_INTAKE exception), `exception_id` is set. The row
-   *  click NO LONGER navigates straight to /exceptions/{id};
-   *  every inbox row selects locally for a consistent master-detail
-   *  UX. The right-pane detail surfaces an "Open in Exception Queue"
-   *  jump button when this field is present, so the operator chooses
-   *  when to leave the inbox surface. Absent on categories that
-   *  don't become exceptions (SHIPMENT_INQUIRY, INVOICE_QUERY,
-   *  COMPLAINT). */
-  exception_id?: string;
-  sender: string;
-  initials: string;
-  initialsColor: string;
-  subject: string;
-  preview: string;
-  time: string;
-  category: string;
-  status: string;
-  amount?: string;
-  lineCount?: number;
-  agentConfidence?: number;
-  agentSummary?: string;
-  agentRecommendation?: string;
-  email?: { from: string; org: string; mailbox: string; received: string; body: string };
-}
+const STATUS_LABEL: Record<string, string> = {
+  OPEN_AGENT_PROCESSING: "Agent processing",
+  OPEN_AWAITING_HUMAN: "Awaiting review",
+  OPEN_AWAITING_BUYER: "Awaiting buyer",
+  OPEN_AWAITING_ERP: "Awaiting ERP",
+  RESOLVED: "Resolved",
+  FAILED: "Failed",
+  BLOCKED: "Blocked",
+};
 
 const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutral"> = {
   breached: "error",
@@ -322,26 +314,23 @@ function InboxPageInner() {
           )}
 
           <div className="max-h-[calc(100vh-370px)] overflow-y-auto">
-            {INBOX.map((item) => {
-              const isSelected = item.id === selectedId;
-              // ADR-034 Phase G (PO supersession 2026-05-10) — every
-              // inbox row selects locally so the right-pane detail
-              // updates in place. Operators see a consistent
-              // master-detail UX regardless of category. For rows
-              // that have an `exception_id`, the right pane renders
-              // an explicit "Open in Exception Queue" jump button —
-              // navigation off the inbox surface is now an explicit
-              // operator action, not a side effect of clicking a row.
-              const handleActivate = () => {
-                setSelectedId(item.id);
-              };
+            {sorted.map(({ case_, sla }) => {
+              const isSelected = case_.case_id === selectedId;
+              const handleActivate = () => setSelectedId(case_.case_id);
+              const orderRef =
+                case_.customer_po_number
+                || case_.sales_order_id
+                || case_.case_id;
               return (
                 <div
                   key={case_.case_id}
                   role="button"
                   tabIndex={0}
-                  aria-label={`Select email from ${item.sender}: ${item.subject}`}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleActivate(); }}
+                  aria-label={`Select case ${orderRef}`}
+                  onClick={handleActivate}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleActivate();
+                  }}
                   className={cn(
                     "px-16 py-12 cursor-pointer border-b border-border-subtle border-l-[3px] transition-colors duration-fast",
                     isSelected
@@ -386,59 +375,24 @@ function InboxPageInner() {
             </div>
           )}
 
-          {/* ── ADR-034 PO supersession (2026-05-10) — Open in
-                Exception Queue jump button. Renders only when the
-                selected inbox item carries an `exception_id`. The
-                row click stays a local master-detail selection
-                (consistent UX across categories); navigation off
-                the inbox surface is now an explicit operator action.
-                `?from=inbox` is whitelisted in
-                src/app/exceptions/[id]/page.tsx::BACK_TARGETS so the
-                detail page renders "Back to Inbox". */}
-          {selected.exception_id && (
-            <div className="bg-surface-primary rounded-md shadow-sm p-16 flex items-center justify-between gap-12">
-              <div className="flex flex-col gap-2">
-                <span className="text-caption font-semibold text-text-primary">
-                  Linked to Exception Queue
-                </span>
-                <span className="text-caption text-text-tertiary font-mono">
-                  {selected.exception_id}
-                </span>
-              </div>
-              <Button
-                variant="brand"
-                size="sm"
-                onClick={() =>
-                  router.push(
-                    `/exceptions/${selected.exception_id}?from=inbox`,
-                  )
-                }
-                aria-label={`Open exception ${selected.exception_id} in Exception Queue`}
-              >
-                <ExternalLink size={12} />
-                Open in Exception Queue
-              </Button>
-            </div>
-          )}
-
-          {/* ── AGENT REASONING CARD (Layer 1 — always visible) ── */}
-          <div className="bg-surface-primary rounded-md shadow-md p-20">
-            <div className="flex items-center gap-8 mb-12">
-              <div className="w-[28px] h-[28px] rounded-sm bg-surface-secondary flex items-center justify-center">
-                <Zap size={14} className="text-text-secondary" />
-              </div>
-              <span className="font-semibold text-subhead text-text-primary">Agent Recommendation</span>
-              <div className="flex-1" />
-              {selected.agentConfidence && (
-                <div className="flex items-center gap-8">
-                  <div className="w-[80px] h-[4px] rounded-full bg-surface-secondary overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-text-secondary"
-                      style={{ width: `${selected.agentConfidence}%` }}
-                    />
-                  </div>
-                  <span className="font-mono text-caption font-semibold text-text-primary">
-                    {selected.agentConfidence}%
+          {selected && (
+            <>
+              <div className="bg-surface-primary rounded-md shadow-sm p-20">
+                <div className="flex items-center gap-8 mb-12">
+                  <Badge variant="neutral" size="sm">
+                    {SOURCE_ICON[selected.case_.source as CaseSource]
+                      ?? SOURCE_ICON.default}
+                    <span className="ml-4">
+                      {SOURCE_LABEL[selected.case_.source as CaseSource]
+                        ?? SOURCE_LABEL.default}
+                    </span>
+                  </Badge>
+                  <Badge variant="neutral" size="sm">
+                    {selected.case_.source_channel}
+                  </Badge>
+                  <span className="ml-auto text-caption text-text-tertiary uppercase tracking-wider">
+                    {STATUS_LABEL[selected.case_.status]
+                      ?? selected.case_.status}
                   </span>
                 </div>
                 <h2 className="text-heading font-bold m-0 leading-snug mb-12">
