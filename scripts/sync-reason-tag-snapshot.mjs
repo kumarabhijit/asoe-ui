@@ -57,6 +57,7 @@ if (!TUPLES.has("_GLOBAL_REASON_TAGS")) {
   console.error("[sync-reason-tag-snapshot] _GLOBAL_REASON_TAGS not found.");
   process.exit(1);
 }
+const GLOBAL_REASON_TAGS = TUPLES.get("_GLOBAL_REASON_TAGS");
 
 // 2. Parse `_CURATED_INTENT_REASON_TAGS: dict[...] = { INTENT: _NAME, ... }`.
 const DICT_RE = /_CURATED_INTENT_REASON_TAGS:\s*dict\[str,\s*tuple\[str,\s*\.\.\.\]\]\s*=\s*\{([\s\S]*?)^\}/m;
@@ -125,6 +126,9 @@ const SNAPSHOT = {
   allowed_override_reason_tags_by_intent: Object.fromEntries(
     Object.keys(CURATED).sort().map((k) => [k, CURATED[k]]),
   ),
+  // Legacy global pool (lowercase). Used by is_valid_reason_tag_for_write
+  // as the fallback when the intent has no curated vocab.
+  legacy_global_reason_tags: GLOBAL_REASON_TAGS,
 };
 
 const SNAPSHOT_PATH = resolve(REPO_ROOT, "tests/contract/snapshots/curated_reason_tags.json");
@@ -146,6 +150,8 @@ const ts = [
     null,
     2,
   )};`,
+  "",
+  `export const LEGACY_GLOBAL_REASON_TAGS = ${JSON.stringify(GLOBAL_REASON_TAGS, null, 2)} as const;`,
   "",
   "export type CuratedIntent = keyof typeof ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT;",
   "",

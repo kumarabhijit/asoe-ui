@@ -1029,10 +1029,24 @@ export interface components {
          * @description GET /api/v1/cases — list response.
          *
          *     Shape matches `asoe-ui/src/lib/api.ts::casesApi.list`'s declared
-         *     return type (`{ items: OrderCase[]; total: number }`). Items are
-         *     serialised from `contracts.models.OrderCase`.
+         *     return type. Items are serialised from `contracts.models.OrderCase`.
+         *
+         *     Cursor pagination (added 2026-05-11 via ADR-038 §D7 amendment):
+         *     `cursor` is the opaque page-anchor token for the next page, set
+         *     only when `has_more` is True. Clients loop `do { fetch } while
+         *     (cursor)` to accumulate every page. The cursor is the `case_id`
+         *     of the last item on the current page; the server's stable sort
+         *     (opened_at DESC, case_id DESC tiebreak) means re-fetches with
+         *     the same cursor are deterministic.
          */
         CaseListResponse: {
+            /** Cursor */
+            cursor?: string | null;
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
             /** Items */
             items?: {
                 [key: string]: unknown;
@@ -3300,6 +3314,8 @@ export interface operations {
                 /** @description Free-text fuzzy match over case_id / customer_po_number / sales_order_id / customer_id. Case-insensitive substring. Operators (po:, so:, customer:) are parsed client-side; the backend sees the free-text term only. */
                 q?: string | null;
                 limit?: number;
+                /** @description Pagination cursor. Opaque page-anchor token; clients loop `do { fetch } while (cursor)` until `has_more` is False. ADR-038 §D7 amendment (2026-05-11) — adds cursor pagination to /cases so the case-projected exception queue is no longer silently capped at the first page. */
+                cursor?: string | null;
             };
             header?: {
                 Authorization?: string | null;

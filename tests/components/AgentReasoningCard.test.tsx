@@ -609,12 +609,12 @@ describe("exceptionsApi — Idempotency-Key contract", () => {
     const key = "test-disposition-key-abc";
     const first = await exceptionsApi.disposition(
       "exc-002",
-      { action: "ALLOW_BOTH", notes: "Retry test", reason_tag: "other" },
+      { action: "ALLOW_BOTH", notes: "Retry test", reason_tag: "OTHER" },
       { idempotencyKey: key },
     );
     const second = await exceptionsApi.disposition(
       "exc-002",
-      { action: "ALLOW_BOTH", notes: "Retry test", reason_tag: "other" },
+      { action: "ALLOW_BOTH", notes: "Retry test", reason_tag: "OTHER" },
       { idempotencyKey: key },
     );
     expect(second).toEqual(first);
@@ -624,13 +624,13 @@ describe("exceptionsApi — Idempotency-Key contract", () => {
     const key = "test-disposition-conflict";
     await exceptionsApi.disposition(
       "exc-002",
-      { action: "ALLOW_BOTH", notes: "First", reason_tag: "other" },
+      { action: "ALLOW_BOTH", notes: "First", reason_tag: "OTHER" },
       { idempotencyKey: key },
     );
     await expect(
       exceptionsApi.disposition(
         "exc-002",
-        { action: "MERGE", notes: "Second", reason_tag: "other" },
+        { action: "MERGE", notes: "Second", reason_tag: "OTHER" },
         { idempotencyKey: key },
       ),
     ).rejects.toThrow(/Idempotency-Key conflict/);
@@ -640,7 +640,7 @@ describe("exceptionsApi — Idempotency-Key contract", () => {
     await expect(
       exceptionsApi.disposition(
         "exc-002",
-        { action: "ALLOW_BOTH", notes: "bad key", reason_tag: "other" },
+        { action: "ALLOW_BOTH", notes: "bad key", reason_tag: "OTHER" },
         { idempotencyKey: "bad key with spaces" },
       ),
     ).rejects.toThrow(/Invalid Idempotency-Key/);

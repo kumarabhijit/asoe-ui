@@ -190,7 +190,7 @@ describe("PRICE_HOLD_RELEASE HITL action data flow", () => {
     // the operator endorsed the recipe's escalate decision.
     const dispositionRequest = {
       action: "ESCALATE",
-      reason_tag: "policy_exception",
+      reason_tag: "OTHER",
       notes: "Within contract; manager approves escalation.",
     };
     expect(dispositionRequest.action).toBe("ESCALATE");
@@ -199,7 +199,7 @@ describe("PRICE_HOLD_RELEASE HITL action data flow", () => {
   it("override request shape uses an alternate action", () => {
     const overrideRequest = {
       action: "BLOCK_AND_NOTIFY",
-      reason_tag: "agent_misclassification",
+      reason_tag: "OTHER",
       notes: "Customer confirmed price; block to renegotiate.",
     };
     expect(overrideRequest.action).not.toBe("ESCALATE");

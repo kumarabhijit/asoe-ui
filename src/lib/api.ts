@@ -34,8 +34,50 @@ import type { HealthResponse, ExceptionSummary, LifecycleState, LineItem, OrderA
 import {
   ALLOWED_OVERRIDE_REASON_TAGS,
   ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT,
+  LEGACY_GLOBAL_REASON_TAGS,
 } from "./__generated__/curated_reason_tags";
 import { ROLE_PERMISSIONS } from "./roles";
+
+// Mirrors asoe2/constraints/specs.py::is_valid_reason_tag_for_write.
+// Curated intents narrow the vocab to their per-intent UPPERCASE
+// set; non-curated / unknown intents fall through to the LEGACY
+// global lowercase pool only (matches asoe2's `_GLOBAL_REASON_TAGS`
+// fallback — not the union of every curated tag). Never silently
+// upper-cases.
+export function isValidReasonTagForWrite(
+  intent: string | undefined | null,
+  tag: string,
+): boolean {
+  if (intent && intent in ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT) {
+    const curated = ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT[intent];
+    return curated.includes(tag);
+  }
+  return (LEGACY_GLOBAL_REASON_TAGS as readonly string[]).includes(tag);
+}
+
+// Read-side grandfathering: historical audit-log rows may carry
+// any tag the wire envelope (AllowedOverrideReasonTag) ever included.
+// Used by trace / events renderers, never by write paths.
+export function isValidReasonTagForRead(tag: string): boolean {
+  return (ALLOWED_OVERRIDE_REASON_TAGS as readonly string[]).includes(tag);
+}
+
+// Terminal lifecycle states reject every HITL disposition (mirrors
+// asoe2/api/routes/exceptions.py::PATCH /disposition gating). The
+// backend returns 409 (`LIFECYCLE_LOCKED`); the mock throws an
+// Error with the same code prefix so the UI's toast renderer
+// doesn't fork on mode.
+export const TERMINAL_LIFECYCLE_STATES: readonly string[] = [
+  "FAILED",
+  "RESOLVED",
+  "BLOCKED",
+  "REJECTED",
+  "CLOSED",
+];
+
+export function isTerminalLifecycle(state: string | undefined | null): boolean {
+  return !!state && TERMINAL_LIFECYCLE_STATES.includes(state);
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MOCK_DELAY = 400;
@@ -388,6 +430,51 @@ interface MockPendingOverride {
   from_lifecycle_state: LifecycleState;
 }
 const MOCK_PENDING_OVERRIDES: Record<string, MockPendingOverride> = {};
+
+// S10: in-process event log for mock state changes. Disposition,
+// escalate, cosign, and reanalyze each append a `case_*` event
+// here on success. The log is the testable surface for the
+// "mock matches live event emission" contract — pages don't yet
+// consume it through useWebSocket (that's a future ticket), but
+// tests can drain the log and assert the right type / case_id /
+// payload landed for each mock state change.
+interface MockEmittedEvent {
+  type: "case_open" | "case_update" | "case_close";
+  case_id: string;
+  exception_id: string;
+  tenant_id: string;
+  timestamp: string;
+  trigger: "disposition" | "escalate" | "cosign" | "reanalyze";
+}
+
+const _mockEmittedEvents: MockEmittedEvent[] = [];
+
+function emitMockCaseEvent(event: MockEmittedEvent): void {
+  _mockEmittedEvents.push(event);
+}
+
+export function drainMockCaseEvents(): MockEmittedEvent[] {
+  return _mockEmittedEvents.splice(0, _mockEmittedEvents.length);
+}
+
+export function peekMockCaseEvents(): readonly MockEmittedEvent[] {
+  return [..._mockEmittedEvents];
+}
+
+export type { MockEmittedEvent };
+
+// `case_close` is the right type when the disposition or cosign
+// transitions to a terminal state; `case_update` is the right type
+// for non-terminal mutations (escalate, reanalyze, in-flight
+// changes). Mirrors asoe2 case-events emission rules at
+// asoe2/api/case_events.py.
+function caseEventTypeForLifecycle(
+  state: string | undefined,
+): "case_close" | "case_update" {
+  return state && TERMINAL_LIFECYCLE_STATES.includes(state)
+    ? "case_close"
+    : "case_update";
+}
 
 const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
@@ -1495,6 +1582,14 @@ export const exceptionsApi = {
       };
     }
     delete MOCK_PENDING_OVERRIDES[id];
+    emitMockCaseEvent({
+      type: caseEventTypeForLifecycle(response.lifecycle_state),
+      case_id: `case-for-${exc.id}`,
+      exception_id: exc.id,
+      tenant_id: exc.tenant_id,
+      timestamp: ts,
+      trigger: "cosign",
+    });
     idempotencyStore(`cosign:${id}`, idempotencyKey, request, response);
     return response;
   },
@@ -1529,8 +1624,25 @@ export const exceptionsApi = {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
+    // S9: terminal-state gate. Disposition is not allowed once the
+    // record has reached a terminal lifecycle (asoe2 returns 409
+    // LIFECYCLE_LOCKED).
+    if (isTerminalLifecycle(exc.lifecycle_state)) {
+      throw new Error(
+        `LIFECYCLE_LOCKED: disposition not allowed on terminal record (lifecycle ${exc.lifecycle_state})`,
+      );
+    }
     if (!request.notes || !request.notes.trim()) {
       throw new Error("NOTES_REQUIRED: notes are required (SOX audit trail).");
+    }
+    // S8: mirror asoe2's is_valid_reason_tag_for_write so the mock
+    // rejects lowercase legacy tags for curated intents, exactly as
+    // the live backend does. Error shape matches the asoe2 422
+    // payload so the UI's toast renderer doesn't fork on mode.
+    if (!isValidReasonTagForWrite(exc.intent, request.reason_tag)) {
+      throw new Error(
+        `INVALID_REASON_TAG: reason_tag '${request.reason_tag}' is not allowed for intent ${exc.intent ?? "<unknown>"}`,
+      );
     }
     // Mock does not persist recommended_action on the summary; treat the
     // chosen action as APPROVE when it matches a minimal known default,
@@ -1564,6 +1676,14 @@ export const exceptionsApi = {
     // reverts — matches pre-fix behaviour for everything except
     // the timestamp.
     exc.updated_at = ts;
+    emitMockCaseEvent({
+      type: caseEventTypeForLifecycle(newLifecycle),
+      case_id: `case-for-${exc.id}`,
+      exception_id: exc.id,
+      tenant_id: exc.tenant_id,
+      timestamp: ts,
+      trigger: "disposition",
+    });
     idempotencyStore(`disposition:${id}`, idempotencyKey, request, response);
     return response;
   },
@@ -1609,6 +1729,14 @@ export const exceptionsApi = {
       resolution_notes: `ESCALATED: ${request.reason}`,
       updated_at: ts,
     };
+    emitMockCaseEvent({
+      type: "case_update",
+      case_id: `case-for-${exc.id}`,
+      exception_id: exc.id,
+      tenant_id: exc.tenant_id,
+      timestamp: ts,
+      trigger: "escalate",
+    });
     idempotencyStore(`escalate:${id}`, idempotencyKey, request, response);
     return response;
   },
@@ -1719,6 +1847,14 @@ export const exceptionsApi = {
     // the mock detail() doesn't return it for summary-derived records
     // anyway.)
     exc.updated_at = ts;
+    emitMockCaseEvent({
+      type: "case_update",
+      case_id: `case-for-${exc.id}`,
+      exception_id: exc.id,
+      tenant_id: exc.tenant_id,
+      timestamp: ts,
+      trigger: "reanalyze",
+    });
 
     return {
       ...exc,
@@ -3574,15 +3710,36 @@ export const casesApi = {
     since?: string;
     /** Free-text fuzzy match across PO/SO/customer/case_id. */
     q?: string;
-  }): Promise<{ items: CaseListItem[]; total: number }> {
+    /** Page size. Backend default 200, max 500
+     *  (asoe2/api/routes/cases.py::list_cases::limit). */
+    limit?: number;
+    /** Pagination cursor. Opaque page-anchor token returned in
+     *  `cursor` on the previous response when `has_more` is true.
+     *  Clients loop `do { fetch } while (cursor)` until exhausted —
+     *  see `useCases` for the canonical consumer. ADR-038 §D7
+     *  amendment (2026-05-11). */
+    cursor?: string;
+  }): Promise<{
+    items: CaseListItem[];
+    total: number;
+    cursor: string | null;
+    has_more: boolean;
+  }> {
     if (USE_REAL_API) {
-      return http<{ items: CaseListItem[]; total: number }>("/api/v1/cases", {
+      return http<{
+        items: CaseListItem[];
+        total: number;
+        cursor: string | null;
+        has_more: boolean;
+      }>("/api/v1/cases", {
         query: {
           source: params?.source,
           status: params?.status,
           intents: params?.intents,
           since: params?.since,
           q: params?.q,
+          limit: params?.limit,
+          cursor: params?.cursor,
         },
       });
     }
@@ -3610,7 +3767,33 @@ export const casesApi = {
           .some((v) => v && v.toLowerCase().includes(needle)),
       );
     }
-    return { items, total: items.length };
+    // Stable sort to match the backend (opened_at DESC, case_id
+    // DESC tiebreak). Cursor determinism requires a total ordering.
+    items.sort((a, b) => {
+      if (a.opened_at !== b.opened_at) {
+        return a.opened_at < b.opened_at ? 1 : -1;
+      }
+      return a.case_id < b.case_id ? 1 : a.case_id > b.case_id ? -1 : 0;
+    });
+    const total = items.length;
+    // Apply backend-parity limit (default 200, max 500). The mock
+    // mirrors the asoe2 contract.
+    const requestedLimit = params?.limit ?? 200;
+    const limit = Math.max(1, Math.min(500, requestedLimit));
+    // Cursor-anchored slicing. Unknown cursors fall through to
+    // start-of-list — matches asoe2 grandfathered behaviour for
+    // stale tokens (api/routes/cases.py::list_cases).
+    let start = 0;
+    if (params?.cursor) {
+      const cursorIdx = items.findIndex((c) => c.case_id === params.cursor);
+      if (cursorIdx >= 0) start = cursorIdx + 1;
+    }
+    const page = items.slice(start, start + limit);
+    const has_more = start + limit < total;
+    const nextCursor = has_more && page.length > 0
+      ? page[page.length - 1].case_id
+      : null;
+    return { items: page, total, cursor: nextCursor, has_more };
   },
 
   async get(case_id: string): Promise<OrderCase | null> {

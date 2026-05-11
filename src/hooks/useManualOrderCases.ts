@@ -29,19 +29,37 @@ interface UseCasesReturn {
   total: number;
   loading: boolean;
   error: string | null;
+  /** Defensive disclosure — `total > cases.length` after the
+   *  cursor loop has completed. Should always be false in normal
+   *  operation (the loop accumulates every page); flipping true
+   *  indicates the loop terminated early via the 200-iteration
+   *  ceiling or a stalled-cursor guard, which is a backend bug. */
+  truncated: boolean;
   /** Force re-fetch. Pages call this from their `useWebSocket` event
    *  handler on `case_*` events, and after operator-driven actions
    *  that mutate the case server-side. */
   refetch: () => void;
 }
 
-export function useCases(source?: CaseSource): UseCasesReturn {
+export interface UseCasesOptions {
+  /** Per-page size for the cursor loop. Defaults to the backend
+   *  default (200). Backend caps at 500. The hook walks every page
+   *  until `has_more` is false, accumulating into `cases`. */
+  limit?: number;
+}
+
+export function useCases(
+  source?: CaseSource,
+  options?: UseCasesOptions,
+): UseCasesReturn {
   const [cases, setCases] = useState<CaseListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Bumped by `refetch()` to trigger an effect re-run.
   const [refetchCounter, setRefetchCounter] = useState(0);
+
+  const limit = options?.limit;
 
   const refetch = useCallback(() => {
     setRefetchCounter((n) => n + 1);
@@ -54,37 +72,76 @@ export function useCases(source?: CaseSource): UseCasesReturn {
     // spinner on every case_update would defeat the live-count UX.
     const isInitial = refetchCounter === 0;
     if (isInitial) setLoading(true);
-    casesApi
-      .list(source ? { source } : undefined)
-      .then((res) => {
+
+    // Cursor-anchored loop. The backend (asoe2/api/routes/cases.py
+    // ::list_cases) and the mock both honour `cursor` + `has_more`
+    // per the ADR-038 §D7 amendment; we walk every page so a
+    // tenant with >limit cases doesn't silently see only the first
+    // slice.
+    const pageParams: { source?: CaseSource; limit?: number } = {};
+    if (source) pageParams.source = source;
+    if (limit !== undefined) pageParams.limit = limit;
+
+    const run = async () => {
+      try {
+        const accumulated: CaseListItem[] = [];
+        let cursor: string | undefined = undefined;
+        let lastTotal = 0;
+        // Bounded loop — defensive guard against a backend that
+        // never advances the cursor. 200 pages × default-limit-200
+        // covers 40k cases per tenant, well past current ceilings.
+        for (let iter = 0; iter < 200; iter += 1) {
+          const params: typeof pageParams & { cursor?: string } = { ...pageParams };
+          if (cursor) params.cursor = cursor;
+          const res = await casesApi.list(
+            Object.keys(params).length > 0 ? params : undefined,
+          );
+          if (cancelled) return;
+          accumulated.push(...res.items);
+          lastTotal = res.total;
+          if (!res.has_more) break;
+          if (!res.cursor || res.cursor === cursor) break; // backend bug guard
+          cursor = res.cursor;
+        }
         if (cancelled) return;
-        setCases(res.items);
-        setTotal(res.total);
+        setCases(accumulated);
+        setTotal(lastTotal);
         setError(null);
-      })
-      .catch((e) => {
+      } catch (e) {
         if (cancelled) return;
         setError(
           e instanceof Error ? e.message : "Failed to fetch cases",
         );
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled && isInitial) setLoading(false);
-      });
+      }
+    };
+
+    void run();
+
     return () => {
       cancelled = true;
     };
-  }, [source, refetchCounter]);
+  }, [source, limit, refetchCounter]);
 
-  return { cases, total, loading, error, refetch };
+  return {
+    cases,
+    total,
+    loading,
+    error,
+    truncated: total > cases.length,
+    refetch,
+  };
 }
 
 /**
  * useManualOrderCases — convenience wrapper. Kept as the previous
  * named export so callers in /inbox don't need to update.
  */
-export function useManualOrderCases(): UseCasesReturn {
-  return useCases("manual_order");
+export function useManualOrderCases(
+  options?: UseCasesOptions,
+): UseCasesReturn {
+  return useCases("manual_order", options);
 }
 
 /**

@@ -305,7 +305,7 @@ describe("CREDIT_BLOCK type contracts", () => {
     const req: DispositionRequest = {
       action: "ALLOW_BOTH",
       notes: "One-time exception — VIP customer with pending payment confirmed",
-      reason_tag: "customer_concession",
+      reason_tag: "OTHER",
     };
     expect(req.action).toBe("ALLOW_BOTH");
     expect(typeof req.notes).toBe("string");
