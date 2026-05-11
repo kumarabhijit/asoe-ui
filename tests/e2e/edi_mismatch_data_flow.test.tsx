@@ -222,7 +222,7 @@ describe("EDI_MISMATCH HITL action data flow", () => {
     // classifications. APPROVE means the operator endorses that action.
     const dispositionRequest = {
       action: "REQUEST_BUYER_CONFIRMATION",
-      reason_tag: "data_error",
+      reason_tag: "OTHER",
       notes: "Quantity differs from PO; query buyer.",
     };
     expect(dispositionRequest.action).toBe("REQUEST_BUYER_CONFIRMATION");
@@ -231,7 +231,7 @@ describe("EDI_MISMATCH HITL action data flow", () => {
   it("override on SHIP_TO_MISMATCH uses an alternate action", () => {
     const overrideRequest = {
       action: "BLOCK_AND_NOTIFY",
-      reason_tag: "policy_exception",
+      reason_tag: "OTHER",
       notes: "Manager blocked pending freight realignment.",
     };
     expect(overrideRequest.action).not.toBe("ESCALATE");

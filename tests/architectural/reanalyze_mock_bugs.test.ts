@@ -112,7 +112,7 @@ describe("Mock write updated_at persistence (Bug #2 — covers every action)", (
     await assertUpdatedAtAdvances("exc-014", () =>
       exceptionsApi.disposition(
         "exc-014",
-        { action: "NO_ACTION", notes: "rejecting", reason_tag: "other" },
+        { action: "NO_ACTION", notes: "rejecting", reason_tag: "OTHER" },
       ),
     );
   });

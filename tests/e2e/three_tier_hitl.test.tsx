@@ -342,7 +342,7 @@ describe("Three-tier HITL invariants — PRICE_HOLD_RELEASE", () => {
     const req: DispositionRequest = {
       action: "ALLOW_BOTH",
       notes: "Manager override: customer accepted current pricing.",
-      reason_tag: "policy_exception",
+      reason_tag: "OTHER",
     };
     expect(req.notes.length).toBeGreaterThan(0);
   });
@@ -366,7 +366,7 @@ describe("Three-tier HITL invariants — EDI_MISMATCH", () => {
     const req: DispositionRequest = {
       action: "BLOCK_AND_NOTIFY",
       notes: "Manager confirms hard reject; notify buyer of SKU mismatch.",
-      reason_tag: "policy_exception",
+      reason_tag: "OTHER",
     };
     expect(req.notes.length).toBeGreaterThan(0);
   });

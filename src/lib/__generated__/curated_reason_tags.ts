@@ -160,4 +160,13 @@ export const ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT: Readonly<Record<string, rea
   ]
 };
 
+export const LEGACY_GLOBAL_REASON_TAGS = [
+  "customer_concession",
+  "contract_stale",
+  "data_error",
+  "policy_exception",
+  "agent_misclassification",
+  "other"
+] as const;
+
 export type CuratedIntent = keyof typeof ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT;

@@ -34,8 +34,33 @@ import type { HealthResponse, ExceptionSummary, LifecycleState, LineItem, OrderA
 import {
   ALLOWED_OVERRIDE_REASON_TAGS,
   ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT,
+  LEGACY_GLOBAL_REASON_TAGS,
 } from "./__generated__/curated_reason_tags";
 import { ROLE_PERMISSIONS } from "./roles";
+
+// Mirrors asoe2/constraints/specs.py::is_valid_reason_tag_for_write.
+// Curated intents narrow the vocab to their per-intent UPPERCASE
+// set; non-curated / unknown intents fall through to the LEGACY
+// global lowercase pool only (matches asoe2's `_GLOBAL_REASON_TAGS`
+// fallback — not the union of every curated tag). Never silently
+// upper-cases.
+export function isValidReasonTagForWrite(
+  intent: string | undefined | null,
+  tag: string,
+): boolean {
+  if (intent && intent in ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT) {
+    const curated = ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT[intent];
+    return curated.includes(tag);
+  }
+  return (LEGACY_GLOBAL_REASON_TAGS as readonly string[]).includes(tag);
+}
+
+// Read-side grandfathering: historical audit-log rows may carry
+// any tag the wire envelope (AllowedOverrideReasonTag) ever included.
+// Used by trace / events renderers, never by write paths.
+export function isValidReasonTagForRead(tag: string): boolean {
+  return (ALLOWED_OVERRIDE_REASON_TAGS as readonly string[]).includes(tag);
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MOCK_DELAY = 400;
@@ -1531,6 +1556,15 @@ export const exceptionsApi = {
     if (!exc) throw new Error("Exception not found");
     if (!request.notes || !request.notes.trim()) {
       throw new Error("NOTES_REQUIRED: notes are required (SOX audit trail).");
+    }
+    // S8: mirror asoe2's is_valid_reason_tag_for_write so the mock
+    // rejects lowercase legacy tags for curated intents, exactly as
+    // the live backend does. Error shape matches the asoe2 422
+    // payload so the UI's toast renderer doesn't fork on mode.
+    if (!isValidReasonTagForWrite(exc.intent, request.reason_tag)) {
+      throw new Error(
+        `INVALID_REASON_TAG: reason_tag '${request.reason_tag}' is not allowed for intent ${exc.intent ?? "<unknown>"}`,
+      );
     }
     // Mock does not persist recommended_action on the summary; treat the
     // chosen action as APPROVE when it matches a minimal known default,
