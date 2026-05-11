@@ -16,6 +16,7 @@ import { render, screen } from "@testing-library/react";
 
 import { CaseDetailPanel } from "@/app/cases/CaseDetailPanel";
 import type { OrderCase } from "@/types/cases";
+import type { ExceptionDetail } from "@/types/exceptions";
 
 
 function mockCase(over: Partial<OrderCase> = {}): OrderCase {
@@ -92,24 +93,17 @@ describe("CaseDetailPanel — Compliance hits section", () => {
 
 
 describe("CaseDetailPanel — Attached records stack (Phase 28.5.x)", () => {
-  function mockRecord(over: Partial<{ id: string; order_id: string; intent: string; lifecycle_state: string }> = {}) {
+  function mockRecord(over: Partial<{ id: string; order_id: string; intent: string }> = {}): ExceptionDetail {
     return {
       id: over.id ?? "exc-A",
       tenant_id: "acme-corp",
       order_id: over.order_id ?? "PO-A",
       event_type: "EDI_850_PRICE_MISMATCH",
       intent: over.intent ?? "CONTRACTUAL_CORRECTION",
-      lifecycle_state: over.lifecycle_state ?? "PENDING_REVIEW",
+      lifecycle_state: "PENDING_REVIEW",
       shadow_verdict: "GREEN",
       selected_recipe: "PriceAdjustmentRecipe",
-      final_status: null,
-      account_id: null,
-      account_name: null,
-      trace_id: "trace-A",
       resolution_data: {},
-      resolved_by: null,
-      resolved_action: null,
-      resolution_notes: null,
       reanalysis_history: [],
       created_at: "2026-05-10T08:00:00Z",
       updated_at: "2026-05-10T08:00:00Z",
@@ -136,10 +130,12 @@ describe("CaseDetailPanel — Attached records stack (Phase 28.5.x)", () => {
         orderCase={mockCase()}
         attachedRecords={[
           mockRecord({ id: "exc-A", order_id: "PO-A" }),
-          mockRecord({
-            id: "exc-B", order_id: "PO-B", intent: "DUPLICATE_PO",
+          {
+            ...mockRecord({
+              id: "exc-B", order_id: "PO-B", intent: "DUPLICATE_PO",
+            }),
             lifecycle_state: "RESOLVED",
-          }),
+          },
         ]}
       />,
     );
