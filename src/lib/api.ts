@@ -31,6 +31,10 @@ import type {
   PipelineTopology,
 } from "@/types/api";
 import type { HealthResponse, ExceptionSummary, LifecycleState, LineItem, OrderAnalysis, ReanalysisEntry } from "@/types/exceptions";
+import {
+  ALLOWED_OVERRIDE_REASON_TAGS,
+  ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT,
+} from "./__generated__/curated_reason_tags";
 import { ROLE_PERMISSIONS } from "./roles";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -1211,14 +1215,18 @@ const MOCK_HEALTH: HealthResponse = {
   // authoritative at runtime (/api/v1/health); this mock list exists only for
   // local development.
   allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION", "ONE_CLICK_APPROVE", "STANDARD_REVIEW", "LOW_CONFIDENCE_FLAG", "AUTO_CORRECT", "REQUEST_CLARIFICATION", "REJECT"],
-  // Mirrors asoe2/constraints/specs.py AllowedOverrideReasonTag.
-  allowed_override_reason_tags: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
-  // Per-intent narrowing (Phase 3 Option A framework). Mock currently
-  // seeds every intent with the full global set — matches the backend's
-  // behavior until real curation arrives.
+  // Sourced from asoe2/constraints/specs.py via the snapshot at
+  // tests/contract/snapshots/curated_reason_tags.json (regen with
+  // `npm run sync:reason-tags`). The 2026-05-10 panel curated every
+  // intent with UPPERCASE per-intent vocabularies; the legacy
+  // lowercase globals stay on `allowed_override_reason_tags` for
+  // grandfathered read-side audit-log rows.
+  allowed_override_reason_tags: [
+    ...ALLOWED_OVERRIDE_REASON_TAGS,
+  ],
   allowed_override_reason_tags_by_intent: Object.fromEntries(
-    ["CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR", "DUPLICATE_PO", "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY", "PALLET_CONFIG", "DELIVERY_DELAY", "PRICE_HOLD_RELEASE", "EDI_MISMATCH", "MANUAL_ORDER_INTAKE"].map(
-      (intent) => [intent, ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"]],
+    Object.entries(ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT).map(
+      ([intent, tags]) => [intent, [...tags]],
     ),
   ),
 };

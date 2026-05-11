@@ -1,0 +1,92 @@
+// Scenario: DUPLICATE_PO record at high value; override needs a
+// four-eyes cosign before applying. Touches the cosign banner path
+// in ExceptionDetailPanel.
+import type { BehaviourScenario } from "./_types";
+
+export const DUPLICATE_PO__high_value_needs_cosign: BehaviourScenario = {
+  id: "DUPLICATE_PO__high_value_needs_cosign",
+  slo_category: "p99_blocker",
+  customer_visible_urgency: "real_time",
+  intent: "DUPLICATE_PO",
+  case: {
+    case_id: "case-dup-001",
+    tenant_id: "acme-corp",
+    source: "automated_order",
+    source_channel: "edi_x12_850",
+    customer_po_number: "PO-2026-9001",
+    edi_transaction_id: "EDI-7782",
+    opened_at: "2026-05-10T09:00:00Z",
+    updated_at: "2026-05-10T09:00:00Z",
+    status: "OPEN_AWAITING_HUMAN",
+    sla_deadline: "2026-05-10T11:00:00Z",
+    tier: 2,
+    child_intents: ["DUPLICATE_PO"],
+  },
+  records: [
+    {
+      id: "exc-dup-001",
+      tenant_id: "acme-corp",
+      order_id: "PO-2026-9001",
+      event_type: "EDI_850_DUPLICATE_PO",
+      intent: "DUPLICATE_PO",
+      lifecycle_state: "PENDING_COSIGN",
+      shadow_verdict: "RED",
+      selected_recipe: "DuplicatePORecipe.py",
+      final_status: "MANUAL_REVIEW_REQUIRED",
+      created_at: "2026-05-10T09:00:00Z",
+      updated_at: "2026-05-10T09:30:00Z",
+      account_id: "acct-walmart-na",
+      account_name: "Walmart North America",
+      parent_case_id: "case-dup-001",
+    },
+  ],
+  detail: {
+    id: "exc-dup-001",
+    tenant_id: "acme-corp",
+    order_id: "PO-2026-9001",
+    event_type: "EDI_850_DUPLICATE_PO",
+    intent: "DUPLICATE_PO",
+    lifecycle_state: "PENDING_COSIGN",
+    shadow_verdict: "RED",
+    selected_recipe: "DuplicatePORecipe.py",
+    final_status: "MANUAL_REVIEW_REQUIRED",
+    created_at: "2026-05-10T09:00:00Z",
+    updated_at: "2026-05-10T09:30:00Z",
+    account_id: "acct-walmart-na",
+    account_name: "Walmart North America",
+    parent_case_id: "case-dup-001",
+    resolution_data: {
+      pending_override: {
+        initiator: "alice@acme.com",
+        action: "ALLOW_BOTH",
+        reason_tag: "INTENTIONAL_REORDER",
+        notes: "Buyer confirmed second order via phone.",
+      },
+    },
+  },
+  allowed_actions: {
+    // Quick-Approve / Reject are disabled while a cosign is pending;
+    // the only valid path is the cosign banner.
+    approve: { allowed: false },
+    reject: { allowed: false },
+    override: {
+      allowed: false,
+      reason_tags: [
+        "INTENTIONAL_REORDER",
+        "AMENDED_PO",
+        "BLANKET_RELEASE",
+        "SYSTEM_RETRY_VALID",
+        "DIFFERENT_SHIP_TO",
+        "CONFIRMED_DUPLICATE",
+        "PARTIAL_OVERLAP",
+        "OTHER",
+      ],
+    },
+    escalate: { allowed: true },
+    reanalyze: { allowed: false },
+    cosign: { allowed: true },
+  },
+  expected_ws_events: [],
+  tool_call_sequence: ["lookup_existing_po", "compare_line_items", "score_duplicate_likelihood"],
+  tier: 2,
+};
