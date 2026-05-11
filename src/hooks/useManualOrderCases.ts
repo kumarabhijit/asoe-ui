@@ -29,19 +29,38 @@ interface UseCasesReturn {
   total: number;
   loading: boolean;
   error: string | null;
+  /** True when the backend returned `total > cases.length`, i.e.
+   *  the operator is only seeing the first page. Pages render a
+   *  truncation banner from this. Cursor pagination is tracked
+   *  separately — see
+   *  docs/test-strategy/cases-cursor-pagination-tracking.md. */
+  truncated: boolean;
   /** Force re-fetch. Pages call this from their `useWebSocket` event
    *  handler on `case_*` events, and after operator-driven actions
    *  that mutate the case server-side. */
   refetch: () => void;
 }
 
-export function useCases(source?: CaseSource): UseCasesReturn {
+export interface UseCasesOptions {
+  /** Page size. Defaults to the backend default (200). Backend caps
+   *  at 500. When `total` exceeds the returned items, the hook flips
+   *  `truncated: true` so the page can show a "Showing N of M"
+   *  disclosure. */
+  limit?: number;
+}
+
+export function useCases(
+  source?: CaseSource,
+  options?: UseCasesOptions,
+): UseCasesReturn {
   const [cases, setCases] = useState<CaseListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Bumped by `refetch()` to trigger an effect re-run.
   const [refetchCounter, setRefetchCounter] = useState(0);
+
+  const limit = options?.limit;
 
   const refetch = useCallback(() => {
     setRefetchCounter((n) => n + 1);
@@ -54,8 +73,11 @@ export function useCases(source?: CaseSource): UseCasesReturn {
     // spinner on every case_update would defeat the live-count UX.
     const isInitial = refetchCounter === 0;
     if (isInitial) setLoading(true);
+    const params: { source?: CaseSource; limit?: number } = {};
+    if (source) params.source = source;
+    if (limit !== undefined) params.limit = limit;
     casesApi
-      .list(source ? { source } : undefined)
+      .list(Object.keys(params).length > 0 ? params : undefined)
       .then((res) => {
         if (cancelled) return;
         setCases(res.items);
@@ -74,17 +96,26 @@ export function useCases(source?: CaseSource): UseCasesReturn {
     return () => {
       cancelled = true;
     };
-  }, [source, refetchCounter]);
+  }, [source, limit, refetchCounter]);
 
-  return { cases, total, loading, error, refetch };
+  return {
+    cases,
+    total,
+    loading,
+    error,
+    truncated: total > cases.length,
+    refetch,
+  };
 }
 
 /**
  * useManualOrderCases — convenience wrapper. Kept as the previous
  * named export so callers in /inbox don't need to update.
  */
-export function useManualOrderCases(): UseCasesReturn {
-  return useCases("manual_order");
+export function useManualOrderCases(
+  options?: UseCasesOptions,
+): UseCasesReturn {
+  return useCases("manual_order", options);
 }
 
 /**

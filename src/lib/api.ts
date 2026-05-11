@@ -3574,6 +3574,11 @@ export const casesApi = {
     since?: string;
     /** Free-text fuzzy match across PO/SO/customer/case_id. */
     q?: string;
+    /** Page size. Backend default 200, max 500
+     *  (asoe2/api/routes/cases.py::list_cases::limit). Mock honours
+     *  the same bounds. Cursor pagination is tracked separately —
+     *  see docs/test-strategy/cases-cursor-pagination-tracking.md. */
+    limit?: number;
   }): Promise<{ items: CaseListItem[]; total: number }> {
     if (USE_REAL_API) {
       return http<{ items: CaseListItem[]; total: number }>("/api/v1/cases", {
@@ -3583,6 +3588,7 @@ export const casesApi = {
           intents: params?.intents,
           since: params?.since,
           q: params?.q,
+          limit: params?.limit,
         },
       });
     }
@@ -3610,7 +3616,14 @@ export const casesApi = {
           .some((v) => v && v.toLowerCase().includes(needle)),
       );
     }
-    return { items, total: items.length };
+    const total = items.length;
+    // Apply backend-parity limit (default 200, max 500). The mock
+    // mirrors the asoe2 contract so a UI that ignores `total`
+    // surfaces the truncation in dev, not first in prod.
+    const requestedLimit = params?.limit ?? 200;
+    const limit = Math.max(1, Math.min(500, requestedLimit));
+    if (items.length > limit) items = items.slice(0, limit);
+    return { items, total };
   },
 
   async get(case_id: string): Promise<OrderCase | null> {
