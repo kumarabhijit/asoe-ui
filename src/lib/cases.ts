@@ -15,6 +15,7 @@
  * No `.tsx` file should ever switch on a status literal.
  */
 import type { CaseStatus } from "@/types/cases";
+import type { HealthResponse } from "@/types/exceptions";
 
 /**
  * The seven case statuses grouped into three operator-meaningful
@@ -284,4 +285,38 @@ export function clusterFor(
     }
   }
   return null;
+}
+
+// Quick-Approve / quick-Reject submit a disposition with a single
+// "no specific override reason" sentinel. The May-2026 panel curated
+// per-intent vocabularies are UPPERCASE; the legacy global set is
+// lowercase. `pickQuickActionReasonTag` reads the value the live
+// backend would have served via `useHealth`, so the UI doesn't carry
+// a casing assumption (Guardrail #1: no per-intent dispatch in page
+// code; Compliance: no silent auto-uppercase that would land a tag
+// in the audit log the user never selected).
+//
+// Returns `null` when health is unavailable. Callers MUST surface an
+// error toast and disable the action in that branch — the Architect
+// + Compliance + Frontend amendments to the 2026-05-11 rollout plan
+// forbid a literal "OTHER" fallback.
+export function pickQuickActionReasonTag(
+  intent: string | undefined,
+  health: HealthResponse | null | undefined,
+): string | null {
+  if (!health) return null;
+  const perIntent = intent
+    ? health.allowed_override_reason_tags_by_intent?.[intent]
+    : undefined;
+  const pool = (perIntent && perIntent.length > 0)
+    ? perIntent
+    : (health.allowed_override_reason_tags ?? []);
+  if (pool.length === 0) return null;
+  // Prefer the explicit OTHER sentinel — every curated vocab carries
+  // one. Fall back to lowercase "other" for the legacy global set.
+  if (pool.includes("OTHER")) return "OTHER";
+  if (pool.includes("other")) return "other";
+  // Last resort: the first tag in the pool. Surfaces in code review
+  // because it implies the backend dropped both sentinels.
+  return pool[0] ?? null;
 }

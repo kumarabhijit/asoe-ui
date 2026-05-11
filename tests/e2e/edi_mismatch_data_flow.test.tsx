@@ -92,7 +92,11 @@ describe("Guardrail #2 — EDI_MISMATCH in health endpoint", () => {
   it("override-reason vocabulary exists for the new intent", () => {
     const tags = MOCK_HEALTH.allowed_override_reason_tags_by_intent?.EDI_MISMATCH;
     expect(tags).toBeDefined();
-    expect(tags).toContain("other");
+    // 2026-05-10 panel curated EDI_MISMATCH with UPPERCASE per-intent
+    // tags; the mandatory sentinel is OTHER (uppercase). Lowercase
+    // "other" lives only in the legacy global set on
+    // `allowed_override_reason_tags` for read-side grandfathering.
+    expect(tags).toContain("OTHER");
   });
 });
 

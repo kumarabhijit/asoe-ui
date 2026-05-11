@@ -95,7 +95,9 @@ describe("Guardrail #2 — PRICE_HOLD_RELEASE in health endpoint", () => {
     const tags = MOCK_HEALTH.allowed_override_reason_tags_by_intent?.PRICE_HOLD_RELEASE;
     expect(tags).toBeDefined();
     expect(tags?.length).toBeGreaterThan(0);
-    expect(tags).toContain("other"); // mandatory fallback
+    // 2026-05-10 panel curated PRICE_HOLD_RELEASE with UPPERCASE
+    // per-intent tags; the mandatory sentinel is OTHER (uppercase).
+    expect(tags).toContain("OTHER");
   });
 });
 

@@ -8,6 +8,10 @@
 import type { ExceptionSummary, ExceptionDetail, HealthResponse, ShadowVerdict } from "@/types/exceptions";
 import type { StatsResponse, TraceResponse } from "@/types/api";
 import type { AuthUser } from "@/types/auth";
+import {
+  ALLOWED_OVERRIDE_REASON_TAGS,
+  ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT,
+} from "@/lib/__generated__/curated_reason_tags";
 
 /* ── Auth fixtures (one per role) ──────────────────────────────────── */
 
@@ -183,17 +187,15 @@ export const MOCK_HEALTH: HealthResponse = {
     "ONE_CLICK_APPROVE", "STANDARD_REVIEW", "LOW_CONFIDENCE_FLAG",
     "AUTO_CORRECT", "REQUEST_CLARIFICATION", "REJECT",
   ],
-  allowed_override_reason_tags: ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
+  // Sourced from asoe2/constraints/specs.py via the snapshot at
+  // tests/contract/snapshots/curated_reason_tags.json. Keeps fixtures
+  // and src/lib/api.ts MOCK_HEALTH on the same wire shape; parity
+  // pinned by tests/contract/test_reason_tag_vocab_parity.test.ts.
+  allowed_override_reason_tags: [...ALLOWED_OVERRIDE_REASON_TAGS],
   allowed_override_reason_tags_by_intent: Object.fromEntries(
-    [
-      "CONTRACTUAL_CORRECTION", "CREDIT_BLOCK", "MASS_PRICING_ERROR",
-      "DUPLICATE_PO", "PRICE_HOLD_RELEASE", "EDI_MISMATCH",
-      "BACK_ORDER", "OVER_MAX", "MIN_ORDER_QTY",
-      "PALLET_CONFIG", "DELIVERY_DELAY", "MANUAL_ORDER_INTAKE",
-    ].map((intent) => [
-      intent,
-      ["customer_concession", "contract_stale", "data_error", "policy_exception", "agent_misclassification", "other"],
-    ]),
+    Object.entries(ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT).map(
+      ([intent, tags]) => [intent, [...tags]],
+    ),
   ),
 };
 

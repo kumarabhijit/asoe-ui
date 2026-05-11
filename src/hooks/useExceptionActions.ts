@@ -28,8 +28,10 @@
 
 import { useCallback, useState, type MutableRefObject } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useHealth } from "@/hooks/useHealth";
 import { useToast } from "@/components/ui/Toast";
 import { exceptionsApi } from "@/lib/api";
+import { pickQuickActionReasonTag } from "@/lib/cases";
 import { notesRequiredForReason } from "@/app/exceptions/reasonCodeClusters";
 import type { ActionInFlight } from "@/components/ui/AgentReasoningCard";
 import type { ExceptionDetail } from "@/types/exceptions";
@@ -57,6 +59,7 @@ export interface UseExceptionActionsOptions {
 export function useExceptionActions(opts: UseExceptionActionsOptions) {
   const { exceptionId, detail, setDetail, onActionComplete, refreshDetail } = opts;
   const { user, hasPermission } = useAuth();
+  const { health } = useHealth();
   const { addToast } = useToast();
 
   const [actionInFlight, setActionInFlight] = useState<ActionInFlight>(null);
@@ -89,12 +92,17 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       addToast("warning", "No recipe recommendation on this exception — use Override to choose an action.");
       return;
     }
+    const reasonTag = pickQuickActionReasonTag(detail?.intent, health);
+    if (!reasonTag) {
+      addToast("warning", "Health unavailable — actions disabled. Retry in a moment.");
+      return;
+    }
     setActionInFlight("approve");
     try {
       const updated = await exceptionsApi.disposition(exceptionId, {
         action: recommended,
         notes: comment || "Approved by reviewer",
-        reason_tag: "other",
+        reason_tag: reasonTag,
       });
       setDetail(updated);
       addToast("success", `Exception ${exceptionId} approved (${recommended})`);
@@ -103,7 +111,7 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       console.error("Approve failed:", err);
       addToast("error", err instanceof Error ? err.message : "Failed to approve exception.");
     } finally { setActionInFlight(null); }
-  }, [exceptionId, hasPermission, addToast, recommendedAction, setDetail, onActionComplete]);
+  }, [exceptionId, hasPermission, addToast, recommendedAction, setDetail, onActionComplete, detail, health]);
 
   /** Reject = NO_ACTION. Server classifies sub_type as REJECT. */
   const handleReject = useCallback(async (comment: string) => {
@@ -111,12 +119,17 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       addToast("warning", "Permission denied: your role cannot reject exceptions.");
       return;
     }
+    const reasonTag = pickQuickActionReasonTag(detail?.intent, health);
+    if (!reasonTag) {
+      addToast("warning", "Health unavailable — actions disabled. Retry in a moment.");
+      return;
+    }
     setActionInFlight("reject");
     try {
       const updated = await exceptionsApi.disposition(exceptionId, {
         action: "NO_ACTION",
         notes: comment || "Rejected by reviewer",
-        reason_tag: "other",
+        reason_tag: reasonTag,
       });
       setDetail(updated);
       addToast("success", `Exception ${exceptionId} rejected`);
@@ -125,7 +138,7 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       console.error("Reject failed:", err);
       addToast("error", err instanceof Error ? err.message : "Failed to reject exception.");
     } finally { setActionInFlight(null); }
-  }, [exceptionId, hasPermission, addToast, setDetail, onActionComplete]);
+  }, [exceptionId, hasPermission, addToast, setDetail, onActionComplete, detail, health]);
 
   /**
    * Escalate is a routing action — its own endpoint with its own
