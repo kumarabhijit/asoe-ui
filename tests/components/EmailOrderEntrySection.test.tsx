@@ -71,7 +71,11 @@ describe("EmailOrderEntrySection", () => {
 
     it("STANDARD_REVIEW renders 'Standard review'", () => {
       render(<EmailOrderEntrySection data={{ ...base, classification: "STANDARD_REVIEW" }} />);
-      expect(screen.getByText(/Standard review/i)).toBeInTheDocument();
+      // Issue #133 PO #14 — the ConstraintsPipeline graph also names
+      // the classification on the terminal node, so the label
+      // appears both in the badge and in the SVG. Either presence
+      // satisfies the assertion.
+      expect(screen.getAllByText(/Standard review/i).length).toBeGreaterThan(0);
     });
 
     it("LOW_CONFIDENCE renders 'Low confidence'", () => {
@@ -87,7 +91,7 @@ describe("EmailOrderEntrySection", () => {
           }}
         />,
       );
-      expect(screen.getByText(/Low confidence/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Low confidence/i).length).toBeGreaterThan(0);
     });
 
     it("FATAL_REJECT renders 'Fatal reject'", () => {
@@ -104,7 +108,7 @@ describe("EmailOrderEntrySection", () => {
           }}
         />,
       );
-      expect(screen.getByText(/Fatal reject/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Fatal reject/i).length).toBeGreaterThan(0);
     });
 
     it("renders an unknown classification with the neutral fallback rather than crashing (CLAUDE.md Guardrail #1)", () => {
@@ -115,7 +119,9 @@ describe("EmailOrderEntrySection", () => {
       expect(() =>
         render(<EmailOrderEntrySection data={{ ...base, classification: newLiteral }} />),
       ).not.toThrow();
-      expect(screen.getByText("PENDING_REVALIDATION")).toBeInTheDocument();
+      // Surfaced verbatim both in the classification badge and the
+      // ConstraintsPipeline terminal node caption.
+      expect(screen.getAllByText("PENDING_REVALIDATION").length).toBeGreaterThan(0);
     });
   });
 

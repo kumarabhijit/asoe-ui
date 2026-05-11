@@ -54,6 +54,13 @@ export interface OrderCase {
 
   opened_at: string;
   closed_at?: string | null;
+  // Issue #133 PO #17 — canonical "last activity" timestamp, bumped
+  // by the CaseStore on every mutation (status flip, pending
+  // override write, correlation-key append). Mirrors
+  // `OrderCase.updated_at` in `asoe2/contracts/models.py`. Always
+  // present from V014 onward; the optional marker covers the V014
+  // backfill window for tests that fixture old payloads.
+  updated_at?: string | null;
   status: CaseStatus;
   sla_deadline?: string | null;
 

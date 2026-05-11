@@ -232,6 +232,43 @@ export function actionLabel(action: string | null | undefined): ActionLabel | nu
 }
 
 /**
+ * Format a "last activity" relative timestamp for the case-list row
+ * and case-detail header (issue #133 PO #17). Operators reading the
+ * SLA queue want to see at a glance whether a case is fresh or has
+ * been sitting; absolute ISO strings buried at the end of the row
+ * don't carry that signal.
+ *
+ * - <60s    → "just now"
+ * - <60m    → "5m ago"
+ * - <24h    → "3h ago"
+ * - <7d     → "2d ago"
+ * - else    → ISO date portion ("2026-05-11") as a fallback that
+ *             never lies about staleness
+ *
+ * Pure function: callers pass the `now` reference (typically from
+ * `useSlaTicker`) so the label updates with the rest of the SLA
+ * countdown. Returns `null` when the input is absent so the caller
+ * can structurally omit the row (Guardrail #6).
+ */
+export function lastActivityLabel(
+  iso: string | null | undefined,
+  now: Date = new Date(),
+): string | null {
+  if (!iso) return null;
+  const target = new Date(iso).getTime();
+  if (Number.isNaN(target)) return null;
+  const ms = now.getTime() - target;
+  if (ms < 60_000) return "just now";
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return iso.slice(0, 10);
+}
+
+/**
  * Lookup the cluster a status belongs to. Returns null when the
  * status isn't covered (defensive — backend addition without a UI
  * label entry). The chip bar treats unknown statuses as Terminal

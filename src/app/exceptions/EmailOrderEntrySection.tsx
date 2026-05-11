@@ -17,6 +17,7 @@ import {
   AlertTriangle, CheckCircle2, Clock, Mail, ShieldCheck, ShieldX,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { ConstraintsPipeline } from "@/components/ui/ConstraintsPipeline";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { autonomyLevelLabel } from "@/lib/cases";
 import type {
@@ -98,14 +99,32 @@ export function EmailOrderEntrySection({ data }: EmailOrderEntrySectionProps) {
         </div>
       </div>
 
-      {/* Non-disable-able floor checks — the four-row evidence grid.
-          Each is audit-bearing per ADR-034 §3.2; absence of the
-          floor_status block means the composer should have routed to
-          AUDIT_CONTEXT_MISSING. EvidenceBlock handles the structural
-          absence + dev warning. */}
+      {/* Constraints pipeline — graphical projection of the gate
+          sequence (PO #14, issue #133). Renders the four floor
+          checks + validations summary + terminal classification as
+          a left-to-right flow so the operator can see exactly which
+          gate broke. Wrapped in EvidenceBlock to inherit the
+          audit-bearing absence handling — if floor_status is missing,
+          the dev warning fires and the section is hidden. */}
       <div className="mb-16">
         <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-8">
-          Non-disable-able floor checks
+          Constraints pipeline
+        </div>
+        <EvidenceBlock tier="audit-bearing" value={data.floor_status}>
+          {() => (
+            <div className="overflow-x-auto">
+              <ConstraintsPipeline data={data} />
+            </div>
+          )}
+        </EvidenceBlock>
+      </div>
+
+      {/* Detail row for the deterministic floor checks. Kept as the
+          textual evidence breakdown beneath the graph so audit users
+          can read each gate's status without parsing the SVG. */}
+      <div className="mb-16">
+        <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-8">
+          Floor checks
         </div>
         <EvidenceBlock tier="audit-bearing" value={data.floor_status}>
           {(floor) => {

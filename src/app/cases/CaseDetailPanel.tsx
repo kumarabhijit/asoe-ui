@@ -29,7 +29,7 @@ import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { PolicyHitBadge } from "@/components/ui/PolicyHitBadge";
 import type { CaseSource, OrderCase, SlaBand } from "@/types/cases";
 import type { ExceptionDetailResponse } from "@/types/api";
-import { STATUS_LABEL, sourceChannelLabel } from "@/lib/cases";
+import { STATUS_LABEL, lastActivityLabel, sourceChannelLabel } from "@/lib/cases";
 import { useSlaTicker } from "@/hooks/useSlaTicker";
 
 import { slaSnapshot } from "./page";
@@ -126,6 +126,22 @@ export function CaseDetailPanel({
               {sla.label}
             </Badge>
           )}
+          {/* PO #17 — "Last activity" surfaces in the header line so the
+              CSR sees freshness next to status. Structurally omitted
+              when updated_at hasn't been populated (V014 backfill
+              window). Ticker drives the relative label. */}
+          {(() => {
+            const activity = lastActivityLabel(orderCase.updated_at, now);
+            return activity ? (
+              <span
+                className="text-caption text-text-tertiary"
+                aria-label={`Last activity ${activity}`}
+                title={orderCase.updated_at ?? undefined}
+              >
+                Last activity {activity}
+              </span>
+            ) : null;
+          })()}
           <span className="ml-auto text-caption text-text-tertiary">
             {STATUS_LABEL[orderCase.status] ?? orderCase.status}
           </span>
