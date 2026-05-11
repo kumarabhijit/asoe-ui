@@ -30,7 +30,11 @@ export async function loginAs(
   await expect(passwordInput).toBeVisible({ timeout: 10_000 });
   await passwordInput.fill("any-non-empty-password");
   await page.getByRole("button", { name: /sign in/i }).click();
-  await page.waitForURL(/\/(exceptions|inbox|dashboard)/, { timeout: 20_000 });
+  // Issue #133 (PO #5/#6) made /home the operational landing surface;
+  // root / now redirects there. Pre-#133 sessions could also land on
+  // /exceptions or /dashboard depending on the callbackUrl that
+  // the login form was carrying.
+  await page.waitForURL(/\/(home|exceptions|dashboard)/, { timeout: 20_000 });
 }
 
 /**

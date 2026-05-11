@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
+import { autonomyLevelLabel } from "@/lib/cases";
 import type {
   EmailOrderEntryAnalysisData,
   EmailOrderEntryClassification,
@@ -126,7 +127,11 @@ export function EmailOrderEntrySection({ data }: EmailOrderEntrySectionProps) {
         </EvidenceBlock>
       </div>
 
-      {/* Validation failures — contextual list. Empty list = nothing rendered. */}
+      {/* Validations — contextual list. Empty list = nothing rendered.
+          PO #14 (issue #133): operator vocabulary is "validations"
+          (or "constraints"); the older "failures" copy was both
+          negatively framed and unclear about what the section is
+          actually showing — the constraints that didn't hold. */}
       <EvidenceBlock
         tier="contextual"
         value={data.validation_failures.length > 0 ? data.validation_failures : null}
@@ -134,7 +139,7 @@ export function EmailOrderEntrySection({ data }: EmailOrderEntrySectionProps) {
         {(failures) => (
           <div className="mb-16">
             <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
-              Validation failures
+              Validations
             </div>
             <ul className="m-0 pl-20 text-body text-text-secondary leading-normal">
               {(failures as string[]).map((code) => (
@@ -183,11 +188,14 @@ export function EmailOrderEntrySection({ data }: EmailOrderEntrySectionProps) {
         </EvidenceBlock>
       </div>
 
-      {/* Autonomy footer */}
+      {/* Autonomy footer — PO #15 (issue #133): bare "L1"/"L2"/"L3"
+          codes don't tell the operator what the level means in
+          plain language. `autonomyLevelLabel` is the shared map
+          (Guardrail #1 default-fallback). */}
       <div className="flex items-center gap-8 px-12 py-8 bg-surface-secondary rounded-sm text-caption">
         <Clock size={12} className="text-text-tertiary" />
         <span className="text-text-tertiary font-semibold">Autonomy:</span>
-        <span className="text-text-secondary">{data.autonomy_level}</span>
+        <span className="text-text-secondary">{autonomyLevelLabel(data.autonomy_level)}</span>
       </div>
     </section>
   );

@@ -51,11 +51,13 @@ import { Button } from "@/components/ui/Button";
 import { useHealth } from "@/hooks/useHealth";
 import { useKeyboardListNav } from "@/hooks/useKeyboardListNav";
 import { useSavedViews, type CaseSavedViewFilters } from "@/hooks/useSavedViews";
+import { useSlaTicker } from "@/hooks/useSlaTicker";
 import { casesApi, type CaseListItem } from "@/lib/api";
 import {
   CASE_STATUS_CLUSTERS,
   STATUS_LABEL,
   clusterFor,
+  sourceChannelLabel,
 } from "@/lib/cases";
 import type { CaseSource, SlaBand } from "@/types/cases";
 import { cn } from "@/lib/utils";
@@ -197,7 +199,10 @@ export function CaseListPane({
   // client-side so the UI works whether the parent refetched yet
   // or not (idempotent — backend + client filters are pure
   // subset operations).
-  const now = useMemo(() => new Date(), []);
+  // PO #20 (issue #133): `useSlaTicker` ticks `now` once a minute
+  // so the SLA band sort order and per-row labels stay live without
+  // a refetch.
+  const now = useSlaTicker();
 
   // Phase 28.5.x V5.1.2 — match-reason tracking. When the operator
   // types a free-text query, we record WHICH field each remaining
@@ -643,7 +648,7 @@ function CaseRow({
       <div className="flex items-center gap-8 mb-6">
         <Badge variant="neutral" size="sm">
           {SOURCE_ICON[case_.source as CaseSource] ?? SOURCE_ICON.default}
-          <span className="ml-4">{case_.source_channel}</span>
+          <span className="ml-4">{sourceChannelLabel(case_.source_channel)}</span>
         </Badge>
         <Badge
           variant={SLA_BAND_VARIANT[slaBand]}

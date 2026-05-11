@@ -248,11 +248,14 @@ export function __resetMockIdempotencyCache(): void {
 
 /* ── Mock data — 5 seed users matching asoe2/api/users.py ─────────── */
 
-/** Tab visibility computed from permissions — mirrors api/users.py compute_visible_tabs */
+/** Tab visibility computed from permissions — mirrors api/users.py compute_visible_tabs.
+ *  Issue #133 — added "home" (anyone who can read exceptions can see
+ *  the operational landing surface) and retired "inbox" (the route
+ *  is now a server redirect into /cases?source=manual_order). */
 function computeVisibleTabs(permissions: string[]): string[] {
   const ps = new Set(permissions);
   const tabs: string[] = [];
-  if (ps.has("exceptions:read")) { tabs.push("inbox", "exceptions", "cases"); }
+  if (ps.has("exceptions:read")) { tabs.push("home", "exceptions", "cases"); }
   if (ps.has("dashboard:read")) { tabs.push("dashboard"); }
   if (ps.has("rules:write") || ps.has("policy:write") || ps.has("users:manage")) { tabs.push("settings"); }
   return tabs;

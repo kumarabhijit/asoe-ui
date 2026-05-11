@@ -25,13 +25,8 @@ import type { ExceptionDetailResponse } from "@/types/api";
 
 import { CaseDetailPanel } from "../CaseDetailPanel";
 
-const NAV_TABS = [
-  { id: "inbox", label: "Customer Inbox", href: "/inbox" },
-  { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
-  { id: "cases", label: "Cases", href: "/cases" },
-  { id: "dashboard", label: "Dashboard", href: "/dashboard" },
-  { id: "settings", label: "Settings", href: "/settings" },
-];
+import { NAV_TABS } from "@/config/nav-tabs";
+// NAV_TABS consolidated to src/config/nav-tabs.ts (issue #133, PO #9).
 
 export default function CaseDetailPage() {
   const params = useParams<{ id: string }>();

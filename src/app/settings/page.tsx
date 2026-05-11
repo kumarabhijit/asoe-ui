@@ -8,6 +8,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Settings, Users, Shield, Zap, Bell, ShieldAlert } from "lucide-react";
@@ -18,13 +19,8 @@ import { useAuth } from "@/hooks/useAuth";
 
 const SETTINGS_PERMISSIONS = ["rules:write", "policy:write", "users:manage"] as const;
 
-const NAV_TABS = [
-  { id: "inbox", label: "Customer Inbox", href: "/inbox" },
-  { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
-  { id: "cases", label: "Cases", href: "/cases" },
-  { id: "dashboard", label: "Dashboard", href: "/dashboard" },
-  { id: "settings", label: "Settings", href: "/settings" },
-];
+import { NAV_TABS } from "@/config/nav-tabs";
+// NAV_TABS consolidated to src/config/nav-tabs.ts (issue #133, PO #9).
 
 const SETTING_SECTIONS = [
   { icon: Users, label: "User Management", description: "Manage users, roles, and permissions", status: "Coming soon" },
@@ -86,13 +82,18 @@ export default function SettingsPage() {
       />
 
       <main id="main-content" className="max-w-[1440px] mx-auto py-24 px-32">
-        {/* Breadcrumb */}
+        {/* Breadcrumb — PO #6 (issue #133): Home is a real link. */}
         <nav
           aria-label="Breadcrumb"
           className="text-caption text-text-tertiary mb-12 flex items-center gap-6"
         >
-          <span>Home</span>
-          <span className="text-text-quaternary">/</span>
+          <Link
+            href="/home"
+            className="text-text-tertiary hover:text-text-secondary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm"
+          >
+            Home
+          </Link>
+          <span className="text-text-quaternary" aria-hidden>/</span>
           <span className="text-text-secondary">Settings</span>
         </nav>
 

@@ -46,12 +46,17 @@ export const PUBLIC_ROUTES: readonly string[] = [
 // persistent UI surface (redirect-only roots, etc.). The meta-test
 // tolerates them outside the chrome registry.
 export const REDIRECT_ROUTES: readonly string[] = [
-  // src/app/page.tsx is a redirect to /inbox; no chrome of its own.
+  // src/app/page.tsx is a redirect to /home; no chrome of its own.
   "/",
+  // Issue #133, PO #9 — `/inbox` is preserved as a server redirect
+  // into `/cases?source=manual_order`. No chrome; the destination
+  // page is the registered surface.
+  "/inbox",
 ] as const;
 
 export const AUTHENTICATED_ROUTES: readonly AuthenticatedRoute[] = [
-  { path: "/inbox", source: "src/app/inbox/page.tsx" },
+  // Issue #133 (PO #5/#6) — operational landing surface.
+  { path: "/home", source: "src/app/home/page.tsx" },
   { path: "/exceptions", source: "src/app/exceptions/page.tsx" },
   {
     path: "/exceptions/:id",

@@ -10,13 +10,14 @@
 # Default back-target rules. The codegen + chrome-invariant runner
 # uses these to compute the expected back-href for any detail
 # page reached via a flow's `entry`.
+#
+# Issue #133, PO #9 — the legacy /inbox-as-master-detail surface is
+# retired; `/inbox` now server-redirects into
+# `/cases?source=manual_order`. The "Back to Inbox" rule has been
+# replaced with the equivalent rule against the case-list filtered
+# view. The `inbox` referrer alias still resolves on the UI side
+# (BACK_TARGETS in /exceptions/[id]/page.tsx) for deep links.
 back_target_rules:
-  # Detail pages reached from /inbox return to /inbox.
-  - entry_pattern: ^/inbox$
-    detail_pattern: ^/exceptions/[^/]+$
-    back_href: /inbox
-    back_label: Back to Inbox
-
   # Detail pages reached from /exceptions return to the queue.
   - entry_pattern: ^/exceptions$
     detail_pattern: ^/exceptions/[^/]+$
@@ -28,6 +29,12 @@ back_target_rules:
     detail_pattern: ^/cases/[^/]+$
     back_href: /cases
     back_label: Back to Cases
+
+  # /home is the operational landing surface (issue #133 PO #5/#6).
+  - entry_pattern: ^/home$
+    detail_pattern: ^/cases/[^/]+$
+    back_href: /home
+    back_label: Back to Home
 
 # Categories — for organisation; codegen uses the directory name
 # rather than this list, but it keeps reviewers in sync with what

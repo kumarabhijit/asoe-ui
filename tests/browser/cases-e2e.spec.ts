@@ -61,18 +61,20 @@ test.describe("/cases surface", () => {
     await expect(page.locator("h1")).toContainText(/cases/i);
   });
 
-  test("CaseViewBanner on /inbox links through to /cases", async ({ page }) => {
+  test("/inbox redirects through to /cases?source=manual_order", async ({ page }) => {
     await loginAs(page, "marcus.webb@acme-corp.com");
+    // Issue #133 (PO #9) retired the parallel /inbox surface; the
+    // route now server-redirects into the case-list filtered view.
+    // The pre-#133 anatomy showed a CaseViewBanner on /inbox with an
+    // "Open in /cases" link; with the redirect that affordance is
+    // obsolete (the operator lands directly on /cases). This test
+    // is rewritten to lock the new contract instead of asserting
+    // the banner.
     await page.goto("/inbox");
-    // UI E2 — the banner shipped on /inbox carries the
-    // `Open in /cases` link with the manual_order filter applied.
-    const bannerLink = page
-      .getByRole("link", { name: /open in \/cases/i })
-      .first();
-    await expect(bannerLink).toBeVisible({ timeout: 15_000 });
-    await bannerLink.click();
-    // The href carries the manual_order filter per inbox banner config.
-    await page.waitForURL(/\/cases\?source=manual_order/, { timeout: 10_000 });
+    await page.waitForURL(/\/cases\?[^?]*source=manual_order/, { timeout: 15_000 });
+    await expect(page.locator("h1")).toContainText(/cases/i, {
+      timeout: 15_000,
+    });
   });
 
   test("filter chips on /cases narrow the list", async ({ page }) => {

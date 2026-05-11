@@ -34,6 +34,7 @@ import { useState, type ReactNode } from "react";
 import { Zap, Check, AlertTriangle, ShieldX, MessageSquare, XCircle, RotateCcw } from "lucide-react";
 import { Badge, verdictVariant } from "./Badge";
 import { Button } from "./Button";
+import { actionLabel as resolveActionLabel } from "@/lib/cases";
 import { PolicyHitBadge } from "./PolicyHitBadge";
 import { cn } from "@/lib/utils";
 import { useIntentLabel } from "@/hooks/useErpProfile";
@@ -221,6 +222,29 @@ export function AgentReasoningCard({
   // a mutation is in flight. `actionLoading` preserved for legacy callers.
   const anyActionInFlight = actionInFlight !== null || actionLoading;
 
+  // PO #11 (issue #133): "Approve / Reject" is too generic when the
+  // recommended action is something like REQUEST_CLARIFICATION (the
+  // actual action is "send the drafted email to the buyer"). The
+  // shared `actionLabel` map renders primary/secondary verbs that
+  // match what the action will do, with a one-line caption above
+  // the buttons. Falls back to plain Approve/Reject when no action
+  // is wired (e.g. RED verdicts where Override is the path forward).
+  const action = recommendedAction ? resolveActionLabel(recommendedAction) : null;
+  const primaryLabel = action?.primary ?? "Approve";
+  const secondaryLabel = action?.secondary ?? "Reject";
+  const actionCaption = action?.caption;
+  // In-flight label = first verb of the action title with an -ing
+  // suffix (sufficient for "Approve", "Send", "Block", "Merge"...).
+  // The visibleLabel helper appends "…" so the operator sees e.g.
+  // "Approving…" or "Sending…" while the request is pending.
+  const ingForm = (label: string) => {
+    const verb = label.split(/\s+/)[0] || label;
+    if (verb.endsWith("e")) return verb.slice(0, -1) + "ing";
+    return verb + "ing";
+  };
+  const primaryInProgress = ingForm(primaryLabel);
+  const secondaryInProgress = ingForm(secondaryLabel);
+
   function confirmAction() {
     if (pendingAction === "approve" && onApprove) onApprove(comment);
     else if (pendingAction === "reject" && onReject) onReject(comment);
@@ -343,6 +367,17 @@ export function AgentReasoningCard({
           </div>
         )}
 
+        {/* PO #11 (issue #133): when the recommended_action implies a
+            non-obvious side effect (sending a buyer email, merging
+            POs, posting to ERP), show a one-line caption above the
+            buttons so "Approve" isn't a leap of faith. Hidden when
+            no action map applies (default Approve/Reject). */}
+        {!pendingAction && verdict === "YELLOW" && actionCaption && (
+          <p className="mt-0 mb-8 text-caption text-text-tertiary">
+            {actionCaption}
+          </p>
+        )}
+
         {/* Action buttons — verdict × permission matrix.
             Visible labels are short verbs; aria-labels are long noun-phrase
             forms for screen readers (WCAG 2.5.3 consistent accessible name). */}
@@ -373,17 +408,20 @@ export function AgentReasoningCard({
                         disabled={anyActionInFlight}
                         onClick={() => setPendingAction("approve")}
                         aria-label={
-                          recommendedAction
-                            ? `Approve recommendation: ${formatActionLabel(recommendedAction)}`
-                            : "Approve recommendation"
+                          action
+                            ? `${primaryLabel} — ${formatActionLabel(recommendedAction!)}`
+                            : recommendedAction
+                              ? `Approve recommendation: ${formatActionLabel(recommendedAction)}`
+                              : "Approve recommendation"
                         }
                         title={
-                          recommendedAction
-                            ? `Approve: ${formatActionLabel(recommendedAction)}`
-                            : undefined
+                          actionCaption
+                            ?? (recommendedAction
+                              ? `Approve: ${formatActionLabel(recommendedAction)}`
+                              : undefined)
                         }
                       >
-                        {visibleLabel("Approve", "Approving", "approve")}
+                        {visibleLabel(primaryLabel, primaryInProgress, "approve")}
                       </Button>
                     )}
                     {onReject && effectiveCanApprove && (
@@ -392,9 +430,13 @@ export function AgentReasoningCard({
                         size="sm"
                         disabled={anyActionInFlight}
                         onClick={() => setPendingAction("reject")}
-                        aria-label="Reject recommendation"
+                        aria-label={
+                          action
+                            ? secondaryLabel
+                            : "Reject recommendation"
+                        }
                       >
-                        {visibleLabel("Reject", "Rejecting", "reject")}
+                        {visibleLabel(secondaryLabel, secondaryInProgress, "reject")}
                       </Button>
                     )}
                     {onOverride && effectiveCanOverride && (

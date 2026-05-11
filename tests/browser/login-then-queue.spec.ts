@@ -50,11 +50,13 @@ test("login → exception queue loads from live backend", async ({ page }) => {
   await expect(passwordInput).toBeVisible({ timeout: 10_000 });
   await passwordInput.fill("any-non-empty-password");
 
-  // Click Sign In. Post-login redirect target depends on the role; for a
-  // manager we expect /exceptions, /inbox, or /dashboard depending on
-  // visible_tabs configuration.
+  // Click Sign In. Post-login redirect target depends on the role.
+  // Issue #133 (PO #5/#6) made /home the operational landing surface;
+  // root / now redirects to /home. Pre-#133 sessions could land on
+  // /exceptions or /dashboard directly depending on visible_tabs
+  // configuration — both still valid post-login URLs for a manager.
   await page.getByRole("button", { name: /sign in/i }).click();
-  await page.waitForURL(/\/(exceptions|inbox|dashboard)/, { timeout: 20_000 });
+  await page.waitForURL(/\/(home|exceptions|dashboard)/, { timeout: 20_000 });
 
   // ── Queue renders against the live backend ───────────────────────────
   await page.goto("/exceptions");

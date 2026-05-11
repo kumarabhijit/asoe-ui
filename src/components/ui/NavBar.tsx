@@ -55,8 +55,11 @@ export function NavBar({
         className,
       )}
     >
-      {/* Logo — links to home */}
-      <Link href="/inbox" className="no-underline flex">
+      {/* Logo — links to /home (issue #133, PO #5/#6). The link
+          target is hard-coded rather than parameterised because
+          "Home" is the canonical landing surface regardless of which
+          tab subset the operator's role exposes. */}
+      <Link href="/home" className="no-underline flex" aria-label="Home">
         <Logo size="sm" />
       </Link>
 

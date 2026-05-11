@@ -159,23 +159,36 @@ export default function ExceptionListPane({
           </div>
         </div>
 
-        {/* Compact inline metrics */}
+        {/* Compact inline metrics — clickable.
+            PO #3 (issue #133): the older anatomy showed Open / Resolved
+            / Avg-resolution as a read-only strip; the operator
+            instinctively reached for "click 'Open' to see open items"
+            and got nothing. The counters are now buttons that apply
+            the matching lifecycle-state preset (same code path as the
+            quick-pill bar below). Avg-resolution is an analytics
+            metric, not a filter, so it moved to /dashboard
+            ("Performance") — leaving this row to a single dimension
+            (Resolution status) per PO #2's separation principle. */}
         {stats && (
           <div className="flex gap-12 mb-10 text-caption">
-            <CompactMetric label="Open" value={stats.open_exceptions} color="var(--color-warning)" />
-            <CompactMetric label="Resolved" value={stats.auto_resolved} color="var(--color-success)" />
-            {/* Structural omission (CLAUDE.md Guardrail #6): suppress
-                the Avg tile entirely when the backend has no
-                resolution-time data, rather than rendering a "—"
-                placeholder that conceals where the missing value
-                came from. */}
-            {stats.avg_resolution_time_seconds ? (
-              <CompactMetric
-                label="Avg"
-                value={`${Math.round(stats.avg_resolution_time_seconds / 60)}m`}
-                color="var(--color-cat-teal)"
-              />
-            ) : null}
+            <CompactMetricButton
+              label="Open"
+              value={stats.open_exceptions}
+              color="var(--color-warning)"
+              active={isPresetActive(hitlOptions) || isPresetActive(failedOptions)}
+              disabled={hitlOptions.length === 0 && failedOptions.length === 0}
+              onClick={() => togglePreset([...hitlOptions, ...failedOptions])}
+              ariaLabel={`Filter to open exceptions (${stats.open_exceptions})`}
+            />
+            <CompactMetricButton
+              label="Resolved"
+              value={stats.auto_resolved}
+              color="var(--color-success)"
+              active={isPresetActive(resolvedOptions)}
+              disabled={resolvedOptions.length === 0}
+              onClick={() => togglePreset(resolvedOptions)}
+              ariaLabel={`Filter to resolved exceptions (${stats.auto_resolved})`}
+            />
           </div>
         )}
 
@@ -204,34 +217,53 @@ export default function ExceptionListPane({
           </div>
         )}
 
-        {/* Quick-filter pill bar — one-click presets that compose with
-            the multi-select chips. Operators reach for these first;
-            the multi-selects exist for ad-hoc combinations the pills
-            don't cover. */}
-        <div role="group" aria-label="Quick filters" className="flex gap-4 flex-wrap mt-8">
-          <QuickPill
-            label="Today"
-            active={filterDate === "today"}
-            onClick={() => onFilterDateChange(filterDate === "today" ? null : "today")}
-          />
-          <QuickPill
-            label="HITL"
-            active={isPresetActive(hitlOptions)}
-            disabled={hitlOptions.length === 0}
-            onClick={() => togglePreset(hitlOptions)}
-          />
-          <QuickPill
-            label="Failed"
-            active={isPresetActive(failedOptions)}
-            disabled={failedOptions.length === 0}
-            onClick={() => togglePreset(failedOptions)}
-          />
-          <QuickPill
-            label="Resolved"
-            active={isPresetActive(resolvedOptions)}
-            disabled={resolvedOptions.length === 0}
-            onClick={() => togglePreset(resolvedOptions)}
-          />
+        {/* Quick-filter pill bars — split into two rows by PO #2
+            (issue #133). The original anatomy mixed a temporal
+            dimension ("Today") with action-type dimensions
+            (HITL / Failed / Resolved) in one row, which the PO
+            flagged as confusing — they are not mutually exclusive
+            constraints. Date sits on its own row; resolution-status
+            pills sit on a second row labelled accordingly. */}
+        <div className="mt-8">
+          <div className="text-label uppercase tracking-wider text-text-quaternary mb-4">
+            Date
+          </div>
+          <div role="group" aria-label="Date filter" className="flex gap-4 flex-wrap">
+            <QuickPill
+              label="Today"
+              active={filterDate === "today"}
+              onClick={() => onFilterDateChange(filterDate === "today" ? null : "today")}
+            />
+          </div>
+        </div>
+        <div className="mt-8">
+          <div className="text-label uppercase tracking-wider text-text-quaternary mb-4">
+            Resolution status
+          </div>
+          <div role="group" aria-label="Resolution status filter" className="flex gap-4 flex-wrap">
+            {/* PO #2 (issue #133): "HITL" is internal jargon; the
+                operator-facing label is "Needs review". The title
+                attribute preserves the acronym for power users. */}
+            <QuickPill
+              label="Needs review"
+              title="Cases needing human review (HITL)"
+              active={isPresetActive(hitlOptions)}
+              disabled={hitlOptions.length === 0}
+              onClick={() => togglePreset(hitlOptions)}
+            />
+            <QuickPill
+              label="Failed"
+              active={isPresetActive(failedOptions)}
+              disabled={failedOptions.length === 0}
+              onClick={() => togglePreset(failedOptions)}
+            />
+            <QuickPill
+              label="Resolved"
+              active={isPresetActive(resolvedOptions)}
+              disabled={resolvedOptions.length === 0}
+              onClick={() => togglePreset(resolvedOptions)}
+            />
+          </div>
         </div>
 
         {/* Filter row — multi-select chips for state and intent.
@@ -376,11 +408,13 @@ function QuickPill({
   active,
   disabled,
   onClick,
+  title,
 }: {
   label: string;
   active: boolean;
   disabled?: boolean;
   onClick: () => void;
+  title?: string;
 }) {
   return (
     <button
@@ -388,6 +422,7 @@ function QuickPill({
       aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
+      title={title}
       className={cn(
         "px-10 py-4 rounded-full text-label font-semibold cursor-pointer font-sans border transition-colors duration-fast",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
@@ -420,28 +455,67 @@ function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }
   );
 }
 
-/* ── Compact Metric (inline dot + label + value) ───────────────────── */
+/* ── Compact Metric Button (PO #3, issue #133) ─────────────────────── */
+/* Clickable counter — pressing it applies the matching lifecycle-state
+ * preset. The colour dot is decorative (status badge convention); the
+ * label + count carry the semantics. `aria-pressed` reflects whether
+ * the preset is currently the active filter so screen readers can
+ * report the toggle state. */
 
-function CompactMetric({ label, value, color }: { label: string; value: string | number; color: string }) {
+function CompactMetricButton({
+  label,
+  value,
+  color,
+  active,
+  disabled,
+  onClick,
+  ariaLabel,
+}: {
+  label: string;
+  value: string | number;
+  color: string;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  ariaLabel?: string;
+}) {
   return (
-    <div className="flex items-center gap-4">
-      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+    <button
+      type="button"
+      aria-pressed={active}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-4 px-6 py-2 rounded-sm border bg-transparent cursor-pointer font-sans transition-colors duration-fast",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+        active
+          ? "border-brand bg-brand-subtle"
+          : "border-transparent hover:border-border",
+        disabled && "opacity-40 cursor-not-allowed pointer-events-none",
+      )}
+    >
+      <div
+        className="w-1.5 h-1.5 rounded-full shrink-0"
+        style={{ background: color }}
+        aria-hidden
+      />
       <span className="text-text-tertiary font-medium">{label}</span>
       <span className="font-mono font-bold text-text-primary">{value}</span>
-    </div>
+    </button>
   );
 }
 
 /* ── Exception Card (compact for pane density) ─────────────────────── */
 
-const TERMINAL_STATES = ["RESOLVED", "CLOSED", "REJECTED"];
-
-function getLeftBorderColor(exc: ExceptionSummary, isSelected: boolean): string {
-  if (isSelected) return "var(--color-brand)";
-  if (exc.shadow_verdict === "GREEN" && TERMINAL_STATES.includes(exc.lifecycle_state)) {
-    return "var(--color-success)";
-  }
-  return "transparent";
+// PO #18 (issue #133): the older anatomy painted a green left bar on
+// resolved rows AND showed an explicit "Resolved" lifecycle badge.
+// The PO flagged this as double-encoding — the status is already
+// conveyed by the badge, the row tint adds nothing and clutters the
+// list when most rows are resolved. The left bar is now reserved
+// for selection state only.
+function getLeftBorderColor(_exc: ExceptionSummary, isSelected: boolean): string {
+  return isSelected ? "var(--color-brand)" : "transparent";
 }
 
 function ExceptionCard({
