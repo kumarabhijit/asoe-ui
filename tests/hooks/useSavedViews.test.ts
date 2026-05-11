@@ -233,3 +233,60 @@ describe("useSavedViews — v1 → v2 migration", () => {
     expect(result.current.views).toHaveLength(1);
   });
 });
+
+
+describe("useSavedViews — rename (V5.1.2)", () => {
+  it("rename() updates the name and bumps updatedAt", async () => {
+    const { result } = renderHook(() => useSavedViews("exceptions"));
+    await act(async () => {});
+    let id = "";
+    let originalUpdatedAt = "";
+    act(() => {
+      const created = result.current.save("Old name", exceptionFilters);
+      id = created.id;
+      originalUpdatedAt = created.updatedAt;
+    });
+    // Sleep 5ms so the new updatedAt is strictly greater.
+    await new Promise((r) => setTimeout(r, 5));
+    act(() => {
+      result.current.rename(id, "New name");
+    });
+    expect(result.current.views[0].name).toBe("New name");
+    expect(result.current.views[0].updatedAt).not.toBe(originalUpdatedAt);
+    // Persisted to storage.
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    expect(raw).toContain("New name");
+    expect(raw).not.toContain("Old name");
+  });
+
+  it("rename() with empty / whitespace name is a no-op", async () => {
+    const { result } = renderHook(() => useSavedViews());
+    await act(async () => {});
+    let id = "";
+    act(() => {
+      id = result.current.save("Keep", exceptionFilters).id;
+    });
+    act(() => { result.current.rename(id, "   "); });
+    expect(result.current.views[0].name).toBe("Keep");
+  });
+
+  it("rename() on an unknown id is a no-op", async () => {
+    const { result } = renderHook(() => useSavedViews());
+    await act(async () => {});
+    act(() => { result.current.save("Untouched", exceptionFilters); });
+    const before = window.localStorage.getItem(STORAGE_KEY);
+    act(() => { result.current.rename("bogus-id", "Whatever"); });
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe(before);
+  });
+
+  it("rename() trims surrounding whitespace from the new name", async () => {
+    const { result } = renderHook(() => useSavedViews());
+    await act(async () => {});
+    let id = "";
+    act(() => {
+      id = result.current.save("Orig", exceptionFilters).id;
+    });
+    act(() => { result.current.rename(id, "  Padded  "); });
+    expect(result.current.views[0].name).toBe("Padded");
+  });
+});

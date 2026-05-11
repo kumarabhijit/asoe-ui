@@ -51,7 +51,11 @@ import {
   useCases,
   isCaseInvalidationEvent,
 } from "@/hooks/useManualOrderCases";
+import { casesApi } from "@/lib/api";
 import { STATUS_LABEL, isAwaitingHuman } from "@/lib/cases";
+import { ChevronLeft } from "lucide-react";
+import type { ExceptionDetailResponse } from "@/types/api";
+import ExceptionDetailPanel from "./ExceptionDetailPanel";
 import { cn } from "@/lib/utils";
 import type { CaseSource, SlaBand } from "@/types/cases";
 import type { WSEvent } from "@/types/websocket";
@@ -115,6 +119,15 @@ function ExceptionQueueContent() {
     : NAV_TABS;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Phase 28.5.x V5.1.2 — per-record drill-in. Right pane state machine:
+  //   selectedId=null              → "Select a case" placeholder
+  //   selectedId + records.empty   → case header only (no children yet)
+  //   selectedId + records + null  → records stack (operator picks one)
+  //   selectedId + records + id    → ExceptionDetailPanel inline
+  // Single-record cases auto-set selectedRecordId so the stack is skipped.
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  const [records, setRecords] = useState<ExceptionDetailResponse[]>([]);
+  const [recordsLoading, setRecordsLoading] = useState(false);
 
   useEffect(() => {
     document.title = "Exception Queue — ASOE";
@@ -132,6 +145,43 @@ function ExceptionQueueContent() {
       return cases[0].case_id;
     });
   }, [cases]);
+
+  // Phase 28.5.x V5.1.2 — fetch attached records on case selection so
+  // the right pane can route to the records-stack or directly to
+  // ExceptionDetailPanel (single-record cases). Re-fetches on case
+  // switch; resets the per-record selection.
+  useEffect(() => {
+    if (!selectedId) {
+      setRecords([]);
+      setSelectedRecordId(null);
+      return;
+    }
+    let cancelled = false;
+    setRecordsLoading(true);
+    setSelectedRecordId(null);
+    casesApi
+      .getRecords(selectedId)
+      .then((res) => {
+        if (cancelled) return;
+        setRecords(res.items);
+        // Single-record case: skip the stack and drill straight in.
+        // The operator's primary HITL flow is per-record action, so
+        // we don't make them click through a one-item list.
+        if (res.items.length === 1) {
+          setSelectedRecordId(res.items[0].id);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setRecords([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRecordsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
 
   const handleWsEvent = useCallback((event: WSEvent) => {
     if (isCaseInvalidationEvent(event)) {
@@ -271,15 +321,48 @@ function ExceptionQueueContent() {
           </div>
         </div>
 
-        {/* ── RIGHT: case detail summary (thin pane — D8 keeps deferred) ── */}
-        <div className="flex-1 flex flex-col gap-16">
+        {/* ── RIGHT: case detail surface (V5.1.2 state machine) ── */}
+        {/*   selectedId=null               → "Select a case" placeholder.
+             selectedId, records loading    → loading state.
+             selectedId, no records         → case header + empty-records
+                                              note.
+             selectedId, records, no record → case header + records stack.
+             selectedId + selectedRecordId  → "← Back to records" +
+                                              ExceptionDetailPanel inline.
+            Single-record cases auto-set selectedRecordId so the stack
+            is skipped (per the V5.1.2 design call). */}
+        <div className="flex-1 flex flex-col gap-16 min-w-0">
           {!selected && !loading && (
             <div className="bg-surface-primary rounded-md shadow-sm p-32 text-text-tertiary text-center">
               Select a case to view its summary.
             </div>
           )}
 
-          {selected && selectedSla && (
+          {selected && selectedRecordId && (
+            <>
+              {/* Back affordance — only meaningful when the case has
+                  more than one record. Single-record cases hide it
+                  because there's nothing to go back to. */}
+              {records.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedRecordId(null)}
+                  className="self-start inline-flex items-center gap-4 text-caption text-brand hover:underline focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm px-2 py-1"
+                  aria-label="Back to attached records"
+                >
+                  <ChevronLeft size={14} aria-hidden />
+                  Back to records ({records.length})
+                </button>
+              )}
+              <ExceptionDetailPanel
+                key={selectedRecordId}
+                exceptionId={selectedRecordId}
+                onActionComplete={refetch}
+              />
+            </>
+          )}
+
+          {selected && !selectedRecordId && selectedSla && (
             <>
               <div className="bg-surface-primary rounded-md shadow-sm p-20">
                 <div className="flex items-center gap-8 mb-12">
@@ -345,25 +428,84 @@ function ExceptionQueueContent() {
                 </dl>
               </div>
 
-              <div className="bg-surface-primary rounded-md shadow-sm p-20 flex items-center justify-between">
-                <div>
-                  <div className="text-label uppercase tracking-wider text-text-quaternary mb-2">
-                    Full case detail
-                  </div>
-                  <p className="text-body text-text-secondary leading-normal m-0">
-                    Open the case for attached records, agent reasoning,
-                    and resolution actions.
-                  </p>
+              {/* Records stack — operator clicks one to drill into
+                  the per-record ExceptionDetailPanel (HITL surface).
+                  Hidden when only one record exists because the effect
+                  above auto-selected it. */}
+              {recordsLoading && (
+                <div role="status" aria-live="polite" className="bg-surface-primary rounded-md shadow-sm p-16 text-text-tertiary">
+                  Loading attached records…
                 </div>
-                <Button
-                  variant="brand"
-                  size="md"
-                  onClick={() => router.push(`/cases/${selected.case_id}`)}
-                >
-                  Open case
-                  <ChevronRight size={14} />
-                </Button>
-              </div>
+              )}
+              {!recordsLoading && records.length === 0 && (
+                <div className="bg-surface-primary rounded-md shadow-sm p-20 flex items-center justify-between">
+                  <div>
+                    <div className="text-label uppercase tracking-wider text-text-quaternary mb-2">
+                      No attached records yet
+                    </div>
+                    <p className="text-body text-text-secondary leading-normal m-0">
+                      This case has no per-event records attached.
+                      The agent may still be processing the first event.
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    onClick={() => router.push(`/cases/${selected.case_id}`)}
+                  >
+                    Open case
+                    <ChevronRight size={14} />
+                  </Button>
+                </div>
+              )}
+              {!recordsLoading && records.length > 0 && (
+                <div className="bg-surface-primary rounded-md shadow-sm p-20">
+                  <div className="flex items-center gap-8 mb-12">
+                    <h3 className="text-subhead font-semibold text-text-primary m-0">
+                      Attached records
+                    </h3>
+                    <span className="text-caption text-text-tertiary">
+                      {records.length}
+                    </span>
+                    <span className="ml-auto">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => router.push(`/cases/${selected.case_id}`)}
+                        aria-label="Open the case detail surface"
+                      >
+                        Open case <ChevronRight size={12} />
+                      </Button>
+                    </span>
+                  </div>
+                  <p className="text-caption text-text-tertiary leading-normal mb-12">
+                    Pick a record to act on it (Approve / Reject / Override / Escalate).
+                  </p>
+                  <ul role="list" className="m-0 p-0 list-none divide-y divide-border-subtle">
+                    {records.map((record) => (
+                      <li key={record.id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRecordId(record.id)}
+                          className="flex items-center gap-12 py-12 w-full text-left hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm"
+                          aria-label={`Open exception ${record.order_id ?? record.id} in this pane`}
+                        >
+                          <Badge variant="neutral" size="sm">
+                            {record.intent ?? "UNCLASSIFIED"}
+                          </Badge>
+                          <span className="font-mono text-body text-text-primary">
+                            {record.order_id ?? record.id}
+                          </span>
+                          <span className="ml-auto text-caption text-text-tertiary">
+                            {record.lifecycle_state}
+                          </span>
+                          <ChevronRight size={14} aria-hidden className="text-text-tertiary" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </>
           )}
         </div>
