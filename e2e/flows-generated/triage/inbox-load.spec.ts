@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("inbox-load", () => {
   test("happy path", async ({ page }) => {
-    await page.goto("/inbox");
+    await page.goto("/cases?source=manual_order");
     await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();
   });
 
@@ -18,7 +18,7 @@ test.describe("inbox-load", () => {
       await routeReady;
       await route.continue();
     });
-    const navigation = page.goto("/inbox");
+    const navigation = page.goto("/cases?source=manual_order");
     // PHASE 2 — assert-during: skeleton must be visible while load is pending.
     await expect(page.locator("[data-testid=\"inbox-skeleton\"]")).toBeVisible();
     resolveRoute();
@@ -33,7 +33,7 @@ test.describe("inbox-load", () => {
         body: "[]",
       });
     });
-    await page.goto("/inbox");
+    await page.goto("/cases?source=manual_order");
     await expect(page.locator("[data-testid=\"inbox-empty-cta\"]")).toBeVisible();
     await expect(page.getByText("You're caught up")).toBeVisible();
   });
@@ -46,7 +46,7 @@ test.describe("inbox-load", () => {
         body: "null",
       });
     });
-    await page.goto("/inbox");
+    await page.goto("/cases?source=manual_order");
     await expect(page.locator("[data-testid=\"inbox-error-retry\"]")).toBeVisible();
   });
 

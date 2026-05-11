@@ -31,7 +31,10 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import YAML from "yaml";
-import { AUTHENTICATED_ROUTES } from "../../e2e/contract/authenticated-routes";
+import {
+  AUTHENTICATED_ROUTES,
+  REDIRECT_ROUTES,
+} from "../../e2e/contract/authenticated-routes";
 
 const ROOT = join(__dirname, "..", "..");
 
@@ -128,49 +131,64 @@ describe("back-target registry coverage (Phase 5a)", () => {
     ).toEqual([]);
   });
 
-  it("every BACK_TARGETS.href is an authenticated route", () => {
+  it("every BACK_TARGETS.href resolves to an authenticated route (allowing query strings + redirect aliases)", () => {
     const authPaths = new Set(AUTHENTICATED_ROUTES.map((r) => r.path));
+    const redirectPaths = new Set(REDIRECT_ROUTES);
     const orphans: string[] = [];
     for (const rel of CONSUMER_PAGES) {
       for (const href of extractBackTargetHrefs(read(rel))) {
-        // hrefs may be exact route strings like "/inbox" or
-        // template-shaped like "/exceptions"; both must match.
-        if (!authPaths.has(href)) {
+        // Strip query string + hash — the route registry holds
+        // paths only. Issue #133 introduced filtered-view back
+        // targets like "/cases?source=manual_order" which point
+        // at /cases with a filter; the auth check is on the path.
+        const path = href.split(/[?#]/)[0];
+        // Accept either an authenticated route (canonical) or a
+        // redirect alias (e.g. /inbox -> /cases). Both surface
+        // chrome on arrival, so back-target validity holds.
+        if (!authPaths.has(path) && !redirectPaths.has(path)) {
           orphans.push(`${rel} BACK_TARGETS contains href=${href} not in registry`);
         }
       }
     }
     expect(
       orphans,
-      "back-target hrefs must each resolve to a registered authenticated route",
+      "back-target hrefs must each resolve to a registered authenticated route or redirect alias",
     ).toEqual([]);
   });
 
-  it("BACK_TARGETS keys have matching back_target_rules in _registry.yaml", () => {
+  it("BACK_TARGETS keys have a matching back_target_rule OR a redirect alias", () => {
     const registry = loadRegistry();
     const ruleEntryPatterns = registry.back_target_rules.map(
       (r) => r.entry_pattern,
     );
+    // Redirect aliases (issue #133): /<key> may live in
+    // REDIRECT_ROUTES rather than having its own back_target_rule.
+    // The alias hits the redirect, which terminates at a real
+    // authenticated route — chrome contract still holds.
+    const redirectPaths = new Set(REDIRECT_ROUTES);
 
     const offenders: string[] = [];
     for (const rel of CONSUMER_PAGES) {
       const keys = extractBackTargetKeys(read(rel));
       for (const key of keys) {
         // Each BACK_TARGETS key corresponds to an entry path:
-        //   inbox -> ^/inbox$
+        //   inbox -> ^/inbox$  (or redirect alias /inbox)
         //   cases -> ^/cases$
-        // So a rule with entry_pattern ^/<key>$ must exist.
         const expectedPattern = new RegExp(`^\\^/${key}\\$$`);
-        if (!ruleEntryPatterns.some((p) => expectedPattern.test(p))) {
+        const hasRule = ruleEntryPatterns.some((p) =>
+          expectedPattern.test(p),
+        );
+        const hasRedirectAlias = redirectPaths.has(`/${key}`);
+        if (!hasRule && !hasRedirectAlias) {
           offenders.push(
-            `${rel} BACK_TARGETS.${key} has no matching back_target_rules entry in _registry.yaml`,
+            `${rel} BACK_TARGETS.${key} has no matching back_target_rules entry and no redirect alias`,
           );
         }
       }
     }
     expect(
       offenders,
-      "BACK_TARGETS keys must each have a matching entry_pattern in _registry.yaml",
+      "BACK_TARGETS keys must each have a back_target_rules entry or a redirect alias in REDIRECT_ROUTES",
     ).toEqual([]);
   });
 

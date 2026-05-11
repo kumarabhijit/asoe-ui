@@ -110,8 +110,12 @@ describe("StatusAnnouncer wiring (Q1)", () => {
   });
 
   it("authenticated pages route sign-out through useSignOut", () => {
+    // Authenticated pages that render NavBar. Issue #133 retired
+    // /inbox as an authenticated surface (it is now a redirect
+    // alias, listed in REDIRECT_ROUTES) and introduced /home as
+    // the new operational landing page.
     const pages = [
-      "src/app/inbox/page.tsx",
+      "src/app/home/page.tsx",
       "src/app/exceptions/page.tsx",
       "src/app/exceptions/[id]/page.tsx",
       "src/app/cases/page.tsx",
