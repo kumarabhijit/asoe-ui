@@ -204,6 +204,11 @@ export interface UseSavedViewsApi {
    *  them on the correct surface. */
   save: (name: string, filters: SavedViewFilters) => SavedView;
   remove: (id: string) => void;
+  /** V5.1.2 — rename a saved view by id. Empty / whitespace
+   *  `newName` is a no-op (the consumer's prompt UI already
+   *  filters those out). `updatedAt` is bumped to the current
+   *  ISO timestamp. */
+  rename: (id: string, newName: string) => void;
   hydrated: boolean;
 }
 
@@ -253,6 +258,20 @@ export function useSavedViews(
     });
   }, []);
 
+  const rename = useCallback((id: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return; // No-op on empty input.
+    setAllViews((prev) => {
+      const idx = prev.findIndex((v) => v.id === id);
+      if (idx === -1) return prev;
+      const now = new Date().toISOString();
+      const updated = [...prev];
+      updated[idx] = { ...prev[idx], name: trimmed, updatedAt: now };
+      writeStorage(updated);
+      return updated;
+    });
+  }, []);
+
   const views = allViews.filter((v) => v.surface === surface);
-  return { views, save, remove, hydrated };
+  return { views, save, remove, rename, hydrated };
 }

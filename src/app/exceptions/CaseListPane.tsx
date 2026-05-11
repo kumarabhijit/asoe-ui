@@ -40,6 +40,7 @@ import {
   Clock,
   Mail,
   PackageCheck,
+  Pencil,
   RefreshCw,
   Search,
   XCircle,
@@ -127,7 +128,7 @@ export function CaseListPane({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { health } = useHealth();
-  const { views, save, remove, hydrated } = useSavedViews("cases");
+  const { views, save, remove, rename, hydrated } = useSavedViews("cases");
 
   /* ── Filter state (URL-synced) ───────────────────────────────── */
   // Cluster expansion is local-only; the underlying status chips
@@ -197,7 +198,15 @@ export function CaseListPane({
   // or not (idempotent — backend + client filters are pure
   // subset operations).
   const now = useMemo(() => new Date(), []);
-  const filtered = useMemo(() => {
+
+  // Phase 28.5.x V5.1.2 — match-reason tracking. When the operator
+  // types a free-text query, we record WHICH field each remaining
+  // row matched on (po / so / customer / case_id) so the row can
+  // surface a small "matched on PO" badge AND the list announces a
+  // single aria-live summary for screen-reader operators. Search-
+  // operator-prefixed queries (`po:KRO`) narrow the match dimension
+  // to that field; the bare free-text path checks all four.
+  const { filtered, matchReasonByCaseId } = useMemo(() => {
     let rows = [...cases];
     if (filterSource) rows = rows.filter((c) => c.source === filterSource);
     if (filterStatuses.length > 0) {
@@ -210,15 +219,36 @@ export function CaseListPane({
         (c.child_intents || []).some((i) => set.has(i)),
       );
     }
+    const reasons = new Map<string, "po" | "so" | "customer" | "case_id">();
     if (searchQuery.trim()) {
-      const needle = searchQuery.trim().toLowerCase();
-      rows = rows.filter((c) =>
-        [c.case_id, c.customer_po_number, c.sales_order_id, c.customer_id]
-          .some((v) => v && v.toLowerCase().includes(needle)),
-      );
+      const parsed = parseSearchQuery(searchQuery);
+      rows = rows.filter((c) => {
+        const reason = findMatchReason(c, parsed);
+        if (reason === null) return false;
+        reasons.set(c.case_id, reason);
+        return true;
+      });
     }
-    return rows;
+    return { filtered: rows, matchReasonByCaseId: reasons };
   }, [cases, filterSource, filterStatuses, filterIntents, searchQuery]);
+
+  // Aria-live summary so a screen-reader operator hears why the
+  // visible row count just changed. Recomputed every render but the
+  // text only changes when the underlying search yields a different
+  // shape, so AT announcement frequency stays sane.
+  const matchSummary = useMemo(() => {
+    if (!searchQuery.trim()) return "";
+    const counts = { po: 0, so: 0, customer: 0, case_id: 0 };
+    matchReasonByCaseId.forEach((r) => { counts[r] += 1; });
+    const parts: string[] = [];
+    if (counts.po) parts.push(`${counts.po} by PO`);
+    if (counts.so) parts.push(`${counts.so} by sales order`);
+    if (counts.customer) parts.push(`${counts.customer} by customer`);
+    if (counts.case_id) parts.push(`${counts.case_id} by case id`);
+    const total = matchReasonByCaseId.size;
+    if (total === 0) return "No cases match the current search.";
+    return `${total} cases match: ${parts.join(", ")}.`;
+  }, [searchQuery, matchReasonByCaseId]);
 
   const sorted = useMemo(() => {
     const decorated = filtered.map((c) => ({ case_: c, sla: slaSnapshot(c, now) }));
@@ -347,6 +377,7 @@ export function CaseListPane({
               onApply={applySavedView}
               onSave={saveCurrent}
               onRemove={remove}
+              onRename={rename}
               canSave={hasActiveFilters}
             />
             <Button variant="ghost" size="sm" onClick={refetch} loading={loading}>
@@ -507,6 +538,15 @@ export function CaseListPane({
       )}
 
       {/* ── Listbox of case rows (D5: role=listbox/option) ──────── */}
+      {/* Phase 28.5.x V5.1.2 — match-reason live announcement.
+          Whenever the search query changes the visible-row count,
+          this region updates so screen readers hear how many cases
+          match and across which dimensions (PO / SO / customer /
+          case id). Empty when no search is active so quiet typing
+          doesn't fire spurious announcements. */}
+      <div role="status" aria-live="polite" className="sr-only">
+        {matchSummary}
+      </div>
       <div
         ref={listRef}
         role="listbox"
@@ -522,6 +562,7 @@ export function CaseListPane({
             slaBand={sla.band}
             isSelected={case_.case_id === selectedId}
             onSelect={() => onSelect(case_.case_id)}
+            matchReason={matchReasonByCaseId.get(case_.case_id)}
           />
         ))}
         {limitCapped && (
@@ -545,7 +586,21 @@ interface CaseRowProps {
   slaBand: SlaBand;
   isSelected: boolean;
   onSelect: () => void;
+  /**
+   * Phase 28.5.x V5.1.2 — when a search query is active and this
+   * row passed the filter, the match-dimension that hit. Surfaced
+   * as a small visible badge plus an aria-label suffix so the
+   * screen-reader hears "Select case PO-123, matched on PO".
+   */
+  matchReason?: "po" | "so" | "customer" | "case_id";
 }
+
+const MATCH_REASON_LABEL: Record<NonNullable<CaseRowProps["matchReason"]>, string> = {
+  po: "PO",
+  so: "sales order",
+  customer: "customer",
+  case_id: "case id",
+};
 
 function CaseRow({
   case_,
@@ -553,9 +608,11 @@ function CaseRow({
   slaBand,
   isSelected,
   onSelect,
+  matchReason,
 }: CaseRowProps) {
   const orderRef =
     case_.customer_po_number || case_.sales_order_id || case_.case_id;
+  const matchLabel = matchReason ? MATCH_REASON_LABEL[matchReason] : null;
   return (
     <div
       role="option"
@@ -563,7 +620,11 @@ function CaseRow({
       aria-selected={isSelected}
       data-keyboard-nav-id={case_.case_id}
       data-case-id={case_.case_id}
-      aria-label={`Select case ${orderRef}`}
+      aria-label={
+        matchLabel
+          ? `Select case ${orderRef}, matched on ${matchLabel}`
+          : `Select case ${orderRef}`
+      }
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -603,6 +664,14 @@ function CaseRow({
             · {clusterFor(case_.status)}
           </span>
         )}
+        {matchLabel && (
+          <span
+            className="ml-8 inline-flex items-center text-label uppercase tracking-wider text-brand"
+            aria-hidden
+          >
+            matched on {matchLabel}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -618,6 +687,10 @@ interface CaseSavedViewsMenuProps {
   onApply: (id: string) => void;
   onSave: () => void;
   onRemove: (id: string) => void;
+  /** V5.1.2 — rename a saved view by id; consumer prompts for
+   *  the new name via window.prompt to match the "save as default"
+   *  flow (no inline-input UI in V5.1.2). */
+  onRename: (id: string, newName: string) => void;
   canSave: boolean;
 }
 
@@ -627,9 +700,24 @@ function CaseSavedViewsMenu({
   onApply,
   onSave,
   onRemove,
+  onRename,
   canSave,
 }: CaseSavedViewsMenuProps) {
   const [open, setOpen] = useState(false);
+  // V5.1.2 — Escape closes the menu. Bound to the window because the
+  // menu doesn't trap focus (no Radix Dialog here); the listener
+  // is gated on `open` so we don't leak keystroke handlers when the
+  // menu is closed.
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
   return (
     <div className="relative">
       <Button
@@ -648,7 +736,7 @@ function CaseSavedViewsMenu({
         <div
           role="menu"
           aria-label="Saved views menu"
-          className="absolute right-0 top-full mt-4 w-[280px] bg-surface-primary border border-border rounded-md shadow-md z-10"
+          className="absolute right-0 top-full mt-4 w-[320px] bg-surface-primary border border-border rounded-md shadow-md z-10"
         >
           {hydrated && views.length === 0 && (
             <p className="p-12 text-caption text-text-tertiary m-0">
@@ -659,7 +747,7 @@ function CaseSavedViewsMenu({
             <div
               key={v.id}
               role="menuitem"
-              className="flex items-center justify-between px-12 py-8 hover:bg-surface-secondary"
+              className="flex items-center gap-6 px-12 py-8 hover:bg-surface-secondary"
             >
               <button
                 type="button"
@@ -667,15 +755,38 @@ function CaseSavedViewsMenu({
                   onApply(v.id);
                   setOpen(false);
                 }}
-                className="flex-1 text-left text-body text-text-primary"
+                className="flex-1 text-left text-body text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm"
               >
                 {v.name}
               </button>
               <button
                 type="button"
-                onClick={() => onRemove(v.id)}
+                onClick={() => {
+                  const next = window.prompt(
+                    "Rename saved view:", v.name,
+                  );
+                  if (next && next.trim()) {
+                    onRename(v.id, next.trim());
+                  }
+                }}
+                aria-label={`Rename saved view ${v.name}`}
+                className="text-text-tertiary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm p-2"
+              >
+                <Pencil size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // V5.1.2 — confirm before deletion. The window.prompt
+                  // pattern matches the rename + save-as-default flow;
+                  // confirm() is the equivalent for destructive
+                  // actions. Cancel keeps the view intact.
+                  if (window.confirm(`Delete saved view "${v.name}"?`)) {
+                    onRemove(v.id);
+                  }
+                }}
                 aria-label={`Remove saved view ${v.name}`}
-                className="text-text-tertiary hover:text-error"
+                className="text-text-tertiary hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm p-2"
               >
                 <XCircle size={14} />
               </button>
@@ -732,4 +843,65 @@ function FilterChip({ label, active, onClick, ariaPressed }: FilterChipProps) {
 function parseCsvParam(raw: string | null): string[] {
   if (!raw) return [];
   return Array.from(new Set(raw.split(",").map((s) => s.trim()).filter(Boolean)));
+}
+
+
+/* ── Search-query parser + match-reason helpers (V5.1.2 §D3) ────── */
+
+interface ParsedQuery {
+  /** When the operator typed `po:KRO`, this narrows the match to
+   *  customer_po_number; null means "search all four fields". */
+  field: "po" | "so" | "customer" | "case_id" | null;
+  needle: string;
+}
+
+/**
+ * Parse the search box's free-text query into a `(field, needle)`
+ * pair. Recognises four operator prefixes (`po:`, `so:`,
+ * `customer:`, `case:`); the bare-text path searches all four
+ * fields and `findMatchReason` returns the first one that matched.
+ */
+function parseSearchQuery(raw: string): ParsedQuery {
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) return { field: null, needle: "" };
+  if (trimmed.startsWith("po:")) {
+    return { field: "po", needle: trimmed.slice(3).trim() };
+  }
+  if (trimmed.startsWith("so:")) {
+    return { field: "so", needle: trimmed.slice(3).trim() };
+  }
+  if (trimmed.startsWith("customer:")) {
+    return { field: "customer", needle: trimmed.slice(9).trim() };
+  }
+  if (trimmed.startsWith("case:")) {
+    return { field: "case_id", needle: trimmed.slice(5).trim() };
+  }
+  return { field: null, needle: trimmed };
+}
+
+/**
+ * Return the match-reason dimension a case matched on, or null
+ * when the case doesn't match the parsed query. Operator-prefixed
+ * queries check only the named field; bare-text checks all four
+ * in PO → SO → customer → case_id priority order (which is the
+ * order operators most often filter by).
+ */
+function findMatchReason(
+  case_: CaseListItem,
+  parsed: ParsedQuery,
+): "po" | "so" | "customer" | "case_id" | null {
+  if (!parsed.needle) return null;
+  const fields: ReadonlyArray<["po" | "so" | "customer" | "case_id", string | null | undefined]> = [
+    ["po", case_.customer_po_number],
+    ["so", case_.sales_order_id],
+    ["customer", case_.customer_id],
+    ["case_id", case_.case_id],
+  ];
+  for (const [name, value] of fields) {
+    if (parsed.field !== null && parsed.field !== name) continue;
+    if (value && value.toLowerCase().includes(parsed.needle)) {
+      return name;
+    }
+  }
+  return null;
 }
