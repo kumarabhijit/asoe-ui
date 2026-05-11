@@ -213,13 +213,19 @@ All other elements use neutrals. Status colors are semantic and map to shadow ve
 | Settings / Admin | Standard layout | `/settings` | PENDING (Phase 9) |
 | **Customer Inbox** | **NOT IN SPEC** | `/inbox` | **DRIFT — new page** |
 
-### 5.1 Exception Queue (`/exceptions`) — Three-Pane Outlook Master-Detail
+### 5.1 Exception Queue (`/exceptions`) — V5.1.1 Master-Detail with CaseListPane
 
-**Spec evolution:** Originally specified as Layout A (queue + sidebar) in Section 11.5. Evolved to a persistent three-pane "Outlook-style" master-detail interface for high-productivity triage. `consol_arch.md` Section 11.5 updated to reflect this layout. All filter values sourced from `useHealth()` per Guardrail #2.
+**Spec evolution:**
+* V5.0 — three-pane "Outlook-style" master-detail driven by `ExceptionListPane` (exceptionsApi list, intent + lifecycle filters, search, saved views, keyboard nav).
+* V5.1 (Phase 28.5) — `/exceptions` re-grounded on `casesApi.list()` (no source filter); inline source-filter-chip queue replaced the legacy list pane. ExceptionListPane stayed mounted at `/exceptions/[id]` parent for the legacy per-event detail flow.
+* V5.1.1 (Phase 28.5.x Item 3) — `CaseListPane` mounts the full filter / search / saved-views / keyboard-nav surface against case-level fields. Binding decisions in `asoe2/docs/workshops/2026-05-11-case-list-pane-decisions.md`.
 
-**Layout architecture:**
+All filter values sourced from `useHealth()` per Guardrail #2. `STATUS_LABEL` + cluster grouping + `isAwaitingHuman` helper consolidated in `src/lib/cases.ts` — retires four duplicate maps + two hardcoded literal comparisons the §D1 lens audit flagged.
+
+**V5.1.1 layout architecture:**
 - **Top Rail (NavBar):** 56px sticky global navigation (unchanged)
-- **Middle Pane (ExceptionListPane):** Resizable (default 35%). Compact exception cards with search bar, state/intent filter dropdowns, inline metrics (open, resolved, avg time). Each card shows: Order ID, Intent Tag, Lifecycle Badge, Timestamp. **The shadow-verdict pill is intentionally omitted from the list card (Phase 8.13)** — list density wins; the detail pane carries an explicit `Audit Result:` label so the verdict isn't concealed (Verdict 2026-04-22 partial-truth guard). Sort: `updated_at desc, created_at desc` (most-recent-first, Outlook-style). Selected card highlighted with brand accent.
+- **Middle Pane (CaseListPane, ~460px):** Cluster filter chips (Live / Waiting / Terminal, sourced from `useHealth().allowed_case_statuses` + the cluster mapping in `src/lib/cases.ts`), per-status sub-chips on demand. Single-value source filter chip. Multi-select intent chips (`useHealth().allowed_intents`). URL-synced search box (`?q=`). Sort toggle (SLA urgency default / Recently opened). Saved views menu — opt-in "My queue" via "Save current as default" tile (no auto-apply, per D4 product call). Rows render `role="option"` inside `role="listbox"`, with `data-keyboard-nav-id` for `useKeyboardListNav` (ArrowUp / ArrowDown / j / k / Home / End). vitest-axe locks at `tests/accessibility/case_list_pane.test.tsx`.
+- **Legacy ExceptionListPane:** Remains in `src/app/exceptions/ExceptionListPane.tsx` for `/exceptions/[id]` parent detail navigation. Not mounted on `/exceptions` after V5.1.1.
 - **Keyboard navigation (Phase 8.13):** ArrowUp/Down, j/k, Home, End move selection through the sorted+filtered list and open the corresponding detail. Document-level handler in `page.tsx`; bails when active element is an input / textarea / select / Radix popover. After selection moves, DOM focus follows so the `:focus-visible` outline tracks the active card.
 - **Right Pane (ExceptionDetailPanel):** Polymorphic detail view adapting per exception intent. Pane defaults follow PO request #4 — minimise everything except the Recommendation (operator scans the recommendation in 3s, drills into evidence on demand):
   - **Dynamic Header Ribbon** — breadcrumb-style: Reference ID > Customer > Location > Primary SKU / "N Lines Affected"; status row prefixed with **`Current State:`** and **`Audit Result:`** labels (Phase 8.13).
@@ -558,6 +564,7 @@ Summary of all alignments and drifts between `consol_arch.md` and the actual `as
 | OverrideRequest.notes optional (T7) | Section 6.2 | UI updated to optional |
 | ExceptionUpdatePayload.updated_fields (T8) | Section 8 | UI updated to `string[]` |
 | TaskCompletePayload.explanation optional (T9) | Section 8 | UI updated to optional |
+| CaseListPane V5.1.1 (Phase 28.5.x §D1-D8) | `asoe2/docs/workshops/2026-05-11-case-list-pane-decisions.md` | Single PR delivery (operator-chosen split). Filter chips sourced from `useHealth().allowed_case_statuses` + cluster grouping in `src/lib/cases.ts`. `role="listbox"`/`role="option"` swap on rows; one Playwright selector update locked in the same PR. v2 saved-views with `surface` discriminator + idempotent v1→v2 migration. vitest-axe scaffolding added (4 a11y locks); zero-coverage gap from the §D5 audit is closed. `STATUS_LABEL` consolidated from four duplicate maps + two hardcoded `OPEN_AWAITING_HUMAN` comparisons retired (§D1 Guardrail #1 corrections from the lens audit). |
 
 ### INTENTIONAL DRIFT (UI enrichment — needs spec update)
 
