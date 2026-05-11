@@ -1,0 +1,78 @@
+# resolve/exception-triage-approval.yaml — golden, J2, task-completion.
+#
+# Closes the J2 (peak-load veteran) task-completion arc:
+# "Do they finish a batch without surprise dialogs or focus loss
+#  after an action?"
+#
+# The flow exercises the full approval keyboard path on a single
+# YELLOW exception:
+#   1. Open the detail surface.
+#   2. Press the Approve button (keyboard equivalent: Enter).
+#   3. The Approval Comment pane mounts inline (NOT a modal —
+#      AgentReasoningCard.tsx:486 renders it as an inline
+#      pendingAction block, not role="dialog" for approve/reject).
+#   4. Confirm Approval.
+#   5. StatusAnnouncer emits "Exception exc-026 approved" (Q1).
+#
+# The announcement assertion is the J2 keyboard-driven veteran's
+# audible confirmation that the action landed — without it the SR
+# operator has to scan the lifecycle pill to find out.
+#
+# Selectors:
+#   - The Approve button's aria-label varies with the
+#     recommended_action ("Approve recommendation: ALLOW_BOTH"
+#     etc.); :has-text("Approve") matches the rendered label
+#     regardless of the suffix.
+#   - The textarea inside the pendingAction block is matched by
+#     placeholder substring ("Add approval notes" — see
+#     AgentReasoningCard.tsx:506).
+#   - "Confirm Approval" is the inline submit button.
+#
+# Test fixture (seed): exc-026 is seeded by asoe2 sandbox mode as
+# a YELLOW-verdict exception eligible for Approve/Reject.
+name: exception-triage-approval
+kind: golden
+journey: J2
+arc: task-completion
+entry: /exceptions/exc-026
+steps:
+  # Step 1 — landed on detail. Chrome contract intact.
+  - action: assert_visible
+    selector: nav
+  - action: assert_visible
+    selector: '[data-testid="status-announcer"]'
+
+  # Step 2 — Approve button reachable. J2's veteran moves
+  # keyboard-first; the button must be tab-reachable and Enter
+  # must activate it (D6 floor).
+  - action: assert_visible
+    selector: 'button:has-text("Approve")'
+  - action: click
+    selector: 'button:has-text("Approve")'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: 'button:has-text("Approve")'
+
+  # Step 3 — approval comment pane mounts. The textarea autoFocus
+  # is asserted by AgentReasoningCard.tsx:511; J2's flow depends
+  # on focus landing here so they can type without a Tab.
+  - action: assert_visible
+    selector: 'textarea[placeholder^="Add approval notes"]'
+  - action: assert_focus_on
+    selector: 'textarea[placeholder^="Add approval notes"]'
+
+  # Step 4 — comment is optional for approve; J2 typically skips
+  # it. The flow exercises the no-comment path so we don't paper
+  # over a regression where empty submit is rejected.
+
+  # Step 5 — Confirm Approval.
+  - action: click
+    selector: 'button:has-text("Confirm Approval")'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: 'button:has-text("Confirm Approval")'
+
+  # Step 6 — Q1: announcement on success. useExceptionActions
+  # emits `Exception ${id} approved` via useStatusAnnouncer.
+  - action: assert_announcement_text
+    text: Exception exc-026 approved

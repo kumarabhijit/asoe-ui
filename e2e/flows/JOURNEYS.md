@@ -155,6 +155,10 @@ expected matrix at the bottom of this file.
 <!-- BEGIN MATRIX -->
 | Flow | Journey | Arc |
 |---|---|---|
+| `onboard/signin-to-home.yaml` | J1 | orientation |
+| `recover/back-from-misroute.yaml` | J3 | orientation |
+| `resolve/exception-triage-approval.yaml` | J2 | task-completion |
+| `signout/signout-from-each-role.yaml` | J2 | orientation |
 | `triage/case-to-exception-detail-roundtrip.yaml` | J1, J3 | task-completion |
 | `triage/email-order-entry-from-inbox.yaml` | J1 | task-completion |
 | `triage/inbox-item-click-behavior-catalog.yaml` | J1, J2 | orientation |
