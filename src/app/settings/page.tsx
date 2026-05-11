@@ -29,6 +29,8 @@ const SETTING_SECTIONS = [
   { icon: Bell, label: "Notifications", description: "Email alerts, webhook integrations, and escalation rules", status: "Coming soon" },
 ];
 
+export const requiresAuth = true;
+
 export default function SettingsPage() {
   const router = useRouter();
   const { health } = useHealth();

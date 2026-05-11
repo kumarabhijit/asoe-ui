@@ -38,6 +38,8 @@ const BACK_TARGETS = {
 
 const DEFAULT_BACK = { href: "/exceptions", label: "Back to Queue" } as const;
 
+export const requiresAuth = true;
+
 export default function ExceptionFullPage() {
   const params = useParams();
   const router = useRouter();

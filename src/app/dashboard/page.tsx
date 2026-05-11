@@ -45,6 +45,8 @@ const RECENT_ACTIVITY = [
   { time: "07:22", orderId: "SO-6001", action: "Pending review — credit hold release needs approval", status: "REVIEW", badge: "warning", color: "var(--color-warning)" },
 ];
 
+export const requiresAuth = true;
+
 export default function DashboardPage() {
   const router = useRouter();
   const { health } = useHealth();

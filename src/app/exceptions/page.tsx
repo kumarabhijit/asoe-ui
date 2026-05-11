@@ -92,6 +92,8 @@ import { NAV_TABS } from "@/config/nav-tabs";
 
 /* ── Page ─────────────────────────────────────────────────────────── */
 
+export const requiresAuth = true;
+
 export default function ExceptionQueuePage() {
   return (
     <Suspense>

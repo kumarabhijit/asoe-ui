@@ -28,6 +28,8 @@ import { CaseDetailPanel } from "../CaseDetailPanel";
 import { NAV_TABS } from "@/config/nav-tabs";
 // NAV_TABS consolidated to src/config/nav-tabs.ts (issue #133, PO #9).
 
+export const requiresAuth = true;
+
 export default function CaseDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();

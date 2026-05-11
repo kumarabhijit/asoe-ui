@@ -74,6 +74,8 @@ const SLA_BAND_VARIANT = {
   none: "neutral",
 } as const;
 
+export const requiresAuth = true;
+
 export default function HomePage() {
   return (
     <Suspense fallback={null}>
