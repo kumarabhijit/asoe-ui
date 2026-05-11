@@ -1,41 +1,42 @@
-# `/api/v1/cases` cursor pagination — deferred ADR tracker
+# `/api/v1/cases` cursor pagination — landed 2026-05-11
 
-**Status:** Deferred (backend contract change requires ADR amendment).
-**Owner:** Backend Platform + Frontend Platform; co-sign required.
-**Skip-test:** `tests/contract/test_cases_cursor_pagination_deferred.test.ts`
-**Plan reference:** `docs/plans/gap-remediation-rollout.md` row S4 (re-scoped).
+**Status:** Active (ADR-038 §D7 amendment shipped).
+**Owner:** Backend + Frontend Platform.
+**Plan reference:** `docs/plans/gap-remediation-rollout.md` row S4 + follow-on.
 
-## Why this is deferred
+## Outcome
 
-The 2026-05-11 gap analysis identified that the case-projected `/exceptions` queue lost the cursor-loop pagination the May-7 `/exceptions/page.tsx` carried (`do { exceptionsApi.list({ cursor }); } while (cursor)`). The rollout plan's S4 originally proposed porting that loop into `useCases`.
+Cursor pagination is live on `/api/v1/cases`. Both repos updated in lockstep:
 
-Mid-S4 the autonomous run hit the plan's §4 emergency-stop trigger:
+### asoe2 (binding contract)
 
-> "A backend route signature in `api/routes/exceptions.py` would have to change to satisfy a UI expectation. The backend contract is binding; the UI must adapt, not the other way round, unless an ADR amendment is filed first."
+- `api/schemas.py::CaseListResponse` — gained `cursor: Optional[str]` and `has_more: bool` fields.
+- `api/routes/cases.py::list_cases` — accepts `?cursor=<token>`. Sort is now (opened_at DESC, case_id DESC tiebreak) for cursor determinism. Slicing is cursor-anchored; unknown cursors fall through to start-of-list (grandfathered, matches `exception_store.list`).
+- `tests/test_routes_cases.py::TestCursorPagination` — five locks: cursor present on first page when more exist, cursor null on last page, full loop covers every case exactly once, unknown cursor falls through, cursor pagination respects filters.
+- `openapi/asoe2.openapi.json` — regenerated; `CaseListResponse` schema now publishes `cursor` + `has_more`.
 
-The backend's `/api/v1/cases` response shape (`CaseListResponse` in `asoe2/api/schemas.py`) is `{ items, total }` — no `cursor` / `has_more` field. Only `/api/v1/exceptions` (`ExceptionListResponse`) supports cursor pagination, and the case-projected `/exceptions` UI no longer talks to that route. Porting the cursor loop unilaterally would require either (a) a new backend route signature or (b) reverting `/exceptions` to its pre-case-projection ancestor — both reach into ADR-038 territory.
+### asoe-ui
 
-## What S4 actually shipped
+- `src/lib/api.ts::casesApi.list` — added `cursor?: string` param; return type widened to `{ items, total, cursor, has_more }`. Mock branch now slices by cursor with the same stable sort.
+- `src/hooks/useManualOrderCases.ts::useCases` — switched to a bounded `for` loop (max 200 iterations) that accumulates pages until `has_more === false`. Stalled-cursor guard breaks the loop if the backend returns the same cursor twice. `truncated` is now a defensive disclosure (should always be false in normal operation).
+- `tests/hooks/useCases.limit.test.ts` — rewritten to exercise the cursor loop end-to-end including the stalled-cursor guard.
+- `tests/contract/test_cases_cursor_pagination_deferred.test.ts` — `it.skip` flipped to active; structural locks verify both the hook source and the OpenAPI shape.
 
-1. `useCases({ limit })` — wires the existing backend `limit` parameter through the hook.
-2. Mock `casesApi.list` honours `limit` (default 200, max 500 — matches the asoe2 contract).
-3. `UseCasesReturn.truncated: boolean` — flips when `total > cases.length`, so pages can render a "Showing N of M" disclosure without rolling their own derivation.
-4. This tracking doc + a `.skip` regression guard in the contract test below.
+## Why this matters
 
-## What S4 deliberately does not ship
+The 2026-05-11 gap report flagged that the case-projected exception queue silently capped at the first page (limit=200). For tenants with more than 200 open cases, the UI's filter chips and aggregate counters were operating on a slice the operator could not see. The bug was invisible in mock-mode because `MOCK_CASES` has fewer than 200 entries.
 
-- No cursor / `has_more` synthesis on the UI side. Faking a cursor against a non-cursor-paginated backend would hide the gap from observability rather than expose it.
-- No silent client-side pagination of the truncated set. The operator must see "you are not seeing everything" or no UI assumption (analytics, count totals) can be trusted.
+## Acceptance criteria (all met)
 
-## Acceptance criteria to un-skip
-
-1. asoe2 ADR-amendment ratifies cursor pagination on `/api/v1/cases` — `CaseListResponse` gains `cursor: Optional[str]` and `has_more: bool` fields. The amendment must clarify whether `/exceptions` retires entirely or remains as the per-event cursor-paginated surface.
-2. asoe2 implementation lands; OpenAPI document carries the new fields.
-3. `useCases` adopts a `do { ... } while (cursor)` loop accumulating items across pages, with `truncated` repurposed for backend-truncated responses (a separate signal from "more pages exist locally").
-4. `tests/contract/test_cases_cursor_pagination_deferred.test.ts` skip is removed; the test body becomes the active lock.
+1. asoe2 `CaseListResponse` carries `cursor: Optional[str]` and `has_more: bool`. ✓
+2. asoe2 `list_cases` route accepts `?cursor=<token>` and slices deterministically. ✓
+3. asoe2 OpenAPI document publishes both fields. ✓
+4. asoe-ui `useCases` walks every page until `has_more` is false. ✓
+5. asoe-ui mock paginates with the same stable sort + cursor scheme. ✓
+6. Tests on both sides lock the invariants (5 backend + 6 frontend). ✓
 
 ## Related work
 
-- Original gap analysis: A3 in the 2026-05-11 chat transcript.
-- May-7 cursor-loop reference: `git show 44ecf51:src/app/exceptions/page.tsx` lines 154–190.
-- Backend route: `asoe2/api/routes/cases.py::list_cases` (limit-only today).
+- Cursor convention reference: `asoe2/db/repository.py::exception_store.list` (created_at DESC anchor).
+- Stable-sort tiebreaker rationale: cursor determinism requires a total ordering; `opened_at` is not unique across cases opened in the same millisecond.
+- Backend-bug guard rationale: a real `exception_store` cursor-loop bug in 2025 went undetected for a sprint because the UI returned `loading=false` after the first page; we now break + surface via `truncated` instead of looping forever.

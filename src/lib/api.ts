@@ -3711,13 +3711,27 @@ export const casesApi = {
     /** Free-text fuzzy match across PO/SO/customer/case_id. */
     q?: string;
     /** Page size. Backend default 200, max 500
-     *  (asoe2/api/routes/cases.py::list_cases::limit). Mock honours
-     *  the same bounds. Cursor pagination is tracked separately —
-     *  see docs/test-strategy/cases-cursor-pagination-tracking.md. */
+     *  (asoe2/api/routes/cases.py::list_cases::limit). */
     limit?: number;
-  }): Promise<{ items: CaseListItem[]; total: number }> {
+    /** Pagination cursor. Opaque page-anchor token returned in
+     *  `cursor` on the previous response when `has_more` is true.
+     *  Clients loop `do { fetch } while (cursor)` until exhausted —
+     *  see `useCases` for the canonical consumer. ADR-038 §D7
+     *  amendment (2026-05-11). */
+    cursor?: string;
+  }): Promise<{
+    items: CaseListItem[];
+    total: number;
+    cursor: string | null;
+    has_more: boolean;
+  }> {
     if (USE_REAL_API) {
-      return http<{ items: CaseListItem[]; total: number }>("/api/v1/cases", {
+      return http<{
+        items: CaseListItem[];
+        total: number;
+        cursor: string | null;
+        has_more: boolean;
+      }>("/api/v1/cases", {
         query: {
           source: params?.source,
           status: params?.status,
@@ -3725,6 +3739,7 @@ export const casesApi = {
           since: params?.since,
           q: params?.q,
           limit: params?.limit,
+          cursor: params?.cursor,
         },
       });
     }
@@ -3752,14 +3767,33 @@ export const casesApi = {
           .some((v) => v && v.toLowerCase().includes(needle)),
       );
     }
+    // Stable sort to match the backend (opened_at DESC, case_id
+    // DESC tiebreak). Cursor determinism requires a total ordering.
+    items.sort((a, b) => {
+      if (a.opened_at !== b.opened_at) {
+        return a.opened_at < b.opened_at ? 1 : -1;
+      }
+      return a.case_id < b.case_id ? 1 : a.case_id > b.case_id ? -1 : 0;
+    });
     const total = items.length;
     // Apply backend-parity limit (default 200, max 500). The mock
-    // mirrors the asoe2 contract so a UI that ignores `total`
-    // surfaces the truncation in dev, not first in prod.
+    // mirrors the asoe2 contract.
     const requestedLimit = params?.limit ?? 200;
     const limit = Math.max(1, Math.min(500, requestedLimit));
-    if (items.length > limit) items = items.slice(0, limit);
-    return { items, total };
+    // Cursor-anchored slicing. Unknown cursors fall through to
+    // start-of-list — matches asoe2 grandfathered behaviour for
+    // stale tokens (api/routes/cases.py::list_cases).
+    let start = 0;
+    if (params?.cursor) {
+      const cursorIdx = items.findIndex((c) => c.case_id === params.cursor);
+      if (cursorIdx >= 0) start = cursorIdx + 1;
+    }
+    const page = items.slice(start, start + limit);
+    const has_more = start + limit < total;
+    const nextCursor = has_more && page.length > 0
+      ? page[page.length - 1].case_id
+      : null;
+    return { items: page, total, cursor: nextCursor, has_more };
   },
 
   async get(case_id: string): Promise<OrderCase | null> {

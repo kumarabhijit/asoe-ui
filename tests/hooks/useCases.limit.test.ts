@@ -1,35 +1,38 @@
 /**
- * useCases — limit + truncation behaviour.
+ * useCases — cursor-loop pagination behaviour.
  *
- * Scope (S4 re-scoped): the case-projected `/exceptions` queue
- * cannot do cursor-based pagination today (see
- * docs/test-strategy/cases-cursor-pagination-tracking.md), but it
- * MUST surface the "total > items.length" case to the operator so
- * they don't act on a silently-truncated view.
+ * After the ADR-038 §D7 amendment landed cursor pagination on
+ * /api/v1/cases, `useCases` walks every page via a bounded loop
+ * until `has_more` is false. This file pins:
  *
- * Locks:
- *   * `useCases(undefined, { limit: N })` passes `limit: N` to
- *     `casesApi.list`.
- *   * Mock honours `limit` (clamped to 1..500 per backend contract).
- *   * `truncated` flips when `total > cases.length`.
- *   * `truncated` is false on a non-truncated fetch.
+ *   * limit pass-through to casesApi.list
+ *   * cursor loop accumulates rows across pages
+ *   * stalled-cursor guard (backend bug protection) does not
+ *     infinite-loop
+ *   * truncated stays false in normal multi-page operation
+ *   * refetch is silent (no spinner flash)
+ *   * limit-less call omits both `limit` and `cursor` from params
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 
 import type { CaseListItem } from "@/lib/api";
 
-const MOCK_ITEMS: CaseListItem[] = Array.from({ length: 12 }).map((_, i) => ({
-  case_id: `case-${i.toString().padStart(3, "0")}`,
-  tenant_id: "acme-corp",
-  source: "manual_order",
-  source_channel: "email",
-  opened_at: "2026-05-10T09:00:00Z",
-  updated_at: "2026-05-10T09:00:00Z",
-  status: "OPEN_AGENT_PROCESSING",
-  tier: 2,
-  child_intents: [],
-}));
+function makeItem(i: number): CaseListItem {
+  return {
+    case_id: `case-${i.toString().padStart(3, "0")}`,
+    tenant_id: "acme-corp",
+    source: "manual_order",
+    source_channel: "email",
+    opened_at: "2026-05-10T09:00:00Z",
+    updated_at: "2026-05-10T09:00:00Z",
+    status: "OPEN_AGENT_PROCESSING",
+    tier: 2,
+    child_intents: [],
+  };
+}
+
+const MOCK_ITEMS = Array.from({ length: 12 }, (_, i) => makeItem(i));
 
 const listMock = vi.fn();
 
@@ -41,44 +44,80 @@ vi.mock("@/lib/api", () => ({
 
 const { useCases } = await import("@/hooks/useManualOrderCases");
 
-describe("useCases — limit + truncation", () => {
+describe("useCases — cursor-loop pagination", () => {
   beforeEach(() => {
     listMock.mockReset();
   });
 
-  it("passes limit through to casesApi.list", async () => {
-    listMock.mockResolvedValue({ items: MOCK_ITEMS.slice(0, 5), total: 12 });
+  it("passes limit through to casesApi.list (first page)", async () => {
+    listMock.mockResolvedValue({
+      items: MOCK_ITEMS.slice(0, 5),
+      total: 5,
+      cursor: null,
+      has_more: false,
+    });
     const { result } = renderHook(() =>
       useCases("manual_order", { limit: 5 }),
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(listMock).toHaveBeenCalledWith({ source: "manual_order", limit: 5 });
+    expect(listMock).toHaveBeenNthCalledWith(1, { source: "manual_order", limit: 5 });
   });
 
-  it("flips truncated when total > items.length", async () => {
-    listMock.mockResolvedValue({ items: MOCK_ITEMS.slice(0, 5), total: 12 });
+  it("walks every page until has_more=false (rows accumulated, total respected)", async () => {
+    // Three-page response: 5, 5, 2.
+    listMock
+      .mockResolvedValueOnce({
+        items: MOCK_ITEMS.slice(0, 5), total: 12, cursor: "case-004", has_more: true,
+      })
+      .mockResolvedValueOnce({
+        items: MOCK_ITEMS.slice(5, 10), total: 12, cursor: "case-009", has_more: true,
+      })
+      .mockResolvedValueOnce({
+        items: MOCK_ITEMS.slice(10, 12), total: 12, cursor: null, has_more: false,
+      });
+
     const { result } = renderHook(() =>
       useCases("manual_order", { limit: 5 }),
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.cases.length).toBe(5);
+    expect(result.current.cases).toHaveLength(12);
     expect(result.current.total).toBe(12);
-    expect(result.current.truncated).toBe(true);
+    expect(result.current.truncated).toBe(false);
+    expect(listMock).toHaveBeenCalledTimes(3);
+    // Subsequent calls carry the previous page's cursor.
+    expect(listMock).toHaveBeenNthCalledWith(2, {
+      source: "manual_order", limit: 5, cursor: "case-004",
+    });
+    expect(listMock).toHaveBeenNthCalledWith(3, {
+      source: "manual_order", limit: 5, cursor: "case-009",
+    });
   });
 
-  it("truncated stays false on a complete fetch", async () => {
-    listMock.mockResolvedValue({ items: MOCK_ITEMS, total: 12 });
+  it("stalled-cursor guard: backend that returns the same cursor breaks the loop", async () => {
+    // Pathological backend — never advances the cursor and never
+    // sets has_more=false. The hook MUST not infinite-loop.
+    listMock.mockResolvedValue({
+      items: MOCK_ITEMS.slice(0, 5),
+      total: 99,
+      cursor: "case-004",  // never changes
+      has_more: true,      // never flips
+    });
     const { result } = renderHook(() =>
-      useCases("manual_order", { limit: 200 }),
+      useCases("manual_order", { limit: 5 }),
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.truncated).toBe(false);
+    // First fetch returns 5 rows; second sees cursor === previous
+    // cursor and breaks. So the call count is 2.
+    expect(listMock).toHaveBeenCalledTimes(2);
+    expect(result.current.cases).toHaveLength(10);
   });
 
   it("refetch is silent (loading does not flip back to true)", async () => {
-    listMock.mockResolvedValue({ items: MOCK_ITEMS.slice(0, 5), total: 12 });
+    listMock.mockResolvedValue({
+      items: MOCK_ITEMS, total: 12, cursor: null, has_more: false,
+    });
     const { result } = renderHook(() =>
-      useCases("manual_order", { limit: 5 }),
+      useCases("manual_order", { limit: 200 }),
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => result.current.refetch());
@@ -86,10 +125,21 @@ describe("useCases — limit + truncation", () => {
     await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
   });
 
-  it("limit-less call omits limit from params", async () => {
-    listMock.mockResolvedValue({ items: MOCK_ITEMS, total: 12 });
+  it("limit-less call omits limit + cursor from the first-page params", async () => {
+    listMock.mockResolvedValue({
+      items: MOCK_ITEMS, total: 12, cursor: null, has_more: false,
+    });
     const { result } = renderHook(() => useCases("manual_order"));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(listMock).toHaveBeenCalledWith({ source: "manual_order" });
+    expect(listMock).toHaveBeenNthCalledWith(1, { source: "manual_order" });
+  });
+
+  it("source-less call omits both source and limit", async () => {
+    listMock.mockResolvedValue({
+      items: MOCK_ITEMS, total: 12, cursor: null, has_more: false,
+    });
+    const { result } = renderHook(() => useCases());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(listMock).toHaveBeenNthCalledWith(1, undefined);
   });
 });
