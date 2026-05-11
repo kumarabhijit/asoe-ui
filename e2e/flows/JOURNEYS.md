@@ -155,6 +155,9 @@ expected matrix at the bottom of this file.
 <!-- BEGIN MATRIX -->
 | Flow | Journey | Arc |
 |---|---|---|
+| `triage/case-to-exception-detail-roundtrip.yaml` | J1, J3 | task-completion |
+| `triage/email-order-entry-from-inbox.yaml` | J1 | task-completion |
+| `triage/inbox-item-click-behavior-catalog.yaml` | J1, J2 | orientation |
 | `triage/inbox-load.yaml` | J1, J2 | orientation |
 <!-- END MATRIX -->
 

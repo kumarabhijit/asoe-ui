@@ -81,6 +81,11 @@ export const actionSchema = z.enum([
   "press",
   "fill",
   "navigate",
+  // Browser back/forward — needed by V2's chrome-during-transition
+  // assertions. No keyboard_equivalent required (Alt+ArrowLeft is
+  // a UA-level shortcut, not a focus-receiving affordance).
+  "back",
+  "forward",
   "assert_visible",
   "assert_url_equals",
   "assert_url_matches",

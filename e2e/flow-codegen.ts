@@ -173,6 +173,12 @@ function emitStep(step: Step): string[] {
       ];
     case "navigate":
       return [`await page.goto(${q(step.url!)});`];
+    case "back":
+      // Browser back: bfcache when available, otherwise re-mount.
+      // V2 asserts chrome survives this transition.
+      return ["await page.goBack();"];
+    case "forward":
+      return ["await page.goForward();"];
     case "assert_visible":
       return [
         `await expect(page.locator(${q(step.selector!)})).toBeVisible();`,

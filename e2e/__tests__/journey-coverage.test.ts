@@ -47,7 +47,11 @@ const FLOWS_ROOT = join(REPO_ROOT, "e2e", "flows");
 
 // Until Phase 2/3 lands the matrix is intentionally sparse. Flip
 // to 0 when the 8 v1.2 plan flows are all authored.
-const SOFT_GAP_THRESHOLD = 9;
+// Ratchet:
+//   - Phase 0 baseline: 8 cells uncovered
+//   - Phase 2 (V1+V2+V3 regression flows): 6 cells uncovered
+//   - Phase 3 (golden paths): 0-2 cells uncovered (J5 reserved)
+const SOFT_GAP_THRESHOLD = 7;
 
 interface IndexedFlow {
   path: string;
@@ -162,8 +166,10 @@ describe("journey-coverage meta-test", () => {
     // its (journey, arc) here. Removing coverage is a regression
     // that fails this test loudly. Append-only.
     const guaranteedCovered: Array<[JourneyId, Arc]> = [
-      ["J1", "orientation"], // triage/inbox-load.yaml
-      ["J2", "orientation"], // triage/inbox-load.yaml
+      ["J1", "orientation"], // triage/inbox-load.yaml + V3 catalog
+      ["J2", "orientation"], // triage/inbox-load.yaml + V3 catalog
+      ["J1", "task-completion"], // V1 + V2 round-trip
+      ["J3", "task-completion"], // V2 round-trip
     ];
     const missing: string[] = [];
     for (const [j, a] of guaranteedCovered) {

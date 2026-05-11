@@ -72,7 +72,12 @@ export function renderMatrix(flows: FlowEntry[]): string {
   const lines: string[] = [];
   lines.push("| Flow | Journey | Arc |");
   lines.push("|---|---|---|");
-  for (const entry of flows) {
+  // Defensive sort: callers always pass loadFlows()'s sorted
+  // output, but the deterministic-output contract is asserted
+  // by passing a reversed list. Sort here so the contract holds
+  // regardless of input order.
+  const sorted = [...flows].sort((a, b) => a.rel.localeCompare(b.rel));
+  for (const entry of sorted) {
     const journeys = journeysOf(entry.flow).sort().join(", ");
     // Drop the leading "flows/" prefix so the table column
     // reads "triage/inbox-load.yaml" instead of
