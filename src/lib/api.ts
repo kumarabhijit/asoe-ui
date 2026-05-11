@@ -62,6 +62,23 @@ export function isValidReasonTagForRead(tag: string): boolean {
   return (ALLOWED_OVERRIDE_REASON_TAGS as readonly string[]).includes(tag);
 }
 
+// Terminal lifecycle states reject every HITL disposition (mirrors
+// asoe2/api/routes/exceptions.py::PATCH /disposition gating). The
+// backend returns 409 (`LIFECYCLE_LOCKED`); the mock throws an
+// Error with the same code prefix so the UI's toast renderer
+// doesn't fork on mode.
+export const TERMINAL_LIFECYCLE_STATES: readonly string[] = [
+  "FAILED",
+  "RESOLVED",
+  "BLOCKED",
+  "REJECTED",
+  "CLOSED",
+];
+
+export function isTerminalLifecycle(state: string | undefined | null): boolean {
+  return !!state && TERMINAL_LIFECYCLE_STATES.includes(state);
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MOCK_DELAY = 400;
 
@@ -1554,6 +1571,14 @@ export const exceptionsApi = {
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
     if (!exc) throw new Error("Exception not found");
+    // S9: terminal-state gate. Disposition is not allowed once the
+    // record has reached a terminal lifecycle (asoe2 returns 409
+    // LIFECYCLE_LOCKED).
+    if (isTerminalLifecycle(exc.lifecycle_state)) {
+      throw new Error(
+        `LIFECYCLE_LOCKED: disposition not allowed on terminal record (lifecycle ${exc.lifecycle_state})`,
+      );
+    }
     if (!request.notes || !request.notes.trim()) {
       throw new Error("NOTES_REQUIRED: notes are required (SOX audit trail).");
     }

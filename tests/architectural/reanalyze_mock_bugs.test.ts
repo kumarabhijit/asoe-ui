@@ -97,11 +97,14 @@ describe("Mock write updated_at persistence (Bug #2 — covers every action)", (
   });
 
   it("disposition (approve) advances updated_at and persists to refetch", async () => {
-    // exc-009 is a YELLOW DUPLICATE_PO PENDING_REVIEW — eligible for
-    // disposition without prior cosign infrastructure.
-    await assertUpdatedAtAdvances("exc-009", () =>
+    // exc-013 is YELLOW MIN_ORDER_QTY PENDING_REVIEW — eligible for
+    // disposition. (exc-009 was the previous target but its mock
+    // lifecycle is actually RESOLVED — S9's terminal-state gate
+    // now catches that inconsistency; this test moves to a record
+    // that is genuinely PENDING_REVIEW.)
+    await assertUpdatedAtAdvances("exc-013", () =>
       exceptionsApi.disposition(
-        "exc-009",
+        "exc-013",
         { action: "BLOCK_AND_NOTIFY", notes: "approving", reason_tag: "OTHER" },
       ),
     );
