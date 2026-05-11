@@ -35,6 +35,7 @@ import { NavBar } from "@/components/ui/NavBar";
 import { ALLOWED_CASE_SOURCES, casesApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
+import { STATUS_LABEL } from "@/lib/cases";
 import { cn } from "@/lib/utils";
 import type {
   CaseSource,
@@ -61,16 +62,9 @@ const SOURCE_ICON: Record<CaseSource | "default", React.ReactNode> = {
   default: <Clock size={12} aria-hidden />,
 };
 
-/** Status → display string. Default fallback per Guardrail #1. */
-const STATUS_LABEL: Record<string, string> = {
-  OPEN_AGENT_PROCESSING: "Agent processing",
-  OPEN_AWAITING_HUMAN: "Awaiting review",
-  OPEN_AWAITING_BUYER: "Awaiting buyer",
-  OPEN_AWAITING_ERP: "Awaiting ERP",
-  RESOLVED: "Resolved",
-  FAILED: "Failed",
-  BLOCKED: "Blocked",
-};
+// STATUS_LABEL is imported from src/lib/cases.ts — the Phase 28.5.x
+// §D1 audit consolidated the four duplicate maps into a single
+// source. Default fallback per Guardrail #1 stays the same.
 
 const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutral"> = {
   breached: "error",

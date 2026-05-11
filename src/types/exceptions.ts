@@ -1014,4 +1014,19 @@ export interface HealthResponse {
    * curated per-intent categories are a follow-up (Phase 5 deferred item).
    */
   allowed_override_reason_tags_by_intent: Record<string, string[]>;
+  /**
+   * Phase 28.5.x §D1 — the seven `CaseStatus` literal values
+   * (asoe2/contracts/models.py). Consumed by the CaseListPane filter
+   * chips so the case-status vocabulary is never hardcoded in .tsx.
+   * Defaults to `[]` until the backend ships the field — UI falls
+   * back to `STATUS_LABEL` keys in `src/lib/cases.ts` in that
+   * transition window.
+   */
+  allowed_case_statuses?: string[];
+  /**
+   * Phase 28.5.x §D1 — the two `CaseSource` values
+   * (manual_order | automated_order). Once present, `ALLOWED_CASE_SOURCES`
+   * in `src/lib/api.ts` is retired and this is the only source.
+   */
+  allowed_case_sources?: string[];
 }

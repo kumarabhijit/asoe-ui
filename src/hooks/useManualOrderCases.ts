@@ -20,12 +20,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { casesApi } from "@/lib/api";
-import type { CaseSource, OrderCase } from "@/types/cases";
+import { casesApi, type CaseListItem } from "@/lib/api";
+import type { CaseSource } from "@/types/cases";
 import type { WSEvent } from "@/types/websocket";
 
 interface UseCasesReturn {
-  cases: OrderCase[];
+  cases: CaseListItem[];
   total: number;
   loading: boolean;
   error: string | null;
@@ -36,7 +36,7 @@ interface UseCasesReturn {
 }
 
 export function useCases(source?: CaseSource): UseCasesReturn {
-  const [cases, setCases] = useState<OrderCase[]>([]);
+  const [cases, setCases] = useState<CaseListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

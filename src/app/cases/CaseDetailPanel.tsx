@@ -29,6 +29,7 @@ import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { PolicyHitBadge } from "@/components/ui/PolicyHitBadge";
 import type { CaseSource, OrderCase } from "@/types/cases";
 import type { ExceptionDetailResponse } from "@/types/api";
+import { STATUS_LABEL } from "@/lib/cases";
 
 import { slaSnapshot } from "./page";
 
@@ -45,15 +46,8 @@ const SOURCE_LABEL: Record<CaseSource | "default", string> = {
   default: "Unknown source",
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  OPEN_AGENT_PROCESSING: "Agent processing",
-  OPEN_AWAITING_HUMAN: "Awaiting review",
-  OPEN_AWAITING_BUYER: "Awaiting buyer",
-  OPEN_AWAITING_ERP: "Awaiting ERP",
-  RESOLVED: "Resolved",
-  FAILED: "Failed",
-  BLOCKED: "Blocked",
-};
+// STATUS_LABEL is imported from src/lib/cases.ts — the consolidated
+// shared map per Phase 28.5.x §D1.
 
 
 export interface CaseDetailPanelProps {

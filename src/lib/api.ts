@@ -3540,23 +3540,65 @@ const MOCK_CASES: OrderCase[] = [
  * serves local development and the `/cases` route's preview fixtures.
  * Same `USE_REAL_API` cutover pattern as exceptionsApi.
  */
+/**
+ * OrderCase + the Phase 28.5.x §D2 derived `child_intents` field.
+ * The base OrderCase model is Pydantic `extra="forbid"` so the
+ * backend adds child_intents to the response dict, not to the
+ * model — the UI's wire type widens here without touching
+ * `src/types/cases.ts`. Empty array when the case has no children
+ * yet (just-opened Manual Order).
+ */
+export interface CaseListItem extends OrderCase {
+  child_intents: string[];
+}
+
 export const casesApi = {
   async list(params?: {
     source?: string;
+    /** Multi-value via comma-separated string. */
     status?: string;
-  }): Promise<{ items: OrderCase[]; total: number }> {
+    /** Multi-value via comma-separated string. */
+    intents?: string;
+    /** Recency preset: today | 24h | 7d | 30d. */
+    since?: string;
+    /** Free-text fuzzy match across PO/SO/customer/case_id. */
+    q?: string;
+  }): Promise<{ items: CaseListItem[]; total: number }> {
     if (USE_REAL_API) {
-      return http<{ items: OrderCase[]; total: number }>("/api/v1/cases", {
+      return http<{ items: CaseListItem[]; total: number }>("/api/v1/cases", {
         query: {
           source: params?.source,
           status: params?.status,
+          intents: params?.intents,
+          since: params?.since,
+          q: params?.q,
         },
       });
     }
     await new Promise((r) => setTimeout(r, MOCK_DELAY));
-    let items = [...MOCK_CASES];
+    let items: CaseListItem[] = MOCK_CASES.map((c) => ({
+      ...c,
+      child_intents: [],  // mock-mode placeholder; live API computes
+    }));
     if (params?.source) items = items.filter((c) => c.source === params.source);
-    if (params?.status) items = items.filter((c) => c.status === params.status);
+    if (params?.status) {
+      const statuses = params.status.split(",").map((s) => s.trim()).filter(Boolean);
+      if (statuses.length > 0) {
+        items = items.filter((c) => statuses.includes(c.status));
+      }
+    }
+    if (params?.intents) {
+      // Mock has no children → intent filter selects no cases when used.
+      const intents = params.intents.split(",").map((s) => s.trim()).filter(Boolean);
+      if (intents.length > 0) items = [];
+    }
+    if (params?.q) {
+      const needle = params.q.toLowerCase();
+      items = items.filter((c) =>
+        [c.case_id, c.customer_po_number, c.sales_order_id, c.customer_id]
+          .some((v) => v && v.toLowerCase().includes(needle)),
+      );
+    }
     return { items, total: items.length };
   },
 

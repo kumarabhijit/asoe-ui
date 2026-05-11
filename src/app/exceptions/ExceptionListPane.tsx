@@ -145,6 +145,7 @@ export default function ExceptionListPane({
           <div className="flex items-center gap-4">
             <SavedViewsMenu
               currentFilters={{
+                surface: "exceptions",
                 filterStates,
                 filterIntents,
                 filterDate,

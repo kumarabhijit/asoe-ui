@@ -1837,6 +1837,10 @@ export interface components {
          * @description GET /api/v1/health
          */
         HealthResponse: {
+            /** Allowed Case Sources */
+            allowed_case_sources?: string[];
+            /** Allowed Case Statuses */
+            allowed_case_statuses?: string[];
             /** Allowed Intents */
             allowed_intents: string[];
             /** Allowed Override Reason Tags */
@@ -3287,8 +3291,14 @@ export interface operations {
             query?: {
                 /** @description Filter by case source (manual_order | automated_order) */
                 source?: string | null;
-                /** @description Filter by case status (CaseStatus literal) */
+                /** @description Filter by case status. Multi-value via comma-separated list (e.g. status=OPEN_AWAITING_HUMAN,OPEN_AWAITING_BUYER). Any-match: a case in any of the listed statuses passes. */
                 status?: string | null;
+                /** @description Filter by child-record intent (Phase 28.5.x §D2). Multi-value via comma-separated list (e.g. intents=DUPLICATE_PO,CONTRACTUAL_CORRECTION). Any-match: a case with at least one child carrying one of the listed intents passes. */
+                intents?: string | null;
+                /** @description Filter by recency: presets `today` / `24h` / `7d` / `30d`. Cases opened within the window pass. Anything else falls through unfiltered. */
+                since?: string | null;
+                /** @description Free-text fuzzy match over case_id / customer_po_number / sales_order_id / customer_id. Case-insensitive substring. Operators (po:, so:, customer:) are parsed client-side; the backend sees the free-text term only. */
+                q?: string | null;
                 limit?: number;
             };
             header?: {
