@@ -1,52 +1,79 @@
 /**
- * Saved-views storage for the Exception Queue list pane.
+ * Saved-views storage — v2 (Phase 28.5.x §D4).
  *
- * A "view" is a snapshot of the four list-pane filter dimensions —
- * lifecycle states, intents, the today-pill, and the search-box query
- * — that the operator wants to recall in one click. Stored in
- * `localStorage` under a versioned key so a future schema change
- * (e.g. adding a date-range filter) has a clean migration point: just
- * bump the key suffix.
+ * v2 adds a `surface` discriminator so the legacy
+ * `ExceptionListPane` queue (`surface: "exceptions"`) and the new
+ * `CaseListPane` queue (`surface: "cases"`) can share the same
+ * storage without their filter shapes colliding. v1 entries are
+ * migrated one-shot on first read (every existing entry inherits
+ * `surface: "exceptions"` because the legacy hook only served that
+ * queue).
  *
- * Slice-3 scope (PO ruling 2026-05-03): client-side only. No server
- * round-trip, no per-tenant scoping, no shareable URLs (the URL search-
- * params already give that for ad-hoc views — saved views are for
- * personal recurring queries). When a user-preferences API ships,
- * `useSavedViews` is the natural seam to swap the localStorage adapter
- * for a server-backed one without touching the UI.
+ * The "My queue" default the workshop pre-read discussed is NOT
+ * shipped as a built-in view — the operator's binding decision
+ * (PO ruling) is opt-in: the operator pins their preferred
+ * filter as a normal saved view named "My queue" on the first
+ * click of "Save as default." No auto-apply.
  *
- * Storage shape: a JSON array of `SavedView` records. Reads tolerate
- * corruption (garbage / wrong shape → empty list, no throw) so a
- * stale browser entry never bricks the queue.
+ * Storage shape (v2): a JSON array of `SavedView` records
+ * discriminated by `surface`. Reads tolerate corruption (garbage /
+ * wrong shape → empty list, no throw) and missing optional fields.
  */
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 
-/** Bumped when the persisted shape changes incompatibly. */
-const STORAGE_KEY = "asoe-ui:saved-views:v1";
+import type { CaseSource } from "@/types/cases";
 
-export interface SavedViewFilters {
+const STORAGE_KEY = "asoe-ui:saved-views:v2";
+const LEGACY_STORAGE_KEY = "asoe-ui:saved-views:v1";
+
+/** The two surfaces with saved-view support. */
+export type SavedViewSurface = "exceptions" | "cases";
+
+export interface ExceptionSavedViewFilters {
+  surface: "exceptions";
   filterStates: string[];
   filterIntents: string[];
   filterDate: "today" | null;
   searchQuery: string;
 }
 
-export interface SavedView extends SavedViewFilters {
+export interface CaseSavedViewFilters {
+  surface: "cases";
+  /** Multi-value case statuses (`CaseStatus` literals). */
+  filterStatuses: string[];
+  /** Multi-value child intents. */
+  filterIntents: string[];
+  /** Single-value source filter. */
+  filterSource: CaseSource | null;
+  /** Recency preset matching the backend's `since=` param. */
+  filterSince: "today" | "24h" | "7d" | "30d" | null;
+  searchQuery: string;
+  sortMode: "sla" | "recent";
+}
+
+export type SavedViewFilters =
+  | ExceptionSavedViewFilters
+  | CaseSavedViewFilters;
+
+export type SavedView = SavedViewFilters & {
   id: string;
   name: string;
   /** ISO 8601 — when the view was first saved. */
   createdAt: string;
-  /** ISO 8601 — last time the view was renamed (rename arrives in a
-   *  follow-up; for now this matches `createdAt`). */
+  /** ISO 8601 — last time the view was renamed (rename UI ships
+   *  in V5.1.2). */
   updatedAt: string;
-}
+};
 
 /* ── Storage adapter (pure, no React) ─────────────────────────────── */
 
 function readStorage(): SavedView[] {
   if (typeof window === "undefined") return [];
+  // One-shot migration: drain v1 into the v2 store with
+  // surface="exceptions" then delete v1.
+  migrateLegacyOnce();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
@@ -54,8 +81,6 @@ function readStorage(): SavedView[] {
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(isValidSavedView);
   } catch {
-    // Corrupt JSON, quota error on read, or localStorage disabled.
-    // Treat as empty — never bubble up to the consumer.
     return [];
   }
 }
@@ -65,33 +90,102 @@ function writeStorage(views: SavedView[]): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(views));
   } catch {
-    // QuotaExceededError or storage disabled. Swallow — the in-memory
-    // state still updates so the user sees their change in this tab;
-    // it just won't survive a reload. A toast would be friendlier and
-    // is on the backlog.
+    // QuotaExceededError or storage disabled — swallow.
   }
+}
+
+function migrateLegacyOnce(): void {
+  // Idempotent: the migration removes the legacy key on success, so
+  // re-running is a no-op.
+  let legacy: unknown;
+  try {
+    const raw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!raw) return;
+    legacy = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (!Array.isArray(legacy) || legacy.length === 0) {
+    try { window.localStorage.removeItem(LEGACY_STORAGE_KEY); } catch {}
+    return;
+  }
+  // Whatever v2 already has stays first — newer entries take
+  // precedence over the migration.
+  let existing: SavedView[] = [];
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) existing = parsed.filter(isValidSavedView);
+    }
+  } catch {}
+  const migrated: SavedView[] = legacy
+    .map((entry) => migrateLegacyEntry(entry))
+    .filter((v): v is SavedView => v !== null);
+  writeStorage([...existing, ...migrated]);
+  try { window.localStorage.removeItem(LEGACY_STORAGE_KEY); } catch {}
+}
+
+function migrateLegacyEntry(v: unknown): SavedView | null {
+  if (typeof v !== "object" || v === null) return null;
+  const r = v as Record<string, unknown>;
+  if (typeof r.id !== "string" || typeof r.name !== "string") return null;
+  const migrated: ExceptionSavedViewFilters & {
+    id: string; name: string; createdAt: string; updatedAt: string;
+  } = {
+    id: r.id,
+    name: r.name,
+    surface: "exceptions",
+    filterStates: Array.isArray(r.filterStates)
+      ? r.filterStates.filter((s) => typeof s === "string") as string[]
+      : [],
+    filterIntents: Array.isArray(r.filterIntents)
+      ? r.filterIntents.filter((s) => typeof s === "string") as string[]
+      : [],
+    filterDate: r.filterDate === "today" ? "today" : null,
+    searchQuery: typeof r.searchQuery === "string" ? r.searchQuery : "",
+    createdAt: typeof r.createdAt === "string" ? r.createdAt : new Date().toISOString(),
+    updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : new Date().toISOString(),
+  };
+  return migrated;
 }
 
 function isValidSavedView(v: unknown): v is SavedView {
   if (typeof v !== "object" || v === null) return false;
   const r = v as Record<string, unknown>;
-  return (
-    typeof r.id === "string" &&
-    typeof r.name === "string" &&
-    Array.isArray(r.filterStates) &&
-    r.filterStates.every((s) => typeof s === "string") &&
-    Array.isArray(r.filterIntents) &&
-    r.filterIntents.every((s) => typeof s === "string") &&
-    (r.filterDate === null || r.filterDate === "today") &&
-    typeof r.searchQuery === "string" &&
-    typeof r.createdAt === "string" &&
-    typeof r.updatedAt === "string"
-  );
+  if (typeof r.id !== "string" || typeof r.name !== "string") return false;
+  if (typeof r.createdAt !== "string" || typeof r.updatedAt !== "string") return false;
+  if (r.surface === "exceptions") {
+    return (
+      Array.isArray(r.filterStates) &&
+      (r.filterStates as unknown[]).every((s) => typeof s === "string") &&
+      Array.isArray(r.filterIntents) &&
+      (r.filterIntents as unknown[]).every((s) => typeof s === "string") &&
+      (r.filterDate === null || r.filterDate === "today") &&
+      typeof r.searchQuery === "string"
+    );
+  }
+  if (r.surface === "cases") {
+    return (
+      Array.isArray(r.filterStatuses) &&
+      (r.filterStatuses as unknown[]).every((s) => typeof s === "string") &&
+      Array.isArray(r.filterIntents) &&
+      (r.filterIntents as unknown[]).every((s) => typeof s === "string") &&
+      (r.filterSource === null
+        || r.filterSource === "manual_order"
+        || r.filterSource === "automated_order") &&
+      (r.filterSince === null
+        || r.filterSince === "today"
+        || r.filterSince === "24h"
+        || r.filterSince === "7d"
+        || r.filterSince === "30d") &&
+      typeof r.searchQuery === "string" &&
+      (r.sortMode === "sla" || r.sortMode === "recent")
+    );
+  }
+  return false;
 }
 
-/** Stable, no-collision id generator. Falls back to a timestamp +
- *  random suffix when `crypto.randomUUID` is missing (older Edge,
- *  some test environments). */
 function newId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -102,27 +196,30 @@ function newId(): string {
 /* ── Hook ─────────────────────────────────────────────────────────── */
 
 export interface UseSavedViewsApi {
-  /** Hydrated list of saved views, sorted by most-recently-created
-   *  first so the menu shows the latest at the top. */
+  /** Hydrated list of saved views for the requested surface,
+   *  sorted most-recently-created first. */
   views: SavedView[];
-  /** Persist a new view from the current filter state. Returns the
-   *  created record so callers can show toast / focus the new entry. */
+  /** Persist a new view from the current filter state.
+   *  Filters carry the `surface` discriminator so the hook stores
+   *  them on the correct surface. */
   save: (name: string, filters: SavedViewFilters) => SavedView;
-  /** Remove a view by id. No-op if the id isn't found. */
   remove: (id: string) => void;
-  /** True after the first hydrate from localStorage — useful for
-   *  callers that want to suppress an empty-state flash on mount. */
   hydrated: boolean;
 }
 
-export function useSavedViews(): UseSavedViewsApi {
-  // SSR: start with [] so the server-rendered HTML matches; hydrate
-  // from localStorage in an effect on the client.
-  const [views, setViews] = useState<SavedView[]>([]);
+/**
+ * Pass `surface` to scope the returned `views` array to one queue.
+ * Defaults to `"exceptions"` so legacy callers (the old
+ * ExceptionListPane) work without changes.
+ */
+export function useSavedViews(
+  surface: SavedViewSurface = "exceptions",
+): UseSavedViewsApi {
+  const [allViews, setAllViews] = useState<SavedView[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setViews(readStorage());
+    setAllViews(readStorage());
     setHydrated(true);
   }, []);
 
@@ -131,17 +228,13 @@ export function useSavedViews(): UseSavedViewsApi {
       const trimmed = name.trim() || `View ${new Date().toLocaleString()}`;
       const now = new Date().toISOString();
       const next: SavedView = {
+        ...filters,
         id: newId(),
         name: trimmed,
-        filterStates: [...filters.filterStates],
-        filterIntents: [...filters.filterIntents],
-        filterDate: filters.filterDate,
-        searchQuery: filters.searchQuery,
         createdAt: now,
         updatedAt: now,
       };
-      setViews((prev) => {
-        // Prepend so the freshly-saved view is first in the menu.
+      setAllViews((prev) => {
         const updated = [next, ...prev];
         writeStorage(updated);
         return updated;
@@ -152,16 +245,14 @@ export function useSavedViews(): UseSavedViewsApi {
   );
 
   const remove = useCallback((id: string) => {
-    setViews((prev) => {
+    setAllViews((prev) => {
       const updated = prev.filter((v) => v.id !== id);
-      // Return the prior reference if nothing changed — React then
-      // bails on the re-render and we avoid a useless localStorage
-      // write on an unknown id.
       if (updated.length === prev.length) return prev;
       writeStorage(updated);
       return updated;
     });
   }, []);
 
+  const views = allViews.filter((v) => v.surface === surface);
   return { views, save, remove, hydrated };
 }

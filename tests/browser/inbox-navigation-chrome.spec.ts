@@ -36,11 +36,13 @@ test("N1 — inbox row selects locally; Open case button navigates to /cases/{id
   await loginAs(page, USERS.MANAGER);
   await page.goto("/inbox");
 
-  // V5.1 — rows project from `useManualOrderCases()`. Aria-label
-  // shape: `Select case <PO-or-SO-or-case_id>`. Skip when no
+  // V5.1.1 — rows project from `useManualOrderCases()` and now
+  // render with `role="option"` inside a `role="listbox"` parent
+  // (Phase 28.5.x §D5 a11y swap). Aria-label shape:
+  // `Select case <PO-or-SO-or-case_id>`. Skip when no
   // manual-order cases are visible (clean tenant); the assertion is
   // meaningful only against a seeded backend.
-  const rows = page.locator('[role="button"][aria-label^="Select case"]');
+  const rows = page.locator('[role="option"][aria-label^="Select case"]');
   const rowCount = await rows.count();
   if (rowCount === 0) {
     test.skip(true, "No manual-order cases seeded — skip until backend has cases.");

@@ -1,31 +1,28 @@
 /**
- * Exception Queue — case-projected master-detail view (V5.1).
+ * Exception Queue — case-projected master-detail view (V5.1.1).
  *
- * Phase 28.5 §28.5 — `/exceptions` is now an "all cases" view of
- * `/cases`: rows project from `casesApi.list()` (no source filter),
- * not from `exceptionsApi.list`. Click-through goes to
- * `/cases/{case_id}` — the canonical case detail surface.
+ * Phase 28.5.x §28.5 → §D8 — `/exceptions` mounts the new
+ * `CaseListPane` (cluster filter chips, intent multi-select,
+ * search with operators, saved views, keyboard nav with
+ * `role="listbox"`/`role="option"`, sort toggle). Right pane stays
+ * the thin case-header summary with "Open case" → `/cases/{id}`
+ * (D8: full-detail-in-pane stays deferred to V5.2). Click-through
+ * still routes to `/cases/{case_id}` — the canonical case detail
+ * surface.
  *
  * Architectural notes:
  *   * Pure list projector (CLAUDE.md Guardrail #6). No client-side
  *     composition; every field comes from OrderCase as the backend
  *     hands it.
- *   * No per-intent / per-lifecycle dispatch (Guardrail #1).
- *     A case is a case regardless of which intent its child
- *     exceptions carry. The legacy ExceptionListPane (intent +
- *     lifecycle filter chips, search, saved views) is unchanged
- *     behind it but no longer mounted on this page; the
- *     V5.1 follow-up is a CaseListPane that replays those
- *     features against case-level fields.
- *   * Direct exception detail (e.g. from a deeplink in a runbook,
- *     or from `/inbox` legacy back-link) remains reachable at
- *     `/exceptions/[id]` — that route still mounts
- *     `ExceptionDetailPanel`.
+ *   * No per-intent / per-lifecycle dispatch (Guardrail #1). Status
+ *     and intent vocabularies come from `useHealth`; the chip bar
+ *     sources its grouping from `src/lib/cases.ts` (the single
+ *     consolidated STATUS_LABEL map this PR creates).
+ *   * Direct exception detail (e.g. from a runbook deeplink)
+ *     remains reachable at `/exceptions/[id]` — that route still
+ *     mounts `ExceptionDetailPanel`.
  *   * WS invalidation: `case_*` events trigger silent refetch via
- *     `useCases().refetch()`; `pipeline_progress` /
- *     `exception_update` / `task_complete` retain their existing
- *     shape but no longer drive list re-fetches on this surface
- *     (they are exception-keyed, not case-keyed).
+ *     `useCases().refetch()`.
  */
 "use client";
 
@@ -54,12 +51,13 @@ import {
   useCases,
   isCaseInvalidationEvent,
 } from "@/hooks/useManualOrderCases";
-import { ALLOWED_CASE_SOURCES } from "@/lib/api";
-import type { CaseSource, OrderCase, SlaBand } from "@/types/cases";
-import type { WSEvent } from "@/types/websocket";
+import { STATUS_LABEL, isAwaitingHuman } from "@/lib/cases";
 import { cn } from "@/lib/utils";
+import type { CaseSource, SlaBand } from "@/types/cases";
+import type { WSEvent } from "@/types/websocket";
 
 import { slaSnapshot } from "@/app/cases/page";
+import { CaseListPane } from "./CaseListPane";
 
 /* ── Visual mappings (Guardrail #1: default-fallback maps) ────────── */
 
@@ -73,16 +71,6 @@ const SOURCE_ICON: Record<CaseSource | "default", React.ReactNode> = {
   manual_order: <Mail size={12} aria-hidden />,
   automated_order: <PackageCheck size={12} aria-hidden />,
   default: <Clock size={12} aria-hidden />,
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  OPEN_AGENT_PROCESSING: "Agent processing",
-  OPEN_AWAITING_HUMAN: "Awaiting review",
-  OPEN_AWAITING_BUYER: "Awaiting buyer",
-  OPEN_AWAITING_ERP: "Awaiting ERP",
-  RESOLVED: "Resolved",
-  FAILED: "Failed",
-  BLOCKED: "Blocked",
 };
 
 const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutral"> = {
@@ -127,7 +115,6 @@ function ExceptionQueueContent() {
     : NAV_TABS;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [sourceFilter, setSourceFilter] = useState<CaseSource | null>(null);
 
   useEffect(() => {
     document.title = "Exception Queue — ASOE";
@@ -160,30 +147,21 @@ function ExceptionQueueContent() {
     onPollFallback: refetch,
   });
 
-  // Source-chip filtering happens client-side. Sort by SLA urgency.
+  // Metric tiles read from the unfiltered tenant cache (NOT the
+  // pane's filtered view) — operators want the global "what's
+  // outstanding?" count regardless of the chip state.
   const now = new Date();
-  const filtered = sourceFilter
-    ? cases.filter((c) => c.source === sourceFilter)
-    : cases;
-  const sorted = filtered
-    .map((c) => ({ case_: c, sla: slaSnapshot(c, now) }))
-    .sort((a, b) => {
-      const aMs = a.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
-      const bMs = b.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
-      return aMs - bMs;
-    });
-
-  const selected = sorted.find((s) => s.case_.case_id === selectedId);
   const breached = cases.filter((c) => {
     const ms = c.sla_deadline
       ? new Date(c.sla_deadline).getTime() - now.getTime()
       : Number.POSITIVE_INFINITY;
     return ms < 0;
   }).length;
-  const awaitingHuman = cases.filter(
-    (c) => c.status === "OPEN_AWAITING_HUMAN",
-  ).length;
+  const awaitingHumanCount = cases.filter((c) => isAwaitingHuman(c.status)).length;
   const resolved = cases.filter((c) => c.status === "RESOLVED").length;
+
+  const selected = cases.find((c) => c.case_id === selectedId) ?? null;
+  const selectedSla = selected ? slaSnapshot(selected, now) : null;
 
   return (
     <div className="min-h-screen bg-surface-page font-sans text-body text-text-primary leading-normal">
@@ -226,7 +204,7 @@ function ExceptionQueueContent() {
                   Exception Queue
                 </h1>
                 <span className="text-caption text-text-tertiary">
-                  All cases — sorted by SLA urgency
+                  All cases — filter, search, sort with keyboard support
                 </span>
               </div>
             </div>
@@ -262,7 +240,7 @@ function ExceptionQueueContent() {
           <MetricTile
             icon={<AlertTriangle size={20} />}
             label="Awaiting review"
-            value={String(awaitingHuman)}
+            value={String(awaitingHumanCount)}
             subtitle="Operator action needed"
             tint="var(--color-warning)"
           />
@@ -276,81 +254,24 @@ function ExceptionQueueContent() {
         </div>
       </div>
 
-      {/* ── SOURCE FILTER CHIPS ── */}
-      <div className="max-w-[1440px] mx-auto px-32 pb-8">
-        <div
-          role="toolbar"
-          aria-label="Case source filter"
-          className="flex items-center gap-8"
-        >
-          <span className="text-label uppercase tracking-wider text-text-quaternary">
-            Source:
-          </span>
-          <FilterChip
-            label="All"
-            active={sourceFilter === null}
-            onClick={() => setSourceFilter(null)}
-          />
-          {ALLOWED_CASE_SOURCES.map((src) => (
-            <FilterChip
-              key={src}
-              label={SOURCE_LABEL[src as CaseSource] ?? SOURCE_LABEL.default}
-              active={sourceFilter === src}
-              onClick={() =>
-                setSourceFilter((cur) =>
-                  cur === src ? null : (src as CaseSource),
-                )
-              }
-            />
-          ))}
-        </div>
-      </div>
-
       {/* ── CONTENT: QUEUE + DETAIL ── */}
       <div className="max-w-[1440px] mx-auto px-32 py-16 flex gap-16">
-        {/* ── LEFT: case queue ── */}
-        <div className="w-[420px] shrink-0 bg-surface-primary rounded-md shadow-sm overflow-hidden">
-          <div className="px-16 py-12 border-b border-border-subtle flex items-center gap-8">
-            <span className="text-label font-bold tracking-widest text-text-tertiary uppercase">
-              Cases
-            </span>
-            <div className="flex-1" />
-            <span className="text-caption text-text-tertiary">
-              {sorted.length} of {total}
-            </span>
-          </div>
-
-          {loading && (
-            <div role="status" aria-live="polite" className="p-16 text-text-tertiary">
-              Loading cases…
-            </div>
-          )}
-          {!loading && error && (
-            <div role="alert" className="p-16 text-error">
-              {error}
-            </div>
-          )}
-          {!loading && !error && sorted.length === 0 && (
-            <div role="status" className="p-16 text-text-tertiary">
-              No cases match the current filter.
-            </div>
-          )}
-
-          <div className="max-h-[calc(100vh-440px)] overflow-y-auto">
-            {sorted.map(({ case_, sla }) => (
-              <CaseRow
-                key={case_.case_id}
-                case_={case_}
-                slaLabel={sla.label}
-                slaBand={sla.band}
-                isSelected={case_.case_id === selectedId}
-                onSelect={() => setSelectedId(case_.case_id)}
-              />
-            ))}
+        {/* ── LEFT: CaseListPane (V5.1.1 — full filter / search / sort) ── */}
+        <div className="w-[460px] shrink-0 bg-surface-primary rounded-md shadow-sm overflow-hidden">
+          <div className="h-[calc(100vh-360px)] min-h-[480px]">
+            <CaseListPane
+              cases={cases}
+              total={total}
+              loading={loading}
+              error={error}
+              refetch={refetch}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+            />
           </div>
         </div>
 
-        {/* ── RIGHT: case detail summary ── */}
+        {/* ── RIGHT: case detail summary (thin pane — D8 keeps deferred) ── */}
         <div className="flex-1 flex flex-col gap-16">
           {!selected && !loading && (
             <div className="bg-surface-primary rounded-md shadow-sm p-32 text-text-tertiary text-center">
@@ -358,75 +279,66 @@ function ExceptionQueueContent() {
             </div>
           )}
 
-          {selected && (
+          {selected && selectedSla && (
             <>
               <div className="bg-surface-primary rounded-md shadow-sm p-20">
                 <div className="flex items-center gap-8 mb-12">
                   <Badge variant="neutral" size="sm">
-                    {SOURCE_ICON[selected.case_.source as CaseSource]
-                      ?? SOURCE_ICON.default}
+                    {SOURCE_ICON[selected.source as CaseSource] ?? SOURCE_ICON.default}
                     <span className="ml-4">
-                      {SOURCE_LABEL[selected.case_.source as CaseSource]
+                      {SOURCE_LABEL[selected.source as CaseSource]
                         ?? SOURCE_LABEL.default}
                     </span>
                   </Badge>
                   <Badge variant="neutral" size="sm">
-                    {selected.case_.source_channel}
+                    {selected.source_channel}
                   </Badge>
                   <Badge
-                    variant={SLA_BAND_VARIANT[selected.sla.band]}
+                    variant={SLA_BAND_VARIANT[selectedSla.band]}
                     size="sm"
-                    aria-label={`SLA: ${selected.sla.label}`}
+                    aria-label={`SLA: ${selectedSla.label}`}
                   >
                     <Clock size={10} aria-hidden className="mr-4" />
-                    {selected.sla.label}
+                    {selectedSla.label}
                   </Badge>
                   <span className="ml-auto text-caption text-text-tertiary uppercase tracking-wider">
-                    {STATUS_LABEL[selected.case_.status]
-                      ?? selected.case_.status}
+                    {STATUS_LABEL[selected.status] ?? selected.status}
                   </span>
                 </div>
                 <h2 className="text-heading font-bold m-0 leading-snug mb-12">
-                  Case <code className="font-mono">{selected.case_.case_id}</code>
+                  Case <code className="font-mono">{selected.case_id}</code>
                 </h2>
 
                 <dl className="grid grid-cols-2 gap-x-24 gap-y-12 text-body">
-                  {selected.case_.customer_po_number && (
+                  {selected.customer_po_number && (
                     <Field
                       label="Customer PO"
-                      value={selected.case_.customer_po_number}
+                      value={selected.customer_po_number}
                       mono
                     />
                   )}
-                  {selected.case_.sales_order_id && (
+                  {selected.sales_order_id && (
                     <Field
                       label="Sales order"
-                      value={selected.case_.sales_order_id}
+                      value={selected.sales_order_id}
                       mono
                     />
                   )}
-                  {selected.case_.customer_id && (
-                    <Field
-                      label="Customer"
-                      value={selected.case_.customer_id}
-                    />
+                  {selected.customer_id && (
+                    <Field label="Customer" value={selected.customer_id} />
                   )}
-                  <Field
-                    label="Opened"
-                    value={selected.case_.opened_at}
-                    mono
-                  />
-                  {selected.sla.deadline && (
+                  <Field label="Opened" value={selected.opened_at} mono />
+                  {selectedSla.deadline && (
                     <Field
-                      label={`SLA · ${selected.sla.label}`}
-                      value={selected.sla.deadline}
+                      label={`SLA · ${selectedSla.label}`}
+                      value={selectedSla.deadline}
                       mono
                     />
                   )}
-                  {selected.case_.bundle_version_at_open && (
+                  {selected.bundle_version_at_open && (
                     <Field
                       label="Skill bundle at open"
-                      value={selected.case_.bundle_version_at_open}
+                      value={selected.bundle_version_at_open}
                       mono
                     />
                   )}
@@ -446,9 +358,7 @@ function ExceptionQueueContent() {
                 <Button
                   variant="brand"
                   size="md"
-                  onClick={() =>
-                    router.push(`/cases/${selected.case_.case_id}`)
-                  }
+                  onClick={() => router.push(`/cases/${selected.case_id}`)}
                 >
                   Open case
                   <ChevronRight size={14} />
@@ -459,92 +369,6 @@ function ExceptionQueueContent() {
         </div>
       </div>
     </div>
-  );
-}
-
-/* ── Case row ─────────────────────────────────────────────────────── */
-
-interface CaseRowProps {
-  case_: OrderCase;
-  slaLabel: string;
-  slaBand: SlaBand;
-  isSelected: boolean;
-  onSelect: () => void;
-}
-
-function CaseRow({
-  case_,
-  slaLabel,
-  slaBand,
-  isSelected,
-  onSelect,
-}: CaseRowProps) {
-  const orderRef =
-    case_.customer_po_number || case_.sales_order_id || case_.case_id;
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      data-case-id={case_.case_id}
-      aria-label={`Select case ${orderRef}`}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") onSelect();
-      }}
-      className={cn(
-        "px-16 py-12 cursor-pointer border-b border-border-subtle border-l-[3px] transition-colors duration-fast",
-        isSelected
-          ? "bg-surface-secondary border-l-brand"
-          : "bg-surface-primary border-l-transparent",
-      )}
-    >
-      <div className="flex items-center gap-8 mb-6">
-        <Badge variant="neutral" size="sm">
-          {SOURCE_ICON[case_.source as CaseSource] ?? SOURCE_ICON.default}
-          <span className="ml-4">{case_.source_channel}</span>
-        </Badge>
-        <Badge
-          variant={SLA_BAND_VARIANT[slaBand]}
-          size="sm"
-          aria-label={`SLA: ${slaLabel}`}
-        >
-          <Clock size={10} aria-hidden className="mr-4" />
-          {slaLabel}
-        </Badge>
-      </div>
-      <div className="font-mono text-body font-medium text-text-primary mb-2">
-        {orderRef}
-      </div>
-      <div className="text-caption text-text-tertiary">
-        {STATUS_LABEL[case_.status] ?? case_.status}
-      </div>
-    </div>
-  );
-}
-
-/* ── Filter chip ──────────────────────────────────────────────────── */
-
-interface FilterChipProps {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}
-
-function FilterChip({ label, active, onClick }: FilterChipProps) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "px-12 py-4 rounded-full border text-caption transition-colors duration-fast",
-        active
-          ? "bg-brand-subtle border-brand text-brand font-semibold"
-          : "bg-surface-primary border-border text-text-secondary hover:bg-surface-secondary",
-      )}
-    >
-      {label}
-    </button>
   );
 }
 

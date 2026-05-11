@@ -211,6 +211,11 @@ function SavedViewRow({
  *  keep the row short. */
 function summariseView(v: SavedView): string {
   const parts: string[] = [];
+  // The SavedViewsMenu lives under /exceptions/ today and only the
+  // exception-surface views are rendered through it (the cases
+  // surface gets its own menu in CaseListPane). We narrow here
+  // rather than rendering a "case view" in the wrong place.
+  if (v.surface !== "exceptions") return "case view";
   if (v.filterStates.length > 0) {
     parts.push(
       v.filterStates.length === 1

@@ -56,6 +56,7 @@ import {
 } from "@/hooks/useManualOrderCases";
 import type { CaseSource, OrderCase, SlaBand } from "@/types/cases";
 import type { WSEvent } from "@/types/websocket";
+import { STATUS_LABEL, isAwaitingHuman } from "@/lib/cases";
 import { cn } from "@/lib/utils";
 
 import { slaSnapshot } from "@/app/cases/page";
@@ -74,15 +75,10 @@ const SOURCE_ICON: Record<CaseSource | "default", React.ReactNode> = {
   default: <Clock size={12} aria-hidden />,
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  OPEN_AGENT_PROCESSING: "Agent processing",
-  OPEN_AWAITING_HUMAN: "Awaiting review",
-  OPEN_AWAITING_BUYER: "Awaiting buyer",
-  OPEN_AWAITING_ERP: "Awaiting ERP",
-  RESOLVED: "Resolved",
-  FAILED: "Failed",
-  BLOCKED: "Blocked",
-};
+// STATUS_LABEL + isAwaitingHuman live in src/lib/cases.ts — see the
+// import block at the top of this file. The Phase 28.5.x §D1 audit
+// flagged this duplicate map (four copies) as a Guardrail #1
+// violation; the shared module is now the single source.
 
 const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutral"> = {
   breached: "error",
@@ -181,9 +177,7 @@ function InboxPageInner() {
     });
 
   const selected = sorted.find((s) => s.case_.case_id === selectedId);
-  const needsReview = cases.filter(
-    (c) => c.status === "OPEN_AWAITING_HUMAN",
-  ).length;
+  const needsReview = cases.filter((c) => isAwaitingHuman(c.status)).length;
   const awaitingBuyer = cases.filter(
     (c) => c.status === "OPEN_AWAITING_BUYER",
   ).length;
@@ -313,7 +307,18 @@ function InboxPageInner() {
             </div>
           )}
 
-          <div className="max-h-[calc(100vh-370px)] overflow-y-auto">
+          {/* Phase 28.5.x §D5 — role="listbox"/"option" pattern.
+              Consistent with the new CaseListPane on /exceptions
+              so a screen reader announces the selection move.
+              Per ADR-038 §H.6: clicks select locally; the
+              right-pane "Open case" jump is the only path off
+              this surface. */}
+          <div
+            role="listbox"
+            aria-label="Manual order cases"
+            aria-multiselectable="false"
+            className="max-h-[calc(100vh-370px)] overflow-y-auto"
+          >
             {sorted.map(({ case_, sla }) => {
               const isSelected = case_.case_id === selectedId;
               const handleActivate = () => setSelectedId(case_.case_id);
@@ -324,18 +329,24 @@ function InboxPageInner() {
               return (
                 <div
                   key={case_.case_id}
-                  role="button"
-                  tabIndex={0}
+                  role="option"
+                  tabIndex={-1}
+                  aria-selected={isSelected}
+                  data-keyboard-nav-id={case_.case_id}
                   aria-label={`Select case ${orderRef}`}
                   onClick={handleActivate}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleActivate();
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleActivate();
+                    }
                   }}
                   className={cn(
-                    "px-16 py-12 cursor-pointer border-b border-border-subtle border-l-[3px] transition-colors duration-fast",
+                    "px-16 py-12 cursor-pointer border-b border-border-subtle border-l-[3px] transition-colors duration-fast outline-none",
                     isSelected
                       ? "bg-surface-secondary border-l-brand"
                       : "bg-surface-primary border-l-transparent",
+                    "focus-visible:ring-2 focus-visible:ring-brand-ring focus-visible:ring-inset",
                   )}
                 >
                   <div className="flex items-center gap-8 mb-6">
