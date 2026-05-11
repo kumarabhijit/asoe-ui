@@ -20,7 +20,9 @@
     "test:browser": "playwright test",
     "test:browser:ui": "playwright test --ui",
     "test:browser:headed": "playwright test --headed",
-    "flows:matrix": "tsx e2e/journey-matrix.ts"
+    "flows:matrix": "tsx e2e/journey-matrix.ts",
+    "flows:gen": "tsx e2e/flows-gen.ts",
+    "flows:check": "tsx e2e/flows-gen.ts --check"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
