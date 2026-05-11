@@ -15,7 +15,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { useSignOut } from "@/hooks/useSignOut";
 
 import { NavBar } from "@/components/ui/NavBar";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +32,7 @@ export default function CaseDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuth();
+  const handleSignOut = useSignOut();
   const caseId = params?.id;
   const [orderCase, setOrderCase] = useState<OrderCase | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,7 +100,7 @@ export default function CaseDetailPage() {
           const tab = NAV_TABS.find((t) => t.id === id);
           if (tab?.href) router.push(tab.href);
         }}
-        onSignOut={() => signOut({ callbackUrl: "/login" })}
+        onSignOut={handleSignOut}
       />
 
       <main className="p-32 max-w-[1280px] mx-auto w-full">

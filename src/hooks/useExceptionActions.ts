@@ -30,6 +30,7 @@ import { useCallback, useState, type MutableRefObject } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useToast } from "@/components/ui/Toast";
+import { useStatusAnnouncer } from "@/components/ui/StatusAnnouncer";
 import { exceptionsApi } from "@/lib/api";
 import { pickQuickActionReasonTag } from "@/lib/cases";
 import { notesRequiredForReason } from "@/app/exceptions/reasonCodeClusters";
@@ -61,6 +62,12 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
   const { user, hasPermission } = useAuth();
   const { health } = useHealth();
   const { addToast } = useToast();
+  // Q1 — every successful action also emits to the canonical
+  // aria-live region so a screen-reader operator confirms the
+  // outcome without re-reading the toast surface. Failures stay
+  // toast-only — the SR transcript records completed actions,
+  // not retry noise.
+  const { announce } = useStatusAnnouncer();
 
   const [actionInFlight, setActionInFlight] = useState<ActionInFlight>(null);
 
@@ -106,12 +113,13 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       });
       setDetail(updated);
       addToast("success", `Exception ${exceptionId} approved (${recommended})`);
+      announce(`Exception ${exceptionId} approved`);
       onActionComplete?.();
     } catch (err) {
       console.error("Approve failed:", err);
       addToast("error", err instanceof Error ? err.message : "Failed to approve exception.");
     } finally { setActionInFlight(null); }
-  }, [exceptionId, hasPermission, addToast, recommendedAction, setDetail, onActionComplete, detail, health]);
+  }, [exceptionId, hasPermission, addToast, announce, recommendedAction, setDetail, onActionComplete, detail, health]);
 
   /** Reject = NO_ACTION. Server classifies sub_type as REJECT. */
   const handleReject = useCallback(async (comment: string) => {
@@ -133,12 +141,13 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       });
       setDetail(updated);
       addToast("success", `Exception ${exceptionId} rejected`);
+      announce(`Exception ${exceptionId} rejected`);
       onActionComplete?.();
     } catch (err) {
       console.error("Reject failed:", err);
       addToast("error", err instanceof Error ? err.message : "Failed to reject exception.");
     } finally { setActionInFlight(null); }
-  }, [exceptionId, hasPermission, addToast, setDetail, onActionComplete, detail, health]);
+  }, [exceptionId, hasPermission, addToast, announce, setDetail, onActionComplete, detail, health]);
 
   /**
    * Escalate is a routing action — its own endpoint with its own
@@ -163,12 +172,13 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       const updated = await exceptionsApi.escalate(exceptionId, { reason: reason.trim() });
       setDetail(updated);
       addToast("warning", `Exception ${exceptionId} escalated for review`);
+      announce(`Exception ${exceptionId} escalated for review`);
       onActionComplete?.();
     } catch (err) {
       console.error("Escalate failed:", err);
       addToast("error", err instanceof Error ? err.message : "Failed to escalate exception.");
     } finally { setActionInFlight(null); }
-  }, [exceptionId, hasPermission, addToast, setDetail, onActionComplete]);
+  }, [exceptionId, hasPermission, addToast, announce, setDetail, onActionComplete]);
 
   /** Opens the Override chooser dialog. API call happens on submit. */
   const handleOverride = useCallback(() => {
@@ -215,12 +225,13 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       setDetail(updated);
       setOverrideOpen(false);
       addToast("success", `Exception ${exceptionId} overridden (${overrideAction})`);
+      announce(`Exception ${exceptionId} overridden`);
       onActionComplete?.();
     } catch (err) {
       console.error("Override failed:", err);
       addToast("error", err instanceof Error ? err.message : "Failed to override exception.");
     } finally { setActionInFlight(null); }
-  }, [exceptionId, overrideAction, overrideNotes, overrideReasonTag, addToast, setDetail, onActionComplete]);
+  }, [exceptionId, overrideAction, overrideNotes, overrideReasonTag, addToast, announce, setDetail, onActionComplete]);
 
   /**
    * Four-eyes cosign (Phase 2 #5). Reason via window.prompt for Phase
@@ -251,12 +262,17 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
           ? `Override cosigned and applied (${updated.resolved_action ?? ""})`
           : "Override rejected; exception restored to prior state",
       );
+      announce(
+        approve
+          ? `Exception ${exceptionId} cosigned and applied`
+          : `Exception ${exceptionId} cosign rejected`,
+      );
       onActionComplete?.();
     } catch (err) {
       console.error("Cosign failed:", err);
       addToast("error", err instanceof Error ? err.message : "Cosign failed.");
     } finally { setActionInFlight(null); }
-  }, [exceptionId, hasPermission, addToast, setDetail, onActionComplete]);
+  }, [exceptionId, hasPermission, addToast, announce, setDetail, onActionComplete]);
 
   /**
    * Re-run the graph. Same permission as override (manager+) — expert
@@ -285,12 +301,13 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       setDetail(updated);
       if (refreshDetail) await refreshDetail();
       addToast("success", `Exception ${exceptionId} re-analyzed`);
+      announce(`Exception ${exceptionId} re-analyzed`);
       onActionComplete?.();
     } catch (err) {
       console.error("Reanalyze failed:", err);
       addToast("error", err instanceof Error ? err.message : "Re-analysis failed.");
     } finally { setActionInFlight(null); }
-  }, [exceptionId, hasPermission, addToast, setDetail, onActionComplete, refreshDetail, user?.email]);
+  }, [exceptionId, hasPermission, addToast, announce, setDetail, onActionComplete, refreshDetail, user?.email]);
 
   return {
     actionInFlight,

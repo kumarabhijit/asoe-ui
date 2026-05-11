@@ -79,28 +79,21 @@ for (const route of AUTHENTICATED_ROUTES) {
 
     // 3) StatusAnnouncer mounted (Q1). Its testid is the canonical
     //    selector every flow YAML's assert_announcement_text resolves
-    //    against — without it, those assertions silently fail.
-    //    NOTE: <StatusAnnouncer> is not yet wired into pages; this
-    //    assertion is intentionally a soft check. When the wiring
-    //    lands, flip `softAnnouncerCheck` to `false` and the spec
-    //    becomes hard.
-    const softAnnouncerCheck = true;
+    //    against. Phase 1 of the BDD plan flipped this from a soft
+    //    check to a hard assertion — <StatusAnnouncer> is now mounted
+    //    at the Providers root in src/app/providers.tsx and every
+    //    authenticated route inherits it.
     const announcer = page.locator(
       `[data-testid="${CHROME_CONTRACT.statusAnnouncerTestid}"]`,
     );
-    if (softAnnouncerCheck) {
-      // Soft: log presence but don't fail the run. Locks the
-      // selector contract without forcing the wiring change in
-      // the same PR as the spec.
-      const count = await announcer.count();
-      console.log(
-        `[chrome-invariant] ${target}: status-announcer count = ${count}`,
-      );
-    } else {
-      await expect(
-        announcer,
-        `${target} should mount a single StatusAnnouncer`,
-      ).toHaveCount(1);
-    }
+    await expect(
+      announcer,
+      `${target} should mount a single StatusAnnouncer (Q1 — wired at src/app/providers.tsx)`,
+    ).toHaveCount(1);
+    // The announcer must be aria-live=polite so SR engines emit
+    // the message without interrupting current speech. Asserted
+    // here so a refactor of the component can't silently break
+    // the contract for every route.
+    await expect(announcer).toHaveAttribute("aria-live", "polite");
   });
 }

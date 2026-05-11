@@ -29,7 +29,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { useSignOut } from "@/hooks/useSignOut";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -104,6 +104,7 @@ function ExceptionQueueContent() {
   const router = useRouter();
   const { health } = useHealth();
   const { user, accessToken, visibleTabs } = useAuth();
+  const handleSignOut = useSignOut();
   const { cases, total, loading, error, refetch } = useCases();
 
   const userName = user?.name || "User";
@@ -226,7 +227,7 @@ function ExceptionQueueContent() {
         userInitials={userInitials}
         userTitle={userTitle}
         agentCount={health?.allowed_intents?.length || 0}
-        onSignOut={() => signOut({ callbackUrl: "/login" })}
+        onSignOut={handleSignOut}
       />
 
       <CaseViewBanner scopeLabel="Exception Queue" />

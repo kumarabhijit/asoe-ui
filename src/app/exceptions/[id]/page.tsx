@@ -14,7 +14,7 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { useSignOut } from "@/hooks/useSignOut";
 import { ArrowLeft } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
 import { Button } from "@/components/ui/Button";
@@ -43,6 +43,7 @@ export default function ExceptionFullPage() {
   const router = useRouter();
   const search = useSearchParams();
   const { user } = useAuth();
+  const handleSignOut = useSignOut();
   const exceptionId = params.id as string;
 
   const userName = user?.name || "User";
@@ -78,7 +79,7 @@ export default function ExceptionFullPage() {
           const tab = NAV_TABS.find((t) => t.id === id);
           if (tab?.href) router.push(tab.href);
         }}
-        onSignOut={() => signOut({ callbackUrl: "/login" })}
+        onSignOut={handleSignOut}
       />
 
       {/* Breadcrumb + back button */}

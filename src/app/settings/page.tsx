@@ -10,7 +10,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { useSignOut } from "@/hooks/useSignOut";
 import { Settings, Users, Shield, Zap, Bell, ShieldAlert } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
 import { Card } from "@/components/ui/Card";
@@ -33,6 +33,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { health } = useHealth();
   const { user, visibleTabs, hasPermission, isLoading } = useAuth();
+  const handleSignOut = useSignOut();
 
   const hasSettingsAccess = SETTINGS_PERMISSIONS.some((p) => hasPermission(p));
 
@@ -77,7 +78,7 @@ export default function SettingsPage() {
         userInitials={userInitials}
         userTitle={userTitle}
         agentCount={health?.allowed_intents?.length || 0}
-        onSignOut={() => signOut({ callbackUrl: "/login" })}
+        onSignOut={handleSignOut}
 
       />
 
