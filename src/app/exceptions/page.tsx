@@ -27,6 +27,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
@@ -46,6 +47,7 @@ import { Button } from "@/components/ui/Button";
 import { MetricTile } from "@/components/ui/MetricTile";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
+import { useSlaTicker } from "@/hooks/useSlaTicker";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import {
   useCases,
@@ -85,13 +87,8 @@ const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutr
   none: "neutral",
 };
 
-const NAV_TABS = [
-  { id: "inbox", label: "Customer Inbox", href: "/inbox" },
-  { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
-  { id: "cases", label: "Cases", href: "/cases" },
-  { id: "dashboard", label: "Dashboard", href: "/dashboard" },
-  { id: "settings", label: "Settings", href: "/settings" },
-];
+import { NAV_TABS } from "@/config/nav-tabs";
+// NAV_TABS consolidated to src/config/nav-tabs.ts (issue #133, PO #9).
 
 /* ── Page ─────────────────────────────────────────────────────────── */
 
@@ -200,7 +197,10 @@ function ExceptionQueueContent() {
   // Metric tiles read from the unfiltered tenant cache (NOT the
   // pane's filtered view) — operators want the global "what's
   // outstanding?" count regardless of the chip state.
-  const now = new Date();
+  // PO #20 (issue #133): `useSlaTicker` re-runs this block once a
+  // minute so the breached counter and the selected-case SLA label
+  // stay live as deadlines pass.
+  const now = useSlaTicker();
   const breached = cases.filter((c) => {
     const ms = c.sla_deadline
       ? new Date(c.sla_deadline).getTime() - now.getTime()
@@ -235,9 +235,17 @@ function ExceptionQueueContent() {
       <div className="bg-surface-primary border-b border-border shadow-xs">
         <div className="max-w-[1440px] mx-auto px-32">
           <nav aria-label="Breadcrumb" className="py-8">
-            <span className="text-caption text-text-tertiary">Home</span>
+            {/* PO #6 (issue #133): Home is a real link, not a static
+                label. */}
+            <Link
+              href="/home"
+              className="text-caption text-text-tertiary hover:text-text-secondary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm"
+            >
+              Home
+            </Link>
             <ChevronRight
               size={10}
+              aria-hidden
               className="mx-4 text-text-tertiary align-middle inline"
             />
             <span className="text-caption text-text-secondary">

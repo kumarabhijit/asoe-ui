@@ -35,6 +35,7 @@ import { NavBar } from "@/components/ui/NavBar";
 import { ALLOWED_CASE_SOURCES, casesApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
+import { useSlaTicker } from "@/hooks/useSlaTicker";
 import { STATUS_LABEL } from "@/lib/cases";
 import { cn } from "@/lib/utils";
 import type {
@@ -134,13 +135,8 @@ interface CasesFilters {
 
 /* ── Page ───────────────────────────────────────────────────────── */
 
-const NAV_TABS = [
-  { id: "inbox", label: "Customer Inbox", href: "/inbox" },
-  { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
-  { id: "cases", label: "Cases", href: "/cases" },
-  { id: "dashboard", label: "Dashboard", href: "/dashboard" },
-  { id: "settings", label: "Settings", href: "/settings" },
-];
+import { NAV_TABS } from "@/config/nav-tabs";
+// NAV_TABS consolidated to src/config/nav-tabs.ts (issue #133, PO #9).
 
 
 export default function CasesPage() {
@@ -184,17 +180,19 @@ export default function CasesPage() {
   }, [filters.source, filters.status]);
 
   // SLA-driven sort — most-urgent (lowest ms_until_deadline) first.
-  // Cases with no SLA sink to the bottom.
+  // Cases with no SLA sink to the bottom. PO #20 (issue #133): the
+  // ticker re-runs this memo once a minute so the band labels and
+  // sort order stay live without a re-fetch.
+  const tickNow = useSlaTicker();
   const sorted = useMemo(() => {
-    const now = new Date();
     return [...cases]
-      .map((c) => ({ case_: c, sla: slaSnapshot(c, now) }))
+      .map((c) => ({ case_: c, sla: slaSnapshot(c, tickNow) }))
       .sort((a, b) => {
         const aMs = a.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
         const bMs = b.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
         return aMs - bMs;
       });
-  }, [cases]);
+  }, [cases, tickNow]);
 
   return (
     <div className="min-h-screen bg-surface-page font-sans text-body text-text-primary leading-normal">

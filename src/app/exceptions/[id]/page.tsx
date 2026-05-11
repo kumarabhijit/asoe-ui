@@ -21,19 +21,18 @@ import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
 import ExceptionDetailPanel from "../ExceptionDetailPanel";
 
-const NAV_TABS = [
-  { id: "inbox", label: "Customer Inbox", href: "/inbox" },
-  { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
-  { id: "cases", label: "Cases", href: "/cases" },
-  { id: "dashboard", label: "Dashboard", href: "/dashboard" },
-  { id: "settings", label: "Settings", href: "/settings" },
-];
+import { NAV_TABS } from "@/config/nav-tabs";
+// NAV_TABS consolidated to src/config/nav-tabs.ts (issue #133, PO #9).
 
 // Whitelisted referrer values. Anything else falls through to the
 // default Exception Queue back-target so a malformed `from=` can't
 // be used to redirect off-app.
+// PO #9 (issue #133): the legacy `inbox` referrer is preserved as a
+// back-target alias — `/inbox` is now a server redirect into the
+// case-list view, so the user lands in the same place either way.
 const BACK_TARGETS = {
-  inbox: { href: "/inbox", label: "Back to Inbox" },
+  inbox: { href: "/cases?source=manual_order", label: "Back to Cases" },
+  home: { href: "/home", label: "Back to Home" },
   cases: { href: "/cases", label: "Back to Cases" },
 } as const;
 
@@ -57,7 +56,14 @@ export default function ExceptionFullPage() {
     fromKey in BACK_TARGETS
       ? BACK_TARGETS[fromKey as keyof typeof BACK_TARGETS]
       : DEFAULT_BACK;
-  const activeTab = fromKey === "inbox" ? "inbox" : "exceptions";
+  // Active tab follows the originating surface so the highlight in
+  // the top bar matches the operator's mental return target.
+  // PO #9 (issue #133): `inbox` referrer routes through /cases now.
+  const activeTab = fromKey === "home"
+    ? "home"
+    : fromKey === "inbox" || fromKey === "cases"
+      ? "cases"
+      : "exceptions";
 
   return (
     <div className="min-h-screen bg-surface-page flex flex-col">

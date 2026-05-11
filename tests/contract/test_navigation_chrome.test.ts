@@ -98,10 +98,14 @@ describe("Exception detail page honours ?from referrer (R2)", () => {
 
   it("declares an inbox-aware Back target", () => {
     const src = read(rel);
+    // Issue #133, PO #9 — `/inbox` now redirects into the case-list
+    // view, so the "inbox" referrer points at `/cases?source=manual_order`.
+    // The back-target alias remains so deep links from notification
+    // emails keep working; the destination is just rewritten.
     expect(
-      /\binbox\b[\s\S]{0,200}\/inbox/.test(src),
-      `${rel} must map the "inbox" referrer to a /inbox back-target. ` +
-        `See BACK_TARGETS in the page module.`,
+      /\binbox\b[\s\S]{0,200}\/cases\?source=manual_order/.test(src),
+      `${rel} must map the "inbox" referrer to the case-list filtered ` +
+        `view (post issue #133). See BACK_TARGETS in the page module.`,
     ).toBe(true);
   });
 
@@ -118,70 +122,54 @@ describe("Exception detail page honours ?from referrer (R2)", () => {
   });
 });
 
-describe("Inbox row dispatch is consistent master-detail (R3 — ADR-038 §H.6, supersedes ADR-034 §6.1)", () => {
+describe("/inbox is a server redirect into the case-list view (issue #133, PO #9)", () => {
   const rel = "src/app/inbox/page.tsx";
 
-  // Phase 28.5 (V5.1) — `/inbox` is now a case-projected list view of
-  // `/cases` per ADR-038 §H.6. The legacy ADR-034 §6.1 inbox-row →
-  // /exceptions/{id} jump pattern is retired; clicks select locally
-  // on the case_id, and the "Open case" jump button on the right
-  // pane navigates to `/cases/{case_id}`. The CSR's "exit point off
-  // the inbox surface" is the canonical case detail.
+  // The 2026-05 PO review (kumarabhijit/asoe2#133, PO #9) flagged
+  // `/inbox` and `/cases` as redundant — both projected the same
+  // case-list shape. Post-#133, `/inbox` is a thin server redirect
+  // into `/cases?source=manual_order`. The contract is therefore
+  // about the *absence* of UI behaviour: no client state, no row
+  // dispatch, no jump button — Next's `redirect()` runs on the
+  // server. Deep links from emails / runbooks continue to land
+  // operators in the right case view via the redirect.
 
-  it("inbox handleActivate selects locally for every row (no router.push in the row dispatch)", () => {
+  it("emits a server redirect to the filtered case-list view", () => {
     const src = read(rel);
-    const m = src.match(
-      /const\s+handleActivate\s*=\s*\(\)\s*=>\s*(?:\{([\s\S]*?)\}|setSelectedId\(\s*case_\.case_id\s*\))/,
-    );
-    expect(m, `${rel} must declare a handleActivate row handler`).not.toBeNull();
-    // ADR-038 §H.6 — every row's onclick goes through
-    // setSelectedId(case_.case_id) and never invokes router.push.
-    // Off-surface navigation is explicit (the "Open case" jump
-    // button on the right pane).
-    const matched = m![0];
     expect(
-      /setSelectedId\(\s*case_\.case_id\s*\)/.test(matched),
-      `${rel} handleActivate must call setSelectedId(case_.case_id) — ` +
-        `the consistent master-detail dispatch per ADR-038 §H.6 / V5.1.`,
+      /from\s+["']next\/navigation["']/.test(src),
+      `${rel} must import from next/navigation (server redirect API).`,
     ).toBe(true);
     expect(
-      /router\.push/.test(matched),
-      `${rel} handleActivate must NOT call router.push. Per ADR-038 §H.6 ` +
-        `(V5.1, supersedes ADR-034 §6.1), navigation off the inbox surface ` +
-        `is an explicit operator action via the "Open case" jump button on ` +
-        `the right pane — not a side effect of clicking a row.`,
+      /\bredirect\s*\(\s*["']\/cases\?source=manual_order["']\s*\)/.test(src),
+      `${rel} must redirect into /cases?source=manual_order. ` +
+        `Issue #133 / PO #9 retired the parallel /inbox surface.`,
+    ).toBe(true);
+  });
+
+  it("has no client-side state, handlers, or row dispatch", () => {
+    const src = read(rel);
+    // The redirect-only file must not retain V5.1.1 master-detail
+    // machinery; if a future refactor re-introduces a client surface
+    // on /inbox without retiring this contract, the test below fires.
+    expect(
+      /\"use client\"/.test(src),
+      `${rel} must not declare "use client" — it is a server redirect.`,
+    ).toBe(false);
+    expect(
+      /useState\b|useRouter\b|setSelectedId\b/.test(src),
+      `${rel} must not retain client-side hooks or row state. The ` +
+        `case-list view lives at /cases; /inbox just redirects to it.`,
     ).toBe(false);
   });
 
-  it("right-pane detail renders an Open-case jump button when a row is selected", () => {
-    const src = read(rel);
-    // V5.1 — the right pane shows the case-header summary when a row
-    // is selected and exposes an "Open case" button that pushes
-    // /cases/{case_id} (the canonical case detail surface).
-    expect(
-      /selected\s*&&/.test(src),
-      `${rel} right pane must conditionally render content gated on ` +
-        `the selected case (the jump-button section).`,
-    ).toBe(true);
-    expect(
-      /Open\s+case/i.test(src),
-      `${rel} right pane must render an "Open case" button label so ` +
-        `the operator has an explicit jump affordance.`,
-    ).toBe(true);
-    expect(
-      /router\.push\(\s*[`'"]?\/cases\/\$\{[^}]*case_id[^}]*\}/.test(src),
-      `${rel} the jump button must push /cases/{case_id} — the ` +
-        `canonical case detail surface per ADR-038 §H.6.`,
-    ).toBe(true);
-  });
-
-  it("the supersession is justified by an explicit ADR-038 reference", () => {
+  it("the redirect is justified by an explicit issue-133 reference", () => {
     const src = read(rel);
     expect(
-      /ADR-038/.test(src),
-      `${rel} must cite ADR-038 next to the inbox dispatch + jump button. ` +
-        `V5.1 supersedes the ADR-034 §6.1 pattern; if you're changing the ` +
-        `behaviour again, update the ADR + this test in the same PR.`,
+      /issue\s*#?133/i.test(src),
+      `${rel} must cite issue #133 next to the redirect declaration. ` +
+        `If a future PR re-introduces a separate /inbox surface, the ` +
+        `comment trail must reference the PO conversation that retired it.`,
     ).toBe(true);
   });
 });

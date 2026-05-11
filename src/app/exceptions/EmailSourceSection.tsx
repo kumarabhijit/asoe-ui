@@ -23,8 +23,7 @@
  */
 "use client";
 
-import Link from "next/link";
-import { ExternalLink, Mail, Paperclip, Hash, Clock } from "lucide-react";
+import { Mail, Paperclip, Hash, Clock } from "lucide-react";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import type { EmailSourceData } from "@/types/exceptions";
 
@@ -48,26 +47,27 @@ export function EmailSourceSection({ data }: EmailSourceSectionProps) {
       aria-label="Source email"
       className="bg-surface-primary rounded-md shadow-sm p-16"
     >
-      {/* Section header */}
+      {/* Section header.
+          PO #12 (issue #133): the older anatomy combined a "Source
+          Email" heading with a "View source email" link pointing
+          into /inbox — confusing because the section IS the source
+          email view. With /inbox redirecting into /cases (PO #9)
+          the back-link would also dead-end, so we drop it: the
+          source_email_id surfaces in the audit-trail metadata row
+          instead. */}
       <div className="flex items-center gap-8 mb-12">
         <Mail size={14} className="text-text-tertiary" />
         <span className="text-subhead font-semibold text-text-primary">
-          Source Email
+          Source email
         </span>
-        {/* ADR-034 Phase G — back-link to the Inbox row when the
-            correlation id is present. Contextual: absent when the
-            upstream email-intelligence-agent integration hasn't
-            shipped (Phase F / proposed ADR-036). */}
         <EvidenceBlock tier="contextual" value={data.source_email_id}>
           {(value) => (
-            <Link
-              href={`/inbox?msg=${encodeURIComponent(String(value))}`}
-              className="ml-auto inline-flex items-center gap-4 text-caption font-semibold text-brand hover:underline"
-              aria-label="View source email in inbox"
+            <span
+              className="ml-auto font-mono text-caption text-text-tertiary"
+              aria-label={`Source email id ${String(value)}`}
             >
-              View source email
-              <ExternalLink size={12} aria-hidden />
-            </Link>
+              {String(value)}
+            </span>
           )}
         </EvidenceBlock>
       </div>

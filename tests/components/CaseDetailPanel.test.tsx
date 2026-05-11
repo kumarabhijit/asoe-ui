@@ -47,7 +47,9 @@ describe("CaseDetailPanel — case header", () => {
   it("renders case_id and source channel", () => {
     render(<CaseDetailPanel orderCase={mockCase()} />);
     expect(screen.getAllByText("case-PHB").length).toBeGreaterThan(0);
-    expect(screen.getByText("email")).toBeInTheDocument();
+    // Issue #133 (PO #10): source_channel is rendered through the
+    // `sourceChannelLabel` helper now — "email" prints as "Email".
+    expect(screen.getByText("Email")).toBeInTheDocument();
   });
 });
 

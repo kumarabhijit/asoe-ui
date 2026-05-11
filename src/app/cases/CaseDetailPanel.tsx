@@ -27,11 +27,20 @@ import { Mail, PackageCheck, Clock, ShieldAlert, ChevronRight } from "lucide-rea
 import { Badge } from "@/components/ui/Badge";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { PolicyHitBadge } from "@/components/ui/PolicyHitBadge";
-import type { CaseSource, OrderCase } from "@/types/cases";
+import type { CaseSource, OrderCase, SlaBand } from "@/types/cases";
 import type { ExceptionDetailResponse } from "@/types/api";
-import { STATUS_LABEL } from "@/lib/cases";
+import { STATUS_LABEL, sourceChannelLabel } from "@/lib/cases";
+import { useSlaTicker } from "@/hooks/useSlaTicker";
 
 import { slaSnapshot } from "./page";
+
+const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutral"> = {
+  breached: "error",
+  at_risk: "warning",
+  today: "warning",
+  comfortable: "success",
+  none: "neutral",
+};
 
 
 const SOURCE_ICON: Record<CaseSource | "default", React.ReactNode> = {
@@ -80,7 +89,10 @@ export function CaseDetailPanel({
   policyHits,
   attachedRecords,
 }: CaseDetailPanelProps) {
-  const sla = slaSnapshot(orderCase);
+  // PO #20 (issue #133): tick the SLA snapshot once a minute so the
+  // header countdown stays live without a refetch.
+  const now = useSlaTicker();
+  const sla = slaSnapshot(orderCase, now);
   const hasPolicyHits = (policyHits ?? []).length > 0;
   const hasAttachedRecords = (attachedRecords ?? []).length > 0;
 
@@ -91,7 +103,7 @@ export function CaseDetailPanel({
         aria-label="Case header"
         className="bg-surface-primary border border-border rounded-md p-16 shadow-xs"
       >
-        <div className="flex items-center gap-12 mb-12">
+        <div className="flex flex-wrap items-center gap-8 mb-12">
           <Badge variant="neutral" size="sm">
             {SOURCE_ICON[orderCase.source as CaseSource] ?? SOURCE_ICON.default}
             <span className="ml-4">
@@ -99,9 +111,22 @@ export function CaseDetailPanel({
             </span>
           </Badge>
           <Badge variant="neutral" size="sm">
-            {orderCase.source_channel}
+            {sourceChannelLabel(orderCase.source_channel)}
           </Badge>
-          <span className="ml-auto text-caption text-text-tertiary uppercase tracking-wider">
+          {/* PO #17 / #20 (issue #133): SLA and status surface in the
+              same top-line band so the CSR sees the time pressure
+              without scrolling. */}
+          {sla.band !== "none" && (
+            <Badge
+              variant={SLA_BAND_VARIANT[sla.band]}
+              size="sm"
+              aria-label={`SLA: ${sla.label}`}
+            >
+              <Clock size={10} aria-hidden className="mr-4" />
+              {sla.label}
+            </Badge>
+          )}
+          <span className="ml-auto text-caption text-text-tertiary">
             {STATUS_LABEL[orderCase.status] ?? orderCase.status}
           </span>
         </div>
@@ -110,7 +135,23 @@ export function CaseDetailPanel({
           Case <code className="font-mono">{orderCase.case_id}</code>
         </h1>
 
+        {/* PO #17 (issue #133): timing context (Opened / SLA deadline)
+            promoted to the top row of the grid so the CSR sees it
+            without scrolling — under the old order it sat at the
+            tail of a six-field grid. */}
         <dl className="grid grid-cols-2 gap-x-24 gap-y-12 text-body">
+          <Field label="Opened" value={orderCase.opened_at} mono />
+          <EvidenceBlock tier="conditional"
+                         value={sla.deadline}
+                         predicateHolds={sla.band !== "none"}>
+            {(v) => (
+              <Field
+                label={`SLA deadline · ${sla.label}`}
+                value={String(v)}
+                mono
+              />
+            )}
+          </EvidenceBlock>
           <EvidenceBlock tier="audit-bearing" value={orderCase.customer_po_number}>
             {(v) => (
               <Field label="Customer PO" value={String(v)} mono />
@@ -123,18 +164,6 @@ export function CaseDetailPanel({
           </EvidenceBlock>
           <EvidenceBlock tier="contextual" value={orderCase.customer_id}>
             {(v) => <Field label="Customer" value={String(v)} />}
-          </EvidenceBlock>
-          <Field label="Opened" value={orderCase.opened_at} mono />
-          <EvidenceBlock tier="conditional"
-                         value={sla.deadline}
-                         predicateHolds={sla.band !== "none"}>
-            {(v) => (
-              <Field
-                label={`SLA deadline · ${sla.label}`}
-                value={String(v)}
-                mono
-              />
-            )}
           </EvidenceBlock>
           <EvidenceBlock tier="contextual" value={orderCase.bundle_version_at_open}>
             {(v) => <Field label="Skill bundle at open" value={String(v)} mono />}

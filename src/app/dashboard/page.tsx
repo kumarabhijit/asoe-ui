@@ -33,13 +33,8 @@ import { exceptionsApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { StatsResponse } from "@/types/api";
 
-const NAV_TABS = [
-  { id: "inbox", label: "Customer Inbox", href: "/inbox" },
-  { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
-  { id: "cases", label: "Cases", href: "/cases" },
-  { id: "dashboard", label: "Dashboard", href: "/dashboard" },
-  { id: "settings", label: "Settings", href: "/settings" },
-];
+import Link from "next/link";
+import { NAV_TABS } from "@/config/nav-tabs";
 
 const RECENT_ACTIVITY = [
   { time: "11:02", orderId: "SO-3100", action: "Resolved — PriceAdjustmentRecipe applied via YK07", status: "RESOLVED", badge: "success", color: "var(--color-success)" },
@@ -63,7 +58,7 @@ export default function DashboardPage() {
   const userTitle = (user as { title?: string })?.title || "";
   const filteredTabs = visibleTabs.length > 0 ? NAV_TABS.filter((t) => visibleTabs.includes(t.id)) : NAV_TABS;
 
-  useEffect(() => { document.title = "Dashboard — ASOE"; }, []);
+  useEffect(() => { document.title = "Performance — ASOE"; }, []);
 
   useEffect(() => {
     async function fetch() {
@@ -101,14 +96,20 @@ export default function DashboardPage() {
       />
 
       <main id="main-content" className="mx-auto max-w-[1440px] px-32 py-24">
-        {/* Breadcrumb */}
+        {/* Breadcrumb — PO #6 (issue #133): "Home" is a real link, not
+            a static label. */}
         <nav
           aria-label="Breadcrumb"
           className="mb-12 flex items-center gap-6 text-caption text-text-tertiary"
         >
-          <span>Home</span>
-          <ChevronRight size={10} />
-          <span className="text-text-secondary">Dashboard</span>
+          <Link
+            href="/home"
+            className="text-text-tertiary hover:text-text-secondary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm"
+          >
+            Home
+          </Link>
+          <ChevronRight size={10} aria-hidden />
+          <span className="text-text-secondary">Performance</span>
         </nav>
 
         {/* Header */}
@@ -118,7 +119,7 @@ export default function DashboardPage() {
           </div>
           <div>
             <h1 className="m-0 text-title font-bold text-text-primary">
-              Dashboard
+              Performance
             </h1>
             <p className="mt-4 mb-0 text-body text-text-tertiary">
               Resolution analytics and agent performance metrics

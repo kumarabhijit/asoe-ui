@@ -78,6 +78,160 @@ export function isTerminalStatus(status: string | null | undefined): boolean {
 }
 
 /**
+ * Pretty-print a free-form `source_channel` string from the backend
+ * (issue #133, PO points #10 / #12). The backend emits raw machine
+ * identifiers like `edi_x12_850`, `email`, `non_edi`, `phone`,
+ * `fax`; renderers used to forward those verbatim through an
+ * `uppercase` Tailwind class, producing strings like "NON_EDI" that
+ * the PO flagged as both ugly and semantically opaque.
+ *
+ * Guardrail #1 — this is a visual mapping function with a
+ * default-fallback. Adding a new channel in the backend keeps
+ * working (falls into the default branch: underscores → spaces,
+ * sentence case) while well-known channels render with the right
+ * casing on technical acronyms.
+ */
+const KNOWN_CHANNEL_LABELS: Readonly<Record<string, string>> = {
+  email: "Email",
+  fax: "Fax",
+  phone: "Phone",
+  edi: "EDI",
+  edi_x12_850: "EDI 850",
+  edi_x12_855: "EDI 855",
+  edi_x12_856: "EDI 856",
+  edi_x12_810: "EDI 810",
+  non_edi: "Non-EDI email",
+  manual: "Manual entry",
+  api: "API",
+};
+
+export function sourceChannelLabel(channel: string | null | undefined): string {
+  if (!channel) return "Unknown channel";
+  const known = KNOWN_CHANNEL_LABELS[channel.toLowerCase()];
+  if (known) return known;
+  return channel
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Autonomy levels (issue #133, PO point #15) are recipe-action-driven
+ * enums sourced from `asoe2/contracts/policy.py` (`L1`–`L4`). The PO
+ * complained that the bare letter codes leak through to the operator
+ * with no plain-language meaning. This map adds a single-sentence
+ * caption per level; unknown values fall back to the bare code so
+ * the UI never crashes when the backend adds an `L5` ahead of a label.
+ *
+ * Source of truth for the underlying business meaning:
+ *   `asoe2/contracts/policy.py` — DUPLICATE_PO_AUTONOMY_LEVELS,
+ *   EMAIL_ORDER_ENTRY_AUTONOMY_LEVELS.
+ */
+const AUTONOMY_LEVEL_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  L1: "Block automatically — operator decides",
+  L2: "Recommend — operator approves",
+  L3: "One-click approve — operator confirms",
+  L4: "Fully automated — audit only",
+};
+
+export function autonomyLevelLabel(level: string | null | undefined): string {
+  if (!level) return "Unknown autonomy";
+  const desc = AUTONOMY_LEVEL_DESCRIPTIONS[level];
+  return desc ? `${level} — ${desc}` : level;
+}
+
+/**
+ * Map a recipe `recommended_action` enum value to an operator-meaningful
+ * primary-button label and a short caption that explains the consequence
+ * of clicking it (issue #133, PO point #11 — "What does Approve mean
+ * when the AI action is to draft an email?").
+ *
+ * Guardrail #1 — visual mapping function with a default-fallback. New
+ * actions added in the backend keep working (rendered as "Apply
+ * recommendation" with the raw token as the caption).
+ */
+export interface ActionLabel {
+  primary: string;
+  /** Optional one-line caption explaining the action's effect. */
+  caption?: string;
+  /** Optional explicit "discard" label for the secondary button. */
+  secondary?: string;
+}
+
+const ACTION_LABELS: Readonly<Record<string, ActionLabel>> = {
+  ONE_CLICK_APPROVE: {
+    primary: "Approve order",
+    caption: "Posts the order to the ERP with the agent's extraction.",
+    secondary: "Reject",
+  },
+  REQUEST_CLARIFICATION: {
+    primary: "Send draft to buyer",
+    caption: "Sends the drafted clarification email to the buyer contact.",
+    secondary: "Discard draft",
+  },
+  REQUEST_BUYER_CONFIRMATION: {
+    primary: "Send draft to buyer",
+    caption: "Sends the drafted confirmation email to the buyer contact.",
+    secondary: "Discard draft",
+  },
+  BLOCK_AND_NOTIFY: {
+    primary: "Block and notify",
+    caption: "Blocks the order and emails the buyer with the reason.",
+    secondary: "Override block",
+  },
+  MERGE: {
+    primary: "Merge with existing",
+    caption: "Links this PO to the existing order; no new case is created.",
+    secondary: "Keep separate",
+  },
+  SUPERSEDE: {
+    primary: "Supersede existing",
+    caption: "Replaces the existing order with this one and notifies the buyer.",
+    secondary: "Keep both",
+  },
+  ALLOW_BOTH: {
+    primary: "Allow both",
+    caption: "Treats both POs as distinct orders.",
+    secondary: "Reject this one",
+  },
+  ESCALATE: {
+    primary: "Escalate to manager",
+    caption: "Routes the case to a manager queue for review.",
+    secondary: "Resolve myself",
+  },
+  STANDARD_REVIEW: {
+    primary: "Approve order",
+    caption: "Operator verifies extraction before posting to the ERP.",
+    secondary: "Reject",
+  },
+  LOW_CONFIDENCE_FLAG: {
+    primary: "Approve order",
+    caption: "Extraction confidence is below the auto-approve floor; verify before posting.",
+    secondary: "Reject",
+  },
+  AUTO_CORRECT: {
+    primary: "Apply correction",
+    caption: "Posts the corrected order to the ERP.",
+    secondary: "Reject correction",
+  },
+  REJECT: {
+    primary: "Reject",
+    caption: "Rejects the order and notifies the buyer.",
+    secondary: "Cancel",
+  },
+};
+
+/**
+ * Returns the mapped label for a known action, or `null` when the
+ * action is unknown / absent. Callers fall back to the generic
+ * "Approve" / "Reject" pair in that case so a backend addition
+ * doesn't crash or relabel surfaces with a misleading caption.
+ */
+export function actionLabel(action: string | null | undefined): ActionLabel | null {
+  if (!action) return null;
+  return ACTION_LABELS[action] ?? null;
+}
+
+/**
  * Lookup the cluster a status belongs to. Returns null when the
  * status isn't covered (defensive — backend addition without a UI
  * label entry). The chip bar treats unknown statuses as Terminal

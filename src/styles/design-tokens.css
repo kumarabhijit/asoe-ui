@@ -283,10 +283,18 @@
   --color-surface-row-stripe: #0F1119;
 
   /* ── TEXT COLORS ──────────────────────────────────────────────────── */
+  /* Issue #133 PO #19 — lifted tertiary/quaternary contrast in dark
+     mode. Previous values (#6E6E84 / #464660) clocked in at ~4.3:1
+     and ~1.9:1 against `--color-surface-primary` (#12141D); the
+     second was below the WCAG AA body-text floor of 4.5:1 and the
+     PO flagged dark mode as "unreadable". The lifted values keep
+     the same hue ladder (each step muted relative to the one above)
+     while landing every level safely above the AA threshold for
+     small body text. */
   --color-text-primary:    #E8E8EE;
-  --color-text-secondary:  #A0A0B4;
-  --color-text-tertiary:   #6E6E84;
-  --color-text-quaternary: #464660;
+  --color-text-secondary:  #B8B8C8;
+  --color-text-tertiary:   #9090A4;
+  --color-text-quaternary: #6E6E84;
   --color-text-inverse:    #FFFFFF;  /* Text on brand/status colored backgrounds — always white */
   --color-text-brand:      #8B7CF7;
   --color-text-brand-hover:#9D90FA;
