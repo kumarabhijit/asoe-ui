@@ -103,6 +103,10 @@ export interface CaseUpdatedPayload {
   status: string;
   updated_fields: string[];
   sla_deadline?: string;
+  // Issue #133 PO #17 — last-activity timestamp, bumped on every
+  // CaseStore mutation. Mirrors `CaseUpdatedPayload.updated_at` in
+  // `asoe2/api/events.py`. Optional until every emitter is on V014+.
+  updated_at?: string;
 }
 
 export interface CaseClosedPayload {

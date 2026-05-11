@@ -2,7 +2,57 @@
 
 > **Source**: AgenticOM Prototype (Issue #50, `Document from Abhijit.html` — 12,051 lines)
 > **Target**: `kumarabhijit/asoe-ui` (Next.js 16 / React 19 / TypeScript)
-> **Date**: 2026-04-14
+> **Date**: 2026-04-14 (first pass); updated 2026-05-11 for issue #133 PO follow-up
+
+---
+
+## 2026-05-11 update — issue #133 PO follow-up
+
+The 2026-05-10 PO review (kumarabhijit/asoe2#133) re-asserted the
+prototype as the reference flow (point #13: "Check the prototype I
+created at the beginning — it has a well defined flow"). The V5.1
+reshape (PR asoe-ui#141) and the #133 follow-up (asoe-ui#146 + this
+PR) close several of the gaps below; the rest remain logged.
+
+Status changes:
+
+| Section | Was | Now (post-#133) |
+|---|---|---|
+| 2.1 Top-level layout | 4 routes (`/exceptions`, `/dashboard`, `/inbox`, `/settings`) | 6 surfaces: `/home` (operational landing — PO #5/#6), `/cases` (canonical case list), `/exceptions`, `/dashboard` (renamed "Performance"), `/settings`, `/inbox` (server redirect into `/cases?source=manual_order` — PO #9). |
+| 4.7 AI Intake Pipeline sub-view | Not built | Partially addressed — `/home` "Top of queue" + `useSlaTicker` countdown cover the SLA-tracking arm of the prototype's 6-step timeline. The full Received → Ingested → Classified → SAP Check → Routed → Resolved per-record view is still **not built** as a dedicated surface; the per-event view lives at `/exceptions/[id]` with the orchestration `PipelineDAG`. |
+| 6.6 Constraint Graph (Palantir-style SVG) | Not built | **Partially addressed** — `ConstraintsPipeline` (issue #133 PO #14) renders the deterministic floor checks + validations + classification as a left-to-right pipeline graph in `EmailOrderEntrySection`. The 5-zone / ~30-node prototype graph is still scoped for the Order Change Workflow (4.4) and remains **not built**. |
+| 7.x OrderCase identifiers | bare UUID `case_id`; PO #16 questioned its purpose | Verified: backend keeps `case_id` as a bare UUID and resolves business-side identifiers (PO number, sales order, EDI txn, source email) through the V010 correlation-key table. The audit-bearing "Created/Updated" pair (PO #17) is now complete with the V014 migration adding `updated_at` to OrderCase. |
+| 2.2 Navigation chrome | Tab list duplicated per page | Consolidated into `src/config/nav-tabs.ts`; logo + breadcrumb "Home" links are real (PO #5/#6). |
+| Dark-mode contrast | Several tokens below WCAG-AA 4.5:1 on dark surface | Tertiary / quaternary text tokens lifted (PO #19). |
+
+Outstanding prototype gaps (still **not built** in the current
+codebase — captured here so the next planning pass has a single
+sourceable list):
+
+- **§4.4 Order Change Workflow** (10-constraint evaluator, lifecycle
+  stage bar, scenario simulation, decision panel). This is the
+  prototype's largest feature; the 30-node Constraint Graph SVG is
+  scoped here. The post-#133 `ConstraintsPipeline` is the right
+  primitive but a much larger flow is needed before it has data to
+  visualise.
+- **§4.5 EDI 850 Viewer** (3 sub-views — Decoded, Raw X12, Segment
+  Map).
+- **§4.6 AI Order Extraction** side-by-side editor with master-data-
+  match badges and pallet-validation widgets.
+- **§4.7 AI Intake Pipeline** as a dedicated tab (the per-event
+  PipelineDAG covers the orchestration view but not the
+  email-to-case timeline).
+- **§5 Quota Mgmt** + **§5 Exception Insights** tabs.
+- **§6 Cross-cutting**: CSR Chat Assistant, Upload / Data Ingestion,
+  Persona system (5 roles with granular RBAC — current RBAC has 5
+  roles but no persona-switching UI).
+
+What remains true after #133: the prototype's *flow* (intake →
+extract → classify → constraint-check → route → resolve) is
+covered conceptually by the current V5.1 pipeline; the prototype's
+*surfaces* are still richer than the live UI in three places (Order
+Change Workflow, EDI Viewer, Order Extraction editor). Closing
+those gaps is a separate planning track from the #133 punch list.
 
 ---
 

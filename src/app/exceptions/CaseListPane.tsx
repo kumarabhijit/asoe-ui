@@ -57,6 +57,7 @@ import {
   CASE_STATUS_CLUSTERS,
   STATUS_LABEL,
   clusterFor,
+  lastActivityLabel,
   sourceChannelLabel,
 } from "@/lib/cases";
 import type { CaseSource, SlaBand } from "@/types/cases";
@@ -568,6 +569,7 @@ export function CaseListPane({
             isSelected={case_.case_id === selectedId}
             onSelect={() => onSelect(case_.case_id)}
             matchReason={matchReasonByCaseId.get(case_.case_id)}
+            now={now}
           />
         ))}
         {limitCapped && (
@@ -591,6 +593,10 @@ interface CaseRowProps {
   slaBand: SlaBand;
   isSelected: boolean;
   onSelect: () => void;
+  /** Live "now" reference (issue #133 PO #17). Threaded from the
+   *  parent's `useSlaTicker()` so the "last activity" relative
+   *  label re-renders once a minute. */
+  now: Date;
   /**
    * Phase 28.5.x V5.1.2 — when a search query is active and this
    * row passed the filter, the match-dimension that hit. Surfaced
@@ -613,11 +619,16 @@ function CaseRow({
   slaBand,
   isSelected,
   onSelect,
+  now,
   matchReason,
 }: CaseRowProps) {
   const orderRef =
     case_.customer_po_number || case_.sales_order_id || case_.case_id;
   const matchLabel = matchReason ? MATCH_REASON_LABEL[matchReason] : null;
+  // PO #17 — show relative last-activity stamp between the order ref
+  // and the status cluster. Structurally omitted when the backend
+  // hasn't populated updated_at yet (V014 backfill window).
+  const activity = lastActivityLabel(case_.updated_at, now);
   return (
     <div
       role="option"
@@ -667,6 +678,15 @@ function CaseRow({
         {clusterFor(case_.status) && (
           <span className="ml-4 text-text-quaternary">
             · {clusterFor(case_.status)}
+          </span>
+        )}
+        {activity && (
+          <span
+            className="ml-4 text-text-quaternary"
+            aria-label={`Last activity ${activity}`}
+            title={case_.updated_at ?? undefined}
+          >
+            · {activity}
           </span>
         )}
         {matchLabel && (
