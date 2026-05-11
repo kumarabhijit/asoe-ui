@@ -2,118 +2,180 @@
 
 Decision D3 (`docs/test-strategy/e2e-flow-plan.md` in `kumarabhijit/asoe2`).
 
-The W7 flow registry is anchored to three operator archetypes. Each
+The W7 flow registry is anchored to operator archetypes. Each
 flow YAML references a journey ID via the `journey:` field; the
 storyboards below are the source of truth for what each journey
 exercises and why.
 
-> Auto-generation from `journey:` tags is recommended for V1.1
-> (Failure modes table — JOURNEYS.md drift). Until then, treat
-> this file as the contract — quarterly journey review on the
-> team calendar mitigates drift.
+## Arcs
 
----
+Every flow declares an `arc:` field. Two values are testable; the
+third is a product KPI, not a test assertion.
 
-## J1 — New operator, day one
+| Arc | What it tests | Test shape | Time budget? |
+|---|---|---|---|
+| `orientation` | Can the operator find the right affordance after navigating to the surface? | Single-screen assertion: chrome present, focus on a sensible element, expected affordance reachable in ≤1 interaction. | No — orientation is about *presence + reachability*, not wall-clock. Performance budgets are deferred (e2e-flow-plan NOT-in-scope). |
+| `task-completion` | Can the operator finish a task end-to-end without context switches? | Multi-step flow: click + keyboard equivalent on each step; focus restoration on every navigation; status announcement on every state change. | No — flow completion is the property, not duration. |
+| `trust` (5-year arc) | Does the operator reach for this tool first when a critical exception lands? Do they feel safe taking risks because recovery is reliable? | **NOT A TEST.** This is a product KPI consumed via observability + product analytics. Documented here so the test layer does not pretend to assert it. | n/a |
+
+Rule: the 5s arcs from prior versions of this doc were rhetorical,
+not budgeted. A flow with `delay_ms: 2000` on the loading state
+does not violate the orientation arc — it tests that the skeleton
+is reachable, which is the orientation property. Web Vitals
+budgets are a separate workstream.
+
+## Archetypes
+
+### J1 — New operator, day one
 
 **Mental model.** Has a customer email open in another tab. Doesn't
 yet know which surface to start on, doesn't know the difference
 between Inbox and Exception Queue, doesn't trust the system to
 have already done work.
 
-**5-second arc.** Do they orient? Can they tell what's already
-been classified vs what needs them?
+**Orientation arc.** Can they tell what's already classified vs
+what needs them, from the first screen they land on?
 
-**5-minute arc.** Can they finish a triage end-to-end without
-asking a colleague?
+**Task-completion arc.** Can they finish a triage end-to-end
+without asking a colleague?
 
-**5-year arc.** Is the inbox a place they trust to surface what
-matters and hide what doesn't?
+**Trust KPI.** Is the inbox a place they trust to surface what
+matters and hide what doesn't? (Out of test scope.)
 
-**Flows that exercise J1.**
-- `onboard/signin-to-home.yaml` — first authenticated load. Chrome
-  invariant must hold; a returning operator must not be greeted by
-  a blank pane mid-render.
-- `triage/inbox-load.yaml` — full state matrix. Empty state must
-  read as "you're caught up", not as a broken pane (D7).
-- `triage/email-order-entry-from-inbox.yaml` — V1 regression. Back
-  button from a detail page reached via inbox lands back on the
-  inbox, not the queue.
-- `triage/inbox-item-click-behavior-catalog.yaml` — V3 regression.
-  Click semantics are uniform across item types; nothing is a
-  silent no-op.
-- `triage/case-to-exception-detail-roundtrip.yaml` — V2 regression.
-  Forward/back navigation never drops chrome (CMT-2).
-
----
-
-## J2 — Peak-load veteran
+### J2 — Peak-load veteran
 
 **Mental model.** 30 cases queued, keyboard-driven, no time for
 mouse trips. Runs through dispositions in seconds. Will notice if
 a Tab order is wrong before they notice if a colour is wrong.
 
-**5-second arc.** Does the next case load instantly when they Enter
-on a row?
+**Orientation arc.** When the next case loads, is the next action
+already focused?
 
-**5-minute arc.** Do they finish a batch without context switches —
-no surprise dialogs, no focus loss after action?
+**Task-completion arc.** Do they finish a batch without surprise
+dialogs or focus loss after an action?
 
-**5-year arc.** Do they reach for this tool first when a critical
-exception lands, or do they fall back to email?
+**Trust KPI.** Do they reach for this tool first when a critical
+exception lands, or fall back to email? (Out of test scope.)
 
-**Flows that exercise J2.**
-- `triage/inbox-load.yaml` — full state matrix; loading state must
-  not block keyboard advance (P1's deferred-promise pattern).
-- `triage/inbox-item-click-behavior-catalog.yaml` — V3. Keyboard
-  Enter must produce the same outcome as left-click for every
-  declared item type (D6 + D7).
-- `resolve/exception-triage-approval.yaml` — full keyboard path.
-  StatusAnnouncer fires "Exception resolved" so the screen reader
-  confirms the approval landed (Q1).
-- `signout/signout-from-each-role.yaml` — focus restored to
-  sign-in input after sign-out (D6).
+### J3 — Recovery from misclick
 
----
-
-## J3 — Recovery from misclick
-
-**Mental model.** Misrouted a case to the wrong queue, just
+**Mental model.** Mis-routed a case to the wrong queue, just
 realised. Wants to back out without losing data already entered.
 A high-trust system makes recovery feel safe enough to take risks.
 
-**5-second arc.** Do they see the misclick happen? (Status
-announcement, undo affordance, breadcrumb that doesn't lie.)
+**Orientation arc.** Does the operator see the misclick happen?
+(Status announcement, undo affordance, breadcrumb that doesn't
+lie.)
 
-**5-minute arc.** Can they recover without re-entering data?
+**Task-completion arc.** Can they recover the prior state — form
+data preserved, selection restored — without re-entering anything?
 
-**5-year arc.** Does the system make recovery feel safe enough
-that they take risks (e.g. try a new resolve workflow) rather
-than always picking the conservative path?
+**Trust KPI.** Does the system make recovery feel safe enough that
+the operator picks risky/correct paths over conservative
+workarounds? (Out of test scope.)
 
-**Flows that exercise J3.**
-- `triage/case-to-exception-detail-roundtrip.yaml` — V2. Back
-  navigation from a detail surface must restore the prior queue
-  state including selection.
-- `recover/back-from-misroute.yaml` — golden. The recovery flow
-  must preserve in-progress data (form values not cleared by
-  the back navigation).
+### J4 — Auth-edge operator (NEW in v1.3)
+
+**Mental model.** The infrastructure is unreliable around them.
+Session expired mid-action. Role was revoked between login and
+the dispatch click. Browser back-button bounced them across two
+detail pages while a 500 was in flight on a third.
+
+**Orientation arc.** When the chrome is in a transitional state
+(forward/back nav, bfcache restore, App Router boundary file like
+`loading.tsx` / `error.tsx` / `not-found.tsx`), is the sign-out
++ user-menu still reachable? Does the operator have an exit?
+
+**Task-completion arc.** When auth degrades mid-flow (session
+expires while an override dialog is open; role lost between
+shadow and execute), does the system fail explicitly to a
+documented terminal state — `BLOCKED`, `MANUAL_REVIEW_REQUIRED`,
+`FAIL_TO_HUMAN` — rather than silently partial-execute?
+
+**Trust KPI.** Do operators trust the system to *not* take a
+financially-binding action on a degraded auth context? (Out of
+test scope.)
+
+**Flows owned by J4.**
+- The chrome invariant's CMT-2 transition + bfcache work.
+- The chrome invariant's CMT-3 boundary-file coverage.
+- Future: session-expiry-mid-flow and role-revocation-mid-flow
+  flows.
+
+### J5 — Auditor / compliance reviewer (NEW in v1.3)
+
+**Mental model.** Reads, never writes. Pulled this case up
+because internal audit flagged the override. Wants to reconstruct
+the decision chain: what evidence was visible, what verdict the
+shadow returned, what reason tag the operator selected, in what
+order. SOX-relevant.
+
+**Orientation arc.** From the case detail surface, can the
+auditor find the override reason tag and the shadow verdict
+within one click of the audit pane opening?
+
+**Task-completion arc.** Can the auditor reconstruct the full
+chain — `OrderEvent` → classified intent → selected recipe →
+shadow verdict → override reason (if any) → executed action →
+status announcement — without leaving the case detail surface?
+Every audit-bearing field declared in
+`compliance/audit_bearing_registry.yaml` must be present or
+explicitly placeholder-rendered (`AUDIT_CONTEXT_MISSING` /
+"Context Not Required for Resolution").
+
+**Trust KPI.** When the audit lands six quarters from now, are
+these traces still parseable from the registry shape alone, with
+no oral history? (Out of test scope.)
+
+**Flows owned by J5.**
+- `compliance/audit-transcript-reconstructs.yaml` (V1.1) — assert
+  the StatusAnnouncer transcript + EvidenceBlock presence map
+  reconstructs the decision chain.
+- `compliance/audit-bearing-registry-render-coverage.yaml` (V1.1)
+  — every registry-required field renders or carries the
+  documented `AUDIT_CONTEXT_MISSING` marker.
+
+### J6 — Accessibility-first operator (DEFERRED to V1.1)
+
+Slot reserved. Keyboard-only is already an implicit floor for J2;
+this archetype owns the full a11y story (screen-reader replay,
+`prefers-reduced-motion`, high-contrast, `aria-live` transcript
+correctness). Listed here so the gap is visible.
 
 ---
 
-## Journey ↔ flow matrix
+## Journey × arc coverage matrix (auto-generated)
 
-| Flow                                                     | J1 | J2 | J3 |
-|----------------------------------------------------------|----|----|----|
-| `onboard/signin-to-home.yaml`                            | ✅ |    |    |
-| `triage/inbox-load.yaml`                                 | ✅ | ✅ |    |
-| `triage/email-order-entry-from-inbox.yaml`               | ✅ |    |    |
-| `triage/inbox-item-click-behavior-catalog.yaml`          | ✅ | ✅ |    |
-| `triage/case-to-exception-detail-roundtrip.yaml`         | ✅ |    | ✅ |
-| `resolve/exception-triage-approval.yaml`                 |    | ✅ |    |
-| `signout/signout-from-each-role.yaml`                    |    | ✅ |    |
-| `recover/back-from-misroute.yaml`                        |    |    | ✅ |
+This matrix is regenerated from each flow YAML's `journey:` +
+`arc:` fields by `e2e/__tests__/journey-coverage.test.ts`. The
+matrix below is updated by hand until the auto-generation tool
+ships in V1.1. The meta-test asserts the YAML side matches the
+expected matrix at the bottom of this file.
 
-Each row's `✅` columns must match the flow YAML's `journey:` field.
-A meta-test will lock this in V1.1 (`/plan-eng-review` Approach C
-auto-generation territory).
+<!-- BEGIN MATRIX -->
+| Flow | Journey | Arc |
+|---|---|---|
+| `triage/inbox-load.yaml` | J1, J2 | orientation |
+<!-- END MATRIX -->
+
+Until the full flow set lands, the journey-coverage meta-test
+will fail with structured gap reports — that is the desired
+behaviour. Each gap is a flow to author next.
+
+---
+
+## Notes for plan readers
+
+- **5y arcs are KPIs, not test assertions.** The 5-year arcs in
+  the original D3 design were rhetorical framing. The test layer
+  asserts orientation + task-completion only. Trust is observed,
+  not tested.
+- **Adversarial coverage is J4.** Forward/back navigation, bfcache
+  restore, App Router boundary files all live under J4 — this is
+  the archetype that owns CMT-2 + CMT-3 from the e2e flow plan.
+- **Compliance is J5.** The audit reviewer is a first-class
+  archetype. This binds the W7 flow registry to the audit-bearing
+  registry workstream in Lane 1 (asoe2) so the two sides cannot
+  drift.
+- **J6 is acknowledged but deferred.** Keyboard floor is already
+  enforced per-step (D6). Full a11y replay lands in V1.1.

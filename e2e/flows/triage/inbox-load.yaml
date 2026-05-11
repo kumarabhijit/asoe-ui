@@ -1,4 +1,4 @@
-# triage/inbox-load.yaml — golden, J1 + J2.
+# triage/inbox-load.yaml — golden, J1 + J2, orientation.
 #
 # Issue #133, PO #9 — the `/inbox` master-detail surface was retired
 # and replaced by a server redirect into `/cases?source=manual_order`.
@@ -6,9 +6,15 @@
 # (load → see manual-order cases → handle the loading / empty /
 # error states) but enters through the case-list filtered view.
 # Filename kept for historical continuity; rename in a follow-up.
+#
+# Arc: orientation. Single-screen assertion — "is the right
+# affordance present after landing on the manual-order case list?" —
+# across each state of the matrix. The task-completion arc is owned
+# by triage/email-order-entry-from-inbox.yaml.
 name: inbox-load
 kind: golden
 journey: [J1, J2]
+arc: orientation
 entry: /cases?source=manual_order
 states:
   - loading

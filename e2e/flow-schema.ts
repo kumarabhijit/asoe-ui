@@ -30,8 +30,17 @@ export const STATE_KEYS = [
 
 export const stateKeySchema = z.enum(STATE_KEYS);
 
-/** Journey archetype IDs from JOURNEYS.md. See D3. */
-export const journeyIdSchema = z.enum(["J1", "J2", "J3"]);
+/** Journey archetype IDs from JOURNEYS.md. See D3.
+ *  J4 (auth-edge operator) and J5 (auditor) added in v1.3.
+ *  J6 (accessibility-first) reserved but not yet used by any flow. */
+export const journeyIdSchema = z.enum(["J1", "J2", "J3", "J4", "J5"]);
+
+/** Arc the flow exercises. See JOURNEYS.md "Arcs" section.
+ *  - orientation: presence + reachability after navigation
+ *  - task-completion: multi-step flow end-to-end
+ *  trust (5y) is intentionally NOT a valid arc — it is a product
+ *  KPI, observed via analytics, never asserted in a test. */
+export const arcSchema = z.enum(["orientation", "task-completion"]);
 
 const httpStatusSchema = z
   .number()
@@ -188,10 +197,17 @@ export const flowSchema = z
           "flow name must be kebab-case (lowercase a-z, digits, hyphens)",
       }),
     kind: flowKindSchema,
-    /** Journey archetype(s) the flow exercises. See D3. */
-    journey: z
-      .union([journeyIdSchema, z.array(journeyIdSchema).min(1)])
-      .optional(),
+    /** Journey archetype(s) the flow exercises. See D3.
+     *  Required, not optional — every flow must claim at least
+     *  one archetype so the journey-coverage meta-test can
+     *  detect orphan flows. */
+    journey: z.union([journeyIdSchema, z.array(journeyIdSchema).min(1)]),
+    /** Arc the flow exercises. See JOURNEYS.md.
+     *  Required: every flow asserts EITHER orientation (single-
+     *  screen presence + reachability) OR task-completion
+     *  (multi-step end-to-end). A flow that wants both should
+     *  be split into two YAMLs. */
+    arc: arcSchema,
     /** Path the flow starts on (must be absolute). */
     entry: z.string().regex(/^\//, { message: "entry must start with /" }),
     /**
@@ -234,6 +250,31 @@ export type StateKey = z.infer<typeof stateKeySchema>;
 export type StateFixture = z.infer<typeof stateFixtureSchema>;
 export type Step = z.infer<typeof stepSchema>;
 export type Flow = z.infer<typeof flowSchema>;
+export type JourneyId = z.infer<typeof journeyIdSchema>;
+export type Arc = z.infer<typeof arcSchema>;
+
+/** All archetypes the meta-test enforces coverage for.
+ *  J6 is declared in JOURNEYS.md but deferred to V1.1 — excluded
+ *  here so the meta-test doesn't fail until it is real. */
+export const ENFORCED_JOURNEYS: readonly JourneyId[] = [
+  "J1",
+  "J2",
+  "J3",
+  "J4",
+  "J5",
+] as const;
+
+/** Arcs the meta-test enforces coverage for. Trust (5y) is a
+ *  product KPI, not a testable arc — see JOURNEYS.md. */
+export const ENFORCED_ARCS: readonly Arc[] = [
+  "orientation",
+  "task-completion",
+] as const;
+
+/** Normalise the journey field to an array regardless of single vs list. */
+export function journeysOf(flow: Flow): JourneyId[] {
+  return Array.isArray(flow.journey) ? [...flow.journey] : [flow.journey];
+}
 
 /**
  * Parse a raw object (typically `YAML.parse(fs.readFileSync(path))`)

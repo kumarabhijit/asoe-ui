@@ -19,7 +19,8 @@
     "verify:ui-routes": "node scripts/extract-ui-routes.mjs && git diff --exit-code -- tests/contract/snapshots/ui_route_surface.json",
     "test:browser": "playwright test",
     "test:browser:ui": "playwright test --ui",
-    "test:browser:headed": "playwright test --headed"
+    "test:browser:headed": "playwright test --headed",
+    "flows:matrix": "tsx e2e/journey-matrix.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -56,6 +57,7 @@
     "openapi-typescript": "^7.13.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.3",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.4",
