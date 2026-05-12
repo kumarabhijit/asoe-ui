@@ -12,6 +12,13 @@ states:
   - loading
   - empty
   - error
+state_opt_out_justifications:
+  partial_failure: >-
+    Sample fixture — partial_failure not exercised in the golden
+    snapshot test.
+  stale: >-
+    Sample fixture — stale not exercised in the golden snapshot
+    test.
 state_fixtures:
   loading:
     route: /api/v1/exceptions

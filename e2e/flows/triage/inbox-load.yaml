@@ -42,11 +42,19 @@ entry: /cases?source=manual_order
 states:
   - loading
   - empty
-  # `error` opt-out: /cases has no inline error UI (see header).
-  # `partial_failure` and `stale` opt-out: the cases list endpoint
-  # is a single GET — no per-row failure mode and no mid-view
-  # status-change channel today. Re-evaluate when the WebSocket-
-  # driven case list lands.
+state_opt_out_justifications:
+  error: >-
+    /cases has no inline error UI branch; the App Router error
+    boundary owns hard errors and is already covered by CMT-3
+    chrome-invariant-boundaries.spec.ts. Adding `error` here
+    would assert against UI that doesn't exist.
+  partial_failure: >-
+    The cases list endpoint is a single GET — no per-row
+    failure mode. Re-evaluate when streamed/chunked responses
+    land.
+  stale: >-
+    No mid-view status-change channel today. Re-evaluate when
+    the WebSocket-driven case list arrives.
 state_fixtures:
   loading:
     route: /api/v1/cases**

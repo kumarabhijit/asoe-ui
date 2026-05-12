@@ -35,9 +35,17 @@ authAs: MANAGER
 entry: /cases?source=manual_order
 states:
   - empty
-  # `loading`, `error`, `partial_failure`, `stale` opt-outs:
-  # this flow asserts the click-dispatch contract, not the
-  # state-matrix surface (owned by triage/inbox-load.yaml).
+state_opt_out_justifications:
+  loading: >-
+    This flow asserts the click-dispatch contract; loading-state
+    coverage is owned by triage/inbox-load.yaml.
+  error: >-
+    /cases has no inline error UI; CMT-3 boundary spec covers it.
+  partial_failure: >-
+    The cases list endpoint is a single GET — no per-row failure
+    mode.
+  stale: >-
+    No mid-view status-change channel today.
 state_fixtures:
   empty:
     route: /api/v1/cases**
