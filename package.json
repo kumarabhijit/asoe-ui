@@ -10,6 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:ci": "mkdir -p reports && vitest run --reporter=default --reporter=junit --outputFile=reports/vitest-junit.xml",
+    "test:ci:metrics": "node scripts/junit-to-prometheus.mjs --input reports/vitest-junit.xml --output reports/vitest-metrics.prom --mode mock",
     "typecheck": "tsc --noEmit",
     "generate-types": "openapi-typescript ../asoe2/openapi/asoe2.openapi.json -o src/types/generated.ts",
     "verify-types": "openapi-typescript ../asoe2/openapi/asoe2.openapi.json -o /tmp/asoe-ui.generated.ts && diff -q src/types/generated.ts /tmp/asoe-ui.generated.ts",

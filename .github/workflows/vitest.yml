@@ -1,0 +1,232 @@
+# Vitest unit / contract / architectural test suite — primary CI gate
+# for asoe-ui.
+#
+# Today the asoe-ui repo has `typecheck.yml` (tsc) and `browser-e2e.yml`
+# (Playwright) but no CI gate for the 1000+ vitest tests under tests/.
+# This workflow closes that gap. It also wires the dual-mode matrix
+# the Boris/SRE/Compliance reviewer-panel amendment requires:
+#
+#   mode=mock — current behaviour: tests run against the in-process
+#     mock at src/lib/api.ts (NEXT_PUBLIC_USE_REAL_API unset). This is
+#     the PR-blocking gate.
+#
+#   mode=stub — informational tier. The same vitest suite runs against
+#     a live asoe2 backend dialled up via a sibling checkout (same
+#     pattern as browser-e2e.yml). Many tests mock `exceptionsApi`
+#     directly and will be inert in this mode; tests that actually
+#     hit `http()` will exercise the real wire contract and surface
+#     mock-vs-live drift early. Marked `continue-on-error: true`
+#     until the stub-conformance tier (S11 follow-on) gates it
+#     formally.
+#
+# After tests: the JUnit XML output is converted to Prometheus
+# textfile metrics by scripts/junit-to-prometheus.mjs. Every failed
+# test is emitted as `tests_scenario_failed_total{scenario_id,
+# slo_category, mode}` so the §28.6 Grafana dashboard surfaces
+# regressions by SLO band. Both the JUnit and Prometheus files are
+# uploaded as workflow artifacts.
+
+name: Vitest
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'e2e/**'
+      - 'scripts/**'
+      - 'package*.json'
+      - 'tsconfig.json'
+      - 'vitest.config.ts'
+      - '.github/workflows/vitest.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: vitest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vitest-mock:
+    name: vitest (mode=mock)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run vitest (mock mode, JUnit reporter)
+        env:
+          ASOE_API_MODE: mock
+          # NEXT_PUBLIC_USE_REAL_API intentionally unset → src/lib/api.ts
+          # falls through to the in-process mock.
+        run: |
+          mkdir -p reports
+          npx vitest run \
+            --reporter=default \
+            --reporter=junit \
+            --outputFile=reports/vitest-junit-mock.xml
+
+      - name: Convert JUnit → Prometheus textfile (slo_category metrics)
+        if: always()
+        env:
+          ASOE_TEST_MODE: mock
+        run: |
+          mkdir -p reports
+          node scripts/junit-to-prometheus.mjs \
+            --input reports/vitest-junit-mock.xml \
+            --output reports/vitest-metrics-mock.prom \
+            --mode mock
+
+      - name: Upload JUnit XML + Prometheus metrics (mock)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-mock-reports
+          path: |
+            reports/vitest-junit-mock.xml
+            reports/vitest-metrics-mock.prom
+          retention-days: 14
+
+  vitest-stub:
+    # Informational tier — runs the same vitest suite against a live
+    # asoe2 sibling so the mock/live drift class of bug surfaces
+    # before first regression. Not PR-blocking yet (continue-on-error
+    # true) because most vitest tests today mock exceptionsApi
+    # directly and won't actually hit the live backend; the value is
+    # in the tests that DO call `http()` (e.g. URL conformance,
+    # health-check parity). The stub-conformance tier (S11 follow-on)
+    # gates this formally once a `slo_category: stub_safe` opt-in is
+    # added to enough scenarios.
+    name: vitest (mode=stub, informational)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Checkout asoe-ui
+        uses: actions/checkout@v4
+        with:
+          path: asoe-ui
+
+      - name: Resolve asoe2 ref (matching branch or main)
+        id: asoe2_ref
+        env:
+          GH_TOKEN: ${{ secrets.ASOE2_READ_TOKEN || github.token }}
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          REPO="${{ github.repository_owner }}/asoe2"
+          if [ -n "$BRANCH" ] \
+             && gh api "repos/$REPO/branches/$BRANCH" >/dev/null 2>&1; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "Using asoe2 branch '$BRANCH' (matched the PR head)."
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+            echo "Using asoe2 'main'."
+          fi
+
+      - name: Checkout asoe2 (sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/asoe2
+          ref: ${{ steps.asoe2_ref.outputs.ref }}
+          path: asoe2
+          token: ${{ secrets.ASOE2_READ_TOKEN || github.token }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: asoe-ui/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install asoe-ui dependencies
+        working-directory: asoe-ui
+        run: npm ci --no-audit --no-fund
+
+      - name: Install asoe2 dependencies
+        working-directory: asoe2
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Start asoe2 uvicorn (sandbox env)
+        working-directory: asoe2
+        env:
+          ASOE_ENV: sandbox
+        run: |
+          # Launch as a background process; capture pid so the job
+          # can tear it down cleanly. /api/v1/health gates the
+          # readiness wait.
+          uvicorn api.app:create_app --factory --host 127.0.0.1 --port 8000 > /tmp/uvicorn.log 2>&1 &
+          echo $! > /tmp/uvicorn.pid
+          # Poll readiness — bounded so a stuck import doesn't hang
+          # the whole job for the full timeout-minutes.
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
+              echo "asoe2 ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "asoe2 failed to come up within 30s:"
+          tail -40 /tmp/uvicorn.log
+          exit 1
+
+      - name: Run vitest (stub mode, JUnit reporter)
+        working-directory: asoe-ui
+        env:
+          ASOE_API_MODE: stub
+          NEXT_PUBLIC_USE_REAL_API: '1'
+          NEXT_PUBLIC_API_URL: 'http://127.0.0.1:8000'
+        run: |
+          mkdir -p reports
+          npx vitest run \
+            --reporter=default \
+            --reporter=junit \
+            --outputFile=reports/vitest-junit-stub.xml || true
+
+      - name: Convert JUnit → Prometheus textfile (slo_category metrics)
+        if: always()
+        working-directory: asoe-ui
+        env:
+          ASOE_TEST_MODE: stub
+        run: |
+          mkdir -p reports
+          node scripts/junit-to-prometheus.mjs \
+            --input reports/vitest-junit-stub.xml \
+            --output reports/vitest-metrics-stub.prom \
+            --mode stub || true
+
+      - name: Tear down asoe2 uvicorn
+        if: always()
+        run: |
+          if [ -f /tmp/uvicorn.pid ]; then
+            kill "$(cat /tmp/uvicorn.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload JUnit XML + Prometheus metrics (stub)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-stub-reports
+          path: |
+            asoe-ui/reports/vitest-junit-stub.xml
+            asoe-ui/reports/vitest-metrics-stub.prom
+            /tmp/uvicorn.log
+          retention-days: 14
