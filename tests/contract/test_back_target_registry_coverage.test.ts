@@ -28,8 +28,8 @@
 // trip end-to-end.
 
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 import YAML from "yaml";
 import {
   AUTHENTICATED_ROUTES,
@@ -37,26 +37,45 @@ import {
 } from "../../e2e/contract/authenticated-routes";
 
 const ROOT = join(__dirname, "..", "..");
+const APP_ROOT = join(ROOT, "src", "app");
 
 function read(rel: string): string {
   return readFileSync(join(ROOT, rel), "utf-8");
 }
 
-// Pages that consume the ?from= query. The first is the
-// authoritative BACK_TARGETS map; if a future detail page
-// duplicates the pattern, add it here.
-const CONSUMER_PAGES = ["src/app/exceptions/[id]/page.tsx"] as const;
+// Auto-discover every src/app/**/page.tsx so a new producer or
+// consumer can't accidentally hide from coverage. Replaces the
+// hand-curated CONSUMER_PAGES + PRODUCER_SOURCE_GLOBS lists from
+// Phase 5a — Item 23 from the pending tasks list.
+function listPageFiles(): string[] {
+  const out: string[] = [];
+  function walk(dir: string) {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      const st = statSync(full);
+      if (st.isDirectory()) walk(full);
+      else if (entry === "page.tsx") {
+        out.push(relative(ROOT, full).split(sep).join("/"));
+      }
+    }
+  }
+  walk(APP_ROOT);
+  return out.sort();
+}
 
-// Pages that push with ?from=<X>. We scan dynamically rather
-// than enumerate, so a new producer can't accidentally hide.
-const PRODUCER_SOURCE_GLOBS = [
-  "src/app/inbox/page.tsx",
-  "src/app/cases/page.tsx",
-  "src/app/cases/[id]/page.tsx",
-  "src/app/dashboard/page.tsx",
-  "src/app/exceptions/page.tsx",
-  "src/app/settings/page.tsx",
-] as const;
+// A page is a CONSUMER if it declares a `const BACK_TARGETS = { ... } as const`
+// block. The Phase 5a extractor pattern still finds it; we just
+// scan every page rather than a fixed list.
+function findConsumerPages(): string[] {
+  return listPageFiles().filter((rel) =>
+    /const\s+BACK_TARGETS\s*=\s*\{/.test(read(rel)),
+  );
+}
+
+// A page is a PRODUCER if it pushes URLs with ?from=<token>. Every
+// page is a potential producer; we scan them all in the orphan
+// check below rather than enumerate.
+const PRODUCER_SOURCE_GLOBS = listPageFiles();
 
 function extractFromTokens(source: string): string[] {
   // Match ?from=<token> where token is a kebab/camel identifier.
@@ -98,7 +117,7 @@ function loadRegistry(): {
 describe("back-target registry coverage (Phase 5a)", () => {
   it("every ?from=<X> producer's X is in BACK_TARGETS", () => {
     const consumerKeys = new Set<string>();
-    for (const rel of CONSUMER_PAGES) {
+    for (const rel of findConsumerPages()) {
       for (const k of extractBackTargetKeys(read(rel))) {
         consumerKeys.add(k);
       }
@@ -135,7 +154,7 @@ describe("back-target registry coverage (Phase 5a)", () => {
     const authPaths = new Set(AUTHENTICATED_ROUTES.map((r) => r.path));
     const redirectPaths = new Set(REDIRECT_ROUTES);
     const orphans: string[] = [];
-    for (const rel of CONSUMER_PAGES) {
+    for (const rel of findConsumerPages()) {
       for (const href of extractBackTargetHrefs(read(rel))) {
         // Strip query string + hash — the route registry holds
         // paths only. Issue #133 introduced filtered-view back
@@ -168,7 +187,7 @@ describe("back-target registry coverage (Phase 5a)", () => {
     const redirectPaths = new Set(REDIRECT_ROUTES);
 
     const offenders: string[] = [];
-    for (const rel of CONSUMER_PAGES) {
+    for (const rel of findConsumerPages()) {
       const keys = extractBackTargetKeys(read(rel));
       for (const key of keys) {
         // Each BACK_TARGETS key corresponds to an entry path:
@@ -190,6 +209,23 @@ describe("back-target registry coverage (Phase 5a)", () => {
       offenders,
       "BACK_TARGETS keys must each have a back_target_rules entry or a redirect alias in REDIRECT_ROUTES",
     ).toEqual([]);
+  });
+
+  it("autodiscovery: scans every src/app/**/page.tsx", () => {
+    const pages = listPageFiles();
+    expect(pages.length).toBeGreaterThan(5);
+    // All paths are src/app/-rooted.
+    for (const p of pages) {
+      expect(p.startsWith("src/app/")).toBe(true);
+    }
+  });
+
+  it("autodiscovery: finds at least one consumer page (BACK_TARGETS owner)", () => {
+    const consumers = findConsumerPages();
+    expect(
+      consumers.length,
+      "no BACK_TARGETS map found in any src/app/**/page.tsx — has the consumer page been removed?",
+    ).toBeGreaterThan(0);
   });
 
   it("self-check: scanner detects an orphan ?from= in a synthetic input", () => {
