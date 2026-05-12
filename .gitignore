@@ -143,3 +143,4 @@ test-results/
 /test-results/
 /playwright-report/
 /playwright/.cache/
+reports/
