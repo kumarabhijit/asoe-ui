@@ -6,26 +6,34 @@
 import { expect, test } from "@playwright/test";
 import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe.fixme("inbox-item-click-behavior-catalog", () => {
-  // SKIP REASON: V3 regression flow — the catalogue of click semantics across inbox item types. Issue #133 retired the rich /inbox surface; the 6 seed INBOX rows no longer render with these aria-labels. Rewrite against /cases?source=manual_order or whatever canonical surface still exposes the per-type semantics. Plus codegen lacks loginAs plumbing.
+test.describe("inbox-item-click-behavior-catalog", () => {
   test("happy path", async ({ page }) => {
     await loginAs(page, USERS.MANAGER);
-    await page.goto("/inbox");
-    await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();
-    await page.locator("[role=\"button\"][aria-label*=\"Change request\"]").click();
-    await expect(page).toHaveURL("/inbox");
-    await expect(page.locator("text=\"Change request — SO 4500023421\"")).toBeVisible();
-    await page.locator("[role=\"button\"][aria-label*=\"Where is my shipment\"]").click();
-    await expect(page).toHaveURL("/inbox");
-    await page.locator("[role=\"button\"][aria-label*=\"Beverages Dept\"]").click();
-    await expect(page).toHaveURL("/inbox");
-    await page.locator("[role=\"button\"][aria-label*=\"PO 4501234567\"]").click();
-    await expect(page).toHaveURL("/inbox");
-    await expect(page.locator("text=\"Open in Exception Queue\"")).toBeVisible();
-    await page.locator("[role=\"button\"][aria-label*=\"critical delivery failure\"]").click();
-    await expect(page).toHaveURL("/inbox");
-    await page.locator("[role=\"button\"][aria-label*=\"Invoice question\"]").click();
-    await expect(page).toHaveURL("/inbox");
+    await page.goto("/cases?source=manual_order");
+    await expect(page.locator("button[aria-label^=\"Open case \"]")).toBeVisible();
+    await page.locator("button[aria-label^=\"Open case \"] >> nth=0").click();
+    await expect(page).toHaveURL(new RegExp("^/cases/[^/?#]+$"));
+    await page.goBack();
+    await expect(page).toHaveURL("/cases?source=manual_order");
+    await page.locator("button[aria-label^=\"Open case \"] >> nth=1").click();
+    await expect(page).toHaveURL(new RegExp("^/cases/[^/?#]+$"));
+    await page.goBack();
+    await expect(page).toHaveURL("/cases?source=manual_order");
+    await page.locator("button[aria-label^=\"Open case \"] >> nth=2").click();
+    await expect(page).toHaveURL(new RegExp("^/cases/[^/?#]+$"));
+  });
+
+  test("state: empty", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
+    await page.route("/api/v1/cases**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: "{\"items\":[],\"total\":0,\"cursor\":null,\"has_more\":false}",
+      });
+    });
+    await page.goto("/cases?source=manual_order");
+    await expect(page.getByText("No cases match the current filters.")).toBeVisible();
   });
 
 });

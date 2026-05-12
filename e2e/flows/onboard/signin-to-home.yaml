@@ -1,53 +1,48 @@
 # onboard/signin-to-home.yaml — golden, J1, orientation.
 #
 # First-mile experience for the new operator. The flow signs in
-# with the seed user, lands on the first authenticated surface,
-# and asserts the canonical chrome contract is in place from the
-# very first page paint.
+# with the seed user, lands on the post-login surface, and asserts
+# the canonical chrome contract is in place from the first
+# authenticated paint.
+#
+# Issue #133, PO #5/#6 — the post-login landing surface is /home
+# (the operational landing page introduced by Issue #133), not the
+# retired /inbox. The signin form's default callbackUrl ("/" when
+# no explicit param is supplied) redirects via src/app/page.tsx
+# into /home.
 #
 # Why orientation (not task-completion):
-#   - The J1 task-completion arc is owned by V1's
-#     email-order-entry-from-inbox flow (operator arrives via
-#     inbox row, finishes a triage round-trip).
+#   - The J1 task-completion arc is owned by
+#     triage/email-order-entry-from-inbox.yaml (V1 regression).
 #   - This flow asserts the "did they land somewhere sensible"
 #     half of the J1 contract: chrome present, focus reachable,
-#     StatusAnnouncer mounted.
+#     StatusAnnouncer mounted, /home heading visible.
 #
 # Test fixture (seed):
 #   - asoe2 sandbox mode accepts any non-empty password.
-#   - jane@acme.com (ADMIN) lands on /inbox per role-based
-#     home-page routing.
+#   - jane@acme.com (ADMIN) -> redirects to / -> /home per the
+#     default callbackUrl path.
 #
 # Selectors:
 #   - placeholder="jane@acme.com" is the email input's stable
 #     attribute (see src/app/login/page.tsx:131).
 #   - placeholder="Enter your password" is the password input
 #     (src/app/login/page.tsx:201).
-#   - The submit buttons have type="submit"; the visible label
-#     ("Next" / "Sign In") disambiguates via :has-text().
+#   - "Next" and "Sign In" submit buttons distinguish via :has-text().
 name: signin-to-home
 kind: golden
 journey: J1
 arc: orientation
+# Public entry — no authAs (the flow drives the login form itself).
 entry: /login
-skip:
-  reason: >-
-    Sign-in flow's assertions on the post-login landing page need
-    live-backend validation. asoe2 sandbox seed + role-based
-    home-page routing changed under Issue #133 (/inbox retired,
-    /home introduced); the focus + chrome assertions assume the
-    pre-#133 destination. Un-skip after the local end-to-end
-    pass.
 steps:
-  # Step 1 — email input must be reachable and focused (autoFocus
-  # in src/app/login/page.tsx:133). The orientation assertion is
-  # "the operator's cursor is in the right place".
+  # Step 1 — email input reachable and autofocused.
   - action: assert_visible
     selector: 'input[placeholder="jane@acme.com"]'
   - action: assert_focus_on
     selector: 'input[placeholder="jane@acme.com"]'
 
-  # Step 2 — enter the seed email and progress.
+  # Step 2 — enter the seed email and advance to the password step.
   - action: fill
     selector: 'input[placeholder="jane@acme.com"]'
     value: jane@acme.com
@@ -63,7 +58,7 @@ steps:
   - action: assert_focus_on
     selector: 'input[placeholder="Enter your password"]'
 
-  # Step 4 — submit. asoe2 sandbox accepts any non-empty pw.
+  # Step 4 — submit. asoe2 sandbox accepts any non-empty password.
   - action: fill
     selector: 'input[placeholder="Enter your password"]'
     value: any-non-empty-password
@@ -73,11 +68,19 @@ steps:
       key: Enter
       focused_selector: 'input[placeholder="Enter your password"]'
 
-  # Step 5 — landed on an authenticated surface. The exact target
-  # depends on role-based home-page routing; assert chrome
-  # presence rather than a specific URL so the test does not
-  # over-couple to the routing table.
+  # Step 5 — landed on the post-login authenticated surface. Per
+  # Issue #133 PO #5/#6 the default landing is /home.
+  - action: assert_url_equals
+    url: /home
+
+  # Step 6 — chrome contract holds: NavBar + StatusAnnouncer testid
+  # are present on the first authenticated paint.
   - action: assert_visible
     selector: nav
   - action: assert_visible
     selector: '[data-testid="status-announcer"]'
+
+  # Step 7 — the /home page heading is rendered (the operator
+  # knows where they are).
+  - action: assert_visible
+    selector: 'h1:has-text("Home")'

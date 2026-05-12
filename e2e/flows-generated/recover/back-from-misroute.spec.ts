@@ -6,18 +6,29 @@
 import { expect, test } from "@playwright/test";
 import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe.fixme("back-from-misroute", () => {
-  // SKIP REASON: Issue #133 retired the rich /inbox surface — the row aria- labels ("Where is my shipment", "Beverages Dept") this flow asserts against now live on /cases?source=manual_order's CaseListPane with different DOM. Plus codegen lacks loginAs plumbing. Rewrite against the post-#133 surface after the auth helper lands.
+test.describe("back-from-misroute", () => {
   test("happy path", async ({ page }) => {
     await loginAs(page, USERS.MANAGER);
-    await page.goto("/inbox");
-    await expect(page.locator("nav")).toBeVisible();
-    await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();
-    await page.locator("[role=\"button\"][aria-label*=\"Where is my shipment\"]").click();
-    await expect(page).toHaveURL("/inbox");
-    await expect(page.locator("text=\"Where is my shipment? SO 4500019882\"")).toBeVisible();
-    await page.locator("[role=\"button\"][aria-label*=\"Beverages Dept\"]").click();
-    await expect(page).toHaveURL("/inbox");
+    await page.goto("/cases?source=manual_order");
+    await expect(page.locator("button[aria-label^=\"Open case \"]")).toBeVisible();
+    await page.locator("button[aria-label^=\"Open case \"] >> nth=0").click();
+    await expect(page).toHaveURL(new RegExp("^/cases/[^/?#]+$"));
+    await expect(page.locator("[aria-label=\"Back to cases list\"]")).toBeVisible();
+    await page.locator("[aria-label=\"Back to cases list\"]").click();
+    await expect(page).toHaveURL("/cases");
+  });
+
+  test("state: empty", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
+    await page.route("/api/v1/cases**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: "{\"items\":[],\"total\":0,\"cursor\":null,\"has_more\":false}",
+      });
+    });
+    await page.goto("/cases?source=manual_order");
+    await expect(page.getByText("No cases match the current filters.")).toBeVisible();
   });
 
 });

@@ -6,20 +6,14 @@
 import { expect, test } from "@playwright/test";
 import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe.fixme("email-order-entry-from-inbox", () => {
-  // SKIP REASON: V1 regression flow. Issue #133 retired /inbox as a master- detail surface; the email-order-entry row + jump button no longer live there. Re-target to /cases?source=manual_order (the post-#133 home of manual-order cases) and update the row selectors to match CaseListPane's DOM. Plus codegen lacks loginAs plumbing.
+test.describe("email-order-entry-from-inbox", () => {
   test("happy path", async ({ page }) => {
     await loginAs(page, USERS.MANAGER);
-    await page.goto("/inbox");
-    await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();
-    await page.locator("[role=\"button\"][aria-label*=\"PO 4501234567\"]").click();
-    await expect(page.locator("text=\"Open in Exception Queue\"")).toBeVisible();
-    await page.locator("text=\"Open in Exception Queue\"").click();
-    await expect(page).toHaveURL("/exceptions/exc-026?from=inbox");
+    await page.goto("/exceptions/exc-026?from=inbox");
     await expect(page.locator("text=\"Back to Inbox\"")).toBeVisible();
     await expect(page.locator("h1, [role=\"heading\"][aria-level=\"1\"]")).toBeFocused();
     await page.locator("text=\"Back to Inbox\"").click();
-    await expect(page).toHaveURL("/inbox");
+    await expect(page).toHaveURL("/cases?source=manual_order");
   });
 
 });
