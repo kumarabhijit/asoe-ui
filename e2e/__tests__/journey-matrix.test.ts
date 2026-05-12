@@ -24,8 +24,10 @@ import {
   loadFlows,
   regenerateJourneysMd,
   renderMatrix,
+  renderPerArchetypeBlock,
   spliceMatrix,
 } from "../journey-matrix";
+import { ENFORCED_JOURNEYS } from "../flow-schema";
 
 const REPO_ROOT = join(__dirname, "..", "..");
 const FLOWS_ROOT = join(REPO_ROOT, "e2e", "flows");
@@ -87,5 +89,63 @@ describe("journey-matrix generator", () => {
     expect(() => spliceMatrix("no markers here", "")).toThrow(
       /missing matrix markers/,
     );
+  });
+
+  // ─── per-archetype block ───────────────────────────────────
+
+  it("renderPerArchetypeBlock emits one section per enforced journey", () => {
+    const flows = loadFlows(FLOWS_ROOT);
+    const block = renderPerArchetypeBlock(flows);
+    for (const journey of ENFORCED_JOURNEYS) {
+      expect(block).toContain(`#### Flows owned by ${journey}`);
+    }
+  });
+
+  it("renderPerArchetypeBlock emits a placeholder for empty journeys", () => {
+    const block = renderPerArchetypeBlock([]);
+    // Every archetype is empty when no flows are loaded.
+    for (const journey of ENFORCED_JOURNEYS) {
+      const sectionStart = block.indexOf(`#### Flows owned by ${journey}`);
+      expect(sectionStart).toBeGreaterThan(-1);
+      // The "(no flows yet)" placeholder must follow within the section.
+      const placeholderIdx = block.indexOf("_(no flows yet)_", sectionStart);
+      expect(placeholderIdx).toBeGreaterThan(sectionStart);
+    }
+  });
+
+  it("renderPerArchetypeBlock is deterministic under input reordering", () => {
+    const flows = loadFlows(FLOWS_ROOT);
+    const a = renderPerArchetypeBlock(flows);
+    const b = renderPerArchetypeBlock([...flows].reverse());
+    expect(a).toBe(b);
+  });
+
+  it("regenerateJourneysMd writes the per-archetype block when markers are present", () => {
+    const flows = loadFlows(FLOWS_ROOT);
+    const synthetic = [
+      "<!-- BEGIN MATRIX -->",
+      "stale",
+      "<!-- END MATRIX -->",
+      "",
+      "<!-- BEGIN PER-ARCHETYPE FLOWS -->",
+      "stale",
+      "<!-- END PER-ARCHETYPE FLOWS -->",
+    ].join("\n");
+    const result = regenerateJourneysMd(synthetic, FLOWS_ROOT);
+    // Matrix block updated.
+    expect(result).toContain(renderMatrix(flows).trim());
+    // Per-archetype block updated too.
+    expect(result).toContain(renderPerArchetypeBlock(flows).trim());
+    expect(result).not.toContain("stale");
+  });
+
+  it("regenerateJourneysMd tolerates missing per-archetype markers (matrix-only)", () => {
+    const synthetic = [
+      "<!-- BEGIN MATRIX -->",
+      "stale",
+      "<!-- END MATRIX -->",
+    ].join("\n");
+    // Should not throw even though PER-ARCHETYPE markers are absent.
+    expect(() => regenerateJourneysMd(synthetic, FLOWS_ROOT)).not.toThrow();
   });
 });

@@ -24,6 +24,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import {
+  ENFORCED_JOURNEYS,
   flowSchema,
   journeysOf,
   type Arc,
@@ -38,6 +39,13 @@ export interface FlowEntry {
 
 const BEGIN_MARKER = "<!-- BEGIN MATRIX -->";
 const END_MARKER = "<!-- END MATRIX -->";
+
+// Per-archetype "Flows owned by Jn." lists live between these
+// markers (one block per enforced journey). Generated alongside
+// the matrix so prose archetype descriptions can't drift from
+// the actual `journey:` tags in flow YAMLs.
+const PER_ARCHETYPE_BEGIN = "<!-- BEGIN PER-ARCHETYPE FLOWS -->";
+const PER_ARCHETYPE_END = "<!-- END PER-ARCHETYPE FLOWS -->";
 
 export function listFlowFiles(flowsRoot: string): string[] {
   const out: string[] = [];
@@ -88,6 +96,53 @@ export function renderMatrix(flows: FlowEntry[]): string {
   return lines.join("\n") + "\n";
 }
 
+// Group flows by journey ID, then render one Markdown block per
+// archetype. The block lists each flow's relative path + arc
+// tag, sorted alphabetically; archetypes with zero flows render
+// an explicit placeholder ("(no flows yet)") so reviewers see
+// the gap.
+export function renderPerArchetypeBlock(flows: FlowEntry[]): string {
+  const sorted = [...flows].sort((a, b) => a.rel.localeCompare(b.rel));
+  const byJourney = new Map<JourneyId, FlowEntry[]>();
+  for (const j of ENFORCED_JOURNEYS) byJourney.set(j, []);
+  for (const entry of sorted) {
+    for (const j of journeysOf(entry.flow)) {
+      byJourney.get(j)?.push(entry);
+    }
+  }
+  const lines: string[] = [];
+  for (const journey of ENFORCED_JOURNEYS) {
+    lines.push(`#### Flows owned by ${journey}`, "");
+    const items = byJourney.get(journey) ?? [];
+    if (items.length === 0) {
+      lines.push("- _(no flows yet)_");
+    } else {
+      for (const entry of items) {
+        const rel = entry.rel.replace(/^flows\//, "");
+        lines.push(`- \`${rel}\` — ${entry.flow.arc}`);
+      }
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+function spliceBlock(
+  source: string,
+  begin: string,
+  end: string,
+  body: string,
+): string {
+  const beginIdx = source.indexOf(begin);
+  const endIdx = source.indexOf(end);
+  if (beginIdx === -1 || endIdx === -1 || endIdx < beginIdx) {
+    throw new Error(`Missing markers ${begin} / ${end}`);
+  }
+  const before = source.slice(0, beginIdx + begin.length);
+  const after = source.slice(endIdx);
+  return `${before}\n${body}${after}`;
+}
+
 export function spliceMatrix(journeysMd: string, matrixBody: string): string {
   const beginIdx = journeysMd.indexOf(BEGIN_MARKER);
   const endIdx = journeysMd.indexOf(END_MARKER);
@@ -108,7 +163,22 @@ export function regenerateJourneysMd(
   flowsRoot: string,
 ): string {
   const flows = loadFlows(flowsRoot);
-  return spliceMatrix(journeysMd, renderMatrix(flows));
+  let out = spliceMatrix(journeysMd, renderMatrix(flows));
+  // Per-archetype block is optional — only spliced when the
+  // markers are present. Older snapshots of JOURNEYS.md won't
+  // have them; the matrix-only regen still works.
+  if (
+    out.includes(PER_ARCHETYPE_BEGIN)
+    && out.includes(PER_ARCHETYPE_END)
+  ) {
+    out = spliceBlock(
+      out,
+      PER_ARCHETYPE_BEGIN,
+      PER_ARCHETYPE_END,
+      renderPerArchetypeBlock(flows),
+    );
+  }
+  return out;
 }
 
 // CLI: bun run e2e/journey-matrix.ts (or via node --import tsx).
