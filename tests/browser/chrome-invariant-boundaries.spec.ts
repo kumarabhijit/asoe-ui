@@ -47,17 +47,32 @@ async function assertChromeOnPage(page: import("@playwright/test").Page) {
 // ------------------------------------------------------------
 // loading.tsx coverage (P1 deferred-promise pattern).
 // ------------------------------------------------------------
-for (const route of ["/inbox", "/exceptions"]) {
+// All authenticated routes that own a Suspense fallback. Each has
+// a loading.tsx committed alongside its page.tsx. /inbox is a
+// server redirect post-Issue-#133 but the boundary file is kept
+// as defense-in-depth; the assertion runs against the redirect
+// target anyway.
+for (const route of [
+  "/home",
+  "/exceptions",
+  "/cases",
+  "/dashboard",
+  "/settings",
+]) {
   test(`CMT-3 loading boundary: ${route} renders chrome while data is in flight`, async ({
     page,
   }) => {
     // Hold the backend response so the loading.tsx fallback
-    // becomes observable. P1 from the e2e plan.
+    // becomes observable. P1 from the e2e plan. The mock pattern
+    // is broad enough to catch every authenticated page's
+    // primary data fetch (cases, exceptions, health) regardless
+    // of which route is under test — the route to assert is the
+    // page-level loading.tsx, not endpoint-specific UI.
     let resolveRoute: () => void = () => {};
     const routeReady = new Promise<void>((r) => {
       resolveRoute = r;
     });
-    await page.route("**/api/v1/exceptions*", async (apiRoute) => {
+    await page.route("**/api/v1/**", async (apiRoute) => {
       await routeReady;
       await apiRoute.continue();
     });
@@ -98,6 +113,23 @@ test("CMT-3 not-found boundary: /exceptions/<bogus> renders chrome", async ({
   });
 
   await page.goto("/exceptions/exc-bogus-cmt3", {
+    waitUntil: "domcontentloaded",
+  });
+  await assertChromeOnPage(page);
+});
+
+test("CMT-3 not-found boundary: /cases/<bogus> renders chrome", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/cases/case-bogus-cmt3*", async (route) => {
+    await route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "NOT_FOUND", message: "no" } }),
+    });
+  });
+
+  await page.goto("/cases/case-bogus-cmt3", {
     waitUntil: "domcontentloaded",
   });
   await assertChromeOnPage(page);
