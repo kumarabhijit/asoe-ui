@@ -5,7 +5,8 @@
 
 import { expect, test } from "@playwright/test";
 
-test.describe("inbox-item-click-behavior-catalog", () => {
+test.describe.fixme("inbox-item-click-behavior-catalog", () => {
+  // SKIP REASON: V3 regression flow — the catalogue of click semantics across inbox item types. Issue #133 retired the rich /inbox surface; the 6 seed INBOX rows no longer render with these aria-labels. Rewrite against /cases?source=manual_order or whatever canonical surface still exposes the per-type semantics. Plus codegen lacks loginAs plumbing.
   test("happy path", async ({ page }) => {
     await page.goto("/inbox");
     await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();

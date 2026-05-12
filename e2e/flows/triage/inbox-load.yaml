@@ -16,6 +16,15 @@ kind: golden
 journey: [J1, J2]
 arc: orientation
 entry: /cases?source=manual_order
+skip:
+  reason: >-
+    Entry path was migrated post-rebase to the correct surface
+    (Issue #133), but the selectors ([data-testid="inbox-row"],
+    [data-testid="inbox-skeleton"], [data-testid="inbox-empty-
+    cta"], [data-testid="inbox-error-retry"]) still target the
+    retired rich-inbox DOM. Re-author the assertions against
+    CaseListPane's actual testids. Plus codegen lacks loginAs
+    plumbing.
 states:
   - loading
   - empty

@@ -35,6 +35,14 @@ kind: regression
 journey: J1
 arc: task-completion
 entry: /inbox
+skip:
+  reason: >-
+    V1 regression flow. Issue #133 retired /inbox as a master-
+    detail surface; the email-order-entry row + jump button no
+    longer live there. Re-target to /cases?source=manual_order
+    (the post-#133 home of manual-order cases) and update the
+    row selectors to match CaseListPane's DOM. Plus codegen
+    lacks loginAs plumbing.
 # Inbox -> detail -> back. Each interactive step declares its
 # keyboard equivalent (D6 a11y floor).
 steps:

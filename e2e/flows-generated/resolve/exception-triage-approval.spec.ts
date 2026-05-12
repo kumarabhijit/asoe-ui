@@ -5,7 +5,8 @@
 
 import { expect, test } from "@playwright/test";
 
-test.describe("exception-triage-approval", () => {
+test.describe.fixme("exception-triage-approval", () => {
+  // SKIP REASON: Codegen does not yet emit a loginAs() step before page.goto for authenticated entries. The middleware redirects to /login and every assertion fires against the login page DOM. Un-skip once flow-codegen.ts is taught to inject loginAs() (or the flow YAML schema declares an authAs role).
   test("happy path", async ({ page }) => {
     await page.goto("/exceptions/exc-026");
     await expect(page.locator("nav")).toBeVisible();

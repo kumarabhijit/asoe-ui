@@ -35,6 +35,14 @@ kind: golden
 journey: J3
 arc: orientation
 entry: /inbox
+skip:
+  reason: >-
+    Issue #133 retired the rich /inbox surface — the row aria-
+    labels ("Where is my shipment", "Beverages Dept") this flow
+    asserts against now live on /cases?source=manual_order's
+    CaseListPane with different DOM. Plus codegen lacks loginAs
+    plumbing. Rewrite against the post-#133 surface after the
+    auth helper lands.
 steps:
   # Step 1 — landed on inbox; chrome intact.
   - action: assert_visible

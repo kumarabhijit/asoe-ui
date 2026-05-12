@@ -52,7 +52,12 @@ describe("flow discovery", () => {
       });
       // Smoke checks on the generated text.
       expect(spec).toMatch(/^\/\/ AUTO-GENERATED/);
-      expect(spec).toContain(`test.describe("${flow.name}"`);
+      // describe wrapper may be `test.describe(...)` (live) or
+      // `test.describe.fixme(...)` (skipped per the flow YAML's
+      // skip.reason). Both are valid emitted forms.
+      expect(spec).toMatch(
+        new RegExp(`test\\.describe(?:\\.fixme)?\\("${flow.name}"`),
+      );
       // The on-disk filename should match the flow.name (kebab-case).
       const basename = path.split("/").pop()!.replace(/\.ya?ml$/, "");
       expect(basename).toBe(flow.name);

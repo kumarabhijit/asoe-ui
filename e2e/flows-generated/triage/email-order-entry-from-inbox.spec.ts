@@ -5,7 +5,8 @@
 
 import { expect, test } from "@playwright/test";
 
-test.describe("email-order-entry-from-inbox", () => {
+test.describe.fixme("email-order-entry-from-inbox", () => {
+  // SKIP REASON: V1 regression flow. Issue #133 retired /inbox as a master- detail surface; the email-order-entry row + jump button no longer live there. Re-target to /cases?source=manual_order (the post-#133 home of manual-order cases) and update the row selectors to match CaseListPane's DOM. Plus codegen lacks loginAs plumbing.
   test("happy path", async ({ page }) => {
     await page.goto("/inbox");
     await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();

@@ -222,6 +222,26 @@ export const flowSchema = z
      */
     back_target_override: z.string().optional(),
     /**
+     * Mark the flow as skipped in CI. The codegen emits
+     * `test.describe.fixme(...)` so Playwright reports the
+     * skip with the citation but does not fail.
+     *
+     * Required uses:
+     *   - A flow YAML lands BEFORE the selectors / login plumbing
+     *     it depends on are validated end-to-end. The schema-side
+     *     contract (parse + codegen + journey-coverage ratchet)
+     *     still holds; only the browser-driven run is paused.
+     *   - A regression flow lands ahead of the underlying UI
+     *     refactor (the test is "ready"; the surface is not).
+     *
+     * Every skip MUST carry a `reason` so reviewers can challenge
+     * the deferral and a follow-up commit can un-skip it.
+     */
+    skip: z
+      .object({ reason: z.string().min(1) })
+      .strict()
+      .optional(),
+    /**
      * State matrix opt-in. See D2 + A8. Empty array = flow opts
      * out of the matrix entirely; opt-out requires a justification
      * comment in the YAML, which the linter (not the schema)

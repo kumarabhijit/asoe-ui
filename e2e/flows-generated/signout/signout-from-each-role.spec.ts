@@ -5,7 +5,8 @@
 
 import { expect, test } from "@playwright/test";
 
-test.describe("signout-from-each-role", () => {
+test.describe.fixme("signout-from-each-role", () => {
+  // SKIP REASON: Two blockers: (1) codegen does not emit loginAs() before page.goto, so /inbox starts on the login page; (2) Issue #133 retired /inbox — even authenticated, the page server-redirects to /cases?source=manual_order and the user-menu trigger lives on the new surface. Re-target to /home (or /cases) after the auth plumbing lands.
   test("happy path", async ({ page }) => {
     await page.goto("/inbox");
     await expect(page.locator("button[aria-label=\"User menu\"]")).toBeVisible();
