@@ -4,10 +4,12 @@
 // Edits are clobbered by `bun run flows:gen`. Update the YAML.
 
 import { expect, test } from "@playwright/test";
+import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe.fixme("exception-triage-approval", () => {
-  // SKIP REASON: Codegen does not yet emit a loginAs() step before page.goto for authenticated entries. The middleware redirects to /login and every assertion fires against the login page DOM. Un-skip once flow-codegen.ts is taught to inject loginAs() (or the flow YAML schema declares an authAs role).
+test.describe.fixme("exception-triage-approval", { tag: ["@flow-exception-triage-approval", "@arc-task-completion", "@kind-golden", "@journey-J2"] }, () => {
+  // SKIP REASON: Happy path failed in CI run 25730556094. The flow asserts the Approve button is reachable + the Confirm Approval flow fires. Likely root cause: exc-026 (a) doesn't exist in the CI sandbox seed, OR (b) doesn't carry a YELLOW verdict, OR (c) is in a lifecycle state where Approve isn't rendered. The Approve button is gated on verdict==YELLOW AND a recommended_action being present (see AgentReasoningCard.tsx lines 369-388). Need to confirm the seed shape; potentially parameterise via an env-var so the spec targets a known Approve-eligible record.
   test("happy path", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.goto("/exceptions/exc-026");
     await expect(page.locator("nav")).toBeVisible();
     await expect(page.locator("[data-testid=\"status-announcer\"]")).toBeVisible();

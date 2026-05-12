@@ -2,52 +2,96 @@
 #
 # Issue #133, PO #9 — the `/inbox` master-detail surface was retired
 # and replaced by a server redirect into `/cases?source=manual_order`.
-# This flow continues to exercise the same operator journey
-# (load → see manual-order cases → handle the loading / empty /
-# error states) but enters through the case-list filtered view.
-# Filename kept for historical continuity; rename in a follow-up.
+# This flow exercises the same operator journey (load → see manual-
+# order cases → handle the loading / empty states) through the
+# post-#133 surface. The filename is preserved for historical
+# continuity; rename in a follow-up PR.
 #
 # Arc: orientation. Single-screen assertion — "is the right
 # affordance present after landing on the manual-order case list?" —
-# across each state of the matrix. The task-completion arc is owned
-# by triage/email-order-entry-from-inbox.yaml.
+# across each state of the matrix. The task-completion arc is
+# owned by triage/email-order-entry-from-inbox.yaml.
+#
+# Selector strategy (post-#133):
+#   - loading: `role="status"` + `aria-live="polite"` containing the
+#     literal "Loading cases…" copy. The /cases page does not render
+#     a skeleton element; the text status is the only signal.
+#   - empty:   `role="status"` containing "No cases match the
+#     current filters." (the filtered-empty branch — applies when
+#     ?source=manual_order is set and the backend returns 0 items).
+#   - rows:    `button[aria-label^="Open case "]` — the case-list
+#     button's aria-label format from src/app/cases/page.tsx:294.
+#
+# API endpoint:
+#   /api/v1/cases (not /api/v1/exceptions — Issue #133 wires the
+#   surface to useCases() / casesApi.list() rather than the old
+#   exceptions endpoint).
+#
+# Error-state opt-out:
+#   /cases has no explicit error UI branch — on API failure the
+#   page falls through to the empty placeholder. The hard-error
+#   path is owned by the App Router error boundary, which CMT-3
+#   chrome-invariant-boundaries.spec.ts already covers. Adding an
+#   `error` state here would assert against UI that doesn't exist.
 name: inbox-load
 kind: golden
 journey: [J1, J2]
 arc: orientation
+authAs: MANAGER
 entry: /cases?source=manual_order
 skip:
   reason: >-
-    Entry path was migrated post-rebase to the correct surface
-    (Issue #133), but the selectors ([data-testid="inbox-row"],
-    [data-testid="inbox-skeleton"], [data-testid="inbox-empty-
-    cta"], [data-testid="inbox-error-retry"]) still target the
-    retired rich-inbox DOM. Re-author the assertions against
-    CaseListPane's actual testids. Plus codegen lacks loginAs
-    plumbing.
+    Happy + loading sub-tests failed in CI run 25730556094;
+    state: empty + state: error sub-tests passed (the mocked
+    fixtures match contract). The failure mode is seed-data
+    dependency: the sandbox seed may return zero manual-order
+    cases under ?source=manual_order, so the selector
+    button[aria-label^="Open case "] resolves to nothing for
+    the happy path. The loading test's deferred-promise mock
+    may not catch the actual /api/v1/cases URL (Playwright glob
+    matching may miss the ?source query in the
+    "**/api/v1/cases**" pattern). Need local verification of
+    (a) the seed actually contains manual-order cases, and
+    (b) the route glob matches the live URL.
 states:
   - loading
   - empty
-  - error
-  # `partial_failure` and `stale` opt-out: the inbox list endpoint
-  # is a single GET — there is no per-row failure mode and no mid-
-  # view status-change channel today. When the WebSocket-driven
-  # inbox lands those become meaningful and must be added.
+state_opt_out_justifications:
+  error: >-
+    /cases has no inline error UI branch; the App Router error
+    boundary owns hard errors and is already covered by CMT-3
+    chrome-invariant-boundaries.spec.ts. Adding `error` here
+    would assert against UI that doesn't exist.
+  partial_failure: >-
+    The cases list endpoint is a single GET — no per-row
+    failure mode. Re-evaluate when streamed/chunked responses
+    land.
+  stale: >-
+    No mid-view status-change channel today. Re-evaluate when
+    the WebSocket-driven case list arrives.
 state_fixtures:
   loading:
-    route: /api/v1/exceptions
+    route: /api/v1/cases**
     delay_ms: 2000
-    assert_visible: '[data-testid="inbox-skeleton"]'
+    # The skeleton-equivalent on /cases is a role=status aria-live
+    # region. Match by selector with text since there is no
+    # dedicated data-testid.
+    assert_visible: 'role=status[name="Loading cases…"]'
   empty:
-    route: /api/v1/exceptions
-    body: []
-    assert_visible: '[data-testid="inbox-empty-cta"]'
+    route: /api/v1/cases**
+    body:
+      items: []
+      total: 0
+      cursor: null
+      has_more: false
+    # When ?source=manual_order is set and zero items return, the
+    # /cases page renders the "No cases match the current filters."
+    # branch (because hasActiveFilters is true on the source chip).
     assert_text_contains:
-      - "You're caught up"
-  error:
-    route: /api/v1/exceptions
-    status: 500
-    assert_visible: '[data-testid="inbox-error-retry"]'
+      - "No cases match the current filters."
 steps:
+  # Happy-path: at least one case row reachable. The button
+  # aria-label is the stable contract — case_id is dynamic so we
+  # use a starts-with match.
   - action: assert_visible
-    selector: '[data-testid="inbox-row"]'
+    selector: 'button[aria-label^="Open case "]'

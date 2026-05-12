@@ -5,8 +5,8 @@
 
 import { expect, test } from "@playwright/test";
 
-test.describe.fixme("signin-to-home", () => {
-  // SKIP REASON: Sign-in flow's assertions on the post-login landing page need live-backend validation. asoe2 sandbox seed + role-based home-page routing changed under Issue #133 (/inbox retired, /home introduced); the focus + chrome assertions assume the pre-#133 destination. Un-skip after the local end-to-end pass.
+test.describe.fixme("signin-to-home", { tag: ["@flow-signin-to-home", "@arc-orientation", "@kind-golden", "@journey-J1"] }, () => {
+  // SKIP REASON: Happy path failed in CI run 25730556094. Likely root cause: the post-login URL assertion (/home) doesn't match the sandbox's actual landing path, OR the seeded user (jane@acme.com) doesn't trigger the expected default callbackUrl flow. Need a local end-to-end pass to determine whether (a) the URL assertion is wrong, (b) the seed user is wrong, or (c) the form selectors drift in the dev environment. Un-skip after local verification + assertion correction.
   test("happy path", async ({ page }) => {
     await page.goto("/login");
     await expect(page.locator("input[placeholder=\"jane@acme.com\"]")).toBeVisible();
@@ -17,8 +17,10 @@ test.describe.fixme("signin-to-home", () => {
     await expect(page.locator("input[placeholder=\"Enter your password\"]")).toBeFocused();
     await page.locator("input[placeholder=\"Enter your password\"]").fill("any-non-empty-password");
     await page.locator("button:has-text(\"Sign In\")").click();
+    await expect(page).toHaveURL("/home");
     await expect(page.locator("nav")).toBeVisible();
     await expect(page.locator("[data-testid=\"status-announcer\"]")).toBeVisible();
+    await expect(page.locator("h1:has-text(\"Home\")")).toBeVisible();
   });
 
 });

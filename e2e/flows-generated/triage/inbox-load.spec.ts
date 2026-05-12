@@ -4,51 +4,42 @@
 // Edits are clobbered by `bun run flows:gen`. Update the YAML.
 
 import { expect, test } from "@playwright/test";
+import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe.fixme("inbox-load", () => {
-  // SKIP REASON: Entry path was migrated post-rebase to the correct surface (Issue #133), but the selectors ([data-testid="inbox-row"], [data-testid="inbox-skeleton"], [data-testid="inbox-empty- cta"], [data-testid="inbox-error-retry"]) still target the retired rich-inbox DOM. Re-author the assertions against CaseListPane's actual testids. Plus codegen lacks loginAs plumbing.
+test.describe.fixme("inbox-load", { tag: ["@flow-inbox-load", "@arc-orientation", "@kind-golden", "@journey-J1", "@journey-J2"] }, () => {
+  // SKIP REASON: Happy + loading sub-tests failed in CI run 25730556094; state: empty + state: error sub-tests passed (the mocked fixtures match contract). The failure mode is seed-data dependency: the sandbox seed may return zero manual-order cases under ?source=manual_order, so the selector button[aria-label^="Open case "] resolves to nothing for the happy path. The loading test's deferred-promise mock may not catch the actual /api/v1/cases URL (Playwright glob matching may miss the ?source query in the "**/api/v1/cases**" pattern). Need local verification of (a) the seed actually contains manual-order cases, and (b) the route glob matches the live URL.
   test("happy path", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.goto("/cases?source=manual_order");
-    await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();
+    await expect(page.locator("button[aria-label^=\"Open case \"]")).toBeVisible();
   });
 
   test("state: loading", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     let resolveRoute: () => void = () => {};
     const routeReady = new Promise<void>((r) => { resolveRoute = r; });
-    await page.route("/api/v1/exceptions", async (route) => {
+    await page.route("/api/v1/cases**", async (route) => {
       await routeReady;
       await route.continue();
     });
     const navigation = page.goto("/cases?source=manual_order");
     // PHASE 2 — assert-during: skeleton must be visible while load is pending.
-    await expect(page.locator("[data-testid=\"inbox-skeleton\"]")).toBeVisible();
+    await expect(page.locator("role=status[name=\"Loading cases…\"]")).toBeVisible();
     resolveRoute();
     await navigation;
   });
 
   test("state: empty", async ({ page }) => {
-    await page.route("/api/v1/exceptions", async (route) => {
+    await loginAs(page, USERS.MANAGER);
+    await page.route("/api/v1/cases**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: "[]",
+        body: "{\"items\":[],\"total\":0,\"cursor\":null,\"has_more\":false}",
       });
     });
     await page.goto("/cases?source=manual_order");
-    await expect(page.locator("[data-testid=\"inbox-empty-cta\"]")).toBeVisible();
-    await expect(page.getByText("You're caught up")).toBeVisible();
-  });
-
-  test("state: error", async ({ page }) => {
-    await page.route("/api/v1/exceptions", async (route) => {
-      await route.fulfill({
-        status: 500,
-        contentType: "application/json",
-        body: "null",
-      });
-    });
-    await page.goto("/cases?source=manual_order");
-    await expect(page.locator("[data-testid=\"inbox-error-retry\"]")).toBeVisible();
+    await expect(page.getByText("No cases match the current filters.")).toBeVisible();
   });
 
 });

@@ -4,20 +4,17 @@
 // Edits are clobbered by `bun run flows:gen`. Update the YAML.
 
 import { expect, test } from "@playwright/test";
+import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe.fixme("email-order-entry-from-inbox", () => {
-  // SKIP REASON: V1 regression flow. Issue #133 retired /inbox as a master- detail surface; the email-order-entry row + jump button no longer live there. Re-target to /cases?source=manual_order (the post-#133 home of manual-order cases) and update the row selectors to match CaseListPane's DOM. Plus codegen lacks loginAs plumbing.
+test.describe.fixme("email-order-entry-from-inbox", { tag: ["@flow-email-order-entry-from-inbox", "@arc-task-completion", "@kind-regression", "@journey-J1"] }, () => {
+  // SKIP REASON: Happy path failed in CI run 25730556094. The flow asserts the "Back to Inbox" affordance + the post-click URL transitions to the /inbox redirect target. Likely root cause: exc-026 doesn't exist in the CI sandbox seed (the V1 regression flow was authored against a specific seeded ID; the sandbox may have evolved). Need to either (a) confirm exc-026 is in the seed, or (b) re-target to a stable seeded ID, or (c) parameterise via an env-var passed to the spec. Un-skip after the seed mapping is verified.
   test("happy path", async ({ page }) => {
-    await page.goto("/inbox");
-    await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();
-    await page.locator("[role=\"button\"][aria-label*=\"PO 4501234567\"]").click();
-    await expect(page.locator("text=\"Open in Exception Queue\"")).toBeVisible();
-    await page.locator("text=\"Open in Exception Queue\"").click();
-    await expect(page).toHaveURL("/exceptions/exc-026?from=inbox");
+    await loginAs(page, USERS.MANAGER);
+    await page.goto("/exceptions/exc-026?from=inbox");
     await expect(page.locator("text=\"Back to Inbox\"")).toBeVisible();
     await expect(page.locator("h1, [role=\"heading\"][aria-level=\"1\"]")).toBeFocused();
     await page.locator("text=\"Back to Inbox\"").click();
-    await expect(page).toHaveURL("/inbox");
+    await expect(page).toHaveURL("/cases?source=manual_order");
   });
 
 });

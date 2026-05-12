@@ -42,6 +42,25 @@ export const journeyIdSchema = z.enum(["J1", "J2", "J3", "J4", "J5"]);
  *  KPI, observed via analytics, never asserted in a test. */
 export const arcSchema = z.enum(["orientation", "task-completion"]);
 
+/** Seed user roles available to the generated specs. Mirrors the
+ *  USERS map in tests/browser/_helpers.ts; the codegen emits
+ *  `loginAs(page, USERS[<role>])` before page.goto() when the
+ *  flow's entry is not a public surface. Keep this enum in lockstep
+ *  with the helper's USERS map.
+ *
+ *  Roles chosen per the seed permission grid:
+ *    - ADMIN     — full permissions, all tabs visible
+ *    - MANAGER   — exceptions:{override, approve, escalate}
+ *    - MANAGER_2 — same as MANAGER, distinct sub (for SoD flows)
+ *    - ANALYST   — exceptions:{approve, escalate} only
+ */
+export const authRoleSchema = z.enum([
+  "ADMIN",
+  "MANAGER",
+  "MANAGER_2",
+  "ANALYST",
+]);
+
 const httpStatusSchema = z
   .number()
   .int()
@@ -222,6 +241,26 @@ export const flowSchema = z
      */
     back_target_override: z.string().optional(),
     /**
+     * Seed user role the codegen authenticates as before the
+     * happy-path page.goto. Required when the entry surface is
+     * authenticated (i.e. not /login or /auth/*); omitted for
+     * sign-in flows that drive the login form themselves.
+     *
+     * The codegen emits one line at the top of the happy-path
+     * test body:
+     *   await loginAs(page, USERS.<authAs>);
+     *
+     * Pick the LEAST-privileged role that can complete the flow.
+     * Flows that exercise role-restricted affordances (override,
+     * cosign) should specify MANAGER. Read-only flows can use
+     * ANALYST.
+     *
+     * No default: ambiguity here turns into silent auth-skip
+     * failures. The schema enforces that authenticated entries
+     * declare a role via a superRefine() below.
+     */
+    authAs: authRoleSchema.optional(),
+    /**
      * Mark the flow as skipped in CI. The codegen emits
      * `test.describe.fixme(...)` so Playwright reports the
      * skip with the citation but does not fail.
@@ -242,12 +281,39 @@ export const flowSchema = z
       .strict()
       .optional(),
     /**
-     * State matrix opt-in. See D2 + A8. Empty array = flow opts
-     * out of the matrix entirely; opt-out requires a justification
-     * comment in the YAML, which the linter (not the schema)
-     * enforces because comments are stripped by the YAML parser.
+     * State matrix opt-in. See D2 + A8.
+     *
+     * Empty array (or field omitted) = flow opts out of the matrix
+     * entirely; no per-state justifications required. Use this for
+     * flows whose contract is not state-matrix-shaped (e.g., a
+     * pure navigation flow).
+     *
+     * Non-empty array = flow engages the matrix. For every
+     * STANDARD state (loading | empty | error | partial_failure |
+     * stale) NOT in this list, a structured justification MUST
+     * appear in `state_opt_out_justifications`. A8 originally
+     * required a justification comment; comments are stripped at
+     * YAML parse time, so the schema couldn't enforce them. The
+     * structured field closes that gap.
      */
     states: z.array(stateKeySchema).optional(),
+    /**
+     * A8 opt-out justifications. Maps each state key the flow
+     * does NOT opt into to a free-text justification. Reviewers
+     * can challenge weak justifications in PR review; a missing
+     * entry fails the schema loudly.
+     *
+     * Format:
+     *   state_opt_out_justifications:
+     *     error: >-
+     *       /cases has no inline error UI branch; the App Router
+     *       error boundary owns hard errors via CMT-3 coverage.
+     *     partial_failure: >-
+     *       Single-GET surface — no per-row failure mode.
+     */
+    state_opt_out_justifications: z
+      .record(stateKeySchema, z.string().min(1))
+      .optional(),
     state_fixtures: stateFixturesSchema.optional(),
     steps: z.array(stepSchema).min(1),
   })
@@ -268,6 +334,63 @@ export const flowSchema = z
           });
         }
       }
+
+      // A8 — every standard state NOT in `states` must carry a
+      // justification. Flows that engage the matrix at all opt
+      // into structured opt-outs. Flows that omit `states`
+      // entirely (or set [] empty) opt out of the matrix
+      // concept and need no justifications.
+      const optedIn = new Set(flow.states);
+      const justifications = flow.state_opt_out_justifications ?? {};
+      for (const state of STATE_KEYS) {
+        if (optedIn.has(state)) {
+          // Justifications for OPTED-IN states are spurious —
+          // the state is engaged, not opted out.
+          if (state in justifications) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `state "${state}" is in states[] but also has a state_opt_out_justifications entry — pick one`,
+              path: ["state_opt_out_justifications", state],
+            });
+          }
+          continue;
+        }
+        if (!(state in justifications)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `state "${state}" opted out of states[] requires a state_opt_out_justifications.${state} entry (A8)`,
+            path: ["state_opt_out_justifications", state],
+          });
+        }
+      }
+    }
+
+    // Authenticated entries must declare an authAs role. Public
+    // entries (/login or /auth/*) must NOT, since the codegen
+    // would otherwise emit a redundant loginAs() against a route
+    // that doesn't require it.
+    const isPublicEntry =
+      flow.entry === "/login"
+      || flow.entry === "/auth"
+      || flow.entry.startsWith("/auth/")
+      || flow.entry.startsWith("/login?")
+      || flow.entry.startsWith("/login#");
+
+    if (!isPublicEntry && flow.authAs === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "authenticated entry requires an authAs role — the codegen needs to know which seed user to loginAs() before page.goto()",
+        path: ["authAs"],
+      });
+    }
+    if (isPublicEntry && flow.authAs !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "public entry must not declare authAs — the codegen does not emit loginAs() for public routes (sign-in flows drive the form themselves)",
+        path: ["authAs"],
+      });
     }
   });
 

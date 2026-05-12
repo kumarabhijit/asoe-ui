@@ -4,11 +4,21 @@ name: sample-flow
 kind: golden
 journey: J1
 arc: orientation
+# Authenticated entry — schema requires authAs so the codegen
+# knows which seed user to loginAs() before page.goto(entry).
+authAs: MANAGER
 entry: /inbox
 states:
   - loading
   - empty
   - error
+state_opt_out_justifications:
+  partial_failure: >-
+    Sample fixture — partial_failure not exercised in the golden
+    snapshot test.
+  stale: >-
+    Sample fixture — stale not exercised in the golden snapshot
+    test.
 state_fixtures:
   loading:
     route: /api/v1/exceptions

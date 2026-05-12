@@ -23,7 +23,7 @@
 //   - Loading state uses the deferred-promise pattern (decision P1).
 
 import type { Flow, StateFixture, StateKey, Step } from "./flow-schema";
-import { parseFlow } from "./flow-schema";
+import { journeysOf, parseFlow } from "./flow-schema";
 
 export interface CodegenInput {
   // The raw object parsed from YAML (e.g. via `yaml.parse(text)`).
@@ -54,8 +54,18 @@ export function generateSpec(input: CodegenInput): CodegenOutput {
     "// Edits are clobbered by `bun run flows:gen`. Update the YAML.",
     "",
     'import { expect, test } from "@playwright/test";',
-    "",
   );
+
+  // Conditional import: loginAs + USERS only when authAs is set.
+  // Path is relative because tests/browser/ has no @/ alias and the
+  // generated specs sit at e2e/flows-generated/<cat>/<name>.spec.ts
+  // (three levels deep from repo root).
+  if (flow.authAs) {
+    lines.push(
+      'import { loginAs, USERS } from "../../../tests/browser/_helpers";',
+    );
+  }
+  lines.push("");
 
   // describe wrapper. If the flow opts into `skip:`, emit
   // `test.describe.fixme(...)` so Playwright reports the skip
@@ -68,11 +78,44 @@ export function generateSpec(input: CodegenInput): CodegenOutput {
     ? [`  // SKIP REASON: ${flow.skip.reason}`]
     : [];
 
+  // Phase 8 / Item 14 — observability tags. Playwright supports
+  // tags via test.describe(name, { tag: ["@..."] }, fn). Tags
+  // appear in the HTML report, can be filtered with --grep, and
+  // are read by the coverage-report script (scripts/coverage-
+  // report.ts) to slice pass/fail by journey + arc.
+  //
+  // Tag vocabulary (stable contract):
+  //   @flow-<name>            — every flow tagged with its name
+  //   @arc-<orientation|task-completion>
+  //   @journey-<J1..J5>       — one tag per journey the flow claims
+  //   @kind-<golden|regression>
+  //
+  // The tags use kebab-case prefixes so a grep like
+  // `--grep "@journey-J5"` reports zero results today (no J5
+  // flows yet) — a useful signal.
+  const tagList = [
+    `"@flow-${flow.name}"`,
+    `"@arc-${flow.arc}"`,
+    `"@kind-${flow.kind}"`,
+    ...journeysOf(flow).map((j) => `"@journey-${j}"`),
+  ];
+  const describeOpts = `{ tag: [${tagList.join(", ")}] }`;
+
+  // loginAs() preamble emitted before every page.goto when authAs
+  // is set. The middleware (src/middleware.ts) redirects
+  // unauthenticated requests to /login; without this line every
+  // authenticated-entry flow's assertions fire against the login
+  // page DOM instead of the intended surface.
+  const authPreamble = flow.authAs
+    ? [`    await loginAs(page, USERS.${flow.authAs});`]
+    : [];
+
   // Happy-path test — runs the steps with no state mocks.
   lines.push(
-    `${describeFn}(${q(flow.name)}, () => {`,
+    `${describeFn}(${q(flow.name)}, ${describeOpts}, () => {`,
     ...skipBanner,
     `  test(${q("happy path")}, async ({ page }) => {`,
+    ...authPreamble,
     `    await page.goto(${q(flow.entry)});`,
   );
   for (const step of flow.steps) {
@@ -103,6 +146,15 @@ function emitStateTest(
 ): string[] {
   const out: string[] = [];
   out.push(`  test(${q(`state: ${stateKey}`)}, async ({ page }) => {`);
+  // Authenticate BEFORE registering the route mock — loginAs
+  // performs its own page.goto('/login') + form submit + wait
+  // for the post-login landing; we do not want those internal
+  // requests intercepted by the state-matrix mock. After login
+  // we set the mock, then navigate to the flow's entry, and the
+  // entry's API calls hit the mock as intended.
+  if (flow.authAs) {
+    out.push(`    await loginAs(page, USERS.${flow.authAs});`);
+  }
   if (stateKey === "loading" && typeof fx.delay_ms === "number") {
     // P1: deferred-promise + assert-during pattern.
     out.push(

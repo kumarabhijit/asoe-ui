@@ -89,8 +89,44 @@ testable arcs (`orientation`, `task-completion`).
 
 - `npm run flows:check` exits non-zero if `e2e/flows-generated/` is
   out of sync with `e2e/flows/`.
+- `npm run flows:coverage` prints a journey × arc coverage matrix
+  (✅ / ⏸ / ❌). `npm run flows:coverage:check` exits non-zero
+  if any enforced cell is empty — wire this into a CI job once
+  the J4 + J5 flows land.
 - The journey-coverage meta-test reports a structured `(journey × arc)`
   gap list. `SOFT_GAP_THRESHOLD` is the ratchet ceiling; lower it as
   flows close cells.
 - Empirically-covered cells live in `guaranteedCovered`; removing a
   flow that fills one fails CI.
+
+### Test-driven development with the flow runner
+
+The intended TDD cycle (Phase 8 of the BDD plan):
+
+1. **Red** — author a new flow YAML for the feature you are about
+   to build. Give it a clear `name`, the smallest plausible step
+   list, and the matching `journey:` + `arc:` tags. Run
+   `npm run flows:gen` and `npm run test:browser`. The new
+   generated spec fails because the UI doesn't yet exist.
+2. **Green** — implement the page / handler / surface until the
+   spec passes locally. The Playwright HTML report's per-tag
+   filter (`--grep "@flow-<name>"`) is the fastest signal during
+   the iteration.
+3. **Refactor** — clean up. The chrome-invariant + back-target
+   meta-tests catch regressions on the surrounding surface, so
+   the refactor only has to keep the new flow green.
+4. **Lock** — when the flow lands, the journey-coverage ratchet
+   pulls down by one and the coverage report's matrix gains a ✅.
+   Removing the flow later fails the meta-test loud.
+
+Every generated spec carries observability tags emitted by the
+codegen (Item 14 of the plan):
+
+- `@flow-<name>` — every flow tagged with its YAML name.
+- `@arc-orientation` / `@arc-task-completion`.
+- `@kind-golden` / `@kind-regression`.
+- `@journey-J1` … `@journey-J5` — one tag per claimed archetype.
+
+Filter Playwright by tag with `npx playwright test --grep
+"@journey-J3"`. The HTML report's tag pills appear inline next to
+each test name.

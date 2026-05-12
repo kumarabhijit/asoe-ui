@@ -1,114 +1,112 @@
 # triage/inbox-item-click-behavior-catalog.yaml — regression, V3, J1+J2.
 #
-# Closes V3 from eng-review-test-plan.md amendment v1.1:
-#   "Inconsistent click semantics: most inbox items populate the
-#    right pane on click; 'Email Order Entry' jumps directly to
-#    the exception page without a right-pane preview. Either the
-#    spec is silent, or the implementation drifted from a spec
-#    the test layer never enforced."
+# Issue #133, PO #9 — the rich /inbox surface (6 hardcoded INBOX[]
+# item types with per-type click semantics) was retired and replaced
+# with /cases?source=manual_order. The V3 contract — "click semantics
+# are uniform across item types; silence is not a default" — still
+# applies but the surface and the variation axis changed.
 #
-# Per ADR-034 Section 6.1 (PO ruling 2026-05-10), the contract is
-# uniform: EVERY inbox row click selects locally and updates the
-# right pane in place. For rows whose detail carries an
-# exception_id, the right pane ALSO renders an explicit
-# "Open in Exception Queue" jump button. Silence is not a
-# default — every item-type asserted here has a declared
-# click behaviour; an undeclared type is a test failure.
+# Pre-#133 V3 catalog: 6 inbox item types (ORDER_CHANGE, SHIPMENT_
+# INQUIRY, NEW_ORDER, NEW_ORDER+exception_id, COMPLAINT,
+# INVOICE_QUERY), and the contract asserted clicks selected locally
+# (right-pane) except for the exception-linked row which also
+# rendered a jump button.
 #
-# Item-type catalog matches src/app/inbox/page.tsx::INBOX (seed):
+# Post-#133 V3 catalog: case rows of different INTENTS all dispatch
+# uniformly to /cases/{case_id}. No per-intent variation, no
+# right-pane (the /cases page is a navigation surface). The
+# /exceptions CaseListPane is a separate master-detail surface with
+# its own uniform click semantics; coverage for that surface is a
+# future, separate flow.
 #
-#   | id | category          | exception_id | expected right-pane |
-#   |----|-------------------|--------------|---------------------|
-#   |  1 | ORDER_CHANGE      | -            | detail, NO jump btn |
-#   |  2 | SHIPMENT_INQUIRY  | -            | detail, NO jump btn |
-#   |  3 | NEW_ORDER         | -            | detail, NO jump btn |
-#   |  4 | NEW_ORDER         | exc-026      | detail + jump btn   |
-#   |  5 | COMPLAINT         | -            | detail, NO jump btn |
-#   |  6 | INVOICE_QUERY     | -            | detail, NO jump btn |
-#
-# A future inbox-item type that lands without a row here will
-# fail the schema's strict required journey + arc declaration;
-# the discovery test parses every YAML and a missing category
-# row will be visible in code review even before runtime.
-#
-# Arc: orientation. Single-screen — never leaves /inbox. The
-# task-completion arc for the email-order-entry path lives in
-# triage/email-order-entry-from-inbox.yaml.
+# Test approach:
+#   - Click 3 cases by listbox position (Playwright nth= suffix).
+#   - Each click MUST navigate to /cases/{some-id} — the URL
+#     pattern catches a row that ever dispatches differently
+#     (e.g., a regression that jumps to /exceptions/{id} from
+#     the list view).
+#   - Empty-state fixture also exercised so a degenerate seed
+#     surfaces the no-cases placeholder, not a broken page.
 name: inbox-item-click-behavior-catalog
 kind: regression
 journey: [J1, J2]
 arc: orientation
-entry: /inbox
+authAs: MANAGER
+entry: /cases?source=manual_order
 skip:
   reason: >-
-    V3 regression flow — the catalogue of click semantics across
-    inbox item types. Issue #133 retired the rich /inbox surface;
-    the 6 seed INBOX rows no longer render with these aria-labels.
-    Rewrite against /cases?source=manual_order or whatever
-    canonical surface still exposes the per-type semantics. Plus
-    codegen lacks loginAs plumbing.
+    Happy path failed in CI run 25730556094; state: empty
+    sub-test passed. The catalog clicks 3 case rows by listbox
+    position (nth=0/1/2); if the sandbox seed has fewer than 3
+    manual-order cases or none at all under ?source=manual_order,
+    each click times out. Un-skip after confirming the sandbox
+    seed exposes ≥3 manual-order cases via the filter (the V3
+    catalog asserts uniformity across multiple rows; degrading
+    to nth=0 only would weaken the contract).
+states:
+  - empty
+state_opt_out_justifications:
+  loading: >-
+    This flow asserts the click-dispatch contract; loading-state
+    coverage is owned by triage/inbox-load.yaml.
+  error: >-
+    /cases has no inline error UI; CMT-3 boundary spec covers it.
+  partial_failure: >-
+    The cases list endpoint is a single GET — no per-row failure
+    mode.
+  stale: >-
+    No mid-view status-change channel today.
+state_fixtures:
+  empty:
+    route: /api/v1/cases**
+    body:
+      items: []
+      total: 0
+      cursor: null
+      has_more: false
+    assert_text_contains:
+      - "No cases match the current filters."
 steps:
-  # Confirm the surface seeded as expected.
+  # Wait for at least one case row to mount.
   - action: assert_visible
-    selector: '[data-testid="inbox-row"]'
+    selector: 'button[aria-label^="Open case "]'
 
-  # --- Item type 1: ORDER_CHANGE (id=1, no exception_id) ---
-  # Click selects locally; right pane shows detail; NO jump btn.
+  # Click row 0. Playwright's `nth=` suffix picks the Nth matching
+  # element from the locator's resolved set, which is exactly the
+  # "the 1st case row in document order" we want.
   - action: click
-    selector: '[role="button"][aria-label*="Change request"]'
+    selector: 'button[aria-label^="Open case "] >> nth=0'
     keyboard_equivalent:
       key: Enter
-      focused_selector: '[role="button"][aria-label*="Change request"]'
-  - action: assert_url_equals
-    url: /inbox
-  - action: assert_visible
-    selector: 'text="Change request — SO 4500023421"'
+      focused_selector: 'button[aria-label^="Open case "] >> nth=0'
+  - action: assert_url_matches
+    pattern: ^/cases/[^/?#]+$
 
-  # --- Item type 2: SHIPMENT_INQUIRY (id=2) ---
+  # Back to the list. Operator's recovery affordance.
+  - action: back
+  - action: assert_url_equals
+    url: /cases?source=manual_order
+
+  # Click row 1. Same contract.
   - action: click
-    selector: '[role="button"][aria-label*="Where is my shipment"]'
+    selector: 'button[aria-label^="Open case "] >> nth=1'
     keyboard_equivalent:
       key: Enter
-      focused_selector: '[role="button"][aria-label*="Where is my shipment"]'
-  - action: assert_url_equals
-    url: /inbox
+      focused_selector: 'button[aria-label^="Open case "] >> nth=1'
+  - action: assert_url_matches
+    pattern: ^/cases/[^/?#]+$
 
-  # --- Item type 3: NEW_ORDER without exception_id (id=3) ---
+  - action: back
+  - action: assert_url_equals
+    url: /cases?source=manual_order
+
+  # Click row 2. If a case ever dispatches to a different surface
+  # (e.g., directly to /exceptions/{id}) this URL pattern fails
+  # loud and points at the offending row.
   - action: click
-    selector: '[role="button"][aria-label*="Beverages Dept"]'
+    selector: 'button[aria-label^="Open case "] >> nth=2'
     keyboard_equivalent:
       key: Enter
-      focused_selector: '[role="button"][aria-label*="Beverages Dept"]'
-  - action: assert_url_equals
-    url: /inbox
-
-  # --- Item type 4: NEW_ORDER WITH exception_id (id=4) ---
-  # This is the V3-triggering type. Right pane must show BOTH
-  # the detail AND the "Open in Exception Queue" jump button.
-  - action: click
-    selector: '[role="button"][aria-label*="PO 4501234567"]'
-    keyboard_equivalent:
-      key: Enter
-      focused_selector: '[role="button"][aria-label*="PO 4501234567"]'
-  - action: assert_url_equals
-    url: /inbox
-  - action: assert_visible
-    selector: 'text="Open in Exception Queue"'
-
-  # --- Item type 5: COMPLAINT (id=5, no exception_id) ---
-  - action: click
-    selector: '[role="button"][aria-label*="critical delivery failure"]'
-    keyboard_equivalent:
-      key: Enter
-      focused_selector: '[role="button"][aria-label*="critical delivery failure"]'
-  - action: assert_url_equals
-    url: /inbox
-
-  # --- Item type 6: INVOICE_QUERY (id=6, no exception_id) ---
-  - action: click
-    selector: '[role="button"][aria-label*="Invoice question"]'
-    keyboard_equivalent:
-      key: Enter
-      focused_selector: '[role="button"][aria-label*="Invoice question"]'
-  - action: assert_url_equals
-    url: /inbox
+      focused_selector: 'button[aria-label^="Open case "] >> nth=2'
+  - action: assert_url_matches
+    pattern: ^/cases/[^/?#]+$

@@ -36,15 +36,16 @@ name: signout-from-each-role
 kind: golden
 journey: J2
 arc: orientation
-entry: /inbox
-skip:
-  reason: >-
-    Two blockers: (1) codegen does not emit loginAs() before
-    page.goto, so /inbox starts on the login page; (2) Issue #133
-    retired /inbox — even authenticated, the page server-redirects
-    to /cases?source=manual_order and the user-menu trigger lives
-    on the new surface. Re-target to /home (or /cases) after the
-    auth plumbing lands.
+# Any authenticated role works; MANAGER is the default for
+# "operator can sign out" coverage. Future variant flows can
+# add ADMIN / ANALYST as separate YAMLs.
+authAs: MANAGER
+# Issue #133 retired /inbox; /home is the new operational
+# landing surface where the user-menu trigger lives. The
+# sign-out user-menu is the same NavBar component on every
+# authenticated route, so /home suffices for the orientation
+# arc (any authenticated route would).
+entry: /home
 steps:
   # Step 1 — chrome reachable, user-menu trigger present.
   - action: assert_visible

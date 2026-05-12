@@ -14,6 +14,9 @@ const baseValid = {
   kind: "golden" as const,
   journey: ["J1", "J2"] as const,
   arc: "orientation" as const,
+  // Authenticated entry: schema requires authAs so the codegen
+  // knows which seed user to loginAs() before page.goto.
+  authAs: "MANAGER" as const,
   entry: "/inbox",
   steps: [
     {
@@ -252,5 +255,135 @@ describe("flow-schema — invalid inputs", () => {
     expect(() =>
       parseFlow({ ...baseValid, journey: ["J3", "J5"] }),
     ).not.toThrow();
+  });
+
+  it("rejects an authenticated entry without authAs", () => {
+    const { authAs: _drop, ...withoutAuth } = baseValid;
+    const result = flowSchema.safeParse(withoutAuth);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const msgs = result.error.issues.map((i) => i.message).join(" | ");
+      expect(msgs).toMatch(/authAs/);
+    }
+  });
+
+  it("accepts a public /login entry without authAs", () => {
+    const { authAs: _drop, ...rest } = baseValid;
+    expect(() =>
+      parseFlow({ ...rest, entry: "/login" }),
+    ).not.toThrow();
+  });
+
+  it("accepts a public /auth/callback entry without authAs", () => {
+    const { authAs: _drop, ...rest } = baseValid;
+    expect(() =>
+      parseFlow({ ...rest, entry: "/auth/callback" }),
+    ).not.toThrow();
+  });
+
+  it("rejects a public entry that DOES declare authAs", () => {
+    const result = flowSchema.safeParse({
+      ...baseValid,
+      entry: "/login",
+      authAs: "MANAGER",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const msgs = result.error.issues.map((i) => i.message).join(" | ");
+      expect(msgs).toMatch(/public entry must not declare authAs/);
+    }
+  });
+
+  it("rejects an unknown authAs role (no ad-hoc role names)", () => {
+    const result = flowSchema.safeParse({
+      ...baseValid,
+      authAs: "SUPERUSER" as unknown,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // ────────────────────────────────────────────────────────────
+  // A8 — opt-out justification structured enforcement.
+  // ────────────────────────────────────────────────────────────
+
+  it("rejects a flow with states[] missing opt-out justifications (A8)", () => {
+    const result = flowSchema.safeParse({
+      ...baseValid,
+      states: ["loading"],
+      state_fixtures: {
+        loading: { route: "/api/v1/cases", delay_ms: 1000 },
+      },
+      // No state_opt_out_justifications -> empty, error,
+      // partial_failure, stale all unjustified.
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const msgs = result.error.issues.map((i) => i.message).join(" | ");
+      expect(msgs).toMatch(/state_opt_out_justifications/);
+      expect(msgs).toMatch(/A8/);
+    }
+  });
+
+  it("accepts a flow with full opt-out justifications (A8)", () => {
+    expect(() =>
+      parseFlow({
+        ...baseValid,
+        states: ["loading"],
+        state_fixtures: {
+          loading: { route: "/api/v1/cases", delay_ms: 1000 },
+        },
+        state_opt_out_justifications: {
+          empty: "covered elsewhere",
+          error: "no inline error UI",
+          partial_failure: "single GET",
+          stale: "no live channel",
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects a justification for a state that's IN states[] (A8)", () => {
+    const result = flowSchema.safeParse({
+      ...baseValid,
+      states: ["loading", "empty"],
+      state_fixtures: {
+        loading: { route: "/api/v1/cases", delay_ms: 1000 },
+        empty: { route: "/api/v1/cases", body: [] },
+      },
+      state_opt_out_justifications: {
+        // loading is OPTED IN — a justification here is spurious
+        loading: "spurious",
+        error: "no inline error UI",
+        partial_failure: "single GET",
+        stale: "no live channel",
+      },
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const msgs = result.error.issues.map((i) => i.message).join(" | ");
+      expect(msgs).toMatch(/loading.*also has/);
+    }
+  });
+
+  it("accepts a flow without states[] and without justifications (matrix opt-out)", () => {
+    const { ...rest } = baseValid;
+    expect(() => parseFlow(rest)).not.toThrow();
+  });
+
+  it("rejects an empty-string justification (no placeholder waivers)", () => {
+    const result = flowSchema.safeParse({
+      ...baseValid,
+      states: ["loading"],
+      state_fixtures: {
+        loading: { route: "/api/v1/cases", delay_ms: 1000 },
+      },
+      state_opt_out_justifications: {
+        empty: "",
+        error: "x",
+        partial_failure: "x",
+        stale: "x",
+      },
+    });
+    expect(result.success).toBe(false);
   });
 });
