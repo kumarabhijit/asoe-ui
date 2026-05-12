@@ -16,11 +16,15 @@ describe("coverage-report", () => {
     }
   });
 
-  it("counts the gaps correctly (J4 + J5 = 4 cells today)", () => {
+  it("counts the gaps correctly (J3 task-completion + J4 + J5 = 5 cells today)", () => {
     const { gaps } = render();
-    // Today: J1×{both}, J2×{both}, J3×{both} covered live.
-    // J4×{both} and J5×{both} are empty.
-    expect(gaps).toBe(4);
+    // Today: J1×{both} covered live; J2×{both} covered live;
+    // J3×{orientation} covered live. J3×{task-completion} was
+    // covered by the case ↔ exception round-trip flow until
+    // S15a retired /exceptions/[id]; uncovered until a
+    // case-centric replacement flow lands. J4×{both} and
+    // J5×{both} are empty.
+    expect(gaps).toBe(5);
   });
 
   it("emits a flow tally line", () => {

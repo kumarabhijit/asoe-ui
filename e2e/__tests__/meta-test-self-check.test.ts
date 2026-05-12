@@ -183,8 +183,8 @@ describe("pathFromSource", () => {
     expect(pathFromSource("src/app/inbox/page.tsx")).toBe("/inbox");
   });
   it("strips dynamic segments to colon-prefixed params", () => {
-    expect(pathFromSource("src/app/exceptions/[id]/page.tsx")).toBe(
-      "/exceptions/:id",
+    expect(pathFromSource("src/app/cases/[id]/page.tsx")).toBe(
+      "/cases/:id",
     );
   });
   it("treats the root page.tsx as /", () => {

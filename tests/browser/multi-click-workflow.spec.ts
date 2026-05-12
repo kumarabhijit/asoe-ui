@@ -38,6 +38,7 @@ import {
   BACKEND_URL,
   USERS,
   backendToken,
+  exceptionUrl,
   createPendingReviewException,
   loginAs,
   resetTenant,
@@ -72,7 +73,7 @@ test("W1 — detail → override → next record dispatches each via the full pi
 
   // ── Click 1: log in, open record A's detail page ─────────────
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${idA}`);
+  await page.goto(await exceptionUrl(request, token, idA));
 
   // ── Click 2: open Override dialog, submit ─────────────────────
   const openOverride = page.getByRole("button", {
@@ -103,7 +104,7 @@ test("W1 — detail → override → next record dispatches each via the full pi
     .toBe("RESOLVED");
 
   // ── Click 3: navigate to record B's detail page ───────────────
-  await page.goto(`/exceptions/${idB}`);
+  await page.goto(await exceptionUrl(request, token, idB));
 
   // ── Click 4: Override dialog must NOT carry stale state from A ─
   const openOverrideB = page.getByRole("button", {
@@ -158,7 +159,7 @@ test("W2 — override → re-override on the same record (PO ruling 2026-05-03)"
     request, token, `PO-W2-${Date.now()}`,
   );
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, token, exceptionId));
 
   const openOverride = page.getByRole("button", { name: /choose different action/i });
 
@@ -248,7 +249,7 @@ test("W3 — multi-record disposition workflow: 3 distinct resolutions across de
 
   for (const rec of records) {
     // Click 1: open this record's detail page directly
-    await page.goto(`/exceptions/${rec.id}`);
+    await page.goto(await exceptionUrl(request, token, rec.id));
 
     // Click 2: open Override dialog
     const openBtn = page.getByRole("button", {
@@ -293,7 +294,7 @@ test("W4 — override dialog cancel → reopen → submit (no stale form state)"
   );
 
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, token, exceptionId));
 
   const openOverride = page.getByRole("button", {
     name: /choose different action/i,

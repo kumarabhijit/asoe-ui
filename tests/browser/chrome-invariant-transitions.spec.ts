@@ -60,10 +60,13 @@ function byPath(path: string): AuthenticatedRoute {
 // at spec collection time and abort the entire Playwright run.
 // /home (the new operational landing surface) is the equivalent
 // cross-tab origin for the chrome-during-transition assertion.
+// S15a — /exceptions/[id] retired in favour of inline mount on
+// /cases/[id]?record=<id>. The dynamic-segment round-trip is now
+// covered by /cases <-> /cases/:id.
 const TRANSITION_PAIRS: Array<[AuthenticatedRoute, AuthenticatedRoute]> = [
-  [byPath("/exceptions"), byPath("/exceptions/:id")],
+  [byPath("/cases"), byPath("/cases/:id")],
   [byPath("/home"), byPath("/exceptions")],
-  [byPath("/cases/:id"), byPath("/exceptions/:id")],
+  [byPath("/cases/:id"), byPath("/exceptions")],
   [byPath("/dashboard"), byPath("/settings")],
 ];
 

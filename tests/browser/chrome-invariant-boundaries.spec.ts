@@ -8,14 +8,19 @@
 //    assert not-found.tsx renders + chrome present. Each
 //    boundary tested for the SAME chrome contract as page.tsx."
 //
-// Coverage scope (Phase 4b):
-//   - /exceptions and /exceptions/[id]: all three boundaries
-//     (loading / error / not-found) committed in this PR.
-//   - /inbox: loading + error boundaries committed; not-found
-//     is shared with /exceptions' notFound() path because the
-//     inbox does not call notFound() today.
-//   - /cases, /dashboard, /settings: deferred — same pattern,
-//     mechanical authoring.
+// Coverage scope (Phase 4b, amended S15a):
+//   - /exceptions (queue): all three boundaries (loading / error /
+//     not-found) committed in this PR.
+//   - /inbox: loading + error boundaries committed.
+//   - /cases, /cases/[id], /dashboard, /settings: deferred — same
+//     pattern, mechanical authoring.
+//
+// S15a — /exceptions/[id] retired (per-record ribbon mounts inline
+// on /cases/[id]?record=<id>). The not-found boundary test that
+// targeted /exceptions/<bogus> is removed because the route no
+// longer exists; the /cases/[id] not-found path is the case-list
+// "Case not found" inline message, exercised by the unit-test
+// surface, not by a Next.js boundary file.
 //
 // Loading-state pattern (P1 from the e2e plan): deferred-promise
 // + assert-during. The route mock holds the response until
@@ -94,29 +99,9 @@ for (const route of [
   });
 }
 
-// ------------------------------------------------------------
-// not-found.tsx coverage: navigate to a bogus exception id.
-// The /exceptions/[id]/page.tsx is expected to call notFound()
-// for unknown ids. Until that call is wired, the boundary may
-// not render — this test will fail loudly to surface the gap.
-// ------------------------------------------------------------
-test("CMT-3 not-found boundary: /exceptions/<bogus> renders chrome", async ({
-  page,
-}) => {
-  // Make the backend respond 404 so the page sees a missing id.
-  await page.route("**/api/v1/exceptions/exc-bogus-cmt3*", async (route) => {
-    await route.fulfill({
-      status: 404,
-      contentType: "application/json",
-      body: JSON.stringify({ error: { code: "NOT_FOUND", message: "no" } }),
-    });
-  });
-
-  await page.goto("/exceptions/exc-bogus-cmt3", {
-    waitUntil: "domcontentloaded",
-  });
-  await assertChromeOnPage(page);
-});
+// not-found.tsx coverage — see header comment. The /exceptions/[id]
+// boundary was retired with the route (S15a); /cases/[id]'s inline
+// "Case not found" message is covered by the unit-test surface.
 
 test("CMT-3 not-found boundary: /cases/<bogus> renders chrome", async ({
   page,

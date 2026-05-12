@@ -1,20 +1,18 @@
-/**
- * /cases/[id] — case detail surface (ADR-038 Phase H.6).
- *
- * Loads the OrderCase + delegates rendering to CaseDetailPanel.
- * Phase H.6 keeps this thin; the rich child-section stack lives
- * inside CaseDetailPanel. ExceptionDetailPanel still renders for
- * /exceptions/[id]; both surfaces converge on the same section
- * components via data-presence dispatch.
- *
- * Top NavBar (with Sign out) is mandatory on every authenticated
- * page — operators must always have the canonical exit point.
- */
+// /cases/[id] — case detail surface (ADR-038 / S15a).
+//
+// Loads the OrderCase + attached records, delegates rendering to
+// CaseDetailPanel. The page owns the `?record=<id>` URL-query
+// binding so the picker selection survives reload and lets callers
+// deep-link into a specific record's HITL surface (the case-centric
+// pivot retired the standalone /exceptions/[id] route).
+//
+// Top NavBar (with Sign out) is mandatory on every authenticated
+// page — operators must always have the canonical exit point.
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSignOut } from "@/hooks/useSignOut";
 
 import { NavBar } from "@/components/ui/NavBar";
@@ -33,6 +31,7 @@ export const requiresAuth = true;
 export default function CaseDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const search = useSearchParams();
   const { user } = useAuth();
   const handleSignOut = useSignOut();
   const caseId = params?.id;
@@ -45,6 +44,20 @@ export default function CaseDetailPage() {
   // populates the L1/L2 PolicyHitBadge surface).
   const [records, setRecords] = useState<ExceptionDetailResponse[]>([]);
   const [policyHits, setPolicyHits] = useState<string[]>([]);
+
+  // ?record=<id> drives the per-record HITL surface. The picker
+  // (CaseDetailPanel) syncs back through `handleSelectRecord` so a
+  // user click survives reload and is shareable. router.replace
+  // (not push) keeps Back navigation pointing at the case-list
+  // surface rather than at each picker step.
+  const selectedRecordId = search?.get("record") ?? undefined;
+  const handleSelectRecord = useCallback(
+    (recordId: string) => {
+      if (!caseId) return;
+      router.replace(`/cases/${caseId}?record=${encodeURIComponent(recordId)}`);
+    },
+    [caseId, router],
+  );
 
   const userName = user?.name || "User";
   const userInitials =
@@ -132,6 +145,8 @@ export default function CaseDetailPage() {
             orderCase={orderCase}
             attachedRecords={records}
             policyHits={policyHits}
+            selectedRecordId={selectedRecordId}
+            onSelectRecord={handleSelectRecord}
           />
         )}
       </main>

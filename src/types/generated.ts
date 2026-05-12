@@ -131,6 +131,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/_sandbox/seed/manual-order-intake": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Seed Manual Order Intake
+         * @description Producer-side stand-in for the email-intelligence-agent.
+         *
+         *     Emits a MANUAL_ORDER_INTAKE event by default and routes it through
+         *     the normal /exceptions/resolve graph so the dashboard's
+         *     `event_type_received_total` gauge sees the canonical name.
+         *     ASOE_EMIT_LEGACY_EVENT_TYPES=1 flips emission to the transitional
+         *     EMAIL_ORDER_ENTRY_REQUEST literal for dual-acceptance soaks.
+         *
+         *     Returns the resulting exception_id, the event_type that was actually
+         *     emitted, and whether the legacy flag was honoured — the caller's
+         *     backward-compat suite asserts on all three.
+         */
+        post: operations["seed_manual_order_intake_api_v1__sandbox_seed_manual_order_intake_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/_sandbox/tenant/reset": {
         parameters: {
             query?: never;
@@ -2709,6 +2739,31 @@ export interface components {
             /** Financial Impact Usd */
             financial_impact_usd: number;
         };
+        /** SeedManualOrderIntakeRequest */
+        SeedManualOrderIntakeRequest: {
+            /**
+             * Composite Confidence
+             * @default 0.97
+             */
+            composite_confidence: number;
+            /**
+             * Metadata Extra
+             * @description Free-form metadata blob merged into the emitted event's metadata dict. The producer never overrides composite_confidence / non_disableable_floor with these keys — those have dedicated fields above.
+             */
+            metadata_extra?: {
+                [key: string]: unknown;
+            } | null;
+            /** Non Disableable Floor */
+            non_disableable_floor?: {
+                [key: string]: unknown;
+            } | null;
+            /** Order Id */
+            order_id?: string | null;
+            /** Reject Reason Code */
+            reject_reason_code?: string | null;
+            /** Validation Failures */
+            validation_failures?: string[] | null;
+        };
         /**
          * StatsResponse
          * @description GET /api/v1/exceptions/stats — dashboard metrics.
@@ -3207,6 +3262,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SeedFinancialImpactRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    seed_manual_order_intake_api_v1__sandbox_seed_manual_order_intake_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeedManualOrderIntakeRequest"];
             };
         };
         responses: {

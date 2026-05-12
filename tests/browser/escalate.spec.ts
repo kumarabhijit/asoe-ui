@@ -20,6 +20,7 @@ import { test, expect } from "@playwright/test";
 import {
   loginAs,
   backendToken,
+  exceptionUrl,
   createYellowException,
   resetTenant,
   USERS,
@@ -41,7 +42,7 @@ test("analyst escalates a YELLOW exception → lifecycle flips to ESCALATED", as
   const exceptionId = await createYellowException(request, token);
 
   await loginAs(page, USERS.ANALYST);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, token, exceptionId));
 
   const escalateButton = page.getByRole("button", { name: /send for triage/i });
   await expect(escalateButton).toBeVisible({ timeout: 15_000 });
