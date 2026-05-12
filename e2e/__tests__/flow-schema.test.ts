@@ -13,6 +13,7 @@ const baseValid = {
   name: "inbox-load",
   kind: "golden" as const,
   journey: ["J1", "J2"] as const,
+  arc: "orientation" as const,
   entry: "/inbox",
   steps: [
     {
@@ -214,5 +215,42 @@ describe("flow-schema — invalid inputs", () => {
   it("rejects a flow missing required fields", () => {
     const result = flowSchema.safeParse({ name: "x" });
     expect(result.success).toBe(false);
+  });
+
+  it("rejects a flow without a journey field (every flow claims an archetype)", () => {
+    const { journey: _drop, ...withoutJourney } = baseValid;
+    const result = flowSchema.safeParse(withoutJourney);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path.join("."));
+      expect(paths).toContain("journey");
+    }
+  });
+
+  it("rejects a flow without an arc field", () => {
+    const { arc: _drop, ...withoutArc } = baseValid;
+    const result = flowSchema.safeParse(withoutArc);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path.join("."));
+      expect(paths).toContain("arc");
+    }
+  });
+
+  it("rejects an unknown arc value (trust/5y is not a test assertion)", () => {
+    const result = flowSchema.safeParse({
+      ...baseValid,
+      arc: "trust" as unknown,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts the new auth-edge (J4) and auditor (J5) archetypes", () => {
+    expect(() =>
+      parseFlow({ ...baseValid, journey: "J4" }),
+    ).not.toThrow();
+    expect(() =>
+      parseFlow({ ...baseValid, journey: ["J3", "J5"] }),
+    ).not.toThrow();
   });
 });

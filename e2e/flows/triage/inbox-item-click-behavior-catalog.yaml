@@ -1,0 +1,114 @@
+# triage/inbox-item-click-behavior-catalog.yaml — regression, V3, J1+J2.
+#
+# Closes V3 from eng-review-test-plan.md amendment v1.1:
+#   "Inconsistent click semantics: most inbox items populate the
+#    right pane on click; 'Email Order Entry' jumps directly to
+#    the exception page without a right-pane preview. Either the
+#    spec is silent, or the implementation drifted from a spec
+#    the test layer never enforced."
+#
+# Per ADR-034 Section 6.1 (PO ruling 2026-05-10), the contract is
+# uniform: EVERY inbox row click selects locally and updates the
+# right pane in place. For rows whose detail carries an
+# exception_id, the right pane ALSO renders an explicit
+# "Open in Exception Queue" jump button. Silence is not a
+# default — every item-type asserted here has a declared
+# click behaviour; an undeclared type is a test failure.
+#
+# Item-type catalog matches src/app/inbox/page.tsx::INBOX (seed):
+#
+#   | id | category          | exception_id | expected right-pane |
+#   |----|-------------------|--------------|---------------------|
+#   |  1 | ORDER_CHANGE      | -            | detail, NO jump btn |
+#   |  2 | SHIPMENT_INQUIRY  | -            | detail, NO jump btn |
+#   |  3 | NEW_ORDER         | -            | detail, NO jump btn |
+#   |  4 | NEW_ORDER         | exc-026      | detail + jump btn   |
+#   |  5 | COMPLAINT         | -            | detail, NO jump btn |
+#   |  6 | INVOICE_QUERY     | -            | detail, NO jump btn |
+#
+# A future inbox-item type that lands without a row here will
+# fail the schema's strict required journey + arc declaration;
+# the discovery test parses every YAML and a missing category
+# row will be visible in code review even before runtime.
+#
+# Arc: orientation. Single-screen — never leaves /inbox. The
+# task-completion arc for the email-order-entry path lives in
+# triage/email-order-entry-from-inbox.yaml.
+name: inbox-item-click-behavior-catalog
+kind: regression
+journey: [J1, J2]
+arc: orientation
+entry: /inbox
+skip:
+  reason: >-
+    V3 regression flow — the catalogue of click semantics across
+    inbox item types. Issue #133 retired the rich /inbox surface;
+    the 6 seed INBOX rows no longer render with these aria-labels.
+    Rewrite against /cases?source=manual_order or whatever
+    canonical surface still exposes the per-type semantics. Plus
+    codegen lacks loginAs plumbing.
+steps:
+  # Confirm the surface seeded as expected.
+  - action: assert_visible
+    selector: '[data-testid="inbox-row"]'
+
+  # --- Item type 1: ORDER_CHANGE (id=1, no exception_id) ---
+  # Click selects locally; right pane shows detail; NO jump btn.
+  - action: click
+    selector: '[role="button"][aria-label*="Change request"]'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: '[role="button"][aria-label*="Change request"]'
+  - action: assert_url_equals
+    url: /inbox
+  - action: assert_visible
+    selector: 'text="Change request — SO 4500023421"'
+
+  # --- Item type 2: SHIPMENT_INQUIRY (id=2) ---
+  - action: click
+    selector: '[role="button"][aria-label*="Where is my shipment"]'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: '[role="button"][aria-label*="Where is my shipment"]'
+  - action: assert_url_equals
+    url: /inbox
+
+  # --- Item type 3: NEW_ORDER without exception_id (id=3) ---
+  - action: click
+    selector: '[role="button"][aria-label*="Beverages Dept"]'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: '[role="button"][aria-label*="Beverages Dept"]'
+  - action: assert_url_equals
+    url: /inbox
+
+  # --- Item type 4: NEW_ORDER WITH exception_id (id=4) ---
+  # This is the V3-triggering type. Right pane must show BOTH
+  # the detail AND the "Open in Exception Queue" jump button.
+  - action: click
+    selector: '[role="button"][aria-label*="PO 4501234567"]'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: '[role="button"][aria-label*="PO 4501234567"]'
+  - action: assert_url_equals
+    url: /inbox
+  - action: assert_visible
+    selector: 'text="Open in Exception Queue"'
+
+  # --- Item type 5: COMPLAINT (id=5, no exception_id) ---
+  - action: click
+    selector: '[role="button"][aria-label*="critical delivery failure"]'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: '[role="button"][aria-label*="critical delivery failure"]'
+  - action: assert_url_equals
+    url: /inbox
+
+  # --- Item type 6: INVOICE_QUERY (id=6, no exception_id) ---
+  - action: click
+    selector: '[role="button"][aria-label*="Invoice question"]'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: '[role="button"][aria-label*="Invoice question"]'
+  - action: assert_url_equals
+    url: /inbox

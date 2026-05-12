@@ -1,0 +1,83 @@
+# onboard/signin-to-home.yaml — golden, J1, orientation.
+#
+# First-mile experience for the new operator. The flow signs in
+# with the seed user, lands on the first authenticated surface,
+# and asserts the canonical chrome contract is in place from the
+# very first page paint.
+#
+# Why orientation (not task-completion):
+#   - The J1 task-completion arc is owned by V1's
+#     email-order-entry-from-inbox flow (operator arrives via
+#     inbox row, finishes a triage round-trip).
+#   - This flow asserts the "did they land somewhere sensible"
+#     half of the J1 contract: chrome present, focus reachable,
+#     StatusAnnouncer mounted.
+#
+# Test fixture (seed):
+#   - asoe2 sandbox mode accepts any non-empty password.
+#   - jane@acme.com (ADMIN) lands on /inbox per role-based
+#     home-page routing.
+#
+# Selectors:
+#   - placeholder="jane@acme.com" is the email input's stable
+#     attribute (see src/app/login/page.tsx:131).
+#   - placeholder="Enter your password" is the password input
+#     (src/app/login/page.tsx:201).
+#   - The submit buttons have type="submit"; the visible label
+#     ("Next" / "Sign In") disambiguates via :has-text().
+name: signin-to-home
+kind: golden
+journey: J1
+arc: orientation
+entry: /login
+skip:
+  reason: >-
+    Sign-in flow's assertions on the post-login landing page need
+    live-backend validation. asoe2 sandbox seed + role-based
+    home-page routing changed under Issue #133 (/inbox retired,
+    /home introduced); the focus + chrome assertions assume the
+    pre-#133 destination. Un-skip after the local end-to-end
+    pass.
+steps:
+  # Step 1 — email input must be reachable and focused (autoFocus
+  # in src/app/login/page.tsx:133). The orientation assertion is
+  # "the operator's cursor is in the right place".
+  - action: assert_visible
+    selector: 'input[placeholder="jane@acme.com"]'
+  - action: assert_focus_on
+    selector: 'input[placeholder="jane@acme.com"]'
+
+  # Step 2 — enter the seed email and progress.
+  - action: fill
+    selector: 'input[placeholder="jane@acme.com"]'
+    value: jane@acme.com
+  - action: click
+    selector: 'button:has-text("Next")'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: 'input[placeholder="jane@acme.com"]'
+
+  # Step 3 — password input mounts and gets focus.
+  - action: assert_visible
+    selector: 'input[placeholder="Enter your password"]'
+  - action: assert_focus_on
+    selector: 'input[placeholder="Enter your password"]'
+
+  # Step 4 — submit. asoe2 sandbox accepts any non-empty pw.
+  - action: fill
+    selector: 'input[placeholder="Enter your password"]'
+    value: any-non-empty-password
+  - action: click
+    selector: 'button:has-text("Sign In")'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: 'input[placeholder="Enter your password"]'
+
+  # Step 5 — landed on an authenticated surface. The exact target
+  # depends on role-based home-page routing; assert chrome
+  # presence rather than a specific URL so the test does not
+  # over-couple to the routing table.
+  - action: assert_visible
+    selector: nav
+  - action: assert_visible
+    selector: '[data-testid="status-announcer"]'

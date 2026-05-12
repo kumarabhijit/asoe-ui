@@ -57,9 +57,21 @@ export function generateSpec(input: CodegenInput): CodegenOutput {
     "",
   );
 
+  // describe wrapper. If the flow opts into `skip:`, emit
+  // `test.describe.fixme(...)` so Playwright reports the skip
+  // with the citation but does not fail. Used while a flow's
+  // selectors / login plumbing are still being validated.
+  const describeFn = flow.skip
+    ? "test.describe.fixme"
+    : "test.describe";
+  const skipBanner = flow.skip
+    ? [`  // SKIP REASON: ${flow.skip.reason}`]
+    : [];
+
   // Happy-path test — runs the steps with no state mocks.
   lines.push(
-    `test.describe(${q(flow.name)}, () => {`,
+    `${describeFn}(${q(flow.name)}, () => {`,
+    ...skipBanner,
     `  test(${q("happy path")}, async ({ page }) => {`,
     `    await page.goto(${q(flow.entry)});`,
   );
@@ -173,6 +185,12 @@ function emitStep(step: Step): string[] {
       ];
     case "navigate":
       return [`await page.goto(${q(step.url!)});`];
+    case "back":
+      // Browser back: bfcache when available, otherwise re-mount.
+      // V2 asserts chrome survives this transition.
+      return ["await page.goBack();"];
+    case "forward":
+      return ["await page.goForward();"];
     case "assert_visible":
       return [
         `await expect(page.locator(${q(step.selector!)})).toBeVisible();`,

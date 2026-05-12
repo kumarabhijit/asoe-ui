@@ -1,0 +1,103 @@
+# triage/email-order-entry-from-inbox.yaml — regression, V1, J1.
+#
+# Closes V1 from eng-review-test-plan.md amendment v1.1:
+#   "Context-aware navigation: opening a case from the customer
+#    inbox routes to the exception page, but the exception page
+#    only offers 'Back to queue', not 'Back to customer inbox'.
+#    Entry-path context is lost."
+#
+# Per ADR-034 Section 6.1 (PO ruling 2026-05-10), the inbox is a
+# master-detail surface: clicking a row selects locally and
+# updates the right pane. For rows whose detail carries an
+# exception_id, the right pane renders an explicit
+# "Open in Exception Queue" jump button. Clicking the jump
+# button navigates to /exceptions/<id>?from=inbox and the
+# detail page MUST surface "Back to Inbox" instead of the
+# default "Back to Queue".
+#
+# This is the task-completion arc for J1: the new operator
+# arrives via an email-order-entry inbox row, finishes a
+# triage round-trip, and lands back where they started with no
+# data loss.
+#
+# Test fixture (seed):
+#   - INBOX[3] in src/app/inbox/page.tsx has id="4",
+#     exception_id="exc-026", subject "Re: PO 4501234567...".
+#   - Sandbox-mode asoe2 backend serves /api/v1/exceptions/exc-026.
+#
+# State matrix opt-outs:
+#   - loading: covered by triage/inbox-load.yaml
+#   - empty / partial_failure / stale: the round-trip itself is
+#     unaffected by the inbox content matrix; orchestration
+#     coverage lives in the orientation flow.
+name: email-order-entry-from-inbox
+kind: regression
+journey: J1
+arc: task-completion
+entry: /inbox
+skip:
+  reason: >-
+    V1 regression flow. Issue #133 retired /inbox as a master-
+    detail surface; the email-order-entry row + jump button no
+    longer live there. Re-target to /cases?source=manual_order
+    (the post-#133 home of manual-order cases) and update the
+    row selectors to match CaseListPane's DOM. Plus codegen
+    lacks loginAs plumbing.
+# Inbox -> detail -> back. Each interactive step declares its
+# keyboard equivalent (D6 a11y floor).
+steps:
+  # 1. Confirm inbox surfaces rows we can act on.
+  - action: assert_visible
+    selector: '[data-testid="inbox-row"]'
+
+  # 2. Click the email-order-entry row. Match by aria-label
+  # substring so the test does not depend on the absolute row
+  # index (the seed may grow).
+  - action: click
+    selector: '[role="button"][aria-label*="PO 4501234567"]'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: '[role="button"][aria-label*="PO 4501234567"]'
+
+  # 3. Right-pane detail mounts. The jump affordance must appear
+  # for rows whose detail carries an exception_id (V3 catalog
+  # asserts the converse — items without exception_id must NOT
+  # render the jump button).
+  - action: assert_visible
+    selector: 'text="Open in Exception Queue"'
+
+  # 4. Jump button navigates with ?from=inbox so the detail
+  # page sees the referrer hint.
+  - action: click
+    selector: 'text="Open in Exception Queue"'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: 'text="Open in Exception Queue"'
+
+  # 5. Detail page URL carries the seed exception id + ?from=inbox.
+  # D4: prefer assert_url_equals over regex when the id is known.
+  - action: assert_url_equals
+    url: /exceptions/exc-026?from=inbox
+
+  # 6. The detail page MUST surface "Back to Inbox" (not the
+  # default "Back to Queue"). This is the V1 affordance the
+  # contract test in tests/contract/test_navigation_chrome.test.ts
+  # protects structurally; this flow protects it behaviourally.
+  - action: assert_visible
+    selector: 'text="Back to Inbox"'
+
+  # 7. Focus management — after navigation the heading should
+  # receive focus so SR operators know they have arrived (D6).
+  - action: assert_focus_on
+    selector: 'h1, [role="heading"][aria-level="1"]'
+
+  # 8. Click "Back to Inbox" to close the loop.
+  - action: click
+    selector: 'text="Back to Inbox"'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: 'text="Back to Inbox"'
+
+  # 9. Landed back at the inbox surface. No query params.
+  - action: assert_url_equals
+    url: /inbox

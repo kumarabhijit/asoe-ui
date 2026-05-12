@@ -27,7 +27,16 @@ const BACKEND_URL = process.env.E2E_BACKEND_URL ?? "http://localhost:8000";
 const ASOE2_ROOT = process.env.ASOE2_ROOT ?? "../asoe2";
 
 export default defineConfig({
-  testDir: "./tests/browser",
+  // Two spec roots:
+  //   - tests/browser/  hand-authored Playwright specs
+  //   - e2e/flows-generated/  YAML-derived specs (W7). The
+  //     generator runs via `npm run flows:gen`; drift is caught
+  //     by e2e/__tests__/flows-gen.test.ts.
+  testDir: ".",
+  testMatch: [
+    "tests/browser/**/*.spec.ts",
+    "e2e/flows-generated/**/*.spec.ts",
+  ],
   timeout: 30_000,
   expect: { timeout: 5_000 },
   // The asoe2 backend uses an in-memory exception store and audit log

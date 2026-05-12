@@ -1,0 +1,85 @@
+# signout/signout-from-each-role.yaml — golden, J2, orientation.
+#
+# Closes J2's orientation arc on the sign-out surface: from any
+# authenticated page, can the operator find and execute Sign out
+# via the keyboard, and does focus restore to a sensible target
+# after the redirect?
+#
+# Why orientation (not task-completion):
+#   - The behaviour is single-screen + redirect; no multi-step
+#     task is being completed.
+#   - "Is sign-out reachable from this surface?" is the
+#     orientation property.
+#
+# Why a single role (instead of looping all 4 USERS):
+#   - The flow YAML format does not support a parameterised loop
+#     today; the codegen would emit one test per flow.
+#   - The user-menu + Sign out affordance is identical across
+#     roles in the current UI; rendering once per role is
+#     redundant coverage. If role-specific menu items diverge
+#     (e.g. ADMIN-only "Switch tenant"), split into per-role
+#     flows.
+#
+# Selectors:
+#   - User-menu trigger: button[aria-label="User menu"]
+#     (NavBar.tsx:104).
+#   - "Sign out" menu item is gated on the onSignOut prop
+#     (NavBar.tsx:119). The DropdownMenuItem renders the LogOut
+#     icon + the literal "Sign out" text.
+#
+# Q1: useSignOut announces "Signing out" before the redirect.
+# The aria-live transcript carries the message even though the
+# authenticated page tears down on the navigation (the
+# <StatusAnnouncer> on /login mounts and the speech queue
+# survives same-origin redirects on every major engine today).
+name: signout-from-each-role
+kind: golden
+journey: J2
+arc: orientation
+entry: /inbox
+skip:
+  reason: >-
+    Two blockers: (1) codegen does not emit loginAs() before
+    page.goto, so /inbox starts on the login page; (2) Issue #133
+    retired /inbox — even authenticated, the page server-redirects
+    to /cases?source=manual_order and the user-menu trigger lives
+    on the new surface. Re-target to /home (or /cases) after the
+    auth plumbing lands.
+steps:
+  # Step 1 — chrome reachable, user-menu trigger present.
+  - action: assert_visible
+    selector: 'button[aria-label="User menu"]'
+
+  # Step 2 — open the user menu.
+  - action: click
+    selector: 'button[aria-label="User menu"]'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: 'button[aria-label="User menu"]'
+
+  # Step 3 — Sign out menu item must surface.
+  - action: assert_visible
+    selector: '[role="menuitem"]:has-text("Sign out")'
+
+  # Step 4 — activate Sign out. The useSignOut hook announces
+  # "Signing out" and defers signOut() to the next microtask
+  # so the announcement settles before the redirect.
+  - action: click
+    selector: '[role="menuitem"]:has-text("Sign out")'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: '[role="menuitem"]:has-text("Sign out")'
+
+  # Step 5 — Q1: SR-audible confirmation. The announcement is
+  # emitted on the authenticated origin; the test asserts it
+  # against the canonical testid which is also mounted on
+  # /login (Providers wraps both routes).
+  - action: assert_announcement_text
+    text: Signing out
+
+  # Step 6 — landed at /login. Email input autoFocus restores
+  # focus to a sensible target for the next sign-in.
+  - action: assert_url_equals
+    url: /login
+  - action: assert_focus_on
+    selector: 'input[placeholder="jane@acme.com"]'

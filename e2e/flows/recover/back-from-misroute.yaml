@@ -1,0 +1,83 @@
+# recover/back-from-misroute.yaml — golden, J3, orientation.
+#
+# Closes J3's orientation arc: "Does the operator see the
+# misclick happen?" From an inbox row click that opens the
+# wrong context (a row whose detail does NOT have an
+# exception_id, but the operator expected one), can they tell
+# from a single glance that the right pane is the destination
+# and the "go forward to the exception queue" affordance is
+# absent?
+#
+# The V3 inbox-item-click-behavior-catalog asserts the converse
+# structurally (per item type, jump button presence is
+# declared); this flow asserts the J3-perspective question —
+# the operator's CONFIDENCE that they're on a recoverable
+# surface. Selection updates locally; URL never leaves /inbox.
+#
+# Steps:
+#   1. Land on /inbox. Chrome contract intact.
+#   2. Click an item whose detail does NOT carry an
+#      exception_id (id=2, SHIPMENT_INQUIRY). The right pane
+#      updates in place.
+#   3. Assert URL did NOT change — the operator is still on
+#      the inbox surface (recovery is one click away, not a
+#      browser-back gamble).
+#   4. Assert the jump affordance is ABSENT — the operator can
+#      see at a glance this row has no Exception Queue context.
+#   5. Click a DIFFERENT row to "recover" the selection. The
+#      right pane updates again; no state was lost.
+#
+# Arc: orientation. The task-completion arc for J3 is owned by
+# triage/case-to-exception-detail-roundtrip.yaml (forward/back
+# across detail surfaces preserving chrome + selection).
+name: back-from-misroute
+kind: golden
+journey: J3
+arc: orientation
+entry: /inbox
+skip:
+  reason: >-
+    Issue #133 retired the rich /inbox surface — the row aria-
+    labels ("Where is my shipment", "Beverages Dept") this flow
+    asserts against now live on /cases?source=manual_order's
+    CaseListPane with different DOM. Plus codegen lacks loginAs
+    plumbing. Rewrite against the post-#133 surface after the
+    auth helper lands.
+steps:
+  # Step 1 — landed on inbox; chrome intact.
+  - action: assert_visible
+    selector: nav
+  - action: assert_visible
+    selector: '[data-testid="inbox-row"]'
+
+  # Step 2 — click a row WITHOUT an exception_id (the "misclick"
+  # for an operator expecting Exception Queue context).
+  - action: click
+    selector: '[role="button"][aria-label*="Where is my shipment"]'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: '[role="button"][aria-label*="Where is my shipment"]'
+
+  # Step 3 — URL still /inbox: the surface is a master-detail,
+  # not a navigation. Recovery is trivial.
+  - action: assert_url_equals
+    url: /inbox
+
+  # Step 4 — the "Open in Exception Queue" jump affordance is
+  # NOT present for this row type. The operator sees the
+  # absence and knows there's no jump to misuse. Today we
+  # cannot assert NEGATIVE selectors via the schema; instead,
+  # we assert a SHIPMENT_INQUIRY-specific right-pane marker is
+  # present (the row's subject is rendered).
+  - action: assert_visible
+    selector: 'text="Where is my shipment? SO 4500019882"'
+
+  # Step 5 — click a different row to confirm selection updates
+  # cleanly. Recovery without re-entering anything.
+  - action: click
+    selector: '[role="button"][aria-label*="Beverages Dept"]'
+    keyboard_equivalent:
+      key: Enter
+      focused_selector: '[role="button"][aria-label*="Beverages Dept"]'
+  - action: assert_url_equals
+    url: /inbox

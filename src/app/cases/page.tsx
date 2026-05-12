@@ -29,7 +29,7 @@ import {
   PackageCheck,
 } from "lucide-react";
 
-import { signOut } from "next-auth/react";
+import { useSignOut } from "@/hooks/useSignOut";
 import { Badge } from "@/components/ui/Badge";
 import { NavBar } from "@/components/ui/NavBar";
 import { ALLOWED_CASE_SOURCES, casesApi } from "@/lib/api";
@@ -139,10 +139,13 @@ import { NAV_TABS } from "@/config/nav-tabs";
 // NAV_TABS consolidated to src/config/nav-tabs.ts (issue #133, PO #9).
 
 
+export const requiresAuth = true;
+
 export default function CasesPage() {
   const router = useRouter();
   const { user, visibleTabs } = useAuth();
   const { health } = useHealth();
+  const handleSignOut = useSignOut();
   const [cases, setCases] = useState<OrderCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<CasesFilters>({
@@ -207,7 +210,7 @@ export default function CasesPage() {
         userInitials={userInitials}
         userTitle={userTitle}
         agentCount={health?.allowed_intents?.length || 0}
-        onSignOut={() => signOut({ callbackUrl: "/login" })}
+        onSignOut={handleSignOut}
       />
     <main className="p-32 max-w-[1280px] mx-auto">
       <header className="mb-24">

@@ -8,7 +8,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { useSignOut } from "@/hooks/useSignOut";
 import { intentLabelFor } from "@/config/erp-label-map";
 import { useErpProfile } from "@/hooks/useErpProfile";
 import {
@@ -45,10 +45,13 @@ const RECENT_ACTIVITY = [
   { time: "07:22", orderId: "SO-6001", action: "Pending review — credit hold release needs approval", status: "REVIEW", badge: "warning", color: "var(--color-warning)" },
 ];
 
+export const requiresAuth = true;
+
 export default function DashboardPage() {
   const router = useRouter();
   const { health } = useHealth();
   const { user, visibleTabs } = useAuth();
+  const handleSignOut = useSignOut();
   const erp = useErpProfile();
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,7 +94,7 @@ export default function DashboardPage() {
         userInitials={userInitials}
         userTitle={userTitle}
         agentCount={health?.allowed_intents?.length || 0}
-        onSignOut={() => signOut({ callbackUrl: "/login" })}
+        onSignOut={handleSignOut}
 
       />
 

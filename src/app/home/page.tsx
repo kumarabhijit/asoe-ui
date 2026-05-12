@@ -24,7 +24,7 @@
 import { Suspense, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { useSignOut } from "@/hooks/useSignOut";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -74,6 +74,8 @@ const SLA_BAND_VARIANT = {
   none: "neutral",
 } as const;
 
+export const requiresAuth = true;
+
 export default function HomePage() {
   return (
     <Suspense fallback={null}>
@@ -86,6 +88,7 @@ function HomePageInner() {
   const router = useRouter();
   const { health } = useHealth();
   const { user, accessToken, visibleTabs } = useAuth();
+  const handleSignOut = useSignOut();
   const { cases, total, loading, error, refetch } = useCases();
 
   useEffect(() => {
@@ -158,7 +161,7 @@ function HomePageInner() {
         userInitials={userInitials}
         userTitle={userTitle}
         agentCount={health?.allowed_intents?.length || 0}
-        onSignOut={() => signOut({ callbackUrl: "/login" })}
+        onSignOut={handleSignOut}
       />
 
       {/* ── Page header ── */}

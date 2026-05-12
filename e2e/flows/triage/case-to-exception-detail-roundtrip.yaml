@@ -1,0 +1,96 @@
+# triage/case-to-exception-detail-roundtrip.yaml — regression, V2, J1+J3.
+#
+# Closes V2 from eng-review-test-plan.md amendment v1.1:
+#   "Affordance regression: sign-out (and surrounding auth chrome)
+#    is present on the exception queue page but disappears during
+#    forward/backward navigation across case ↔ exception detail."
+#
+# The chrome-invariant Playwright spec asserts chrome on each
+# route in isolation (page.goto then assert). V2 was a TRANSITION
+# bug — chrome vanished DURING navigation, not on final-state DOM.
+# This flow drives the operator through the full forward/back
+# round-trip and asserts the chrome contract (NavBar + sign-out
+# + StatusAnnouncer testid) at every step.
+#
+# Why this is a flow, not a chrome-invariant extension:
+#   - CMT-2 (transition assertions during the navigation) belongs
+#     to the chrome-invariant spec; it observes chrome
+#     continuously while the navigation is in flight.
+#   - THIS flow asserts chrome on the BFCACHE-RESTORED page
+#     specifically — page.goBack() can either re-mount the
+#     component tree or restore from bfcache; both must preserve
+#     chrome. Asserting after goBack() exercises the restored
+#     state.
+#
+# Arc: task-completion. The J3 (misclick recovery) operator
+# wandered from /cases to /exceptions/:id and needs to navigate
+# back without losing context. The J1 (new operator) version is
+# the more conservative "I clicked the wrong thing, take me back"
+# story.
+#
+# Notes:
+#   - The route /exceptions/exc-026 is the same seed the V1 flow
+#     uses; sandbox-mode asoe2 serves it.
+#   - The case ID case-001 is a sandbox seed; if the seed changes
+#     update both this YAML and authenticated-routes.ts.
+name: case-to-exception-detail-roundtrip
+kind: regression
+journey: [J1, J3]
+arc: task-completion
+entry: /cases
+skip:
+  reason: >-
+    Codegen does not emit loginAs() before page.goto, so the
+    forward/back navigation hops all start on /login. The chrome
+    assertions (nav + status-announcer) fail there because the
+    Login surface intentionally lacks the authenticated NavBar.
+    Un-skip after flow-codegen.ts is taught to inject loginAs().
+steps:
+  # Step 1 — landed on /cases. Chrome present.
+  - action: assert_visible
+    selector: nav
+  - action: assert_visible
+    selector: '[data-testid="status-announcer"]'
+
+  # Step 2 — navigate into a case detail surface.
+  - action: navigate
+    url: /cases/case-001
+  - action: assert_url_equals
+    url: /cases/case-001
+  - action: assert_visible
+    selector: nav
+  - action: assert_visible
+    selector: '[data-testid="status-announcer"]'
+
+  # Step 3 — cross-surface jump to the related exception detail.
+  # Operators reach this surface via a deep-link today; the
+  # affordance (a case → exception button) is a planned UI add
+  # (Phase H.6 follow-up). The flow drives the navigation
+  # directly so V2 protection lands before the UI affordance.
+  - action: navigate
+    url: /exceptions/exc-026
+  - action: assert_url_equals
+    url: /exceptions/exc-026
+  - action: assert_visible
+    selector: nav
+  - action: assert_visible
+    selector: '[data-testid="status-announcer"]'
+
+  # Step 4 — browser back. V2 root cause: chrome vanished here.
+  # If chrome is present after goBack() the regression is closed.
+  - action: back
+  - action: assert_url_equals
+    url: /cases/case-001
+  - action: assert_visible
+    selector: nav
+  - action: assert_visible
+    selector: '[data-testid="status-announcer"]'
+
+  # Step 5 — back again, all the way to /cases.
+  - action: back
+  - action: assert_url_equals
+    url: /cases
+  - action: assert_visible
+    selector: nav
+  - action: assert_visible
+    selector: '[data-testid="status-announcer"]'

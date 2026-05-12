@@ -57,19 +57,34 @@ describe("Authenticated detail pages render NavBar with Sign out (R1)", () => {
       expect(/<NavBar\b/.test(src), `${rel} must render <NavBar />`).toBe(true);
     });
 
-    it(`${rel} imports signOut from next-auth/react`, () => {
+    it(`${rel} sources a sign-out handler from useSignOut`, () => {
+      // Phase 1 of the BDD plan moved the per-page inline
+      // `() => signOut({ callbackUrl: "/login" })` into the
+      // useSignOut hook so every sign-out path also fires a
+      // StatusAnnouncer message (Q1). The contract is now:
+      // import useSignOut + call it to obtain the handler.
+      // The previous assertion (direct `signOut` import) was
+      // an implementation detail; the structural contract is
+      // unchanged — NavBar still receives a sign-out callback,
+      // it just routes through the announcer-aware hook.
       const src = read(rel);
       expect(
-        /import\s+\{[^}]*\bsignOut\b[^}]*\}\s+from\s+["']next-auth\/react["']/.test(src),
-        `${rel} must import signOut to wire onSignOut on NavBar`,
+        /import\s+\{[^}]*\buseSignOut\b[^}]*\}\s+from\s+["']@\/hooks\/useSignOut["']/.test(
+          src,
+        ),
+        `${rel} must import useSignOut from @/hooks/useSignOut so sign-out announces via StatusAnnouncer (Q1)`,
+      ).toBe(true);
+      expect(
+        /useSignOut\s*\(\s*\)/.test(src),
+        `${rel} must call useSignOut() to obtain the handler`,
       ).toBe(true);
     });
 
-    it(`${rel} passes onSignOut to NavBar (Sign out menu item is gated on it)`, () => {
+    it(`${rel} passes the useSignOut handler to NavBar (Sign out menu item is gated on it)`, () => {
       const src = read(rel);
       expect(
-        /onSignOut\s*=\s*\{[\s\S]*?signOut\s*\(/.test(src),
-        `${rel} must pass an onSignOut callback that invokes signOut(). ` +
+        /onSignOut\s*=\s*\{[^}]*\}/.test(src),
+        `${rel} must pass an onSignOut prop to NavBar. ` +
           `Without onSignOut the user-menu DropdownMenuItem renders nothing — ` +
           `see src/components/ui/NavBar.tsx:119 ("{onSignOut && ...}").`,
       ).toBe(true);

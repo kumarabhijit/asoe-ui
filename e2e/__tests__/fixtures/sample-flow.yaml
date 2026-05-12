@@ -3,6 +3,7 @@
 name: sample-flow
 kind: golden
 journey: J1
+arc: orientation
 entry: /inbox
 states:
   - loading
