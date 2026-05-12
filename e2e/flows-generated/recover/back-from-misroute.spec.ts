@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe("back-from-misroute", () => {
+test.describe("back-from-misroute", { tag: ["@flow-back-from-misroute", "@arc-orientation", "@kind-golden", "@journey-J3"] }, () => {
   test("happy path", async ({ page }) => {
     await loginAs(page, USERS.MANAGER);
     await page.goto("/cases?source=manual_order");

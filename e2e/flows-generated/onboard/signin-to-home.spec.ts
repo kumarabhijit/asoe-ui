@@ -5,7 +5,7 @@
 
 import { expect, test } from "@playwright/test";
 
-test.describe("signin-to-home", () => {
+test.describe("signin-to-home", { tag: ["@flow-signin-to-home", "@arc-orientation", "@kind-golden", "@journey-J1"] }, () => {
   test("happy path", async ({ page }) => {
     await page.goto("/login");
     await expect(page.locator("input[placeholder=\"jane@acme.com\"]")).toBeVisible();

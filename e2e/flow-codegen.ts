@@ -23,7 +23,7 @@
 //   - Loading state uses the deferred-promise pattern (decision P1).
 
 import type { Flow, StateFixture, StateKey, Step } from "./flow-schema";
-import { parseFlow } from "./flow-schema";
+import { journeysOf, parseFlow } from "./flow-schema";
 
 export interface CodegenInput {
   // The raw object parsed from YAML (e.g. via `yaml.parse(text)`).
@@ -78,6 +78,29 @@ export function generateSpec(input: CodegenInput): CodegenOutput {
     ? [`  // SKIP REASON: ${flow.skip.reason}`]
     : [];
 
+  // Phase 8 / Item 14 — observability tags. Playwright supports
+  // tags via test.describe(name, { tag: ["@..."] }, fn). Tags
+  // appear in the HTML report, can be filtered with --grep, and
+  // are read by the coverage-report script (scripts/coverage-
+  // report.ts) to slice pass/fail by journey + arc.
+  //
+  // Tag vocabulary (stable contract):
+  //   @flow-<name>            — every flow tagged with its name
+  //   @arc-<orientation|task-completion>
+  //   @journey-<J1..J5>       — one tag per journey the flow claims
+  //   @kind-<golden|regression>
+  //
+  // The tags use kebab-case prefixes so a grep like
+  // `--grep "@journey-J5"` reports zero results today (no J5
+  // flows yet) — a useful signal.
+  const tagList = [
+    `"@flow-${flow.name}"`,
+    `"@arc-${flow.arc}"`,
+    `"@kind-${flow.kind}"`,
+    ...journeysOf(flow).map((j) => `"@journey-${j}"`),
+  ];
+  const describeOpts = `{ tag: [${tagList.join(", ")}] }`;
+
   // loginAs() preamble emitted before every page.goto when authAs
   // is set. The middleware (src/middleware.ts) redirects
   // unauthenticated requests to /login; without this line every
@@ -89,7 +112,7 @@ export function generateSpec(input: CodegenInput): CodegenOutput {
 
   // Happy-path test — runs the steps with no state mocks.
   lines.push(
-    `${describeFn}(${q(flow.name)}, () => {`,
+    `${describeFn}(${q(flow.name)}, ${describeOpts}, () => {`,
     ...skipBanner,
     `  test(${q("happy path")}, async ({ page }) => {`,
     ...authPreamble,

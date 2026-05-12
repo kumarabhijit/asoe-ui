@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe("exception-triage-approval", () => {
+test.describe("exception-triage-approval", { tag: ["@flow-exception-triage-approval", "@arc-task-completion", "@kind-golden", "@journey-J2"] }, () => {
   test("happy path", async ({ page }) => {
     await loginAs(page, USERS.MANAGER);
     await page.goto("/exceptions/exc-026");

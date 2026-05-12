@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe("case-to-exception-detail-roundtrip", () => {
+test.describe("case-to-exception-detail-roundtrip", { tag: ["@flow-case-to-exception-detail-roundtrip", "@arc-task-completion", "@kind-regression", "@journey-J1", "@journey-J3"] }, () => {
   test("happy path", async ({ page }) => {
     await loginAs(page, USERS.MANAGER);
     await page.goto("/cases");

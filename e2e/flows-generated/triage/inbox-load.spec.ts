@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe("inbox-load", () => {
+test.describe("inbox-load", { tag: ["@flow-inbox-load", "@arc-orientation", "@kind-golden", "@journey-J1", "@journey-J2"] }, () => {
   test("happy path", async ({ page }) => {
     await loginAs(page, USERS.MANAGER);
     await page.goto("/cases?source=manual_order");

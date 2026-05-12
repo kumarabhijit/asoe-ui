@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe("signout-from-each-role", () => {
+test.describe("signout-from-each-role", { tag: ["@flow-signout-from-each-role", "@arc-orientation", "@kind-golden", "@journey-J2"] }, () => {
   test("happy path", async ({ page }) => {
     await loginAs(page, USERS.MANAGER);
     await page.goto("/home");

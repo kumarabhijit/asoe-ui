@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe("email-order-entry-from-inbox", () => {
+test.describe("email-order-entry-from-inbox", { tag: ["@flow-email-order-entry-from-inbox", "@arc-task-completion", "@kind-regression", "@journey-J1"] }, () => {
   test("happy path", async ({ page }) => {
     await loginAs(page, USERS.MANAGER);
     await page.goto("/exceptions/exc-026?from=inbox");

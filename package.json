@@ -22,6 +22,8 @@
     "test:browser:headed": "playwright test --headed",
     "flows:matrix": "tsx e2e/journey-matrix.ts",
     "flows:gen": "tsx e2e/flows-gen.ts",
+    "flows:coverage": "tsx scripts/coverage-report.ts",
+    "flows:coverage:check": "tsx scripts/coverage-report.ts --check",
     "flows:check": "tsx e2e/flows-gen.ts --check"
   },
   "dependencies": {
