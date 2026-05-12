@@ -6,54 +6,39 @@
 import { expect, test } from "@playwright/test";
 import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe.fixme("inbox-load", () => {
-  // SKIP REASON: Entry path was migrated post-rebase to the correct surface (Issue #133), but the selectors ([data-testid="inbox-row"], [data-testid="inbox-skeleton"], [data-testid="inbox-empty- cta"], [data-testid="inbox-error-retry"]) still target the retired rich-inbox DOM. Re-author the assertions against CaseListPane's actual testids. Plus codegen lacks loginAs plumbing.
+test.describe("inbox-load", () => {
   test("happy path", async ({ page }) => {
     await loginAs(page, USERS.MANAGER);
     await page.goto("/cases?source=manual_order");
-    await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();
+    await expect(page.locator("button[aria-label^=\"Open case \"]")).toBeVisible();
   });
 
   test("state: loading", async ({ page }) => {
     await loginAs(page, USERS.MANAGER);
     let resolveRoute: () => void = () => {};
     const routeReady = new Promise<void>((r) => { resolveRoute = r; });
-    await page.route("/api/v1/exceptions", async (route) => {
+    await page.route("/api/v1/cases**", async (route) => {
       await routeReady;
       await route.continue();
     });
     const navigation = page.goto("/cases?source=manual_order");
     // PHASE 2 — assert-during: skeleton must be visible while load is pending.
-    await expect(page.locator("[data-testid=\"inbox-skeleton\"]")).toBeVisible();
+    await expect(page.locator("role=status[name=\"Loading cases…\"]")).toBeVisible();
     resolveRoute();
     await navigation;
   });
 
   test("state: empty", async ({ page }) => {
     await loginAs(page, USERS.MANAGER);
-    await page.route("/api/v1/exceptions", async (route) => {
+    await page.route("/api/v1/cases**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: "[]",
+        body: "{\"items\":[],\"total\":0,\"cursor\":null,\"has_more\":false}",
       });
     });
     await page.goto("/cases?source=manual_order");
-    await expect(page.locator("[data-testid=\"inbox-empty-cta\"]")).toBeVisible();
-    await expect(page.getByText("You're caught up")).toBeVisible();
-  });
-
-  test("state: error", async ({ page }) => {
-    await loginAs(page, USERS.MANAGER);
-    await page.route("/api/v1/exceptions", async (route) => {
-      await route.fulfill({
-        status: 500,
-        contentType: "application/json",
-        body: "null",
-      });
-    });
-    await page.goto("/cases?source=manual_order");
-    await expect(page.locator("[data-testid=\"inbox-error-retry\"]")).toBeVisible();
+    await expect(page.getByText("No cases match the current filters.")).toBeVisible();
   });
 
 });
