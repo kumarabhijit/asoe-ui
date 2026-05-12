@@ -50,11 +50,19 @@ function byPath(path: string): AuthenticatedRoute {
 
 // Representative transition pairs covering V2's bug class:
 //   - queue -> detail -> queue (dynamic-segment round-trip)
-//   - cross-tab navigation (inbox -> exceptions queue)
+//   - cross-tab navigation (home -> exceptions queue)
 //   - detail -> detail across tabs (case detail -> exception detail)
+//
+// Note: /inbox used to be a cross-tab origin here. Issue #133
+// retired /inbox as an authenticated surface (now a redirect to
+// /cases?source=manual_order) — it lives in REDIRECT_ROUTES, not
+// AUTHENTICATED_ROUTES. Routing it through byPath() would throw
+// at spec collection time and abort the entire Playwright run.
+// /home (the new operational landing surface) is the equivalent
+// cross-tab origin for the chrome-during-transition assertion.
 const TRANSITION_PAIRS: Array<[AuthenticatedRoute, AuthenticatedRoute]> = [
   [byPath("/exceptions"), byPath("/exceptions/:id")],
-  [byPath("/inbox"), byPath("/exceptions")],
+  [byPath("/home"), byPath("/exceptions")],
   [byPath("/cases/:id"), byPath("/exceptions/:id")],
   [byPath("/dashboard"), byPath("/settings")],
 ];
