@@ -4,10 +4,12 @@
 // Edits are clobbered by `bun run flows:gen`. Update the YAML.
 
 import { expect, test } from "@playwright/test";
+import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
 test.describe.fixme("back-from-misroute", () => {
   // SKIP REASON: Issue #133 retired the rich /inbox surface — the row aria- labels ("Where is my shipment", "Beverages Dept") this flow asserts against now live on /cases?source=manual_order's CaseListPane with different DOM. Plus codegen lacks loginAs plumbing. Rewrite against the post-#133 surface after the auth helper lands.
   test("happy path", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.goto("/inbox");
     await expect(page.locator("nav")).toBeVisible();
     await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();

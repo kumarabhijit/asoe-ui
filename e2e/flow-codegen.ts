@@ -54,8 +54,18 @@ export function generateSpec(input: CodegenInput): CodegenOutput {
     "// Edits are clobbered by `bun run flows:gen`. Update the YAML.",
     "",
     'import { expect, test } from "@playwright/test";',
-    "",
   );
+
+  // Conditional import: loginAs + USERS only when authAs is set.
+  // Path is relative because tests/browser/ has no @/ alias and the
+  // generated specs sit at e2e/flows-generated/<cat>/<name>.spec.ts
+  // (three levels deep from repo root).
+  if (flow.authAs) {
+    lines.push(
+      'import { loginAs, USERS } from "../../../tests/browser/_helpers";',
+    );
+  }
+  lines.push("");
 
   // describe wrapper. If the flow opts into `skip:`, emit
   // `test.describe.fixme(...)` so Playwright reports the skip
@@ -68,11 +78,21 @@ export function generateSpec(input: CodegenInput): CodegenOutput {
     ? [`  // SKIP REASON: ${flow.skip.reason}`]
     : [];
 
+  // loginAs() preamble emitted before every page.goto when authAs
+  // is set. The middleware (src/middleware.ts) redirects
+  // unauthenticated requests to /login; without this line every
+  // authenticated-entry flow's assertions fire against the login
+  // page DOM instead of the intended surface.
+  const authPreamble = flow.authAs
+    ? [`    await loginAs(page, USERS.${flow.authAs});`]
+    : [];
+
   // Happy-path test — runs the steps with no state mocks.
   lines.push(
     `${describeFn}(${q(flow.name)}, () => {`,
     ...skipBanner,
     `  test(${q("happy path")}, async ({ page }) => {`,
+    ...authPreamble,
     `    await page.goto(${q(flow.entry)});`,
   );
   for (const step of flow.steps) {
@@ -103,6 +123,15 @@ function emitStateTest(
 ): string[] {
   const out: string[] = [];
   out.push(`  test(${q(`state: ${stateKey}`)}, async ({ page }) => {`);
+  // Authenticate BEFORE registering the route mock — loginAs
+  // performs its own page.goto('/login') + form submit + wait
+  // for the post-login landing; we do not want those internal
+  // requests intercepted by the state-matrix mock. After login
+  // we set the mock, then navigate to the flow's entry, and the
+  // entry's API calls hit the mock as intended.
+  if (flow.authAs) {
+    out.push(`    await loginAs(page, USERS.${flow.authAs});`);
+  }
   if (stateKey === "loading" && typeof fx.delay_ms === "number") {
     // P1: deferred-promise + assert-during pattern.
     out.push(

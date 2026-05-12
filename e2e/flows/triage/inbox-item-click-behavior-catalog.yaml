@@ -38,6 +38,7 @@ name: inbox-item-click-behavior-catalog
 kind: regression
 journey: [J1, J2]
 arc: orientation
+authAs: MANAGER
 entry: /inbox
 skip:
   reason: >-

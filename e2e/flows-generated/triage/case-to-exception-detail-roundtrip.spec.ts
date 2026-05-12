@@ -4,10 +4,11 @@
 // Edits are clobbered by `bun run flows:gen`. Update the YAML.
 
 import { expect, test } from "@playwright/test";
+import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe.fixme("case-to-exception-detail-roundtrip", () => {
-  // SKIP REASON: Codegen does not emit loginAs() before page.goto, so the forward/back navigation hops all start on /login. The chrome assertions (nav + status-announcer) fail there because the Login surface intentionally lacks the authenticated NavBar. Un-skip after flow-codegen.ts is taught to inject loginAs().
+test.describe("case-to-exception-detail-roundtrip", () => {
   test("happy path", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.goto("/cases");
     await expect(page.locator("nav")).toBeVisible();
     await expect(page.locator("[data-testid=\"status-announcer\"]")).toBeVisible();

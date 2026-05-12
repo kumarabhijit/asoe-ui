@@ -34,6 +34,7 @@ name: back-from-misroute
 kind: golden
 journey: J3
 arc: orientation
+authAs: MANAGER
 entry: /inbox
 skip:
   reason: >-

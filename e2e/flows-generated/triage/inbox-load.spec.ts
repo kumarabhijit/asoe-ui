@@ -4,15 +4,18 @@
 // Edits are clobbered by `bun run flows:gen`. Update the YAML.
 
 import { expect, test } from "@playwright/test";
+import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
 test.describe.fixme("inbox-load", () => {
   // SKIP REASON: Entry path was migrated post-rebase to the correct surface (Issue #133), but the selectors ([data-testid="inbox-row"], [data-testid="inbox-skeleton"], [data-testid="inbox-empty- cta"], [data-testid="inbox-error-retry"]) still target the retired rich-inbox DOM. Re-author the assertions against CaseListPane's actual testids. Plus codegen lacks loginAs plumbing.
   test("happy path", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.goto("/cases?source=manual_order");
     await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();
   });
 
   test("state: loading", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     let resolveRoute: () => void = () => {};
     const routeReady = new Promise<void>((r) => { resolveRoute = r; });
     await page.route("/api/v1/exceptions", async (route) => {
@@ -27,6 +30,7 @@ test.describe.fixme("inbox-load", () => {
   });
 
   test("state: empty", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.route("/api/v1/exceptions", async (route) => {
       await route.fulfill({
         status: 200,
@@ -40,6 +44,7 @@ test.describe.fixme("inbox-load", () => {
   });
 
   test("state: error", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.route("/api/v1/exceptions", async (route) => {
       await route.fulfill({
         status: 500,

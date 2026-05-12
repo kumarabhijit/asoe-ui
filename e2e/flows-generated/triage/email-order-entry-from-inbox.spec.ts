@@ -4,10 +4,12 @@
 // Edits are clobbered by `bun run flows:gen`. Update the YAML.
 
 import { expect, test } from "@playwright/test";
+import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
 test.describe.fixme("email-order-entry-from-inbox", () => {
   // SKIP REASON: V1 regression flow. Issue #133 retired /inbox as a master- detail surface; the email-order-entry row + jump button no longer live there. Re-target to /cases?source=manual_order (the post-#133 home of manual-order cases) and update the row selectors to match CaseListPane's DOM. Plus codegen lacks loginAs plumbing.
   test("happy path", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.goto("/inbox");
     await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();
     await page.locator("[role=\"button\"][aria-label*=\"PO 4501234567\"]").click();

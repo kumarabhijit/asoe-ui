@@ -14,6 +14,9 @@ const baseValid = {
   kind: "golden" as const,
   journey: ["J1", "J2"] as const,
   arc: "orientation" as const,
+  // Authenticated entry: schema requires authAs so the codegen
+  // knows which seed user to loginAs() before page.goto.
+  authAs: "MANAGER" as const,
   entry: "/inbox",
   steps: [
     {
@@ -252,5 +255,50 @@ describe("flow-schema — invalid inputs", () => {
     expect(() =>
       parseFlow({ ...baseValid, journey: ["J3", "J5"] }),
     ).not.toThrow();
+  });
+
+  it("rejects an authenticated entry without authAs", () => {
+    const { authAs: _drop, ...withoutAuth } = baseValid;
+    const result = flowSchema.safeParse(withoutAuth);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const msgs = result.error.issues.map((i) => i.message).join(" | ");
+      expect(msgs).toMatch(/authAs/);
+    }
+  });
+
+  it("accepts a public /login entry without authAs", () => {
+    const { authAs: _drop, ...rest } = baseValid;
+    expect(() =>
+      parseFlow({ ...rest, entry: "/login" }),
+    ).not.toThrow();
+  });
+
+  it("accepts a public /auth/callback entry without authAs", () => {
+    const { authAs: _drop, ...rest } = baseValid;
+    expect(() =>
+      parseFlow({ ...rest, entry: "/auth/callback" }),
+    ).not.toThrow();
+  });
+
+  it("rejects a public entry that DOES declare authAs", () => {
+    const result = flowSchema.safeParse({
+      ...baseValid,
+      entry: "/login",
+      authAs: "MANAGER",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const msgs = result.error.issues.map((i) => i.message).join(" | ");
+      expect(msgs).toMatch(/public entry must not declare authAs/);
+    }
+  });
+
+  it("rejects an unknown authAs role (no ad-hoc role names)", () => {
+    const result = flowSchema.safeParse({
+      ...baseValid,
+      authAs: "SUPERUSER" as unknown,
+    });
+    expect(result.success).toBe(false);
   });
 });

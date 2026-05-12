@@ -15,6 +15,7 @@ name: inbox-load
 kind: golden
 journey: [J1, J2]
 arc: orientation
+authAs: MANAGER
 entry: /cases?source=manual_order
 skip:
   reason: >-

@@ -4,9 +4,11 @@
 // Edits are clobbered by `bun run flows:gen`. Update the YAML.
 
 import { expect, test } from "@playwright/test";
+import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
 test.describe("sample-flow", () => {
   test("happy path", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.goto("/inbox");
     await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();
     await page.locator("[data-testid=\"inbox-row-3\"]").click();
@@ -16,6 +18,7 @@ test.describe("sample-flow", () => {
   });
 
   test("state: loading", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     let resolveRoute: () => void = () => {};
     const routeReady = new Promise<void>((r) => { resolveRoute = r; });
     await page.route("/api/v1/exceptions", async (route) => {
@@ -30,6 +33,7 @@ test.describe("sample-flow", () => {
   });
 
   test("state: empty", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.route("/api/v1/exceptions", async (route) => {
       await route.fulfill({
         status: 200,
@@ -43,6 +47,7 @@ test.describe("sample-flow", () => {
   });
 
   test("state: error", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.route("/api/v1/exceptions", async (route) => {
       await route.fulfill({
         status: 500,

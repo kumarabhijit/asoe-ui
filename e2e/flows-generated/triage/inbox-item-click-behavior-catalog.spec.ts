@@ -4,10 +4,12 @@
 // Edits are clobbered by `bun run flows:gen`. Update the YAML.
 
 import { expect, test } from "@playwright/test";
+import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
 test.describe.fixme("inbox-item-click-behavior-catalog", () => {
   // SKIP REASON: V3 regression flow — the catalogue of click semantics across inbox item types. Issue #133 retired the rich /inbox surface; the 6 seed INBOX rows no longer render with these aria-labels. Rewrite against /cases?source=manual_order or whatever canonical surface still exposes the per-type semantics. Plus codegen lacks loginAs plumbing.
   test("happy path", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.goto("/inbox");
     await expect(page.locator("[data-testid=\"inbox-row\"]")).toBeVisible();
     await page.locator("[role=\"button\"][aria-label*=\"Change request\"]").click();

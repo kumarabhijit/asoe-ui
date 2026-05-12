@@ -42,6 +42,25 @@ export const journeyIdSchema = z.enum(["J1", "J2", "J3", "J4", "J5"]);
  *  KPI, observed via analytics, never asserted in a test. */
 export const arcSchema = z.enum(["orientation", "task-completion"]);
 
+/** Seed user roles available to the generated specs. Mirrors the
+ *  USERS map in tests/browser/_helpers.ts; the codegen emits
+ *  `loginAs(page, USERS[<role>])` before page.goto() when the
+ *  flow's entry is not a public surface. Keep this enum in lockstep
+ *  with the helper's USERS map.
+ *
+ *  Roles chosen per the seed permission grid:
+ *    - ADMIN     — full permissions, all tabs visible
+ *    - MANAGER   — exceptions:{override, approve, escalate}
+ *    - MANAGER_2 — same as MANAGER, distinct sub (for SoD flows)
+ *    - ANALYST   — exceptions:{approve, escalate} only
+ */
+export const authRoleSchema = z.enum([
+  "ADMIN",
+  "MANAGER",
+  "MANAGER_2",
+  "ANALYST",
+]);
+
 const httpStatusSchema = z
   .number()
   .int()
@@ -222,6 +241,26 @@ export const flowSchema = z
      */
     back_target_override: z.string().optional(),
     /**
+     * Seed user role the codegen authenticates as before the
+     * happy-path page.goto. Required when the entry surface is
+     * authenticated (i.e. not /login or /auth/*); omitted for
+     * sign-in flows that drive the login form themselves.
+     *
+     * The codegen emits one line at the top of the happy-path
+     * test body:
+     *   await loginAs(page, USERS.<authAs>);
+     *
+     * Pick the LEAST-privileged role that can complete the flow.
+     * Flows that exercise role-restricted affordances (override,
+     * cosign) should specify MANAGER. Read-only flows can use
+     * ANALYST.
+     *
+     * No default: ambiguity here turns into silent auth-skip
+     * failures. The schema enforces that authenticated entries
+     * declare a role via a superRefine() below.
+     */
+    authAs: authRoleSchema.optional(),
+    /**
      * Mark the flow as skipped in CI. The codegen emits
      * `test.describe.fixme(...)` so Playwright reports the
      * skip with the citation but does not fail.
@@ -268,6 +307,34 @@ export const flowSchema = z
           });
         }
       }
+    }
+
+    // Authenticated entries must declare an authAs role. Public
+    // entries (/login or /auth/*) must NOT, since the codegen
+    // would otherwise emit a redundant loginAs() against a route
+    // that doesn't require it.
+    const isPublicEntry =
+      flow.entry === "/login"
+      || flow.entry === "/auth"
+      || flow.entry.startsWith("/auth/")
+      || flow.entry.startsWith("/login?")
+      || flow.entry.startsWith("/login#");
+
+    if (!isPublicEntry && flow.authAs === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "authenticated entry requires an authAs role — the codegen needs to know which seed user to loginAs() before page.goto()",
+        path: ["authAs"],
+      });
+    }
+    if (isPublicEntry && flow.authAs !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "public entry must not declare authAs — the codegen does not emit loginAs() for public routes (sign-in flows drive the form themselves)",
+        path: ["authAs"],
+      });
     }
   });
 

@@ -37,14 +37,8 @@ name: case-to-exception-detail-roundtrip
 kind: regression
 journey: [J1, J3]
 arc: task-completion
+authAs: MANAGER
 entry: /cases
-skip:
-  reason: >-
-    Codegen does not emit loginAs() before page.goto, so the
-    forward/back navigation hops all start on /login. The chrome
-    assertions (nav + status-announcer) fail there because the
-    Login surface intentionally lacks the authenticated NavBar.
-    Un-skip after flow-codegen.ts is taught to inject loginAs().
 steps:
   # Step 1 — landed on /cases. Chrome present.
   - action: assert_visible

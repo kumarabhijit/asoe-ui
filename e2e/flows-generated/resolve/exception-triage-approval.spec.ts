@@ -4,10 +4,11 @@
 // Edits are clobbered by `bun run flows:gen`. Update the YAML.
 
 import { expect, test } from "@playwright/test";
+import { loginAs, USERS } from "../../../tests/browser/_helpers";
 
-test.describe.fixme("exception-triage-approval", () => {
-  // SKIP REASON: Codegen does not yet emit a loginAs() step before page.goto for authenticated entries. The middleware redirects to /login and every assertion fires against the login page DOM. Un-skip once flow-codegen.ts is taught to inject loginAs() (or the flow YAML schema declares an authAs role).
+test.describe("exception-triage-approval", () => {
   test("happy path", async ({ page }) => {
+    await loginAs(page, USERS.MANAGER);
     await page.goto("/exceptions/exc-026");
     await expect(page.locator("nav")).toBeVisible();
     await expect(page.locator("[data-testid=\"status-announcer\"]")).toBeVisible();
