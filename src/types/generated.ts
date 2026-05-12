@@ -1710,6 +1710,8 @@ export interface components {
             lifecycle_state: string;
             /** Order Id */
             order_id: string;
+            /** Parent Case Id */
+            parent_case_id?: string | null;
             /** Reanalysis History */
             reanalysis_history?: {
                 [key: string]: unknown;
