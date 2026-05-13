@@ -262,9 +262,21 @@ function CasesWorkspace() {
       setDetailMissing(false);
       return;
     }
+    // Clear the prior case's data BEFORE the new fetch starts.
+    // Without this, a fast case-switch (keyboard nav + click) re-
+    // renders CaseDetailPanel with the OLD case's records still in
+    // state — the panel's auto-mount effect then calls
+    // onSelectRecord(records[0].id), writing the stale record's id
+    // into the URL. By the time the new fetch finishes, the URL has
+    // a record that doesn't exist on the new case, so the inline
+    // ribbon never mounts ("many cases don't show detailed view"
+    // bug, ADR-041 P3c follow-on).
+    setOrderCase(null);
+    setRecords([]);
+    setPolicyHits([]);
+    setDetailMissing(false);
     let cancelled = false;
     setDetailLoading(true);
-    setDetailMissing(false);
     Promise.all([
       casesApi.get(selectedCaseId),
       casesApi.getRecords(selectedCaseId).catch(() => ({
@@ -504,7 +516,16 @@ function CasesWorkspace() {
             Case not found: <code>{selectedCaseId}</code>
           </div>
         )}
-        {selectedCaseId && !detailLoading && orderCase && (
+        {/* Render guard against fast case-switch race: don't show the
+            panel until the fetched `orderCase.case_id` matches the
+            current URL `?case=` value. Without this, a click → click
+            sequence renders the panel with the prior case's records
+            still in state, and CaseDetailPanel's auto-mount writes
+            the wrong record id back into the URL. */}
+        {selectedCaseId
+          && !detailLoading
+          && orderCase
+          && orderCase.case_id === selectedCaseId && (
           <CaseDetailPanel
             orderCase={orderCase}
             attachedRecords={records}
