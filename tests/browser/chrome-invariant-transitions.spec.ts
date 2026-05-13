@@ -63,10 +63,13 @@ function byPath(path: string): AuthenticatedRoute {
 // S15a — /exceptions/[id] retired in favour of inline mount on
 // /cases/[id]?record=<id>. The dynamic-segment round-trip is now
 // covered by /cases <-> /cases/:id.
+// ADR-041 P4 — /exceptions (queue) retired too; transitions that
+// previously used it now use /home and /dashboard for cross-tab
+// chrome assertions.
 const TRANSITION_PAIRS: Array<[AuthenticatedRoute, AuthenticatedRoute]> = [
   [byPath("/cases"), byPath("/cases/:id")],
-  [byPath("/home"), byPath("/exceptions")],
-  [byPath("/cases/:id"), byPath("/exceptions")],
+  [byPath("/home"), byPath("/cases")],
+  [byPath("/cases/:id"), byPath("/home")],
   [byPath("/dashboard"), byPath("/settings")],
 ];
 

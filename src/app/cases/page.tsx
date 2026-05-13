@@ -38,6 +38,11 @@ import { ALLOWED_CASE_SOURCES, casesApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useSlaTicker } from "@/hooks/useSlaTicker";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import {
+  isCaseInvalidationEvent,
+  useCases,
+} from "@/hooks/useManualOrderCases";
 import { STATUS_LABEL } from "@/lib/cases";
 import { cn } from "@/lib/utils";
 import type {
@@ -204,8 +209,6 @@ function CasesWorkspace() {
   const selectedCaseId = search?.get("case") ?? undefined;
   const selectedRecordId = search?.get("record") ?? undefined;
 
-  const [cases, setCases] = useState<OrderCase[]>([]);
-  const [listLoading, setListLoading] = useState(true);
   const [filters, setFilters] = useState<CasesFilters>({
     source: null,
     status: null,
@@ -220,25 +223,34 @@ function CasesWorkspace() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailMissing, setDetailMissing] = useState(false);
 
-  /* ── Load the queue ─────────────────────────────────────────── */
-  useEffect(() => {
-    let cancelled = false;
-    setListLoading(true);
-    casesApi
-      .list({
-        source: filters.source ?? undefined,
-        status: filters.status ?? undefined,
-      })
-      .then((res) => {
-        if (!cancelled) setCases(res.items);
-      })
-      .finally(() => {
-        if (!cancelled) setListLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [filters.source, filters.status]);
+  /* ── Queue — silent live refresh via useCases + useWebSocket ── */
+  // P3b restored the WS-driven silent refresh that landed on the
+  // deleted /exceptions/page.tsx. `useCases` walks the cursor loop
+  // (handles >limit cases) and exposes `refetch()`; the WS handler
+  // calls it on any case_* event. `useCases` only flips `loading`
+  // on the initial fetch — subsequent refetches are silent so the
+  // queue doesn't flash a spinner under the operator's cursor.
+  const {
+    cases: rawCases,
+    loading: listLoading,
+    refetch,
+  } = useCases(filters.source ?? undefined);
+
+  // useCases doesn't take a status filter; apply it client-side so
+  // the chip toolbar stays responsive without an extra round-trip.
+  const cases = useMemo<OrderCase[]>(() => {
+    if (!filters.status) return rawCases;
+    return rawCases.filter((c) => c.status === filters.status);
+  }, [rawCases, filters.status]);
+
+  /* ── WS silent refresh wiring ───────────────────────────────── */
+  useWebSocket({
+    onEvent: (ev) => {
+      if (isCaseInvalidationEvent(ev)) refetch();
+    },
+    onReconnect: refetch,
+    onPollFallback: refetch,
+  });
 
   /* ── Load the selected case's detail ────────────────────────── */
   useEffect(() => {
