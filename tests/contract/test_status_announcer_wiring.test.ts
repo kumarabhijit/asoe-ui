@@ -114,11 +114,12 @@ describe("StatusAnnouncer wiring (Q1)", () => {
     // /inbox as an authenticated surface (it is now a redirect
     // alias, listed in REDIRECT_ROUTES) and introduced /home as
     // the new operational landing page.
+    // ADR-041 P4 — `/exceptions/page.tsx` deleted (redirect to /cases);
+    // S15a had already retired `/exceptions/[id]`. `/cases/page.tsx`
+    // is the canonical queue + workspace; `/cases/[id]/page.tsx`
+    // survives as the focused single-case view.
     const pages = [
       "src/app/home/page.tsx",
-      "src/app/exceptions/page.tsx",
-      // S15a — /exceptions/[id] retired; per-record ribbon mounts
-      // inline on /cases/[id]?record=<id>.
       "src/app/cases/page.tsx",
       "src/app/cases/[id]/page.tsx",
       "src/app/dashboard/page.tsx",

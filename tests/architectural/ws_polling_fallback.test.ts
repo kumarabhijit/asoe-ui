@@ -29,11 +29,6 @@ const HOOK_PATH = path.resolve(
   __dirname,
   "../../src/hooks/useWebSocket.ts",
 );
-const PAGE_PATH = path.resolve(
-  __dirname,
-  "../../src/app/exceptions/page.tsx",
-);
-
 describe("useWebSocket: Section 8.4 polling fallback", () => {
   it("accepts an onPollFallback option in UseWebSocketOptions", () => {
     const src = readFileSync(HOOK_PATH, "utf-8");
@@ -78,19 +73,9 @@ describe("useWebSocket: Section 8.4 polling fallback", () => {
   });
 });
 
-describe("ExceptionQueuePage (V5.1): WS+polling unified silent refresh", () => {
-  // Phase 28.5 — `/exceptions` projects from `useCases().refetch`.
-  // The page wires both `onReconnect` and `onPollFallback` to the
-  // same silent refresh so the visual behaviour is identical
-  // whether the trigger is a WS recovery or REST polling.
-
-  it("passes onPollFallback to useWebSocket", () => {
-    const src = readFileSync(PAGE_PATH, "utf-8");
-    expect(src).toMatch(/onPollFallback:\s*refetch/);
-  });
-
-  it("reuses the same silent-refresh handler for both onReconnect and onPollFallback", () => {
-    const src = readFileSync(PAGE_PATH, "utf-8");
-    expect(src).toMatch(/onReconnect:\s*refetch[\s\S]{0,400}onPollFallback:\s*refetch/);
-  });
-});
+// ADR-041 P4 (2026-05-13) — the `/exceptions` page-level locks for
+// onReconnect/onPollFallback wiring were tied to the now-deleted
+// `/exceptions/page.tsx`. The hook-level Section 8.4 polling-
+// fallback contract above still applies. Restoring the page-level
+// silent-refresh on the canonical `/cases/page.tsx` workspace is
+// tracked as a P3b follow-on.

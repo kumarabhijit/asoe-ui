@@ -57,11 +57,10 @@ export const REDIRECT_ROUTES: readonly string[] = [
 export const AUTHENTICATED_ROUTES: readonly AuthenticatedRoute[] = [
   // Issue #133 (PO #5/#6) — operational landing surface.
   { path: "/home", source: "src/app/home/page.tsx" },
-  { path: "/exceptions", source: "src/app/exceptions/page.tsx" },
-  // S15a — /exceptions/[id] retired. The per-record HITL ribbon is
-  // mounted inline on /cases/[id]?record=<id> (CaseDetailPanel +
-  // ExceptionDetailPanel). The queue page is the last `/exceptions/*`
-  // surface; deep-links into records live under /cases/.
+  // ADR-041 P4 (2026-05-13) — `/exceptions` retired (redirect to
+  // `/cases`); the route files and CaseListPane were deleted. S15a
+  // had already retired `/exceptions/[id]`. `/cases` is the single
+  // canonical queue + workspace surface now.
   { path: "/cases", source: "src/app/cases/page.tsx" },
   {
     path: "/cases/:id",
