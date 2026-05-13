@@ -21,7 +21,7 @@
 
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -37,6 +37,7 @@ import { NavBar } from "@/components/ui/NavBar";
 import { ALLOWED_CASE_SOURCES, casesApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
+import { useKeyboardListNav } from "@/hooks/useKeyboardListNav";
 import { useSlaTicker } from "@/hooks/useSlaTicker";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import {
@@ -326,6 +327,21 @@ function CasesWorkspace() {
       });
   }, [cases, tickNow]);
 
+  /* ── Keyboard nav (j / k / ArrowDown / ArrowUp / Home / End) ── */
+  // Plug the canonical hook into the queue. The hook gates on
+  // typing-in-input + Cmd/Ctrl combos so search inputs and command
+  // palettes keep their own bindings. Selection updates the URL via
+  // handleSelectCase, which preserves the back/forward semantics.
+  const queueRef = useRef<HTMLUListElement | null>(null);
+  useKeyboardListNav({
+    items: sorted,
+    getId: ({ case_ }) => case_.case_id,
+    selectedId: selectedCaseId ?? null,
+    onSelect: handleSelectCase,
+    containerRef: queueRef,
+    enabled: sorted.length > 0,
+  });
+
   return (
     <main
       className={cn(
@@ -394,11 +410,13 @@ function CasesWorkspace() {
           )}
           {!listLoading && sorted.length > 0 && (
             <ul
+              ref={queueRef}
               role="listbox"
               aria-label="Cases"
               aria-activedescendant={
                 selectedCaseId ? `case-row-${selectedCaseId}` : undefined
               }
+              tabIndex={0}
               className="m-0 p-0 list-none"
             >
               {sorted.map(({ case_, sla }) => {
@@ -410,6 +428,7 @@ function CasesWorkspace() {
                       type="button"
                       role="option"
                       aria-selected={isSelected}
+                      data-keyboard-nav-id={case_.case_id}
                       onClick={() => handleSelectCase(case_.case_id)}
                       className={cn(
                         "w-full text-left py-12 px-16 flex flex-col gap-4",
