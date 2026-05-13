@@ -231,6 +231,40 @@ The following capabilities are **not in scope** for current sessions. Do not imp
 
 ---
 
+## Test strategy
+
+The test pyramid, the gap-closure patterns, and the per-bug
+regression rule are codified in `docs/test-strategy/README.md`.
+Read that doc once. Reference impls listed there.
+
+Required gates on every PR:
+
+  * **Bug-fix PRs MUST include a regression test that fails on the
+    parent commit.** Verify by:
+
+    ```
+    git stash
+    git checkout HEAD~1 -- <fixed-file>
+    npx vitest run <new-test>     # or the matching browser-e2e
+    ```
+
+    The test must fail. Restore the fix and verify it now passes.
+    Paste both verifications into the PR description.
+
+  * **State-machine surfaces** (any page driving its state off
+    `useSearchParams` / `useParams` / multiple `useEffect`s)
+    require BOTH a source-level architectural lock AND a multi-
+    step operator-journey browser e2e. The pattern in
+    `tests/architectural/cases_workspace_render_guard.test.ts` +
+    `tests/browser/cases-workspace-case-switch.spec.ts` is the
+    reference.
+
+  * **Mock-data layer changes** (any edit to `MOCK_*` constants or
+    `caseFromMockException`-shaped derivations in `src/lib/api.ts`)
+    require a matching architectural lock mirroring any backend
+    Pydantic `model_validator` on the same entity. See
+    `tests/architectural/case_pivot_mock_wiring.test.ts`.
+
 ## Definition of Done
 
 A task is done only if:
@@ -242,4 +276,5 @@ A task is done only if:
 - Status indicators use icon + text (WCAG 1.4.1)
 - Layer 1/2 pattern implemented where applicable
 - Types match `asoe2` backend contracts
+- Bug-fix PRs include a regression test that fails on the parent commit (see Test strategy above)
 - Docs updated if the change adds pages, components, hooks, or types (see `prompts/update_docs.md`)
