@@ -1,29 +1,22 @@
-/**
- * Exception Queue — case-projected master-detail view (V5.1.1).
- *
- * Phase 28.5.x §28.5 → §D8 — `/exceptions` mounts the new
- * `CaseListPane` (cluster filter chips, intent multi-select,
- * search with operators, saved views, keyboard nav with
- * `role="listbox"`/`role="option"`, sort toggle). Right pane stays
- * the thin case-header summary with "Open case" → `/cases/{id}`
- * (D8: full-detail-in-pane stays deferred to V5.2). Click-through
- * still routes to `/cases/{case_id}` — the canonical case detail
- * surface.
- *
- * Architectural notes:
- *   * Pure list projector (CLAUDE.md Guardrail #6). No client-side
- *     composition; every field comes from OrderCase as the backend
- *     hands it.
- *   * No per-intent / per-lifecycle dispatch (Guardrail #1). Status
- *     and intent vocabularies come from `useHealth`; the chip bar
- *     sources its grouping from `src/lib/cases.ts` (the single
- *     consolidated STATUS_LABEL map this PR creates).
- *   * Direct exception detail (e.g. from a runbook deeplink)
- *     remains reachable at `/exceptions/[id]` — that route still
- *     mounts `ExceptionDetailPanel`.
- *   * WS invalidation: `case_*` events trigger silent refetch via
- *     `useCases().refetch()`.
- */
+// /exceptions — RETIRED. ADR-041 P2 (2026-05-13).
+//
+// `/cases` is the single canonical queue surface. This page survives
+// only to host the `CaseListPane`-based richer queue features
+// (filter chips, intent multi-select, search with operators, saved
+// views, keyboard nav, sort toggle) until P3 folds them into
+// `/cases/page.tsx` as the three-pane workspace.
+//
+// `/exceptions` and `/exceptions/:path*` are redirected to `/cases`
+// in `next.config.mjs::redirects()`. The NavBar tab was removed
+// from `src/config/nav-tabs.ts` and ChromeBoundary. `/exceptions/[id]`
+// was retired in PR #153 (S15a) — the previous docstring's claim
+// that it remained reachable was stale and is now corrected.
+//
+// Architectural notes (still apply to the queue features below):
+//   * Pure list projector (CLAUDE.md Guardrail #6).
+//   * No per-intent / per-lifecycle dispatch (Guardrail #1).
+//   * WS invalidation: `case_*` events trigger silent refetch via
+//     `useCases().refetch()`.
 "use client";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
