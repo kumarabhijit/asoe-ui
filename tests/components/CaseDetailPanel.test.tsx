@@ -15,6 +15,16 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+// Stub the inline ExceptionDetailPanel — it pulls NextAuth + WebSocket
+// + a full mock graph. Tests in this file exercise only the case-level
+// surface (header anatomy, picker semantics, slim-strip disclosure);
+// the per-record ribbon is exercised in its own dedicated suite.
+vi.mock("@/app/exceptions/ExceptionDetailPanel", () => ({
+  default: ({ exceptionId }: { exceptionId: string }) => (
+    <div data-testid="exception-detail-panel-stub">{exceptionId}</div>
+  ),
+}));
+
 import { CaseDetailPanel } from "@/app/cases/CaseDetailPanel";
 import type { OrderCase } from "@/types/cases";
 import type { ExceptionDetail } from "@/types/exceptions";
@@ -175,5 +185,96 @@ describe("CaseDetailPanel — Attached records stack (Phase 28.5.x)", () => {
       />,
     );
     expect(onSelectRecord).toHaveBeenCalledWith("only-exc");
+  });
+});
+
+
+describe("CaseDetailPanel — slim case context strip", () => {
+  function mockRecord(over: Partial<{ id: string }> = {}): ExceptionDetail {
+    return {
+      id: over.id ?? "exc-mounted",
+      tenant_id: "acme-corp",
+      order_id: "PO-mounted",
+      event_type: "EDI_850_PRICE_MISMATCH",
+      intent: "CONTRACTUAL_CORRECTION",
+      lifecycle_state: "PENDING_REVIEW",
+      shadow_verdict: "GREEN",
+      selected_recipe: "PriceAdjustmentRecipe",
+      resolution_data: {},
+      reanalysis_history: [],
+      created_at: "2026-05-10T08:00:00Z",
+      updated_at: "2026-05-10T08:00:00Z",
+    };
+  }
+
+  it("collapses to the slim context strip when a record is mounted", () => {
+    // With selectedRecordId set, the per-record HITL ribbon owns the
+    // primary visual weight. The case header collapses to a slim
+    // context strip — case_id + channel + SLA + customer PO + status.
+    // The verbose `dl` grid (`Opened`, `SLA deadline · …`, `Customer`,
+    // `Skill bundle at open`) only re-appears via the disclosure.
+    render(
+      <CaseDetailPanel
+        orderCase={mockCase()}
+        attachedRecords={[mockRecord()]}
+        selectedRecordId="exc-mounted"
+      />,
+    );
+    expect(
+      screen.getByRole("banner", { name: /case context/i }),
+    ).toBeInTheDocument();
+    // Slim strip still surfaces case_id + channel.
+    expect(screen.getAllByText("case-PHB").length).toBeGreaterThan(0);
+    expect(screen.getByText("Email")).toBeInTheDocument();
+    // Field grid heading absent until disclosure expands.
+    expect(screen.queryByText(/skill bundle at open/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^opened$/i)).not.toBeInTheDocument();
+    // Disclosure is keyboard-reachable.
+    expect(
+      screen.getByRole("button", { name: /case details/i }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("re-expands the full header on disclosure click and collapses again", async () => {
+    render(
+      <CaseDetailPanel
+        orderCase={mockCase()}
+        attachedRecords={[mockRecord()]}
+        selectedRecordId="exc-mounted"
+      />,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /^case details$/i }),
+    );
+    // Full grid present.
+    expect(
+      screen.getByRole("banner", { name: /^case header$/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^opened$/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /hide case details/i }),
+    ).toHaveAttribute("aria-expanded", "true");
+    // Re-collapse round-trips back to the slim strip.
+    await userEvent.click(
+      screen.getByRole("button", { name: /hide case details/i }),
+    );
+    expect(
+      screen.getByRole("banner", { name: /case context/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^opened$/i)).not.toBeInTheDocument();
+  });
+
+  it("renders the full header when no record is selected", () => {
+    // Multi-record cases without a pick (or no-records cases) keep the
+    // full header — there's no inline ribbon yet, so the case-level
+    // fields ARE the primary content.
+    render(<CaseDetailPanel orderCase={mockCase()} />);
+    expect(
+      screen.getByRole("banner", { name: /^case header$/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^opened$/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^case details$/i }),
+    ).not.toBeInTheDocument();
   });
 });

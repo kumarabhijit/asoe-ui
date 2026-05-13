@@ -23,8 +23,8 @@
 
 "use client";
 
-import { useEffect } from "react";
-import { Mail, PackageCheck, Clock, ShieldAlert, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Mail, PackageCheck, Clock, ShieldAlert, ChevronRight, ChevronDown } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
@@ -110,6 +110,13 @@ export function CaseDetailPanel({
   const hasPolicyHits = (policyHits ?? []).length > 0;
   const records = attachedRecords ?? [];
   const hasAttachedRecords = records.length > 0;
+  // When a record is selected, the per-record HITL ribbon is the
+  // primary work surface; the case header collapses to a slim
+  // context strip so the ribbon starts near the top of the
+  // viewport. The disclosure lets the operator re-expand the full
+  // field grid on demand without losing the case URL as the
+  // canonical action surface.
+  const [showFullCaseHeader, setShowFullCaseHeader] = useState(false);
 
   // Single-record cases auto-mount the ribbon — the picker step
   // collapses to zero clicks. We surface this through onSelectRecord
@@ -124,11 +131,62 @@ export function CaseDetailPanel({
   const selectedRecord = selectedRecordId
     ? records.find((r) => r.id === selectedRecordId) ?? null
     : null;
+  // Slim strip when a record is mounted inline, full header
+  // otherwise. The disclosure (only present in the slim variant)
+  // expands the full field grid below the strip without
+  // unmounting the selected-record panel.
+  const renderSlimHeader = selectedRecord !== null && !showFullCaseHeader;
 
   return (
     <div className="space-y-24">
-      {/* ── Case header ──────────────────────────────────────────── */}
+      {renderSlimHeader ? (
+        <header
+          aria-label="Case context"
+          className="flex flex-wrap items-center gap-8 px-12 py-8 bg-surface-secondary border border-border-subtle rounded-md text-caption text-text-secondary"
+        >
+          <code className="font-mono text-text-primary">{orderCase.case_id}</code>
+          <span aria-hidden className="text-text-quaternary">·</span>
+          <span>{sourceChannelLabel(orderCase.source_channel)}</span>
+          {sla.band !== "none" && (
+            <>
+              <span aria-hidden className="text-text-quaternary">·</span>
+              <Badge
+                variant={SLA_BAND_VARIANT[sla.band]}
+                size="sm"
+                aria-label={`SLA: ${sla.label}`}
+              >
+                <Clock size={10} aria-hidden className="mr-4" />
+                {sla.label}
+              </Badge>
+            </>
+          )}
+          <EvidenceBlock tier="audit-bearing" value={orderCase.customer_po_number}>
+            {(v) => (
+              <>
+                <span aria-hidden className="text-text-quaternary">·</span>
+                <span>
+                  PO <code className="font-mono text-text-primary">{String(v)}</code>
+                </span>
+              </>
+            )}
+          </EvidenceBlock>
+          <span className="ml-auto text-text-tertiary">
+            {STATUS_LABEL[orderCase.status] ?? orderCase.status}
+          </span>
+          <button
+            type="button"
+            aria-expanded={false}
+            aria-controls="case-full-header"
+            onClick={() => setShowFullCaseHeader(true)}
+            className="flex items-center gap-4 text-text-tertiary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm px-4"
+          >
+            <ChevronDown size={12} aria-hidden />
+            Case details
+          </button>
+        </header>
+      ) : (
       <header
+        id={selectedRecord ? "case-full-header" : undefined}
         aria-label="Case header"
         className="bg-surface-primary border border-border rounded-md p-16 shadow-xs"
       >
@@ -214,7 +272,20 @@ export function CaseDetailPanel({
             {(v) => <Field label="Skill bundle at open" value={String(v)} mono />}
           </EvidenceBlock>
         </dl>
+        {selectedRecord && showFullCaseHeader && (
+          <button
+            type="button"
+            aria-expanded={true}
+            aria-controls="case-full-header"
+            onClick={() => setShowFullCaseHeader(false)}
+            className="mt-12 flex items-center gap-4 text-caption text-text-tertiary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm"
+          >
+            <ChevronRight size={12} aria-hidden className="rotate-90" />
+            Hide case details
+          </button>
+        )}
       </header>
+      )}
 
       {/* ── Compliance hits (ADR-039 §4.5 — L1 vs L2 distinction) ── */}
       {hasPolicyHits && (
