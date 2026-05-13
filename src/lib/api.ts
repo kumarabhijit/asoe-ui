@@ -688,6 +688,20 @@ const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   },
 ];
 
+// S15a — every record is attached to a case. Mirror asoe2's
+// `materialise every record` invariant (api/case_resolver.py
+// `should_materialise() -> True`) so the mock data layer behaves
+// like the live backend: every exception carries a `parent_case_id`,
+// and `casesApi.getRecords(parent_case_id).items` is non-empty.
+// Pre-S15a only events used the `case-for-${id}` naming; aligning
+// the records here closes the gap that left `/cases/[id]?record=…`
+// rendering only the case header (the picker had no rows, so the
+// inline ExceptionDetailPanel — and with it AgentReasoningCard,
+// the HITL action ribbon, and DiagnosticsSection — never mounted).
+MOCK_EXCEPTIONS.forEach((e) => {
+  e.parent_case_id = `case-for-${e.id}`;
+});
+
 /** Per-exception trace enrichment — optional Layer 2 fields demonstrated
  *  on a couple of representative exceptions. In production these will be
  *  populated by the recipe layer via TraceRecord extensions. */
@@ -3610,75 +3624,84 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
  * ADR-038 Phase H.6 — case-centric API + mock data
  * ============================================================ */
 
-import type { OrderCase } from "@/types/cases";
+import type { CaseStatus, OrderCase } from "@/types/cases";
 
 /**
- * Mock cases — stand-in until asoe2's V009 / case-store ships in the
- * real backend. Each case parents one or more existing MOCK_EXCEPTIONS
- * via `parent_case_id`. The case list view consumes these directly;
- * detail view loads the case + its child exceptions.
+ * Derive an OrderCase for a given mock exception. The asoe2 backend's
+ * S15a invariant materialises a case for every record; the mock layer
+ * mirrors that here so `/cases/[id]?record=<id>` resolves to a real
+ * case for every exception the queue can link to.
  *
- * The IDs are stable across runs so tests can assert against them.
+ * Field derivations:
+ *   * `source` / `source_channel` — inferred from `event_type`. Email-
+ *     origin events surface as manual_order/email; EDI events as
+ *     automated_order/edi_x12_850; everything else as automated_order
+ *     with a generic api channel. This is a UI-side default — the
+ *     live backend reads this off the case row directly.
+ *   * `customer_po_number` / `sales_order_id` — the exception's
+ *     `order_id` is the operator-visible PO; we mirror it into both
+ *     slots so the slim context strip + case-list rows both render.
+ *   * `status` — projected from the exception's `lifecycle_state`.
+ *     The case status enum is a 7-state pivot of the per-record
+ *     lifecycle; mapping below is deterministic.
+ *   * `opened_at` / `sla_deadline` — opened mirrors the exception's
+ *     `created_at`; SLA is +24h, matching the asoe2 sandbox default.
  */
-const MOCK_CASES: OrderCase[] = [
-  {
-    case_id: "case-001",
-    tenant_id: "acme-corp",
-    customer_id: "acct-walmart",
-    source: "automated_order",
-    source_channel: "edi_x12_850",
-    customer_po_number: "PO-DUP-001",
-    sales_order_id: "SO-DUP-001",
+function caseFromMockException(exc: ExceptionSummary): OrderCase {
+  const isEmail =
+    exc.event_type?.startsWith("EMAIL_") || exc.event_type === "ORDER_RECEIVED";
+  const isEdi = exc.event_type?.startsWith("EDI_");
+  const source = isEmail ? "manual_order" : "automated_order";
+  const source_channel = isEdi ? "edi_x12_850" : isEmail ? "email" : "api";
+  const status: CaseStatus = (() => {
+    switch (exc.lifecycle_state) {
+      case "RESOLVED":
+      case "CLOSED":
+        return "RESOLVED";
+      case "BLOCKED":
+        return "BLOCKED";
+      case "FAILED":
+        return "FAILED";
+      default:
+        // PENDING_REVIEW / ESCALATED / PENDING_COSIGN all mean a human
+        // owes a decision — projected to OPEN_AWAITING_HUMAN.
+        return "OPEN_AWAITING_HUMAN";
+    }
+  })();
+  const opened = new Date(exc.created_at);
+  const sla = new Date(opened.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  const isClosed = status === "RESOLVED" || status === "BLOCKED";
+  return {
+    case_id: `case-for-${exc.id}`,
+    tenant_id: exc.tenant_id,
+    customer_id: exc.account_id ?? null,
+    source,
+    source_channel,
+    customer_po_number: exc.order_id ?? null,
+    sales_order_id: source === "automated_order" ? exc.order_id ?? null : null,
     edi_transaction_id: null,
-    source_email_id: null,
-    opened_at: "2026-04-21T08:00:00Z",
-    closed_at: null,
-    status: "OPEN_AWAITING_HUMAN",
-    sla_deadline: "2026-04-23T08:00:00Z",
+    source_email_id: isEmail ? `msg-${exc.id}` : null,
+    opened_at: exc.created_at,
+    closed_at: isClosed ? exc.updated_at : null,
+    status,
+    sla_deadline: sla,
     tier: 2,
     working_memory_summary: null,
     last_compaction_at: null,
-    bundle_version_at_open: "duplicate-po@1.0.0",
-  },
-  {
-    case_id: "case-002",
-    tenant_id: "acme-corp",
-    customer_id: "acct-kroger",
-    source: "automated_order",
-    source_channel: "edi_x12_850",
-    customer_po_number: "PO-PRH-001",
-    sales_order_id: "SO-PRH-001",
-    edi_transaction_id: null,
-    source_email_id: null,
-    opened_at: "2026-04-22T10:15:00Z",
-    closed_at: null,
-    status: "OPEN_AWAITING_HUMAN",
-    sla_deadline: "2026-04-22T18:00:00Z",
-    tier: 2,
-    working_memory_summary: null,
-    last_compaction_at: null,
-    bundle_version_at_open: "price-hold-release@1.0.0",
-  },
-  {
-    case_id: "case-003",
-    tenant_id: "acme-corp",
-    customer_id: "acct-target",
-    source: "manual_order",
-    source_channel: "email",
-    customer_po_number: "EML-PO-2026-0042",
-    sales_order_id: null,
-    edi_transaction_id: null,
-    source_email_id: "msg-southeast-001",
-    opened_at: "2026-04-23T07:30:00Z",
-    closed_at: null,
-    status: "OPEN_AWAITING_BUYER",
-    sla_deadline: "2026-04-25T07:30:00Z",
-    tier: 2,
-    working_memory_summary: null,
-    last_compaction_at: null,
-    bundle_version_at_open: "email-order-entry@1.0.0",
-  },
-];
+    bundle_version_at_open: null,
+  };
+}
+
+/**
+ * Mock cases — one per MOCK_EXCEPTIONS entry, derived deterministically
+ * so `casesApi.get(case-for-<excId>)` resolves and `casesApi.getRecords`
+ * returns a populated `items` array. Pre-S15a this list held three
+ * standalone demo cases with no attached records; that left the case
+ * detail surface rendering only the header (Verdict 2026-04-22
+ * Guardrail #6 — no "no records" placeholder, so the inline ribbon
+ * silently never mounted).
+ */
+const MOCK_CASES: OrderCase[] = MOCK_EXCEPTIONS.map(caseFromMockException);
 
 /**
  * Cases API (/api/v1/cases/*) — Phase H.6 surface. Backend endpoints
