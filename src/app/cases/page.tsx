@@ -1,26 +1,28 @@
-/**
- * /cases — primary CSR work surface (ADR-038 §6 / Phase H.6).
- *
- * Single page that shows every OrderCase the operator can act on,
- * sorted by SLA deadline (most-urgent first). Filter chips for case
- * source and status. Existing /inbox and /exceptions retain as
- * filtered case-list views per ADR-038 §12.5 (next commit).
- *
- * Architecturally:
- *   * No per-intent dispatch — a case is a case regardless of which
- *     intent its child exceptions carry. Guardrail #1 preserved.
- *   * Source vocabulary from ALLOWED_CASE_SOURCES (api.ts boundary
- *     layer); page code never names the literal strings inline.
- *   * SLA visualisation is a pure derivation (slaSnapshot helper).
- *     No threshold logic in page code; the band thresholds sit in
- *     this file's helper as visual policy and are ratified by
- *     Frontend Platform.
- */
+// /cases — primary CSR work surface (ADR-041 P3).
+//
+// Two-pane workspace: queue (left) + case detail (right), URL-driven
+// via `?case=<caseId>&record=<recordId>`. Replaces the prior full-
+// width queue that forced a route change on every drill-in.
+//
+// The UX architect's panel recommendation was three-pane (case list
+// | record list | detail); P3a ships the queue+detail split because
+// the record list already lives INSIDE `CaseDetailPanel` as the
+// "Attached records" picker. P3c will lift the picker out when the
+// responsive-collapse + pin-selection work lands.
+//
+// Architecturally:
+//   * No per-intent dispatch (Guardrail #1). Source vocabulary from
+//     ALLOWED_CASE_SOURCES (api.ts boundary).
+//   * No threshold logic in page code — `slaSnapshot` is exported as
+//     a pure derivation (visual policy ratified by Frontend Platform).
+//   * `/cases/[id]` survives as a focused single-case view for deep
+//     links and notifications; this page is the workspace where the
+//     queue stays visible while the operator works the detail.
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -45,12 +47,14 @@ import type {
   SlaBand,
   SlaSnapshot,
 } from "@/types/cases";
+import type { ExceptionDetailResponse } from "@/types/api";
+
+import { CaseDetailPanel } from "./CaseDetailPanel";
+import { NAV_TABS } from "@/config/nav-tabs";
 
 
 /* ── Visual mappings (vendor-neutral; per-source / per-status badge style) ── */
 
-/** Source → human label + icon. New sources land here without
- *  rerunning the page; the table is data-driven. */
 const SOURCE_LABEL: Record<CaseSource | "default", string> = {
   manual_order: "Manual",
   automated_order: "Automated",
@@ -63,10 +67,6 @@ const SOURCE_ICON: Record<CaseSource | "default", React.ReactNode> = {
   default: <Clock size={12} aria-hidden />,
 };
 
-// STATUS_LABEL is imported from src/lib/cases.ts — the Phase 28.5.x
-// §D1 audit consolidated the four duplicate maps into a single
-// source. Default fallback per Guardrail #1 stays the same.
-
 const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutral"> = {
   breached: "error",
   at_risk: "warning",
@@ -78,7 +78,9 @@ const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutr
 
 /**
  * Derive the SLA visualisation snapshot for a case. Pure function —
- * tests assert against it directly.
+ * tests assert against it directly. Exported because the home page
+ * and other case-rendering surfaces (CaseDetailPanel, ChromeBoundary
+ * banner) consume it.
  */
 export function slaSnapshot(
   case_: OrderCase,
@@ -135,23 +137,17 @@ interface CasesFilters {
 
 /* ── Page ───────────────────────────────────────────────────────── */
 
-import { NAV_TABS } from "@/config/nav-tabs";
-// NAV_TABS consolidated to src/config/nav-tabs.ts (issue #133, PO #9).
-
-
 export const requiresAuth = true;
 
+// `useSearchParams` must be inside a <Suspense> boundary for the
+// build to succeed in Next.js App Router. The page is split into a
+// shell (NavBar + Suspense wrapper) and a workspace (the searchParams-
+// reading body) so static rendering still works for the chrome.
 export default function CasesPage() {
   const router = useRouter();
   const { user, visibleTabs } = useAuth();
   const { health } = useHealth();
   const handleSignOut = useSignOut();
-  const [cases, setCases] = useState<OrderCase[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<CasesFilters>({
-    source: null,
-    status: null,
-  });
 
   const userName = user?.name || "User";
   const userInitials = (
@@ -162,40 +158,6 @@ export default function CasesPage() {
   const filteredTabs = visibleTabs.length > 0
     ? NAV_TABS.filter((t) => visibleTabs.includes(t.id))
     : NAV_TABS;
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    casesApi
-      .list({
-        source: filters.source ?? undefined,
-        status: filters.status ?? undefined,
-      })
-      .then((res) => {
-        if (!cancelled) setCases(res.items);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [filters.source, filters.status]);
-
-  // SLA-driven sort — most-urgent (lowest ms_until_deadline) first.
-  // Cases with no SLA sink to the bottom. PO #20 (issue #133): the
-  // ticker re-runs this memo once a minute so the band labels and
-  // sort order stay live without a re-fetch.
-  const tickNow = useSlaTicker();
-  const sorted = useMemo(() => {
-    return [...cases]
-      .map((c) => ({ case_: c, sla: slaSnapshot(c, tickNow) }))
-      .sort((a, b) => {
-        const aMs = a.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
-        const bMs = b.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
-        return aMs - bMs;
-      });
-  }, [cases, tickNow]);
 
   return (
     <div className="min-h-screen bg-surface-page font-sans text-body text-text-primary leading-normal">
@@ -212,117 +174,316 @@ export default function CasesPage() {
         agentCount={health?.allowed_intents?.length || 0}
         onSignOut={handleSignOut}
       />
-    <main className="p-32 max-w-[1280px] mx-auto">
-      <header className="mb-24">
-        <h1 className="text-display font-bold text-text-primary mb-4">
-          Cases
-        </h1>
-        <p className="text-body text-text-secondary leading-normal">
-          Every order needing attention, sorted by SLA. Cases unify the
-          email + ERP sides of one business order — open one to see
-          source, agent recommendations, and resolution actions.
-        </p>
-      </header>
-
-      {/* Filter chips. ALLOWED_CASE_SOURCES comes from the api.ts
-          boundary; page code never names the source literals
-          inline (Guardrail #1). */}
-      <div
-        role="toolbar"
-        aria-label="Case filters"
-        className="flex items-center gap-8 mb-16"
-      >
-        <span className="text-label uppercase tracking-wider text-text-quaternary">
-          Source:
-        </span>
-        <FilterChip
-          label="All"
-          active={filters.source === null}
-          onClick={() =>
-            setFilters((f) => ({ ...f, source: null }))
-          }
-        />
-        {ALLOWED_CASE_SOURCES.map((src) => (
-          <FilterChip
-            key={src}
-            label={SOURCE_LABEL[src as CaseSource] ?? SOURCE_LABEL.default}
-            active={filters.source === src}
-            onClick={() =>
-              setFilters((f) => ({
-                ...f,
-                source: f.source === src ? null : (src as CaseSource),
-              }))
-            }
-          />
-        ))}
-      </div>
-
-      {loading && (
-        <div role="status" className="text-text-tertiary py-24" aria-live="polite">
-          Loading cases…
-        </div>
-      )}
-
-      {!loading && sorted.length === 0 && (
-        <div role="status" className="text-text-tertiary py-24">
-          <CheckCircle2 size={16} className="inline mr-6" aria-hidden />
-          No cases match the current filters.
-        </div>
-      )}
-
-      {!loading && sorted.length > 0 && (
-        <ul role="list" className="m-0 p-0 list-none">
-          {sorted.map(({ case_, sla }) => (
-            <li
-              key={case_.case_id}
-              className="border-b border-border-subtle"
-            >
-              <button
-                type="button"
-                onClick={() => router.push(`/cases/${case_.case_id}`)}
-                className={cn(
-                  "w-full text-left py-12 px-16 hover:bg-surface-secondary",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
-                  "transition-colors duration-fast",
-                )}
-                aria-label={`Open case ${case_.case_id}`}
-              >
-                <div className="flex items-center gap-12">
-                  <Badge variant="neutral" size="sm">
-                    {SOURCE_ICON[case_.source as CaseSource] ??
-                      SOURCE_ICON.default}
-                    <span className="ml-4">
-                      {SOURCE_LABEL[case_.source as CaseSource] ??
-                        SOURCE_LABEL.default}
-                    </span>
-                  </Badge>
-                  <span className="font-mono text-body text-text-primary">
-                    {case_.customer_po_number ??
-                      case_.sales_order_id ??
-                      case_.case_id}
-                  </span>
-                  <span className="text-text-tertiary text-caption ml-auto">
-                    {STATUS_LABEL[case_.status] ?? case_.status}
-                  </span>
-                  <Badge
-                    variant={SLA_BAND_VARIANT[sla.band]}
-                    size="sm"
-                    aria-label={`SLA: ${sla.label}`}
-                  >
-                    {sla.band === "breached" && (
-                      <AlertTriangle size={10} aria-hidden className="mr-4" />
-                    )}
-                    <Clock size={10} aria-hidden className="mr-4" />
-                    {sla.label}
-                  </Badge>
-                </div>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+      <Suspense fallback={<WorkspaceFallback />}>
+        <CasesWorkspace />
+      </Suspense>
     </div>
+  );
+}
+
+
+function WorkspaceFallback() {
+  return (
+    <main className="p-32 max-w-[1280px] mx-auto">
+      <div role="status" className="text-text-tertiary py-24" aria-live="polite">
+        Loading cases…
+      </div>
+    </main>
+  );
+}
+
+
+/**
+ * The URL-bound workspace. Reads `?case=` and `?record=` via
+ * `useSearchParams`; click handlers update the URL via
+ * `router.replace` so back/forward + reload preserve the selection.
+ */
+function CasesWorkspace() {
+  const router = useRouter();
+  const search = useSearchParams();
+  const selectedCaseId = search?.get("case") ?? undefined;
+  const selectedRecordId = search?.get("record") ?? undefined;
+
+  const [cases, setCases] = useState<OrderCase[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [filters, setFilters] = useState<CasesFilters>({
+    source: null,
+    status: null,
+  });
+
+  // Right-pane state — case + records for `selectedCaseId`. Fetched
+  // alongside the case so the header + picker both render on first
+  // paint (no "loading records" flicker after the header lands).
+  const [orderCase, setOrderCase] = useState<OrderCase | null>(null);
+  const [records, setRecords] = useState<ExceptionDetailResponse[]>([]);
+  const [policyHits, setPolicyHits] = useState<string[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailMissing, setDetailMissing] = useState(false);
+
+  /* ── Load the queue ─────────────────────────────────────────── */
+  useEffect(() => {
+    let cancelled = false;
+    setListLoading(true);
+    casesApi
+      .list({
+        source: filters.source ?? undefined,
+        status: filters.status ?? undefined,
+      })
+      .then((res) => {
+        if (!cancelled) setCases(res.items);
+      })
+      .finally(() => {
+        if (!cancelled) setListLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filters.source, filters.status]);
+
+  /* ── Load the selected case's detail ────────────────────────── */
+  useEffect(() => {
+    if (!selectedCaseId) {
+      setOrderCase(null);
+      setRecords([]);
+      setPolicyHits([]);
+      setDetailMissing(false);
+      return;
+    }
+    let cancelled = false;
+    setDetailLoading(true);
+    setDetailMissing(false);
+    Promise.all([
+      casesApi.get(selectedCaseId),
+      casesApi.getRecords(selectedCaseId).catch(() => ({
+        items: [] as ExceptionDetailResponse[],
+        total: 0,
+        aggregated_policy_hits: [] as string[],
+      })),
+    ])
+      .then(([c, r]) => {
+        if (cancelled) return;
+        if (c) {
+          setOrderCase(c);
+          setRecords(r.items);
+          setPolicyHits(r.aggregated_policy_hits);
+        } else {
+          setDetailMissing(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCaseId]);
+
+  /* ── URL writes ─────────────────────────────────────────────── */
+  const handleSelectCase = useCallback(
+    (caseId: string) => {
+      // Drop the `record` param when switching cases — the new case
+      // has its own records; the auto-mount effect in CaseDetailPanel
+      // will pick the right one.
+      router.replace(`/cases?case=${encodeURIComponent(caseId)}`);
+    },
+    [router],
+  );
+
+  const handleSelectRecord = useCallback(
+    (recordId: string) => {
+      if (!selectedCaseId) return;
+      router.replace(
+        `/cases?case=${encodeURIComponent(selectedCaseId)}` +
+          `&record=${encodeURIComponent(recordId)}`,
+      );
+    },
+    [router, selectedCaseId],
+  );
+
+  /* ── SLA-driven sort ────────────────────────────────────────── */
+  // PO #20 (issue #133): tick once a minute so the band labels and
+  // sort order stay live without a re-fetch.
+  const tickNow = useSlaTicker();
+  const sorted = useMemo(() => {
+    return [...cases]
+      .map((c) => ({ case_: c, sla: slaSnapshot(c, tickNow) }))
+      .sort((a, b) => {
+        const aMs = a.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
+        const bMs = b.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
+        return aMs - bMs;
+      });
+  }, [cases, tickNow]);
+
+  return (
+    <main
+      className={cn(
+        "max-w-[1600px] mx-auto p-24",
+        "grid gap-24",
+        // Two-pane layout: queue ~360px, detail flex. Below 1024px
+        // (CSS variable breakpoint), the right pane stacks below the
+        // queue — P3c's responsive-collapse work will turn it into a
+        // proper overlay/popover.
+        "grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]",
+      )}
+    >
+      {/* ── Left pane: queue ────────────────────────────────── */}
+      <aside
+        aria-label="Case queue"
+        className="bg-surface-primary border border-border rounded-md shadow-xs flex flex-col min-h-0"
+      >
+        <div className="p-16 border-b border-border-subtle">
+          <h1 className="text-heading font-semibold text-text-primary mb-4">
+            Cases
+          </h1>
+          <p className="text-caption text-text-tertiary leading-normal">
+            Sorted by SLA. Select one to open its workspace on the right.
+          </p>
+        </div>
+
+        {/* Filter chips. ALLOWED_CASE_SOURCES comes from the api.ts
+            boundary; page code never names the source literals
+            inline (Guardrail #1). */}
+        <div
+          role="toolbar"
+          aria-label="Case filters"
+          className="flex items-center flex-wrap gap-4 px-16 py-12 border-b border-border-subtle"
+        >
+          <FilterChip
+            label="All"
+            active={filters.source === null}
+            onClick={() => setFilters((f) => ({ ...f, source: null }))}
+          />
+          {ALLOWED_CASE_SOURCES.map((src) => (
+            <FilterChip
+              key={src}
+              label={SOURCE_LABEL[src as CaseSource] ?? SOURCE_LABEL.default}
+              active={filters.source === src}
+              onClick={() =>
+                setFilters((f) => ({
+                  ...f,
+                  source: f.source === src ? null : (src as CaseSource),
+                }))
+              }
+            />
+          ))}
+        </div>
+
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {listLoading && (
+            <div role="status" className="text-text-tertiary px-16 py-24" aria-live="polite">
+              Loading cases…
+            </div>
+          )}
+          {!listLoading && sorted.length === 0 && (
+            <div role="status" className="text-text-tertiary px-16 py-24">
+              <CheckCircle2 size={16} className="inline mr-6" aria-hidden />
+              No cases match the current filters.
+            </div>
+          )}
+          {!listLoading && sorted.length > 0 && (
+            <ul
+              role="listbox"
+              aria-label="Cases"
+              aria-activedescendant={
+                selectedCaseId ? `case-row-${selectedCaseId}` : undefined
+              }
+              className="m-0 p-0 list-none"
+            >
+              {sorted.map(({ case_, sla }) => {
+                const isSelected = case_.case_id === selectedCaseId;
+                return (
+                  <li key={case_.case_id} className="border-b border-border-subtle">
+                    <button
+                      id={`case-row-${case_.case_id}`}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      onClick={() => handleSelectCase(case_.case_id)}
+                      className={cn(
+                        "w-full text-left py-12 px-16 flex flex-col gap-4",
+                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+                        "transition-colors duration-fast",
+                        isSelected
+                          ? "bg-surface-row-active"
+                          : "hover:bg-surface-secondary",
+                      )}
+                    >
+                      <div className="flex items-center gap-8">
+                        <Badge variant="neutral" size="sm">
+                          {SOURCE_ICON[case_.source as CaseSource] ??
+                            SOURCE_ICON.default}
+                          <span className="ml-4">
+                            {SOURCE_LABEL[case_.source as CaseSource] ??
+                              SOURCE_LABEL.default}
+                          </span>
+                        </Badge>
+                        <Badge
+                          variant={SLA_BAND_VARIANT[sla.band]}
+                          size="sm"
+                          aria-label={`SLA: ${sla.label}`}
+                        >
+                          {sla.band === "breached" && (
+                            <AlertTriangle size={10} aria-hidden className="mr-4" />
+                          )}
+                          <Clock size={10} aria-hidden className="mr-4" />
+                          {sla.label}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-8">
+                        <span className="font-mono text-body text-text-primary truncate">
+                          {case_.customer_po_number ??
+                            case_.sales_order_id ??
+                            case_.case_id}
+                        </span>
+                      </div>
+                      <span className="text-caption text-text-tertiary">
+                        {STATUS_LABEL[case_.status] ?? case_.status}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </aside>
+
+      {/* ── Right pane: case workspace ──────────────────────── */}
+      <section
+        aria-label="Case workspace"
+        className="bg-surface-primary border border-border rounded-md shadow-xs p-24 min-h-[60vh]"
+      >
+        {!selectedCaseId && (
+          <div className="h-full flex flex-col items-center justify-center text-center gap-12 text-text-tertiary">
+            <Mail size={24} aria-hidden />
+            <div className="text-body">Select a case from the queue to open its workspace.</div>
+            <div className="text-caption max-w-[420px]">
+              The Approve / Reject / Override / Escalate / Re-analyze ribbon
+              mounts here for the selected record.
+            </div>
+          </div>
+        )}
+        {selectedCaseId && detailLoading && (
+          <div role="status" className="text-text-tertiary py-24" aria-live="polite">
+            Loading case…
+          </div>
+        )}
+        {selectedCaseId && !detailLoading && detailMissing && (
+          <div role="status" className="text-text-tertiary py-24">
+            Case not found: <code>{selectedCaseId}</code>
+          </div>
+        )}
+        {selectedCaseId && !detailLoading && orderCase && (
+          <CaseDetailPanel
+            orderCase={orderCase}
+            attachedRecords={records}
+            policyHits={policyHits}
+            selectedRecordId={selectedRecordId}
+            onSelectRecord={handleSelectRecord}
+          />
+        )}
+      </section>
+    </main>
   );
 }
 
