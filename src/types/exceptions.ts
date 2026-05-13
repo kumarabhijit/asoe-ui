@@ -193,6 +193,11 @@ export interface ExceptionSummary {
    *  to a case. None on Tier-1 stateless records and pre-Phase-H.3
    *  legacy rows. UI uses this for the "View case" deeplink. */
   parent_case_id?: string | null;
+  /** ADR-041 §2 — raw SAP block reason code on records whose parent
+   *  case is `case_type === "BLOCK"`. Distinct from `intent` (the
+   *  classified business intent recipes dispatch on). `null` on
+   *  EMAIL_ENTRY-parented records and pre-ADR-041 legacy rows. */
+  sap_block_code?: string | null;
 }
 
 /** One append-only entry in an exception's reanalysis audit trail.

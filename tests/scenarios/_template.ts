@@ -55,6 +55,8 @@ export function buildOpenActionableScenario(
       tenant_id: "acme-corp",
       source: input.caseSource ?? "automated_order",
       source_channel: input.caseChannel ?? "edi_x12_850",
+      case_type: (input.caseSource === "manual_order" ? "EMAIL_ENTRY" : "BLOCK"),
+      email_classification: (input.caseSource === "manual_order" ? "NEW_ORDER" : null),
       customer_po_number: input.customerPo ?? orderId,
       opened_at: opened,
       updated_at: opened,

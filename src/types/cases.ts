@@ -19,6 +19,31 @@
  */
 export type CaseSource = "manual_order" | "automated_order";
 
+/**
+ * ADR-041 §1 — Why ASOE materialised this case. Orthogonal to
+ * `CaseSource` (which describes how the order originated). Mirrors
+ * `asoe2/contracts/models.py::CaseType` field-for-field.
+ *
+ * - `EMAIL_ENTRY` — customer email arrived; case carries an
+ *   `email_classification` (1:1 with the intake).
+ * - `BLOCK` — SAP order carried a block reason; each child
+ *   ExceptionRecord carries the raw `sap_block_code` (1:N).
+ */
+export type CaseType = "EMAIL_ENTRY" | "BLOCK";
+
+/**
+ * ADR-041 §2 — Per-intake classification for an EMAIL_ENTRY case.
+ * Mirrors `asoe2/contracts/models.py::EmailClassification`. Set once
+ * at case open by the email-classification graph node; never mutates.
+ * `null` for any case where `case_type !== "EMAIL_ENTRY"`.
+ */
+export type EmailClassification =
+  | "NEW_ORDER"
+  | "ORDER_CHANGE"
+  | "INQUIRY"
+  | "COMPLAINT"
+  | "OTHER";
+
 /** ADR-038 §6.1 — 7-state case lifecycle. Distinct from per-exception
  *  LifecycleState. */
 export type CaseStatus =
@@ -46,6 +71,13 @@ export interface OrderCase {
 
   source: CaseSource;
   source_channel: string;
+
+  /** ADR-041 §1 — why ASOE materialised this case. Always present
+   *  on records that exist as cases (backend defaults from `source`
+   *  if not provided at lookup_or_create). */
+  case_type: CaseType;
+  /** ADR-041 §2 — present iff `case_type === "EMAIL_ENTRY"`. */
+  email_classification?: EmailClassification | null;
 
   customer_po_number?: string | null;
   sales_order_id?: string | null;

@@ -81,6 +81,25 @@ describe("case-pivot mock wiring", () => {
     }
   });
 
+  it("every mock case carries an ADR-041 case_type", async () => {
+    const { items: cases } = await casesApi.list();
+    for (const c of cases) {
+      expect(c.case_type, `case ${c.case_id} missing case_type`).toBeTruthy();
+      expect(["EMAIL_ENTRY", "BLOCK"]).toContain(c.case_type);
+      if (c.case_type === "EMAIL_ENTRY") {
+        expect(
+          c.email_classification,
+          `EMAIL_ENTRY case ${c.case_id} missing email_classification`,
+        ).toBeTruthy();
+      } else {
+        expect(
+          c.email_classification ?? null,
+          `BLOCK case ${c.case_id} must have email_classification=null`,
+        ).toBeNull();
+      }
+    }
+  });
+
   it("auto-mount path works for single-record cases (records[0] is fetchable)", async () => {
     // Single-record cases are the CSA's one-task happy path —
     // CaseDetailPanel auto-fires onSelectRecord(records[0].id) and the
