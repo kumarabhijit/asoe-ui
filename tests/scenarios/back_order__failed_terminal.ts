@@ -12,6 +12,7 @@ export const BACK_ORDER__failed_terminal: BehaviourScenario = {
     tenant_id: "acme-corp",
     source: "automated_order",
     source_channel: "edi_x12_850",
+    case_type: "BLOCK",
     customer_po_number: "PO-2026-7777",
     opened_at: "2026-05-09T14:00:00Z",
     closed_at: "2026-05-10T02:00:00Z",

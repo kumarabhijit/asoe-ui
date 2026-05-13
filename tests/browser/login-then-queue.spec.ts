@@ -52,18 +52,18 @@ test("login → exception queue loads from live backend", async ({ page }) => {
 
   // Click Sign In. Post-login redirect target depends on the role.
   // Issue #133 (PO #5/#6) made /home the operational landing surface;
-  // root / now redirects to /home. Pre-#133 sessions could land on
-  // /exceptions or /dashboard directly depending on visible_tabs
-  // configuration — both still valid post-login URLs for a manager.
+  // root / now redirects to /home. ADR-041 P2 (2026-05-13) retired
+  // the `/exceptions` queue route — `/cases` is the canonical queue
+  // surface now. Manager landing URL depends on visible_tabs.
   await page.getByRole("button", { name: /sign in/i }).click();
-  await page.waitForURL(/\/(home|exceptions|dashboard)/, { timeout: 20_000 });
+  await page.waitForURL(/\/(home|cases|dashboard)/, { timeout: 20_000 });
 
   // ── Queue renders against the live backend ───────────────────────────
-  await page.goto("/exceptions");
-  // Either exceptions show up, or the empty-state banner confirms the
-  // page made it past auth + a successful GET /api/v1/exceptions.
+  await page.goto("/cases");
+  // Either cases show up, or the empty-state banner confirms the
+  // page made it past auth + a successful GET /api/v1/cases.
   await expect(page.locator("body")).toContainText(
-    /exceptions|no exceptions|queue|empty/i,
+    /cases|no cases|queue|empty/i,
     { timeout: 15_000 },
   );
 });

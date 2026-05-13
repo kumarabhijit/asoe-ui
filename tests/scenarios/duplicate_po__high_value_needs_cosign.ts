@@ -13,6 +13,7 @@ export const DUPLICATE_PO__high_value_needs_cosign: BehaviourScenario = {
     tenant_id: "acme-corp",
     source: "automated_order",
     source_channel: "edi_x12_850",
+    case_type: "BLOCK",
     customer_po_number: "PO-2026-9001",
     edi_transaction_id: "EDI-7782",
     opened_at: "2026-05-10T09:00:00Z",

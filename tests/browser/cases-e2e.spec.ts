@@ -41,23 +41,14 @@ test.describe("/cases surface", () => {
     });
   });
 
-  test("NavBar tab is reachable from /exceptions", async ({ page }) => {
+  test("/exceptions redirects to /cases (ADR-041 P2)", async ({ page }) => {
     await loginAs(page, "marcus.webb@acme-corp.com");
+    // /exceptions and /exceptions/* are server-redirected to /cases
+    // by `next.config.mjs::redirects()`. Old bookmarks, runbook
+    // deep-links, and notification URLs land on the canonical
+    // queue surface.
     await page.goto("/exceptions");
-    // /exceptions runs WebSocket subscriptions + periodic polling
-    // that re-renders the NavBar's surrounding tree; wait for the
-    // network to settle so the Cases tab isn't detached mid-click.
-    // `networkidle` covers both the initial load AND the first
-    // round of WS-triggered list refreshes.
-    await page.waitForLoadState("networkidle");
-    const casesTab = page.getByRole("button", { name: /^cases$/i });
-    await expect(casesTab).toBeVisible({ timeout: 15_000 });
-    // Race the click with the URL change; explicit click timeout
-    // (>5s default) absorbs the re-render window.
-    await Promise.all([
-      page.waitForURL(/\/cases/, { timeout: 15_000 }),
-      casesTab.click({ timeout: 15_000 }),
-    ]);
+    await page.waitForURL(/\/cases(\?|$)/, { timeout: 15_000 });
     await expect(page.locator("h1")).toContainText(/cases/i);
   });
 

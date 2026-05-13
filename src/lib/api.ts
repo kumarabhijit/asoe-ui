@@ -3624,7 +3624,7 @@ const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
  * ADR-038 Phase H.6 — case-centric API + mock data
  * ============================================================ */
 
-import type { CaseStatus, OrderCase } from "@/types/cases";
+import type { CaseStatus, CaseType, EmailClassification, OrderCase } from "@/types/cases";
 
 /**
  * Derive an OrderCase for a given mock exception. The asoe2 backend's
@@ -3653,6 +3653,18 @@ function caseFromMockException(exc: ExceptionSummary): OrderCase {
   const isEdi = exc.event_type?.startsWith("EDI_");
   const source = isEmail ? "manual_order" : "automated_order";
   const source_channel = isEdi ? "edi_x12_850" : isEmail ? "email" : "api";
+  // ADR-041 §1 — case_type is orthogonal to source. EMAIL_ENTRY iff
+  // the trigger was an inbound email; BLOCK otherwise.
+  const case_type: CaseType = isEmail ? "EMAIL_ENTRY" : "BLOCK";
+  // ADR-041 §2 — per-intake classification (1:1 with the email). For
+  // mock data the modeller's "default to OTHER, surface real intents
+  // when the email-classification node lands" rule applies. The two
+  // email-shaped fixtures we have today (EMAIL_ORDER_ENTRY_REQUEST,
+  // ORDER_RECEIVED) both map to NEW_ORDER under the recipe registry,
+  // so we surface that explicitly.
+  const email_classification: EmailClassification | null = isEmail
+    ? "NEW_ORDER"
+    : null;
   const status: CaseStatus = (() => {
     switch (exc.lifecycle_state) {
       case "RESOLVED":
@@ -3677,6 +3689,8 @@ function caseFromMockException(exc: ExceptionSummary): OrderCase {
     customer_id: exc.account_id ?? null,
     source,
     source_channel,
+    case_type,
+    email_classification,
     customer_po_number: exc.order_id ?? null,
     sales_order_id: source === "automated_order" ? exc.order_id ?? null : null,
     edi_transaction_id: null,

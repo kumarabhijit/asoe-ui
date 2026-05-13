@@ -33,9 +33,11 @@ import { useRouter } from "next/navigation";
 import { NavBar } from "@/components/ui/NavBar";
 import { useSignOut } from "@/hooks/useSignOut";
 
+// Kept in sync with `src/config/nav-tabs.ts` (single source of truth).
+// ADR-041 P2 retires the "Exception Queue" tab — `/cases` is the
+// canonical queue surface.
 const NAV_TABS = [
   { id: "inbox", label: "Customer Inbox", href: "/inbox" },
-  { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
   { id: "cases", label: "Cases", href: "/cases" },
   { id: "dashboard", label: "Dashboard", href: "/dashboard" },
   { id: "settings", label: "Settings", href: "/settings" },

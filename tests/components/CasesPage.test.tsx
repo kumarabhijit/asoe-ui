@@ -22,6 +22,8 @@ function mockCase(over: Partial<OrderCase> = {}): OrderCase {
     customer_id: null,
     source: "manual_order",
     source_channel: "email",
+    case_type: "EMAIL_ENTRY",
+    email_classification: "NEW_ORDER",
     customer_po_number: "PO-1",
     sales_order_id: null,
     edi_transaction_id: null,

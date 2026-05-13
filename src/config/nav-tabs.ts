@@ -20,9 +20,15 @@ export interface NavTab {
 // Mutable array (no `as const`) because NavBar's `tabs` prop is a
 // plain `NavTab[]`; pages call `NAV_TABS.find(...)` and the filtered
 // subset is passed straight through.
+// ADR-041 P2 — the "Exception Queue" tab is gone. `/exceptions` and
+// `/cases` were two routes projecting the same case data; `/cases`
+// is the canonical surface now (next.config.mjs redirects
+// `/exceptions/*` → `/cases`). When `visible_tabs` from
+// `asoe2/api/users.py` carries the legacy `"exceptions"` id, it
+// quietly no-ops because the tab is no longer in the array — no
+// page-code changes needed.
 export const NAV_TABS: NavTab[] = [
   { id: "home", label: "Home", href: "/home" },
-  { id: "exceptions", label: "Exception Queue", href: "/exceptions" },
   { id: "cases", label: "Cases", href: "/cases" },
   { id: "dashboard", label: "Performance", href: "/dashboard" },
   { id: "settings", label: "Settings", href: "/settings" },

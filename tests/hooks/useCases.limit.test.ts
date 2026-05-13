@@ -24,6 +24,8 @@ function makeItem(i: number): CaseListItem {
     tenant_id: "acme-corp",
     source: "manual_order",
     source_channel: "email",
+    case_type: "EMAIL_ENTRY",
+    email_classification: "NEW_ORDER",
     opened_at: "2026-05-10T09:00:00Z",
     updated_at: "2026-05-10T09:00:00Z",
     status: "OPEN_AGENT_PROCESSING",

@@ -57,9 +57,11 @@ async function assertChromeOnPage(page: import("@playwright/test").Page) {
 // server redirect post-Issue-#133 but the boundary file is kept
 // as defense-in-depth; the assertion runs against the redirect
 // target anyway.
+// ADR-041 P2 — `/exceptions` retired (redirects to `/cases`). The
+// loading-boundary contract for the retired route is exercised
+// implicitly via the redirect target.
 for (const route of [
   "/home",
-  "/exceptions",
   "/cases",
   "/dashboard",
   "/settings",
@@ -129,9 +131,15 @@ test("CMT-3 not-found boundary: /cases/<bogus> renders chrome", async ({
 // present whether the error boundary or the page's inline
 // error UI renders.
 // ------------------------------------------------------------
-test("CMT-3 error boundary: /exceptions returns 500 -> chrome present", async ({
+test.skip("CMT-3 error boundary: /exceptions returns 500 -> chrome present", async ({
   page,
 }) => {
+  // ADR-041 P2 (2026-05-13) — `/exceptions` redirects to `/cases`.
+  // The /exceptions route's `error.tsx` boundary is unreachable
+  // through normal navigation. The equivalent contract on /cases is
+  // covered by the test below ("CMT-3 error boundary: /cases ...").
+  // Skipped, not deleted, until the P4 cleanup sprint removes the
+  // `/exceptions` route files entirely.
   await page.route("**/api/v1/exceptions*", async (route) => {
     await route.fulfill({
       status: 500,
