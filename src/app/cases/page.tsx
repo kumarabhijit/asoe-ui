@@ -21,7 +21,7 @@
 
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -37,6 +37,7 @@ import { NavBar } from "@/components/ui/NavBar";
 import { ALLOWED_CASE_SOURCES, casesApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
+import { useKeyboardListNav } from "@/hooks/useKeyboardListNav";
 import { useSlaTicker } from "@/hooks/useSlaTicker";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import {
@@ -261,9 +262,21 @@ function CasesWorkspace() {
       setDetailMissing(false);
       return;
     }
+    // Clear the prior case's data BEFORE the new fetch starts.
+    // Without this, a fast case-switch (keyboard nav + click) re-
+    // renders CaseDetailPanel with the OLD case's records still in
+    // state — the panel's auto-mount effect then calls
+    // onSelectRecord(records[0].id), writing the stale record's id
+    // into the URL. By the time the new fetch finishes, the URL has
+    // a record that doesn't exist on the new case, so the inline
+    // ribbon never mounts ("many cases don't show detailed view"
+    // bug, ADR-041 P3c follow-on).
+    setOrderCase(null);
+    setRecords([]);
+    setPolicyHits([]);
+    setDetailMissing(false);
     let cancelled = false;
     setDetailLoading(true);
-    setDetailMissing(false);
     Promise.all([
       casesApi.get(selectedCaseId),
       casesApi.getRecords(selectedCaseId).catch(() => ({
@@ -325,6 +338,21 @@ function CasesWorkspace() {
         return aMs - bMs;
       });
   }, [cases, tickNow]);
+
+  /* ── Keyboard nav (j / k / ArrowDown / ArrowUp / Home / End) ── */
+  // Plug the canonical hook into the queue. The hook gates on
+  // typing-in-input + Cmd/Ctrl combos so search inputs and command
+  // palettes keep their own bindings. Selection updates the URL via
+  // handleSelectCase, which preserves the back/forward semantics.
+  const queueRef = useRef<HTMLUListElement | null>(null);
+  useKeyboardListNav({
+    items: sorted,
+    getId: ({ case_ }) => case_.case_id,
+    selectedId: selectedCaseId ?? null,
+    onSelect: handleSelectCase,
+    containerRef: queueRef,
+    enabled: sorted.length > 0,
+  });
 
   return (
     <main
@@ -394,11 +422,13 @@ function CasesWorkspace() {
           )}
           {!listLoading && sorted.length > 0 && (
             <ul
+              ref={queueRef}
               role="listbox"
               aria-label="Cases"
               aria-activedescendant={
                 selectedCaseId ? `case-row-${selectedCaseId}` : undefined
               }
+              tabIndex={0}
               className="m-0 p-0 list-none"
             >
               {sorted.map(({ case_, sla }) => {
@@ -410,6 +440,7 @@ function CasesWorkspace() {
                       type="button"
                       role="option"
                       aria-selected={isSelected}
+                      data-keyboard-nav-id={case_.case_id}
                       onClick={() => handleSelectCase(case_.case_id)}
                       className={cn(
                         "w-full text-left py-12 px-16 flex flex-col gap-4",
@@ -485,7 +516,16 @@ function CasesWorkspace() {
             Case not found: <code>{selectedCaseId}</code>
           </div>
         )}
-        {selectedCaseId && !detailLoading && orderCase && (
+        {/* Render guard against fast case-switch race: don't show the
+            panel until the fetched `orderCase.case_id` matches the
+            current URL `?case=` value. Without this, a click → click
+            sequence renders the panel with the prior case's records
+            still in state, and CaseDetailPanel's auto-mount writes
+            the wrong record id back into the URL. */}
+        {selectedCaseId
+          && !detailLoading
+          && orderCase
+          && orderCase.case_id === selectedCaseId && (
           <CaseDetailPanel
             orderCase={orderCase}
             attachedRecords={records}
