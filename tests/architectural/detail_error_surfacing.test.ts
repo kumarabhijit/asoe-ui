@@ -48,40 +48,12 @@ describe("ExceptionDetailPanel: unauthorized-fetch surfacing", () => {
   });
 });
 
-// V5.1 (Phase 28.5) — `/exceptions` is a case-projected list view of
-// `casesApi.list()`. The previous architectural locks pinned the
-// exceptionsApi-driven master-detail (cursor pagination, silent
-// `exception_update` refresh, `handleWsReconnect`). Those are gone;
-// the new locks assert the case-list shape.
-
-describe("ExceptionQueuePage (V5.1): case-projected data source", () => {
-  const PAGE_PATH = path.resolve(
-    __dirname,
-    "../../src/app/exceptions/page.tsx",
-  );
-
-  it("fetches via useCases (not exceptionsApi.list)", () => {
-    const src = readFileSync(PAGE_PATH, "utf-8");
-    expect(src).toMatch(/useCases\b/);
-    expect(src).not.toMatch(/exceptionsApi\.list\(/);
-  });
-
-  it("does not call useCases with a source filter (all sources)", () => {
-    const src = readFileSync(PAGE_PATH, "utf-8");
-    // /exceptions is the no-filter view; the manual_order subset
-    // lives on /inbox.
-    expect(src).toMatch(/useCases\(\s*\)/);
-  });
-
-  it("subscribes to case_* events via isCaseInvalidationEvent + refetch", () => {
-    const src = readFileSync(PAGE_PATH, "utf-8");
-    expect(src).toMatch(/isCaseInvalidationEvent/);
-    expect(src).toMatch(/refetch\(\)/);
-  });
-
-  it("wires onReconnect and onPollFallback to refetch (silent live refresh)", () => {
-    const src = readFileSync(PAGE_PATH, "utf-8");
-    expect(src).toMatch(/onReconnect:\s*refetch/);
-    expect(src).toMatch(/onPollFallback:\s*refetch/);
-  });
-});
+// ADR-041 P4 (2026-05-13) — the previous ExceptionQueuePage (V5.1)
+// locks pinned `/exceptions/page.tsx` shape (useCases + case_*
+// invalidation). Those tests were deleted along with the route.
+// The equivalent contract for the canonical `/cases/page.tsx`
+// workspace is locked by:
+//   * `tests/architectural/case_pivot_mock_wiring.test.ts` —
+//     `/cases/page.tsx` consumes casesApi (not exceptionsApi).
+//   * `tests/architectural/case_invalidation_silent_refresh.test.ts`
+//     — `case_*` event invalidation contract.

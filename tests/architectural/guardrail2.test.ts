@@ -127,26 +127,23 @@ describe("Guardrail #2: Badge variant functions have default fallback", () => {
   });
 });
 
-describe("Guardrail #2: Exception Queue filters source from health endpoint", () => {
-  it("Exception Queue sources filter values from health endpoint (not hardcoded)", () => {
+describe("Guardrail #2: Cases workspace filters source from health endpoint", () => {
+  it("Cases workspace sources filter values from health endpoint (not hardcoded)", () => {
+    // ADR-041 P4 — `/cases/page.tsx` is the canonical queue surface
+    // now. `/exceptions/page.tsx` + `ExceptionListPane.tsx` were
+    // deleted. The Guardrail #2 contract — no hardcoded intent enum
+    // values in filter chips / dropdowns — moves with the route.
     const rootDir = path.resolve(__dirname, "../../");
-    const pagePath = path.join(rootDir, "src/app/exceptions/page.tsx");
-    const listPanePath = path.join(rootDir, "src/app/exceptions/ExceptionListPane.tsx");
+    const pagePath = path.join(rootDir, "src/app/cases/page.tsx");
     const pageContent = stripComments(fs.readFileSync(pagePath, "utf-8"));
 
-    // The page orchestrator must import useHealth
+    // The page orchestrator must import useHealth (NavBar agent count,
+    // status / intent vocabulary all come from health).
     expect(pageContent).toContain("useHealth");
 
-    // The list pane (or page) must reference health.allowed_intents / lifecycle_states
-    const listPaneContent = fs.existsSync(listPanePath)
-      ? stripComments(fs.readFileSync(listPanePath, "utf-8"))
-      : pageContent;
-    expect(listPaneContent).toMatch(/health\??\.(allowed_intents|lifecycle_states)/);
-
-    // Neither file should hardcode intent option values
+    // The page should never hardcode intent option values.
     for (const intent of INTENT_LITERALS) {
       expect(pageContent).not.toMatch(new RegExp(`<option[^>]*value=["']${intent}["']`));
-      expect(listPaneContent).not.toMatch(new RegExp(`<option[^>]*value=["']${intent}["']`));
     }
   });
 });

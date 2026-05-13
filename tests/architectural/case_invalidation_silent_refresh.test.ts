@@ -29,7 +29,6 @@ import {
 import type { WSEvent, WSEventType } from "@/types/websocket";
 
 const REPO_ROOT = path.resolve(__dirname, "../..");
-const PAGE = path.resolve(REPO_ROOT, "src/app/exceptions/page.tsx");
 const HOOK = path.resolve(REPO_ROOT, "src/hooks/useManualOrderCases.ts");
 
 function event(type: WSEventType): WSEvent {
@@ -64,31 +63,14 @@ describe("isCaseInvalidationEvent", () => {
   });
 });
 
-describe("ExceptionQueuePage (V5.1) — WS silent refresh wiring", () => {
-  const src = readFileSync(PAGE, "utf-8");
-
-  it("composes isCaseInvalidationEvent in the WS handler", () => {
-    expect(src).toMatch(/isCaseInvalidationEvent\s*\(/);
-  });
-
-  it("calls refetch() inside the case-invalidation branch", () => {
-    // Capture the block enclosing isCaseInvalidationEvent — assert
-    // it contains a refetch() call.
-    const m = src.match(
-      /isCaseInvalidationEvent\s*\([^)]*\)\s*\)\s*\{([\s\S]*?)\}/,
-    );
-    expect(m, "isCaseInvalidationEvent branch not found").not.toBeNull();
-    expect(m![1]).toMatch(/refetch\s*\(\s*\)/);
-  });
-
-  it("wires onReconnect: refetch on the useWebSocket call", () => {
-    expect(src).toMatch(/onReconnect\s*:\s*refetch\b/);
-  });
-
-  it("wires onPollFallback: refetch on the useWebSocket call", () => {
-    expect(src).toMatch(/onPollFallback\s*:\s*refetch\b/);
-  });
-});
+// ADR-041 P4 (2026-05-13) — the page-level WS-wiring locks that
+// asserted /exceptions/page.tsx composed `isCaseInvalidationEvent`
+// + `refetch()` + `onReconnect: refetch` were tied to the now-
+// deleted /exceptions/page.tsx. The hook-level locks below
+// (silent-refresh contract on `useCases`) still apply; restoring
+// the page-level silent-refresh on the canonical `/cases/page.tsx`
+// workspace is tracked as a P3b follow-on (queued in the ADR-041
+// rollout doc, not in this PR's scope).
 
 describe("useCases — silent refetch contract", () => {
   const src = readFileSync(HOOK, "utf-8");

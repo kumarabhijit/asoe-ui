@@ -122,33 +122,8 @@ test("CMT-3 not-found boundary: /cases/<bogus> renders chrome", async ({
   await assertChromeOnPage(page);
 });
 
-// ------------------------------------------------------------
-// error.tsx coverage: force a 500 from the backend.
-// The error boundary catches thrown errors from server
-// components / data layers. For client-component pages that
-// catch fetch errors internally, the error boundary may not
-// trigger; the assertion is conditional — chrome must be
-// present whether the error boundary or the page's inline
-// error UI renders.
-// ------------------------------------------------------------
-test.skip("CMT-3 error boundary: /exceptions returns 500 -> chrome present", async ({
-  page,
-}) => {
-  // ADR-041 P2 (2026-05-13) — `/exceptions` redirects to `/cases`.
-  // The /exceptions route's `error.tsx` boundary is unreachable
-  // through normal navigation. The equivalent contract on /cases is
-  // covered by the test below ("CMT-3 error boundary: /cases ...").
-  // Skipped, not deleted, until the P4 cleanup sprint removes the
-  // `/exceptions` route files entirely.
-  await page.route("**/api/v1/exceptions*", async (route) => {
-    await route.fulfill({
-      status: 500,
-      contentType: "application/json",
-      body: JSON.stringify({
-        error: { code: "INTERNAL", message: "cmt-3 fixture" },
-      }),
-    });
-  });
-  await page.goto("/exceptions", { waitUntil: "domcontentloaded" });
-  await assertChromeOnPage(page);
-});
+// ADR-041 P4 (2026-05-13) — the previous "/exceptions returns 500 ->
+// chrome present" CMT-3 error-boundary test was deleted along with
+// the `/exceptions` route files. A `/cases` equivalent test is
+// queued as a follow-on (the loading + not-found boundaries above
+// already exercise the chrome contract on `/cases`).

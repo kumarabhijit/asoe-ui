@@ -19,16 +19,17 @@ const nextConfig = {
       process.env.NEXT_PUBLIC_ASOE_ERP_VENDOR ?? 'SAP',
   },
   // S15a (PR #153) made /cases/[id]?record=<id> the canonical action
-  // surface. ADR-041 retires the duplicate `/exceptions` queue route —
-  // `/cases` is the single canonical surface now. The `/exceptions/[id]`
-  // route is already gone; this redirect catches bookmarks, runbook
-  // deep-links, and notification URLs that still point at the old
-  // queue. Permanent: false during the P2 → P3 transition; will flip
-  // to permanent once /exceptions/page.tsx is deleted in P3.
+  // surface. ADR-041 P4 retires the duplicate `/exceptions` queue
+  // route entirely — the route files (`page.tsx`, `error.tsx`,
+  // `loading.tsx`, `CaseListPane.tsx`, `SavedViewsMenu.tsx`,
+  // `searchParser.ts`) are deleted. `/cases` is the single
+  // canonical queue surface. `permanent: true` because the route
+  // no longer exists — bookmarks and notification URLs land on
+  // `/cases` and browsers cache the redirect.
   async redirects() {
     return [
-      { source: '/exceptions', destination: '/cases', permanent: false },
-      { source: '/exceptions/:path*', destination: '/cases', permanent: false },
+      { source: '/exceptions', destination: '/cases', permanent: true },
+      { source: '/exceptions/:path*', destination: '/cases', permanent: true },
     ];
   },
 };
