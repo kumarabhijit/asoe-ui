@@ -117,7 +117,8 @@ describe("StatusAnnouncer wiring (Q1)", () => {
     const pages = [
       "src/app/home/page.tsx",
       "src/app/exceptions/page.tsx",
-      "src/app/exceptions/[id]/page.tsx",
+      // S15a — /exceptions/[id] retired; per-record ribbon mounts
+      // inline on /cases/[id]?record=<id>.
       "src/app/cases/page.tsx",
       "src/app/cases/[id]/page.tsx",
       "src/app/dashboard/page.tsx",

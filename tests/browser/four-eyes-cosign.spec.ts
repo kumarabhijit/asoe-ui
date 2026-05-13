@@ -23,6 +23,7 @@ import { test, expect } from "@playwright/test";
 import {
   loginAs,
   backendToken,
+  exceptionUrl,
   createPendingReviewException,
   seedFinancialImpact,
   resetTenant,
@@ -49,7 +50,7 @@ test("high-value override stages PENDING_COSIGN; different manager cosigns → R
 
   // ── Manager A submits override → PENDING_COSIGN ─────────────────
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, tokenA, exceptionId));
 
   const openOverride = page.getByRole("button", { name: /choose different action/i });
   await expect(openOverride).toBeVisible({ timeout: 15_000 });
@@ -88,7 +89,8 @@ test("high-value override stages PENDING_COSIGN; different manager cosigns → R
   // ── Switch to manager B + cosign ────────────────────────────────
   await context.clearCookies();
   await loginAs(page, USERS.MANAGER_2);
-  await page.goto(`/exceptions/${exceptionId}`);
+  const tokenB = await backendToken(request, USERS.MANAGER_2);
+  await page.goto(await exceptionUrl(request, tokenB, exceptionId));
 
   const approveCosign = page.getByRole("button", { name: /^approve cosign$/i });
   await expect(approveCosign).toBeVisible({ timeout: 15_000 });
@@ -99,7 +101,6 @@ test("high-value override stages PENDING_COSIGN; different manager cosigns → R
   await approveCosign.click();
 
   // Backend resolves.
-  const tokenB = await backendToken(request, USERS.MANAGER_2);
   await expect
     .poll(
       async () => {

@@ -32,6 +32,7 @@ import { test, expect } from "@playwright/test";
 import {
   loginAs,
   backendToken,
+  exceptionUrl,
   resetTenant,
   USERS,
   BACKEND_URL,
@@ -82,7 +83,7 @@ test("EDI_MISMATCH (SKU sub_type) detail page renders with the correct intent", 
   const exceptionId = await createLineMismatchException(request, managerToken, "SKU_MISMATCH");
 
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, managerToken, exceptionId));
 
   await expect(page.getByText(/EDI[_ -]?MISMATCH/i).first()).toBeVisible();
   // The Override button is rendered with display text "Override…"
@@ -108,7 +109,7 @@ test("PRICE_MISMATCH event lands as CONTRACTUAL_CORRECTION (classifier fork)", a
   const exceptionId = await createLineMismatchException(request, managerToken, "PRICE_MISMATCH");
 
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, managerToken, exceptionId));
 
   // Intent badge reflects the classifier decision, NOT the original
   // event_type.
@@ -130,7 +131,7 @@ test("EdiMismatchSection renders sub_type + classification when backend populate
   const managerToken = await backendToken(request, USERS.MANAGER);
   const exceptionId = await createLineMismatchException(request, managerToken, "QTY_MISMATCH");
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, managerToken, exceptionId));
   // EDI Mismatch pane is collapsed by default; expand it before
   // looking inside (PO ruling 2026-05-03).
   await expandSection(page, /EDI Mismatch/i);

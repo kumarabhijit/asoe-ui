@@ -58,6 +58,42 @@ export async function backendToken(
 }
 
 /**
+ * Resolve the case-detail URL that hosts a given exception record.
+ * S15a retired the standalone `/exceptions/[id]` route; the per-
+ * record HITL surface now mounts inline on `/cases/[id]?record=<id>`.
+ * Specs that previously did `page.goto("/exceptions/${id}")` now
+ * call this helper.
+ *
+ * Reads `parent_case_id` off `GET /api/v1/exceptions/{id}`. Throws
+ * if the field is null — the case-centric pivot guarantees every
+ * record has a parent case; a null here is a backend data-integrity
+ * bug that the test should surface, not paper over.
+ */
+export async function exceptionUrl(
+  request: APIRequestContext,
+  token: string,
+  exceptionId: string,
+): Promise<string> {
+  const res = await request.get(
+    `${BACKEND_URL}/api/v1/exceptions/${exceptionId}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok()) {
+    throw new Error(
+      `exceptionUrl(${exceptionId}) lookup failed: ${res.status()}`,
+    );
+  }
+  const body = (await res.json()) as { parent_case_id?: string | null };
+  if (!body.parent_case_id) {
+    throw new Error(
+      `exception ${exceptionId} has no parent_case_id — ` +
+        `case-centric pivot expects every record to be attached to a case`,
+    );
+  }
+  return `/cases/${body.parent_case_id}?record=${encodeURIComponent(exceptionId)}`;
+}
+
+/**
  * Create a PENDING_REVIEW exception via /resolve/explain so the spec
  * has a known-state record to drive. Verdict is GREEN under current
  * thresholds — good enough for specs that only need the manager's

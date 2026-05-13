@@ -27,6 +27,7 @@ import { test, expect } from "@playwright/test";
 import {
   loginAs,
   backendToken,
+  exceptionUrl,
   resetTenant,
   USERS,
   BACKEND_URL,
@@ -77,7 +78,7 @@ test("PRICE_HOLD_RELEASE detail page renders with the correct intent + recipe", 
   const exceptionId = await createPriceHoldException(request, managerToken, 0.05);
 
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, managerToken, exceptionId));
 
   // Intent badge / label appears verbatim somewhere on the panel.
   // Use a regex so a hyphenated or spaced rendering still matches.
@@ -106,7 +107,7 @@ test("PriceHoldSection renders variance + action when backend populates price_ho
   const managerToken = await backendToken(request, USERS.MANAGER);
   const exceptionId = await createPriceHoldException(request, managerToken, 0.05);
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, managerToken, exceptionId));
   // Price Hold pane is collapsed by default; expand it before
   // asserting the recipe-decision content lives inside.
   await expandSection(page, /Price Hold/i);

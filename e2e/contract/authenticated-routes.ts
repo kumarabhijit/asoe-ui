@@ -58,11 +58,10 @@ export const AUTHENTICATED_ROUTES: readonly AuthenticatedRoute[] = [
   // Issue #133 (PO #5/#6) — operational landing surface.
   { path: "/home", source: "src/app/home/page.tsx" },
   { path: "/exceptions", source: "src/app/exceptions/page.tsx" },
-  {
-    path: "/exceptions/:id",
-    source: "src/app/exceptions/[id]/page.tsx",
-    sampleParams: { id: "exc-001" },
-  },
+  // S15a — /exceptions/[id] retired. The per-record HITL ribbon is
+  // mounted inline on /cases/[id]?record=<id> (CaseDetailPanel +
+  // ExceptionDetailPanel). The queue page is the last `/exceptions/*`
+  // surface; deep-links into records live under /cases/.
   { path: "/cases", source: "src/app/cases/page.tsx" },
   {
     path: "/cases/:id",

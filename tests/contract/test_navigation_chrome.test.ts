@@ -1,33 +1,17 @@
-/**
- * Spec-as-oracle: every authenticated page surface carries the
- * canonical navigation chrome (NavBar with Sign out) AND honours
- * its referrer when rendering a Back button.
- *
- * Three regressions surfaced in operator review prompted these tests:
- *
- *   R1. `/exceptions/[id]` and `/cases/[id]` rendered without the
- *       `Sign out` menu item — operators on a detail page had no
- *       canonical exit point. NavBar must always be rendered AND
- *       must receive an `onSignOut` callback (the menu item only
- *       renders when the prop is present, see
- *       src/components/ui/NavBar.tsx:119).
- *
- *   R2. `/exceptions/[id]` always navigated Back → /exceptions
- *       even when the operator arrived from /inbox (Email Order
- *       Entry inbox row, ADR-034 Phase G dispatch). The detail
- *       page must read a referrer hint and route back to the
- *       originating surface.
- *
- *   R3. The inbox row that produces the dispatch must thread the
- *       referrer hint through. Without this pairing, R2's fix is
- *       inert.
- *
- * These are file-scan assertions — they run in plain vitest with
- * no JSDOM/render plumbing and they cannot be circumvented by a
- * runtime conditional that only fires on a specific session shape.
- * Compose them with the rendering tests under tests/components/
- * (NavBar behaviour) and the Playwright suite (end-to-end flow).
- */
+// Spec-as-oracle: every authenticated page surface carries the
+// canonical navigation chrome (NavBar with Sign out).
+//
+// Originally three regressions (R1/R2/R3) were locked here. R2/R3
+// covered the `/exceptions/[id]` referrer dance — S15a retired that
+// route in favour of the inline ribbon on `/cases/[id]?record=<id>`,
+// so the referrer-back contract no longer applies. R1 (NavBar +
+// useSignOut on every detail page) is the surviving lock.
+//
+// File-scan assertions — they run in plain vitest with no JSDOM/
+// render plumbing and cannot be circumvented by a runtime
+// conditional that only fires on a specific session shape.
+// Compose them with the rendering tests under tests/components/
+// (NavBar behaviour) and the Playwright suite (end-to-end flow).
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -41,7 +25,6 @@ function read(rel: string): string {
 
 describe("Authenticated detail pages render NavBar with Sign out (R1)", () => {
   for (const rel of [
-    "src/app/exceptions/[id]/page.tsx",
     "src/app/cases/[id]/page.tsx",
   ]) {
     it(`${rel} imports NavBar`, () => {
@@ -92,50 +75,10 @@ describe("Authenticated detail pages render NavBar with Sign out (R1)", () => {
   }
 });
 
-describe("Exception detail page honours ?from referrer (R2)", () => {
-  const rel = "src/app/exceptions/[id]/page.tsx";
-
-  it("reads ?from via useSearchParams", () => {
-    const src = read(rel);
-    expect(
-      /import\s+\{[^}]*\buseSearchParams\b[^}]*\}\s+from\s+["']next\/navigation["']/.test(src),
-      `${rel} must import useSearchParams to read the referrer hint`,
-    ).toBe(true);
-    expect(
-      /useSearchParams\s*\(\s*\)/.test(src),
-      `${rel} must call useSearchParams()`,
-    ).toBe(true);
-    expect(
-      /\.get\(\s*["']from["']\s*\)/.test(src),
-      `${rel} must read the "from" query parameter`,
-    ).toBe(true);
-  });
-
-  it("declares an inbox-aware Back target", () => {
-    const src = read(rel);
-    // Issue #133, PO #9 — `/inbox` now redirects into the case-list
-    // view, so the "inbox" referrer points at `/cases?source=manual_order`.
-    // The back-target alias remains so deep links from notification
-    // emails keep working; the destination is just rewritten.
-    expect(
-      /\binbox\b[\s\S]{0,200}\/cases\?source=manual_order/.test(src),
-      `${rel} must map the "inbox" referrer to the case-list filtered ` +
-        `view (post issue #133). See BACK_TARGETS in the page module.`,
-    ).toBe(true);
-  });
-
-  it("retains the default Back-to-Queue target for unknown referrers", () => {
-    const src = read(rel);
-    expect(
-      /\/exceptions\b/.test(src),
-      `${rel} must keep "/exceptions" as the default back href`,
-    ).toBe(true);
-    expect(
-      /Back\s+to\s+Queue/i.test(src),
-      `${rel} must keep the "Back to Queue" label as the default`,
-    ).toBe(true);
-  });
-});
+// R2/R3 (Exception detail ?from referrer) — retired by S15a together
+// with `/exceptions/[id]`. The case-detail surface now hosts the
+// per-record ribbon inline via `?record=<id>`; there is no second-
+// detail-page hop and therefore no referrer to thread.
 
 describe("/inbox is a server redirect into the case-list view (issue #133, PO #9)", () => {
   const rel = "src/app/inbox/page.tsx";

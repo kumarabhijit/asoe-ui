@@ -23,6 +23,7 @@ import { test, expect } from "@playwright/test";
 import {
   loginAs,
   backendToken,
+  exceptionUrl,
   createPendingReviewException,
   resetTenant,
   USERS,
@@ -47,7 +48,7 @@ test("detail view renders Override button for a manager on a backend record", as
 
   // ── UI: login as manager, navigate to the detail page ────────────
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, managerToken, exceptionId));
 
   // ── Assertion: the manager-gated Override… affordance renders ────
   //

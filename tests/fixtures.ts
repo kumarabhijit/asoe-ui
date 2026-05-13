@@ -180,6 +180,7 @@ export const MOCK_HEALTH: HealthResponse = {
     "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py",
     "DeliveryDelayResolutionRecipe.py",
     "EmailOrderEntryRecipe.py",
+    "ManualOrderIntakeRecipe.py",
   ],
   allowed_resolution_actions: [
     "BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH",

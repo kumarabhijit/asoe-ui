@@ -1,27 +1,29 @@
-/**
- * CaseDetailPanel — case-level detail surface (ADR-038 §6 / Phase H.6).
- *
- * Renders the case header (source / channel / SLA / status) and
- * delegates per-issue evidence to the existing `*Section.tsx`
- * components in src/app/exceptions/. Future child-record rendering
- * (one stack entry per attached ExceptionRecord) lands as Phase H.6
- * iterates; this commit ships the case-header anatomy and the
- * data-presence dispatch contract.
- *
- * Architecturally:
- *   * Pure projector (Guardrail #6) — all evidence comes from the
- *     OrderCase prop or the child records loaded via the existing
- *     /api/v1/exceptions/* surfaces. No client-side composition.
- *   * No per-intent dispatch (Guardrail #1) — sections mount via
- *     data-presence on the analysis payload exactly as they do
- *     today on /exceptions/[id].
- *   * <EvidenceBlock> renders all audit-bearing case fields. The
- *     three legal presence states are enforced by that primitive.
- */
+// CaseDetailPanel — case-level detail surface (ADR-038 §6 / S15a).
+//
+// Renders the case header (source / channel / SLA / status), the
+// per-event attached-records list as a picker, and — when a record
+// is selected — mounts the full ExceptionDetailPanel inline so the
+// CSA reaches the HITL action ribbon (Approve / Reject / Override
+// / Escalate / Reanalyze) without leaving the case surface.
+//
+// Single-record cases auto-mount the panel; multi-record cases
+// surface the picker first, then auto-mount on selection. The URL
+// `?record=<id>` query keeps the selection bookmarkable and lets
+// callers deep-link straight to a specific record.
+//
+// Architecturally:
+//   * Pure projector (Guardrail #6) — all evidence comes from the
+//     OrderCase prop or the child records loaded via the existing
+//     /api/v1/exceptions/<id> surface. No client-side composition.
+//   * No per-intent dispatch (Guardrail #1) — sections mount via
+//     data-presence on the analysis payload, same as the queue-page
+//     sidebar.
+//   * <EvidenceBlock> renders all audit-bearing case fields. The
+//     three legal presence states are enforced by that primitive.
 
 "use client";
 
-import Link from "next/link";
+import { useEffect } from "react";
 import { Mail, PackageCheck, Clock, ShieldAlert, ChevronRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
@@ -31,6 +33,7 @@ import type { CaseSource, OrderCase, SlaBand } from "@/types/cases";
 import type { ExceptionDetailResponse } from "@/types/api";
 import { STATUS_LABEL, lastActivityLabel, sourceChannelLabel } from "@/lib/cases";
 import { useSlaTicker } from "@/hooks/useSlaTicker";
+import ExceptionDetailPanel from "../exceptions/ExceptionDetailPanel";
 
 import { slaSnapshot } from "./page";
 
@@ -77,24 +80,50 @@ export interface CaseDetailPanelProps {
   /**
    * The child `ExceptionRecord`s attached to this case
    * (Phase 28.5.x §28.5 follow-up). Sourced from
-   * `casesApi.getRecords(case_id).items`. Each row deep-links to
-   * `/exceptions/{id}` for the full per-event detail. Empty array
-   * hides the section entirely (Guardrail #6).
+   * `casesApi.getRecords(case_id).items`. Selecting a row mounts
+   * the per-record ribbon + sections inline. Empty array hides the
+   * section entirely (Guardrail #6).
    */
   attachedRecords?: ExceptionDetailResponse[];
+  /**
+   * Currently selected child record id. The page binds this to the
+   * URL `?record=<id>` query so the selection survives reload and
+   * deep-links. Undefined means "no record selected yet" — the
+   * picker renders without a mounted ribbon.
+   */
+  selectedRecordId?: string;
+  /** Picker click handler — flips selection (and the URL query). */
+  onSelectRecord?: (recordId: string) => void;
 }
 
 export function CaseDetailPanel({
   orderCase,
   policyHits,
   attachedRecords,
+  selectedRecordId,
+  onSelectRecord,
 }: CaseDetailPanelProps) {
   // PO #20 (issue #133): tick the SLA snapshot once a minute so the
   // header countdown stays live without a refetch.
   const now = useSlaTicker();
   const sla = slaSnapshot(orderCase, now);
   const hasPolicyHits = (policyHits ?? []).length > 0;
-  const hasAttachedRecords = (attachedRecords ?? []).length > 0;
+  const records = attachedRecords ?? [];
+  const hasAttachedRecords = records.length > 0;
+
+  // Single-record cases auto-mount the ribbon — the picker step
+  // collapses to zero clicks. We surface this through onSelectRecord
+  // so the URL stays in sync and a subsequent record arrival (multi-
+  // record case loading in stages) re-renders the picker correctly.
+  useEffect(() => {
+    if (!onSelectRecord) return;
+    if (selectedRecordId) return;
+    if (records.length === 1) onSelectRecord(records[0].id);
+  }, [onSelectRecord, selectedRecordId, records]);
+
+  const selectedRecord = selectedRecordId
+    ? records.find((r) => r.id === selectedRecordId) ?? null
+    : null;
 
   return (
     <div className="space-y-24">
@@ -227,37 +256,74 @@ export function CaseDetailPanel({
               Attached records
             </h2>
             <span className="ml-auto text-caption text-text-tertiary">
-              {(attachedRecords ?? []).length}
+              {records.length}
             </span>
           </div>
           <p className="text-caption text-text-tertiary leading-normal mb-12">
             Per-event records (extraction, validation findings, agent
             decisions) attached to{" "}
             <code className="font-mono">{orderCase.case_id}</code>.
-            Open one for the full enrichment + reasoning surface.
+            {records.length > 1 ? " Pick one to act on." : null}
           </p>
-          <ul role="list" className="m-0 p-0 list-none divide-y divide-border-subtle">
-            {(attachedRecords ?? []).map((record) => (
-              <li key={record.id}>
-                <Link
-                  href={`/exceptions/${record.id}`}
-                  className="flex items-center gap-12 py-12 hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
-                  aria-label={`Open exception ${record.order_id ?? record.id}`}
-                >
-                  <Badge variant="neutral" size="sm">
-                    {record.intent ?? "UNCLASSIFIED"}
-                  </Badge>
-                  <span className="font-mono text-body text-text-primary">
-                    {record.order_id ?? record.id}
-                  </span>
-                  <span className="ml-auto text-caption text-text-tertiary">
-                    {record.lifecycle_state}
-                  </span>
-                  <ChevronRight size={14} aria-hidden className="text-text-tertiary" />
-                </Link>
-              </li>
-            ))}
+          <ul
+            role="radiogroup"
+            aria-label="Select a record to act on"
+            className="m-0 p-0 list-none divide-y divide-border-subtle"
+          >
+            {records.map((record) => {
+              const isSelected = record.id === selectedRecordId;
+              return (
+                <li key={record.id}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => onSelectRecord?.(record.id)}
+                    data-testid={`record-picker-row-${record.id}`}
+                    className={[
+                      "w-full flex items-center gap-12 py-12 px-8 rounded-sm text-left",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+                      isSelected
+                        ? "bg-surface-row-active"
+                        : "hover:bg-surface-secondary",
+                    ].join(" ")}
+                  >
+                    <Badge variant={isSelected ? "info" : "neutral"} size="sm">
+                      {record.intent ?? "UNCLASSIFIED"}
+                    </Badge>
+                    <span className="font-mono text-body text-text-primary">
+                      {record.order_id ?? record.id}
+                    </span>
+                    <span className="ml-auto text-caption text-text-tertiary">
+                      {record.lifecycle_state}
+                    </span>
+                    <ChevronRight
+                      size={14}
+                      aria-hidden
+                      className="text-text-tertiary"
+                    />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
+        </section>
+      )}
+
+      {/* Selected-record HITL surface — mounts the full ExceptionDetailPanel
+          (HeaderRibbon + ContextStrip + AgentAnalysis + EvidenceGrid +
+          Diagnostics + per-record cosign banner). Single-record cases
+          mount here automatically via the auto-select effect above.
+          The panel is the canonical action surface — CSA reaches
+          Approve / Reject / Override / Escalate / Reanalyze in a
+          single click from the case URL. */}
+      {selectedRecord && (
+        <section
+          aria-label="Selected record detail"
+          data-testid="case-selected-record-detail"
+          className="bg-surface-primary border border-border rounded-md p-16 shadow-xs"
+        >
+          <ExceptionDetailPanel exceptionId={selectedRecord.id} />
         </section>
       )}
     </div>

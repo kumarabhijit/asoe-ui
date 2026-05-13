@@ -53,7 +53,11 @@ const FLOWS_ROOT = join(REPO_ROOT, "e2e", "flows");
 //   - Phase 3 (golden paths): 4 cells uncovered (J4 + J5)
 //   - Phase 4 (chrome-invariant CMT-2/CMT-3 owns J4): 2 cells
 //     uncovered (J5 only; deferred to V1.1)
-const SOFT_GAP_THRESHOLD = 4;
+// S15a — the case ↔ exception-detail round-trip flow was retired
+// alongside the /exceptions/[id] route it exercised. Until an
+// equivalent flow on the case-centric surface lands, J3 ×
+// task-completion is uncovered again (5 gaps, up from 4).
+const SOFT_GAP_THRESHOLD = 5;
 
 interface IndexedFlow {
   path: string;
@@ -171,7 +175,11 @@ describe("journey-coverage meta-test", () => {
       ["J1", "orientation"], // inbox-load + V3 catalog + signin-to-home
       ["J2", "orientation"], // inbox-load + V3 catalog + signout
       ["J1", "task-completion"], // V1 + V2 round-trip
-      ["J3", "task-completion"], // V2 round-trip
+      // J3 × task-completion was covered by V2's case ↔ exception
+      // round-trip flow. S15a retired that flow with the
+      // /exceptions/[id] route; the cell is uncovered until a
+      // case-centric equivalent lands. Re-add this row when the
+      // replacement flow is committed.
       ["J2", "task-completion"], // resolve/exception-triage-approval
       ["J3", "orientation"], // recover/back-from-misroute
     ];

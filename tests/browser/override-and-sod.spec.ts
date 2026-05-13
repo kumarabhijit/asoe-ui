@@ -23,6 +23,7 @@ import { test, expect } from "@playwright/test";
 import {
   loginAs,
   backendToken,
+  exceptionUrl,
   createPendingReviewException,
   resetTenant,
   USERS,
@@ -44,7 +45,7 @@ test("manager overrides → self-re-override is allowed (PO ruling 2026-05-03)",
   const exceptionId = await createPendingReviewException(request, token);
 
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, token, exceptionId));
 
   // ── First override: open dialog, fill form, confirm ────────────
   const openOverride = page.getByRole("button", { name: /choose different action/i });

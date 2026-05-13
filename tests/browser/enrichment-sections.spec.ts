@@ -28,6 +28,7 @@ import { test, expect } from "@playwright/test";
 import {
   loginAs,
   backendToken,
+  exceptionUrl,
   resetTenant,
   USERS,
   BACKEND_URL,
@@ -80,7 +81,7 @@ test("BackOrder detail page renders primary_dc + alternate warehouses + substitu
   });
 
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, token, exceptionId));
 
   // Enrichment sections are collapsed by default (PO ruling 2026-05-03);
   // expand the Back-Order pane before asserting its inner content.
@@ -122,7 +123,7 @@ test("DuplicatePO detail shows OrderSnapshot pair from matched_po_details gatewa
   });
 
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, token, exceptionId));
 
   // Both Duplicate Detection and Order Comparison are collapsed by
   // default; expand them before asserting their inner snapshots.
@@ -159,7 +160,7 @@ test("DeliveryDelay detail shows projected_eta + at_risk from sla_contract gatew
   });
 
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, token, exceptionId));
 
   // Delivery Delay pane is collapsed by default; expand it.
   await expandSection(page, /Delivery Delay/i);
@@ -195,7 +196,7 @@ test("OverMax detail shows trim plan + contract / block context from gateway", a
   });
 
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, token, exceptionId));
 
   // Over-Max pane is collapsed by default; expand it.
   await expandSection(page, /Over-Max Analysis/i);
@@ -227,7 +228,7 @@ test("MOQ detail shows moq_source + channel from sap_customer_master gateway", a
   });
 
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, token, exceptionId));
 
   // MOQ pane is collapsed by default; expand it.
   await expandSection(page, /MOQ Analysis/i);
@@ -256,7 +257,7 @@ test("PriceAnalysis detail shows variance summary + SAP Context with doc_number 
   });
 
   await loginAs(page, USERS.MANAGER);
-  await page.goto(`/exceptions/${exceptionId}`);
+  await page.goto(await exceptionUrl(request, token, exceptionId));
 
   // Price Analysis pane is collapsed by default; expand it before
   // looking at the variance summary that lives inside.

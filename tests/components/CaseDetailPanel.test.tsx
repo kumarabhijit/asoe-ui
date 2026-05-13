@@ -11,8 +11,9 @@
  *     and the L1 vs L2 distinction (LLM_SHADOW: prefix) reaches
  *     the screen.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { CaseDetailPanel } from "@/app/cases/CaseDetailPanel";
 import type { OrderCase } from "@/types/cases";
@@ -126,7 +127,12 @@ describe("CaseDetailPanel — Attached records stack (Phase 28.5.x)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("renders one row per record with a deep-link to /exceptions/{id}", () => {
+  it("renders one picker row per record and fires onSelectRecord when clicked", async () => {
+    // S15a — rows are no longer Links to /exceptions/{id}; they are
+    // radio-style picker buttons that flip the parent's
+    // selectedRecordId. The parent (CaseDetailPage) reflects the
+    // selection into the ?record=<id> URL query.
+    const onSelectRecord = vi.fn();
     render(
       <CaseDetailPanel
         orderCase={mockCase()}
@@ -139,6 +145,7 @@ describe("CaseDetailPanel — Attached records stack (Phase 28.5.x)", () => {
             lifecycle_state: "RESOLVED",
           },
         ]}
+        onSelectRecord={onSelectRecord}
       />,
     );
     expect(
@@ -148,10 +155,25 @@ describe("CaseDetailPanel — Attached records stack (Phase 28.5.x)", () => {
     expect(screen.getByText("PO-B")).toBeInTheDocument();
     expect(screen.getByText("CONTRACTUAL_CORRECTION")).toBeInTheDocument();
     expect(screen.getByText("DUPLICATE_PO")).toBeInTheDocument();
-    // Both rows are Links to the per-event detail surface.
-    const linkA = screen.getByRole("link", { name: /open exception po-a/i });
-    expect(linkA).toHaveAttribute("href", "/exceptions/exc-A");
-    const linkB = screen.getByRole("link", { name: /open exception po-b/i });
-    expect(linkB).toHaveAttribute("href", "/exceptions/exc-B");
+    const radios = screen.getAllByRole("radio");
+    expect(radios).toHaveLength(2);
+    await userEvent.click(radios[1]);
+    expect(onSelectRecord).toHaveBeenCalledWith("exc-B");
+  });
+
+  it("auto-selects the only record on a single-record case", () => {
+    // The CSA's "one task end-to-end" happy path: a single attached
+    // record means no picking — the ribbon mounts on first paint.
+    // CaseDetailPanel signals the auto-mount via onSelectRecord; the
+    // page-level URL sync writes ?record=<id> in response.
+    const onSelectRecord = vi.fn();
+    render(
+      <CaseDetailPanel
+        orderCase={mockCase()}
+        attachedRecords={[mockRecord({ id: "only-exc", order_id: "PO-only" })]}
+        onSelectRecord={onSelectRecord}
+      />,
+    );
+    expect(onSelectRecord).toHaveBeenCalledWith("only-exc");
   });
 });
