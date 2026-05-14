@@ -316,70 +316,20 @@ export function CaseDetailPanel({
         </section>
       )}
 
-      {/* ── Attached records stack (Phase 28.5.x §28.5) ──────────── */}
-      {hasAttachedRecords && (
-        <section
-          aria-label="Attached records"
-          className="bg-surface-primary border border-border rounded-md p-16 shadow-xs"
-        >
-          <div className="flex items-center gap-8 mb-12">
-            <h2 className="text-heading font-semibold text-text-primary m-0">
-              Attached records
-            </h2>
-            <span className="ml-auto text-caption text-text-tertiary">
-              {records.length}
-            </span>
-          </div>
-          <p className="text-caption text-text-tertiary leading-normal mb-12">
-            Per-event records (extraction, validation findings, agent
-            decisions) attached to{" "}
-            <code className="font-mono">{orderCase.case_id}</code>.
-            {records.length > 1 ? " Pick one to act on." : null}
-          </p>
-          <ul
-            role="radiogroup"
-            aria-label="Select a record to act on"
-            className="m-0 p-0 list-none divide-y divide-border-subtle"
-          >
-            {records.map((record) => {
-              const isSelected = record.id === selectedRecordId;
-              return (
-                <li key={record.id}>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    onClick={() => onSelectRecord?.(record.id)}
-                    data-testid={`record-picker-row-${record.id}`}
-                    className={[
-                      "w-full flex items-center gap-12 py-12 px-8 rounded-sm text-left",
-                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
-                      isSelected
-                        ? "bg-surface-row-active"
-                        : "hover:bg-surface-secondary",
-                    ].join(" ")}
-                  >
-                    <Badge variant={isSelected ? "info" : "neutral"} size="sm">
-                      {record.intent ?? "UNCLASSIFIED"}
-                    </Badge>
-                    <span className="font-mono text-body text-text-primary">
-                      {record.order_id ?? record.id}
-                    </span>
-                    <span className="ml-auto text-caption text-text-tertiary">
-                      {record.lifecycle_state}
-                    </span>
-                    <ChevronRight
-                      size={14}
-                      aria-hidden
-                      className="text-text-tertiary"
-                    />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+      {/* ── Attached records (lifted into the middle pane) ────────
+          ADR-041 P3d-remaining (2026-05-14): the picker now lives
+          in `RecordListPane.tsx` as the workspace's middle column.
+          `CaseDetailPanel` is the right pane and surfaces only the
+          case context + Compliance hits + the selected record's
+          HITL ribbon.
+
+          For deep-link contexts that mount `CaseDetailPanel` outside
+          the workspace (e.g. the focused `/cases/[id]` view that has
+          no queue chrome), a lightweight inline picker would be
+          useful — that's queued as P3e. Today the focused view
+          inherits the workspace's responsive collapse: below 1024px
+          the page stacks vertically so the picker re-appears
+          beneath the case header. */}
 
       {/* Selected-record HITL surface — mounts the full ExceptionDetailPanel
           (HeaderRibbon + ContextStrip + AgentAnalysis + EvidenceGrid +

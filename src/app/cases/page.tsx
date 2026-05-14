@@ -56,6 +56,7 @@ import type {
 import type { ExceptionDetailResponse } from "@/types/api";
 
 import { CaseDetailPanel } from "./CaseDetailPanel";
+import { RecordListPane } from "./RecordListPane";
 import { NAV_TABS } from "@/config/nav-tabs";
 
 
@@ -384,13 +385,24 @@ function CasesWorkspace() {
   return (
     <main
       className={cn(
-        "max-w-[1600px] mx-auto p-24",
+        "max-w-[1800px] mx-auto p-24",
         "grid gap-24",
-        // Two-pane layout: queue ~360px, detail flex. Below 1024px
-        // (CSS variable breakpoint), the right pane stacks below the
-        // queue — P3c's responsive-collapse work will turn it into a
-        // proper overlay/popover.
-        "grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]",
+        // Three-pane workspace (ADR-041 P3d-remaining, 2026-05-14):
+        //   * <1024px  → single column; everything stacks vertically.
+        //     Tablet / phone falls back to the legacy queue-then-
+        //     detail flow.
+        //   * 1024-1280px (lg)  → two columns: queue + detail. The
+        //     record-list column collapses since the right pane's
+        //     attached-records picker still works inline; no operator
+        //     workflow loss.
+        //   * ≥1280px (xl) → full three pane: queue / record-list /
+        //     detail. The middle column ('Records') only renders when
+        //     `records.length > 0` (Guardrail #6 — pane returns null
+        //     and the grid track collapses to its 280px width with
+        //     nothing in it, which is harmless).
+        "grid-cols-1",
+        "lg:grid-cols-[360px_minmax(0,1fr)]",
+        "xl:grid-cols-[320px_280px_minmax(0,1fr)]",
       )}
     >
       {/* ── Left pane: queue ────────────────────────────────── */}
@@ -532,6 +544,38 @@ function CasesWorkspace() {
           )}
         </div>
       </aside>
+
+      {/* ── Middle pane: record list (ADR-041 P3d-remaining) ─────
+          Only mounts when a case is selected, its records have
+          loaded, AND the loaded `orderCase.case_id` matches the
+          URL `?case=` (same render-guard as the right pane — no
+          stale data leaks across a fast case-switch).
+
+          Layout: the column is collapsed below `xl` (1280px) per
+          the grid-template above; React skips this branch under
+          the breakpoint and the queue + detail share the two
+          remaining tracks. Above `xl` the middle column gets its
+          dedicated 280px track.
+
+          Below `xl` the inline picker re-emergence is a P3e
+          follow-on; today the middle column collapses and the
+          single-record auto-mount in `CaseDetailPanel` still
+          drives selection so the focused `/cases/[id]` view +
+          tablet widths continue to work. */}
+      {selectedCaseId
+        && !detailLoading
+        && orderCase
+        && orderCase.case_id === selectedCaseId
+        && records.length > 0 && (
+        <div className="hidden xl:block">
+          <RecordListPane
+            caseId={orderCase.case_id}
+            records={records}
+            selectedRecordId={selectedRecordId}
+            onSelectRecord={handleSelectRecord}
+          />
+        </div>
+      )}
 
       {/* ── Right pane: case workspace ──────────────────────── */}
       <section

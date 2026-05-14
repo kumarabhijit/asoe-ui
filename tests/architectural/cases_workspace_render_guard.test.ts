@@ -96,6 +96,51 @@ describe("/cases workspace — case-switch race invariants", () => {
     ).toMatch(/orderCase\.case_id\s*===\s*selectedCaseId/);
   });
 
+  // Deliverable-completeness pattern (ADR-041 P3d-remaining,
+  // 2026-05-14): the PO flagged "I can't find the 3-pane view; is
+  // this a bug or missing mock data?". Behavioural tests passed
+  // because the workspace's existing two-pane layout still renders
+  // correctly — the gap was that the third pane was simply not
+  // built. Behavioural tests can't catch deliverable absence; an
+  // architectural lock that asserts the EXPECTED STRUCTURE makes
+  // missing deliverables fail loudly at unit-test speed.
+  //
+  // Pattern documented as Gap 7 in `docs/test-strategy/README.md`.
+  it("renders the three-pane workspace: case-queue + record-list + case-workspace", () => {
+    // (a) The three pane wrappers must all be referenced.
+    expect(
+      src,
+      "left pane: queue must be present (aria-label='Case queue')",
+    ).toMatch(/aria-label=["']Case queue["']/);
+    expect(
+      src,
+      "middle pane: RecordListPane must be mounted by the page " +
+        "(ADR-041 P3d-remaining lift)",
+    ).toMatch(/<RecordListPane[\s>]/);
+    expect(
+      src,
+      "right pane: case workspace must be present (aria-label='Case workspace')",
+    ).toMatch(/aria-label=["']Case workspace["']/);
+
+    // (b) The CSS grid-template must declare three columns at the
+    // `xl` breakpoint so the middle column gets a dedicated track.
+    // Pattern: `xl:grid-cols-[<a>_<b>_<c>]` with three space- or
+    // underscore-separated values.
+    expect(
+      src,
+      "the workspace grid must declare three columns at xl breakpoint",
+    ).toMatch(/xl:grid-cols-\[[^\]]+_[^\]]+_[^\]]+\]/);
+
+    // (c) The RecordListPane import must exist — guards against a
+    // refactor that removes the component reference but leaves the
+    // <RecordListPane ...> JSX (would be a TypeScript error, but
+    // the contract-of-existence lock is faster + more explicit).
+    expect(
+      src,
+      "RecordListPane must be imported from the cases route",
+    ).toMatch(/import\s+\{\s*RecordListPane\s*\}\s+from\s+["']\.\/RecordListPane["']/);
+  });
+
   it("pins the selected case in the visible queue across filter mismatches", () => {
     // The UX architect flagged "agent mutates the selected record's
     // status while the operator is on it" as a real incident. When
