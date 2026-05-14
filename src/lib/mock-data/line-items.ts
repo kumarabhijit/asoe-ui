@@ -100,4 +100,33 @@ export const MOCK_LINE_ITEMS: Record<string, LineItem[]> = {
     { line_id: "L3", sku: "SKU-1108", description: "16oz Sparkling Water 12pk", uom: "CS", quantity: 60, erp_price: 18.40, po_price: 18.40 },
     { line_id: "L4", sku: "SKU-1112", description: "20oz Sports Drink 12pk", uom: "CS", quantity: 100, erp_price: 26.00, po_price: 26.00 },
   ],
+
+  // Multi-issue case fixtures — each row's evidence is per-record, so
+  // siblings on the same case carry their own line tables. The shared
+  // PO is reflected in the parent case header, not in the line grids.
+  "exc-027": [
+    { line_id: "L1", sku: "SKU-Q1R-2076", description: "Q1 Reset Display Pack", uom: "CS", quantity: 1_600, erp_price: 20.00, po_price: 21.10, root_cause: "PRICE_HOLD_ESCALATE" },
+  ],
+  "exc-028": [
+    { line_id: "L1", sku: "SKU-Q1R-2076", description: "Q1 Reset Display Pack", uom: "CS", quantity: 1_600, erp_price: 21.10, po_price: 21.10, root_cause: "BACK_ORDER_GAP" },
+  ],
+  "exc-029": [
+    { line_id: "L1", sku: "SKU-Q1R-2076", description: "Q1 Reset Display Pack (retransmit)", uom: "CS", quantity: 1_600, erp_price: 21.10, po_price: 21.10, root_cause: "EDI_RETRANSMIT" },
+  ],
+  "exc-030": [
+    { line_id: "L1", sku: "SKU-COST-EOQ-A", description: "Costco Club-Pack Bundle 36ct", uom: "CS", quantity: 2_000, erp_price: 30.50, po_price: 30.50, root_cause: "OVER_MAX_LINE" },
+    { line_id: "L2", sku: "SKU-COST-EOQ-B", description: "Costco Club-Pack Bundle 48ct", uom: "CS", quantity: 2_000, erp_price: 30.50, po_price: 30.50, root_cause: "OVER_MAX_LINE" },
+  ],
+  "exc-031": [
+    { line_id: "L1", sku: "SKU-COST-EOQ-A", description: "Costco Club-Pack Bundle 36ct", uom: "CS", quantity: 2_000, erp_price: 30.50, po_price: 30.50, root_cause: "PALLET_BROKEN_LAYER" },
+    { line_id: "L2", sku: "SKU-COST-EOQ-B", description: "Costco Club-Pack Bundle 48ct", uom: "CS", quantity: 2_000, erp_price: 30.50, po_price: 30.50, root_cause: "PALLET_BROKEN_LAYER" },
+  ],
+  "exc-032": [
+    { line_id: "L1", sku: "SKU-KR-1100", description: "Kombucha Variety 6pk", uom: "CS", quantity: 50, erp_price: 28.00, po_price: 28.00, root_cause: "MOQ_BELOW_LINE" },
+    { line_id: "L2", sku: "SKU-KR-1110", description: "Ginger Kombucha 6pk", uom: "CS", quantity: 20, erp_price: 28.00, po_price: 28.00, root_cause: "MOQ_BELOW_LINE" },
+  ],
+  "exc-033": [
+    { line_id: "L1", sku: "SKU-KR-1100", description: "Kombucha Variety 6pk", uom: "CS", quantity: 50, erp_price: 28.00, po_price: 28.00, root_cause: "CARRIER_DELAY" },
+    { line_id: "L2", sku: "SKU-KR-1110", description: "Ginger Kombucha 6pk", uom: "CS", quantity: 20, erp_price: 28.00, po_price: 28.00, root_cause: "CARRIER_DELAY" },
+  ],
 };

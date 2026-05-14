@@ -1361,4 +1361,475 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       source_email_id: "4",
     },
   },
+
+  /* ── Multi-issue case fixtures ────────────────────────────────────
+     Three CPG-realistic clusters: one PO produces N coincident
+     exceptions. Each record below stands alone (its own analysis
+     payload, evidence grid, and resolution recommendation), but
+     they share a `parent_case_id` in MOCK_EXCEPTIONS so the
+     RecordListPane renders an N-row picker on the case detail
+     surface.
+     ─────────────────────────────────────────────────────────────── */
+
+  /* ── Case 1 (PO-WMT-Q1-RESET-001) — Walmart Q1 reset bundle.
+   *    exc-027  Price hold escalate band (+5.5% over base)
+   *    exc-028  Back-order at primary DC (320 CS short of 800)
+   *    exc-029  Buyer EDI system retransmitted the PO (duplicate)
+   * ───────────────────────────────────────────────────────────── */
+  "exc-027": {
+    diagnosis: "Q1 reset PO from Walmart held on pricing check: line 1's PO price ($21.10) deviates +5.5% from the SAP base ($20.00) at Plant 4100. Above the 2.0% auto-release tolerance, below the 10.0% hard-block ceiling — PriceHoldReleaseRecipe escalated to category manager. Q1 promotional reset window opened 2026-05-01; buyer may have applied an unconfirmed promo upcharge ahead of the planogram swap.",
+    confidence: 90,
+    risk: "MEDIUM",
+    resolution: "ESCALATE",
+    root_cause: "PO price exceeds auto-release tolerance. Walmart's Q1 reset typically lands with a +3–5% margin uplift confirmed via JBP letter; that letter has not yet arrived in the contract repository.",
+    recommendation: "Category manager confirms the Q1 JBP uplift letter is in flight, then approves the price-hold release. Reject + buyer notification if the uplift is unauthorised.",
+    entity_profile: {
+      customer_name: "Walmart Inc",
+      bp_number: "BP-WMT-001",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Excellent",
+      location: "Plant 4100 — Bentonville DC",
+      region: "South Central",
+    },
+    impact_metrics: {
+      revenue_at_risk: 33_760.00,
+      delta_amount: 1_760.00,
+      delta_percentage: 5.5,
+      sla_priority: "HIGH",
+      sla_deadline: "2026-05-05T18:00:00Z",
+      affected_lines: 1,
+    },
+    lines: [
+      {
+        line_id: "L1",
+        diagnosis: "PO $21.10 vs SAP base $20.00 (+5.5%). Above ±2.0% release tolerance, under +10.0% hard-block. Q1 reset window — pending JBP confirmation.",
+        resolution: "ESCALATE",
+        risk: "MEDIUM",
+        waterfall: [
+          { type: "BASE",     label: "Base Price (PR00)",       record: "PR00/10",    value: 20.00, running: 20.00, detail: "SAP list price, material group 207, effective 04/01/2026" },
+          { type: "CONTRACT", label: "Contract Price (ZA01)",   record: "ZA01/620",   value: 0,     running: 20.00, detail: "Walmart strategic contract #4600055901 — base aligned, no automatic Q1 uplift clause" },
+          { type: "RESULT",   label: "PO Price (incoming)",     record: "EDI 850/L1", value: 21.10, running: 21.10, detail: "Variance +$1.10 (+5.5%). Above tolerance; block held for review." },
+          { type: "ERROR",    label: "Pricing Block Check",     record: "VBKD-FAKSK", value: null,  running: null,  detail: "Release tolerance: ±2.0%. Hard-block: ±10.0%.", error: "Escalate — variance above auto-release threshold; below hard-block." },
+        ],
+      },
+    ],
+    price_hold_analysis: {
+      hold_status: "HELD",
+      po_price: 21.10,
+      sap_base_price: 20.00,
+      variance_pct: 0.055,
+      tolerance_pct: 0.02,
+      hard_block_pct: 0.10,
+      action: "ESCALATE",
+      reason: "Variance +5.5% above tolerance (+2.0%); under hard-block (+10.0%). Category manager review required pending Q1 JBP uplift confirmation.",
+    },
+  },
+
+  "exc-028": {
+    diagnosis: "Walmart ordered 1,600 CS of the Q1-reset SKU but Bentonville DC has only 1,280 CS on hand. Gap of 320 CS (20%). Memphis NDC carries 400 CS with a 2-day transit lane; an inbound production order for 800 CS is due in 6 days.",
+    confidence: 86,
+    risk: "HIGH",
+    resolution: "SPLIT_SHIPMENT",
+    root_cause: "Bentonville pre-shipped Q4 closeout volume against the new planogram, depleting safety stock below the Q1 reset wave demand. Mid-month production run not yet scheduled.",
+    recommendation: "Split shipment: 1,280 CS ex-Bentonville now, 320 CS ex-Memphis NDC on the 2-day transfer lane. Avoids planogram-window slip with $0.32/CS freight uplift.",
+    entity_profile: {
+      customer_name: "Walmart Inc",
+      bp_number: "BP-WMT-001",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Excellent",
+      location: "Plant 4100 — Bentonville DC",
+      region: "South Central",
+    },
+    impact_metrics: {
+      revenue_at_risk: 33_760.00,
+      delta_amount: 6_752.00,
+      delta_percentage: 20.0,
+      fulfillment_gap_pct: 20.0,
+      sla_priority: "CRITICAL",
+      sla_deadline: "2026-05-06T12:00:00Z",
+      affected_lines: 1,
+    },
+    lines: [
+      {
+        line_id: "L1",
+        diagnosis: "Q1 reset SKU: 1,600 CS ordered, 1,280 CS available at primary DC (Bentonville). 20% gap.",
+        resolution: "SPLIT_SHIPMENT",
+        risk: "HIGH",
+        waterfall: [],
+      },
+    ],
+    backorder_analysis: {
+      ordered_qty: 1_600,
+      available_qty: 1_280,
+      gap_qty: 320,
+      gap_pct: 20.0,
+      unit_price: 21.10,
+      uom: "CS",
+      at_risk: 6_752.00,
+      atp_date: "2026-05-12T00:00:00Z",
+      primary_dc: {
+        plant: "4100",
+        name: "Bentonville Regional DC",
+        region: "South Central",
+        qty: 1_280,
+      },
+      alternate_warehouses: [
+        { plant: "3450", name: "Memphis National DC", region: "Mid-South", qty: 400, eta_days: 2, freight_delta_per_unit: 0.32, freight_delta_total: 102.40 },
+        { plant: "5200", name: "Dallas Distribution Hub", region: "South Central", qty: 220, eta_days: 3, freight_delta_per_unit: 0.48, freight_delta_total: 153.60 },
+      ],
+      substitutes: [],
+      production: { qty: 800, date: "2026-05-12T00:00:00Z" },
+      inbound_po: null,
+      resolution_options: [
+        {
+          id: "opt-1",
+          type: "SPLIT_SHIPMENT",
+          title: "Split Shipment (Bentonville + Memphis)",
+          description: "1,280 CS ex-Bentonville, 320 CS ex-Memphis on the 2-day lane. Maintains planogram window.",
+          composite_score: 0.91,
+          scores: { service: 0.93, revenue: 0.92, logistics: 0.88, preference: 0.92 },
+          sap_steps: ["VA02 (split delivery)", "VL01N (create 2nd delivery)", "ME21N (interplant transfer)"],
+          recommended: true,
+        },
+        {
+          id: "opt-2",
+          type: "FUTURE_DELIVERY",
+          title: "Hold full 1,600 CS for production run",
+          description: "Defer ship date 6 days for the inbound production order. Misses the May 6 planogram window.",
+          composite_score: 0.42,
+          scores: { service: 0.25, revenue: 0.95, logistics: 0.85, preference: 0.20 },
+          sap_steps: ["VA02 (change delivery date)", "ZPROD (reserve production)"],
+          recommended: false,
+        },
+      ],
+    },
+  },
+
+  "exc-029": {
+    diagnosis: "PO PO-WMT-Q1-RESET-001-R2 arrived 18h after the original PO-WMT-Q1-RESET-001. Identical line items, quantities, and ship-to. Almost certainly Walmart's EDI re-transmission after their order acknowledgement window expired without an 855 from us — not a buyer-side duplicate.",
+    confidence: 93,
+    risk: "MEDIUM",
+    resolution: "BLOCK_AND_NOTIFY",
+    root_cause: "Buyer EDI VAN auto-retried after missing 855 ack within the 12h SLA. The original PO is still in the duplicate-detection window (48h) and is the canonical record.",
+    recommendation: "Block the R2 retry, send a courtesy 855 against the original PO, and notify Walmart's EDI ops that the retry was caught.",
+    entity_profile: {
+      customer_name: "Walmart Inc",
+      bp_number: "BP-WMT-001",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Excellent",
+      location: "Plant 4100 — Bentonville DC",
+      region: "South Central",
+    },
+    impact_metrics: {
+      revenue_at_risk: 33_760.00,
+      delta_amount: 0,
+      delta_percentage: 0,
+      fulfillment_gap_pct: 0,
+      sla_priority: "HIGH",
+      sla_deadline: "2026-05-06T01:30:00Z",
+      affected_lines: 1,
+    },
+    lines: [
+      {
+        line_id: "L1",
+        diagnosis: "Exact duplicate of PO-WMT-Q1-RESET-001/L1. Same SKU, qty, ship-to, ship date.",
+        resolution: "BLOCK_AND_NOTIFY",
+        risk: "MEDIUM",
+        waterfall: [],
+      },
+    ],
+    duplicate_detection: {
+      original_order: {
+        so_number: "SO-WMT-Q1RESET-001",
+        po_number: "PO-WMT-Q1-RESET-001",
+        created_date: "2026-05-04T07:10:00Z",
+        total_value: 33_760.00,
+        line_count: 1,
+        status: "Pending Pricing Review",
+      },
+      duplicate_order: {
+        so_number: "SO-WMT-Q1RESET-001-R2",
+        po_number: "PO-WMT-Q1-RESET-001-R2",
+        created_date: "2026-05-05T01:30:00Z",
+        total_value: 33_760.00,
+        line_count: 1,
+        status: "Pending",
+      },
+      detection_method: "Identical customer + SKU + qty + ship-to within the 48-hour window; PO suffix '-R2' matches Walmart's retransmission convention.",
+      days_between: 0.77,
+      confidence: 93,
+      recommended_action: "Block SO-WMT-Q1RESET-001-R2; send 855 ack against the original PO.",
+      cancellation_target: "SO-WMT-Q1RESET-001-R2",
+      autonomy_applied: "L2 — Review required, original PO is still mid-review (price hold + back-order on the same case).",
+    },
+    order_comparison: {
+      orders: [
+        {
+          so_number: "SO-WMT-Q1RESET-001",
+          po_number: "PO-WMT-Q1-RESET-001",
+          created_date: "2026-05-04T07:10:00Z",
+          customer: "Walmart Inc",
+          lines: [
+            { sku: "SKU-Q1R-2076", description: "Q1 Reset Display Pack", qty: 1_600, unit_price: 21.10 },
+          ],
+          total_value: 33_760.00,
+          status: "Pending Pricing Review",
+        },
+        {
+          so_number: "SO-WMT-Q1RESET-001-R2",
+          po_number: "PO-WMT-Q1-RESET-001-R2",
+          created_date: "2026-05-05T01:30:00Z",
+          customer: "Walmart Inc",
+          lines: [
+            { sku: "SKU-Q1R-2076", description: "Q1 Reset Display Pack", qty: 1_600, unit_price: 21.10 },
+          ],
+          total_value: 33_760.00,
+          status: "Pending",
+        },
+      ],
+      matching_fields: ["customer_id", "ship_to_address", "sku_list", "quantities", "unit_prices"],
+      differing_fields: ["po_number", "received_at"],
+    },
+  },
+
+  /* ── Case 2 (PO-COST-EOQ-2026Q1) — Costco end-of-quarter bundle.
+   *    exc-030  Over-max: club-pack ceiling breach (+33%)
+   *    exc-031  Pallet config: layers don't tile to Costco club spec
+   * ───────────────────────────────────────────────────────────── */
+  "exc-030": {
+    diagnosis: "Costco end-of-quarter PO totals 4,000 CS, exceeding the contract maximum of 3,000 CS by 1,000 CS (33%). Two SKUs blew through their per-line ceilings. SAP V4080 applied. The EOQ closeout is a known seasonal spike — last year saw the same buyer over-pull by 28%.",
+    confidence: 92,
+    risk: "MEDIUM",
+    resolution: "TRIM",
+    root_cause: "Costco's EOQ allocation grid does not gate against our contract maxima — buyer-side planning lands the order at the gross demand figure even when our line-level ceilings would cap it.",
+    recommendation: "Apply the AI trim plan: round SKU-COST-EOQ-A to its per-line ceiling (1,500 CS) and SKU-COST-EOQ-B to a full club-pack pallet (1,500 CS, even layers). Notify category manager that the EOQ wave overran again.",
+    entity_profile: {
+      customer_name: "Costco Wholesale Corp",
+      bp_number: "BP-COST-001",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Excellent",
+      location: "Plant 7800 — LA Distribution Hub",
+      region: "West",
+    },
+    impact_metrics: {
+      revenue_at_risk: 122_000.00,
+      delta_amount: 30_500.00,
+      delta_percentage: 25.0,
+      sla_priority: "HIGH",
+      sla_deadline: "2026-05-08T16:00:00Z",
+      affected_lines: 2,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "2,000 CS ordered, line max 1,500 CS. Excess 500 CS. Trim to ceiling.", resolution: "TRIM", risk: "MEDIUM", waterfall: [] },
+      { line_id: "L2", diagnosis: "2,000 CS ordered, line max 1,500 CS. Even-layer SKU — trim to 1,500 CS (5 layers × 300 CS).", resolution: "TRIM", risk: "MEDIUM", waterfall: [] },
+    ],
+    overmax_analysis: {
+      total_ordered: 4_000,
+      max_qty: 3_000,
+      excess_qty: 1_000,
+      exceedance_pct: 33.3,
+      uom: "CS",
+      at_risk: 30_500.00,
+      contract_ref: "CTR-4600060101",
+      block_status: "V4080",
+      block_reason: "Order quantity exceeds contract maximum — automatic block per SD-OM-001",
+      order_lines: [
+        { sku: "SKU-COST-EOQ-A", description: "Costco Club-Pack Bundle 36ct", qty: 2_000, max_line_qty: 1_500, excess: 500, is_even_layer_item: false },
+        { sku: "SKU-COST-EOQ-B", description: "Costco Club-Pack Bundle 48ct", qty: 2_000, max_line_qty: 1_500, excess: 500, is_even_layer_item: true },
+      ],
+      trim_plan: [
+        { sku: "SKU-COST-EOQ-A", description: "Costco Club-Pack Bundle 36ct", ordered: 2_000, trimmed_to: 1_500, delta: 500, action: "TRIM" },
+        { sku: "SKU-COST-EOQ-B", description: "Costco Club-Pack Bundle 48ct", ordered: 2_000, trimmed_to: 1_500, delta: 500, action: "TRIM" },
+      ],
+    },
+  },
+
+  "exc-031": {
+    diagnosis: "Two SKUs on the same Costco EOQ PO arrive with quantities that don't tile to Costco's club-pack pallet spec (300 CS/pallet, 60 CS/layer). SKU-COST-EOQ-A lands at 2,000 CS — 6 full pallets + 200 loose; SKU-COST-EOQ-B at 2,000 CS — 6 full pallets + 200 loose. Costco rejects partial pallets at receiving.",
+    confidence: 95,
+    risk: "MEDIUM",
+    resolution: "PALLET_ALIGN",
+    root_cause: "Buyer-side ordering quantum doesn't enforce Costco's own pallet spec. Compounds with the over-max issue on the same PO — trim should target full-pallet quanta, not just the contract ceiling.",
+    recommendation: "Coordinate with the trim plan on the over-max record: target 1,800 CS / 6 full pallets per SKU. Saves 4 broken-pallet handling charges at receiving (~$520).",
+    entity_profile: {
+      customer_name: "Costco Wholesale Corp",
+      bp_number: "BP-COST-001",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Excellent",
+      location: "Plant 7800 — LA Distribution Hub",
+      region: "West",
+    },
+    impact_metrics: {
+      revenue_at_risk: 122_000.00,
+      delta_amount: 520.00,
+      delta_percentage: 0.4,
+      sla_priority: "MEDIUM",
+      sla_deadline: "2026-05-08T16:00:00Z",
+      affected_lines: 2,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "2,000 CS ordered, layer qty 60. 33 full layers = 1,980, 20 loose. Broken layer.", resolution: "ROUND_DOWN", risk: "LOW", waterfall: [] },
+      { line_id: "L2", diagnosis: "2,000 CS ordered, layer qty 60. 33 full layers = 1,980, 20 loose. Broken layer.", resolution: "ROUND_DOWN", risk: "LOW", waterfall: [] },
+    ],
+    pallet_analysis: {
+      total_ordered_cases: 4_000,
+      loose_cases_total: 40,
+      at_risk_total: 520.00,
+      extra_labor_est_hrs: 2.4,
+      freight_waste_pct: 1.0,
+      order_line_count: 2,
+      lines: [
+        {
+          sku: "SKU-COST-EOQ-A", description: "Costco Club-Pack Bundle 36ct", uom: "CS",
+          layer_qty: 60, pallet_qty: 300, ordered_qty: 2_000, complete_layers: 33,
+          loose_qty: 20, full_pallets: 6, pallet_fill_pct: 66.7, violation_type: "Broken Layer",
+        },
+        {
+          sku: "SKU-COST-EOQ-B", description: "Costco Club-Pack Bundle 48ct", uom: "CS",
+          layer_qty: 60, pallet_qty: 300, ordered_qty: 2_000, complete_layers: 33,
+          loose_qty: 20, full_pallets: 6, pallet_fill_pct: 66.7, violation_type: "Broken Layer",
+        },
+      ],
+      suggested_plan: [
+        { sku: "SKU-COST-EOQ-A", description: "Costco Club-Pack Bundle 36ct", current: 2_000, suggested: 1_800, delta: -200, layers: 30, full_pallets: 6, reason: "Round down to 6 full pallets (60 CS/layer × 5 layers/pallet × 6 pallets). Aligns with EOQ trim plan." },
+        { sku: "SKU-COST-EOQ-B", description: "Costco Club-Pack Bundle 48ct", current: 2_000, suggested: 1_800, delta: -200, layers: 30, full_pallets: 6, reason: "Round down to 6 full pallets. Aligns with EOQ trim plan." },
+      ],
+    },
+  },
+
+  /* ── Case 3 (PO-KR-WK15-2026) — Kroger weekly replenishment bundle.
+   *    exc-032  MOQ violation across two SKUs
+   *    exc-033  Carrier slip — 5+ days late on the same PO
+   * ───────────────────────────────────────────────────────────── */
+  "exc-032": {
+    diagnosis: "Kroger's WK-15 replenishment PO totals 70 CS across two SKUs, below the 100 CS MOQ for the DSD channel. SAP V4082 applied. One SKU rounds cleanly to MOQ; the other is below 50% and requires a KNMT waiver.",
+    confidence: 90,
+    risk: "MEDIUM",
+    resolution: "ROUND_UP",
+    root_cause: "Kroger's WK-15 forecast under-allocated the seasonal kombucha SKUs after a category review. The store-level demand projection cleared MOQ at the chain level but not at our line level.",
+    recommendation: "Round SKU-KR-1100 from 50 to 72 CS (full layer). Escalate SKU-KR-1110 (20 CS, 42% of MOQ) for a KNMT-MINBM waiver via category manager.",
+    entity_profile: {
+      customer_name: "Kroger Co",
+      bp_number: "BP-KRG-003",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Good",
+      location: "Plant 5100 — Cincinnati DC",
+      region: "Midwest",
+    },
+    impact_metrics: {
+      revenue_at_risk: 1_960.00,
+      delta_amount: 882.00,
+      delta_percentage: 45.0,
+      sla_priority: "MEDIUM",
+      sla_deadline: "2026-05-09T12:00:00Z",
+      affected_lines: 2,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "50 CS ordered, MOQ 48 CS. Within MOQ but breaks pallet layer — round up to 72 CS (24 CS/layer × 3).", resolution: "ROUND_UP", risk: "LOW", waterfall: [] },
+      { line_id: "L2", diagnosis: "20 CS ordered, MOQ 48 CS. Shortfall 28 CS. Below 50% of MOQ — requires KNMT waiver.", resolution: "ESCALATE", risk: "MEDIUM", waterfall: [] },
+    ],
+    moq_analysis: {
+      ordered_qty: 70,
+      moq_qty: 100,
+      shortfall_qty: 30,
+      shortfall_pct: 30.0,
+      sku: "SKU-KR-1100",
+      description: "Kombucha Variety 6pk",
+      unit_cost: 28.00,
+      uom: "CS",
+      at_risk: 1_960.00,
+      moq_source: "KNMT-MINBM",
+      channel: "Direct Store Delivery",
+      block_message: "Order quantity 70 CS is below minimum order quantity 100 CS for DSD channel. Block V4082 applied per SD-MOQ-001.",
+      contract_ref: "CTR-4600022150",
+      block_status: "V4082",
+      round_up_plan: [
+        { sku: "SKU-KR-1100", description: "Kombucha Variety 6pk", ordered: 50, round_up_to: 72, delta: 22, action: "ROUND_UP" },
+        { sku: "SKU-KR-1110", description: "Ginger Kombucha 6pk", ordered: 20, round_up_to: 20, delta: 0, action: "ESCALATE" },
+      ],
+      sap_steps: [
+        { step: 1, transaction: "VA02", table: "VBAP", field: "KWMENG", description: "Update order quantity for SKU-KR-1100 from 50 to 72 CS" },
+        { step: 2, transaction: "VK11", table: "KONV", field: "KBETR", description: "Apply MOQ round-up pricing tier" },
+        { step: 3, transaction: "V.23", table: "VBAK", field: "LIFSK", description: "Release V4082 delivery block after quantity adjustment" },
+        { step: 4, transaction: "VA02", table: "VBAP", field: "ABGRU", description: "Set rejection reason on SKU-KR-1110 pending KNMT waiver approval" },
+      ],
+    },
+  },
+
+  "exc-033": {
+    diagnosis: "Same Kroger WK-15 PO is now 5 days behind plan on the dispatch leg. Carrier reports a Midwest hub re-route after equipment failure at the Indianapolis cross-dock; estimated recovery is 5-7 days without intervention. SLA breach at risk.",
+    confidence: 87,
+    risk: "HIGH",
+    resolution: "ALTERNATE_ROUTING",
+    root_cause: "Primary carrier (DHL Ground) equipment failure at the Indianapolis cross-dock on 2026-05-05; the WK-15 replenishment lane funnels through that hub.",
+    recommendation: "Switch to FedEx Express on the Chicago → Cincinnati direct lane. ETA recovers to within 1 day of plan; freight +$480 against the WK-15 contract.",
+    entity_profile: {
+      customer_name: "Kroger Co",
+      bp_number: "BP-KRG-003",
+      customer_tier: "Strategic",
+      vip_status: true,
+      credit_standing: "Good",
+      location: "Plant 5100 — Cincinnati DC",
+      region: "Midwest",
+    },
+    impact_metrics: {
+      revenue_at_risk: 1_960.00,
+      delta_amount: 480.00,
+      delta_percentage: 24.5,
+      sla_priority: "HIGH",
+      sla_deadline: "2026-05-09T18:00:00Z",
+      affected_lines: 2,
+    },
+    lines: [
+      { line_id: "L1", diagnosis: "WK-15 replenishment shipment held at DHL Indianapolis cross-dock. Equipment failure 2026-05-05; recovery ETA 5-7 days.", resolution: "RE-ROUTE", risk: "HIGH", waterfall: [] },
+    ],
+    delivery_delay_analysis: {
+      planned_date: "2026-05-09T00:00:00Z",
+      projected_eta: "2026-05-14T00:00:00Z",
+      days_late: 5,
+      rule_id: "SD-DELAY-002",
+      delay_category: "CARRIER_DELAY",
+      delay_reason: "DHL Ground equipment failure at Indianapolis cross-dock on 2026-05-05. WK-15 replenishment held on the inbound deck; recovery estimate 5-7 days. SKUs are also under MOQ review on the same case — coordinate routing only after the MOQ adjustment is approved so we don't expedite an under-quantity load.",
+      affected_lines: 2,
+      at_risk: 1_960.00,
+      carrier: "DHL Ground",
+      route: "CIN → IND → CIN",
+      sla_deadline: "2026-05-09T18:00:00Z",
+      alternate_options: [
+        {
+          id: "opt-1",
+          type: "EXPEDITE",
+          title: "Re-route via FedEx Express (CHI → CIN direct)",
+          description: "Bypass the affected IND cross-dock. ETA 2026-05-10. Freight +$480.",
+          new_eta: "2026-05-10T00:00:00Z",
+          extra_cost: 480,
+          recommended: true,
+        },
+        {
+          id: "opt-2",
+          type: "RESCHEDULE",
+          title: "Hold for DHL recovery, push delivery 5 days",
+          description: "Wait for IND cross-dock to clear backlog. No freight uplift; misses SLA by 5 days.",
+          new_eta: "2026-05-14T00:00:00Z",
+          extra_cost: 0,
+          recommended: false,
+        },
+        {
+          id: "opt-3",
+          type: "SPLIT_SHIP",
+          title: "Partial pickup ex-Cincinnati DC, balance via DHL when recovered",
+          description: "Customer-pickup arrangement for the MOQ-cleared SKU; balance follows once DHL recovers.",
+          new_eta: "2026-05-12T00:00:00Z",
+          extra_cost: 120,
+          recommended: false,
+        },
+      ],
+    },
+  },
 };
