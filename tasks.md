@@ -315,7 +315,7 @@ Phase-based tracker for the `asoe-ui` frontend. Each phase maps to `ui_architect
 ### [ ] PHASE 10: Testing
 **Scope:** Expand test coverage (Vitest + React Testing Library already configured, 269 tests passing).
 - [ ] Component unit tests for PricingWaterfall (new component)
-- [ ] `vitest-axe` accessibility tests on status-related components (Badge, Toast, AgentReasoningCard)
+- [x] `vitest-axe` accessibility tests on status-related components (Badge, Toast, AgentReasoningCard) — `tests/accessibility/status_components.test.tsx` (Phase 8.13) + `tests/accessibility/component_sweep.test.tsx` (PR #163) extend the sweep to NavBar / ThemeToggle / EvidenceBlock / EventsTimeline / Dialog / DropdownMenu / Select. UX/a11y bundle (PR #163) also adds: focus-management invariants on Sidebar + skip-link (`tests/accessibility/keyboard_focus.test.tsx`); WCAG 2.1 contrast lock on `design-tokens.css` (`tests/accessibility/design_tokens_contrast.test.ts`); source-level clutter invariants — z-index ladder, landmark plumbing, StatusAnnouncer mount, `MAX_PRIMARY_ACTIONS=3` cap on AgentReasoningCard (`tests/architectural/ux_clutter_invariants.test.ts`); route-level `@axe-core/playwright` sweep with ratchet baseline (`tests/browser/a11y-route-sweep.spec.ts`); viewport-overflow + reduced-motion + keyboard-only operator journey + StatusAnnouncer announcement assertion (three new specs in `tests/browser/`). Strategy doc: `docs/test-strategy/UX_ACCESSIBILITY.md`.
 - [ ] Guardrail #2 lint rule (`no-hardcoded-enums` ESLint custom rule)
 - [ ] Type contract tests — verify TypeScript types compile against mock API data
 - [ ] Page integration tests — Exception Queue expand, line-item grid, sidebar open

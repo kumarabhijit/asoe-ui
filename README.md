@@ -110,6 +110,7 @@ asoe-ui/
 | `docs/AUDITOR_GUIDE.md` | Auditors | 10 frontend compliance controls (RBAC, session, trace, tenancy) |
 | `tasks.md` | Team | Phase-based progress (Phases 0-8.13, 12-15 complete; 9-11 pending) |
 | `docs/test-strategy/README.md` | Engineers | Test pyramid + gap-closure patterns (ADR-041 codification of the test-strategy gates added to CLAUDE.md) |
+| `docs/test-strategy/UX_ACCESSIBILITY.md` | Engineers / A11y reviewers | UX, accessibility (WCAG 2.1 AA), and screen-clutter test patterns — component axe sweeps, focus management, design-token contrast, route-level axe, viewport overflow, reduced motion, keyboard-only journey |
 | `consol_arch.md` | All | Platform architecture — Section 11 is a stub pointer to `ui_architecture.md` |
 
 ---

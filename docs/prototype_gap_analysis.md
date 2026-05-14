@@ -23,7 +23,7 @@ Status changes:
 | 6.6 Constraint Graph (Palantir-style SVG) | Not built | **Partially addressed** — `ConstraintsPipeline` (issue #133 PO #14) renders the deterministic floor checks + validations + classification as a left-to-right pipeline graph in `EmailOrderEntrySection`. The 5-zone / ~30-node prototype graph is still scoped for the Order Change Workflow (4.4) and remains **not built**. |
 | 7.x OrderCase identifiers | bare UUID `case_id`; PO #16 questioned its purpose | Verified: backend keeps `case_id` as a bare UUID and resolves business-side identifiers (PO number, sales order, EDI txn, source email) through the V010 correlation-key table. The audit-bearing "Created/Updated" pair (PO #17) is now complete with the V014 migration adding `updated_at` to OrderCase. |
 | 2.2 Navigation chrome | Tab list duplicated per page | Consolidated into `src/config/nav-tabs.ts`; logo + breadcrumb "Home" links are real (PO #5/#6). |
-| Dark-mode contrast | Several tokens below WCAG-AA 4.5:1 on dark surface | Tertiary / quaternary text tokens lifted (PO #19). |
+| Dark-mode contrast | Several tokens below WCAG-AA 4.5:1 on dark surface | Tertiary / quaternary text tokens lifted (PO #19). PR #163 locks the win with a token-level WCAG contrast test (`tests/accessibility/design_tokens_contrast.test.ts`) that asserts every shipped foreground/background pair in both light + dark themes. One known shortfall recorded explicitly as `it.todo`: white-on-dark-brand-button (#8B7CF7 → 3.32:1, above large-text floor but below small-text floor — token-darkening pass tracked in `UX_ACCESSIBILITY.md` "Known shortfalls"). |
 
 Outstanding prototype gaps (still **not built** in the current
 codebase — captured here so the next planning pass has a single
@@ -1006,10 +1006,11 @@ The prototype uses these animations:
 |---------|-----------|---------|-----|
 | Focus rings | `2px solid var(--blue)` on `:focus-visible` | `2px solid var(--color-brand-ring)` | **Built** |
 | Min touch targets | 36px buttons, 44px large buttons | Present | **Built** |
-| Reduced motion | `prefers-reduced-motion` media query | Present in tokens | **Built** |
+| Reduced motion | `prefers-reduced-motion` media query | `@media (prefers-reduced-motion: reduce)` block in `design-tokens.css` collapses every `--dur-*` to 0ms; locked by `tests/browser/viewport-and-motion.spec.ts` (PR #163) | **Built** |
 | Color-alone indicators | Some reliance on color-only (autonomy badges use color only) | Icon + text required (WCAG 1.4.1) | asoe-ui is **stricter** (good) |
 | ARIA attributes | Minimal in prototype | `aria-live`, `role="dialog"`, `aria-modal` | asoe-ui is **better** |
-| Keyboard navigation | Basic `:focus-visible` | Full keyboard nav | asoe-ui is **better** |
+| Keyboard navigation | Basic `:focus-visible` | Full keyboard nav; PR #163 adds focus-management invariants on Sidebar (focus-on-open, ESC close, dialog semantics), a skip-to-main link reachable on first Tab, and a keyboard-only operator journey spec | asoe-ui is **better** |
+| Test coverage | No CI gate | Layered bundle (PR #163): token-level contrast lock, component axe sweep, source-level clutter invariants (z-index/skip-link/StatusAnnouncer/`MAX_PRIMARY_ACTIONS=3`), route-level `@axe-core/playwright` sweep with per-route ratchet baseline, viewport overflow @ 1280/1440/1920, reduced-motion respect, keyboard-only journey with StatusAnnouncer announcement assertion. Strategy doc: `docs/test-strategy/UX_ACCESSIBILITY.md` | asoe-ui is **better** |
 
 ---
 
