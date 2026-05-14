@@ -118,7 +118,7 @@ export default function CaseDetailPage() {
         onSignOut={handleSignOut}
       />
 
-      <main className="p-32 max-w-[1280px] mx-auto w-full">
+      <main id="main-content" className="p-32 max-w-[1280px] mx-auto w-full">
         <button
           type="button"
           onClick={() => router.push("/cases")}

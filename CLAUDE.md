@@ -290,4 +290,5 @@ A task is done only if:
 - Layer 1/2 pattern implemented where applicable
 - Types match `asoe2` backend contracts
 - Bug-fix PRs include a regression test that fails on the parent commit (see Test strategy above)
+- New top-level interactive components under `src/components/ui/` get a case in `tests/accessibility/component_sweep.test.tsx`; new pages get an entry in `e2e/contract/authenticated-routes.ts` so the route-level axe sweep covers them (see `docs/test-strategy/UX_ACCESSIBILITY.md`)
 - Docs updated if the change adds pages, components, hooks, or types (see `prompts/update_docs.md`)

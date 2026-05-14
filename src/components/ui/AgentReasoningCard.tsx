@@ -119,6 +119,16 @@ interface AgentReasoningCardProps {
   className?: string;
 }
 
+/**
+ * Cap on the primary action buttons rendered in any single verdict
+ * branch. The verdict × permission matrix above tops out at 3
+ * (YELLOW + canApprove + canEscalate → Approve / Reject / Escalate);
+ * a fourth primary CTA produces the button-soup anti-pattern the UX
+ * panel flagged. Source-grep-locked by
+ * tests/architectural/ux_clutter_invariants.test.ts.
+ */
+export const MAX_PRIMARY_ACTIONS = 3;
+
 const VERDICT_CONFIG: Record<ShadowVerdict, { label: string; icon: ReactNode }> = {
   GREEN: { label: "Auto-resolved", icon: <Check size={14} /> },
   YELLOW: { label: "Review Required", icon: <AlertTriangle size={14} /> },

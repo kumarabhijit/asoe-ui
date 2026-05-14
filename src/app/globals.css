@@ -36,7 +36,7 @@ body {
   position: absolute;
   top: -100%;
   left: var(--space-16);
-  z-index: 100;
+  z-index: var(--z-skip-link);
   padding: var(--space-8) var(--space-16);
   background: var(--color-surface-primary);
   color: var(--color-brand);
