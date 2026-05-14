@@ -92,9 +92,19 @@ test("operator drives login → cases → action via keyboard only", async ({
   await page.keyboard.press("Enter");
 
   // The right pane now shows the case detail. Wait for the
-  // AgentReasoningCard action row to appear — the verdict-matrix
-  // buttons are our action targets.
-  const escalateBtn = page.getByRole("button", { name: /escalate/i });
+  // AgentReasoningCard action row to appear — `re-analyze` is the
+  // vocabulary-stable beacon (it exists across every verdict ×
+  // permission branch); the per-action buttons (Approve / Reject /
+  // Escalate / Override…) vary. Mirrors the pattern in
+  // tests/browser/cases-workspace-case-switch.spec.ts.
+  await expect(
+    page.getByRole("button", { name: /re-analyze/i }).first(),
+  ).toBeVisible({ timeout: 15_000 });
+
+  // Now grab the Escalate action by its aria-label "Send for
+  // triage" (the visible text is just "Escalate"; the accessible
+  // name carries the verb the screen reader announces).
+  const escalateBtn = page.getByRole("button", { name: /send for triage/i });
   await expect(escalateBtn).toBeVisible({ timeout: 15_000 });
 
   // ── 4. Trigger the action via keyboard + assert announcement ─
@@ -106,15 +116,23 @@ test("operator drives login → cases → action via keyboard only", async ({
   await expect(announcer).toBeAttached();
   const before = (await announcer.textContent()) ?? "";
 
+  // Escalate uses window.prompt() to collect a reason. Playwright
+  // auto-dismisses native dialogs unless a handler is registered;
+  // we accept with a test reason so the flow completes and the
+  // announcer fires. (The native-prompt UX is itself a separate
+  // a11y concern — a non-native dialog would be more accessible
+  // — tracked outside this spec.)
+  page.once("dialog", (dialog) => dialog.accept("Need supervisor review"));
+
   await escalateBtn.focus();
   await page.keyboard.press("Enter");
 
-  // The Escalate path may open a confirmation prompt or fire
-  // directly depending on permissions; in either branch the
-  // announcer eventually updates. Poll up to 5s.
+  // After the prompt is accepted, useExceptionActions.handleEscalate
+  // calls exceptionsApi.escalate and then announce(). Poll up to 8s
+  // to absorb the network round-trip against the live backend.
   await expect
     .poll(async () => (await announcer.textContent()) ?? "", {
-      timeout: 5_000,
+      timeout: 8_000,
       message: "StatusAnnouncer text did not change after Escalate",
     })
     .not.toEqual(before);
