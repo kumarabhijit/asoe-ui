@@ -76,7 +76,12 @@ export function NavBar({
                 "relative bg-transparent border-none cursor-pointer px-12 py-8 text-body font-sans whitespace-nowrap transition-colors duration-fast",
                 isActive
                   ? "font-semibold text-text-primary"
-                  : "font-medium text-text-tertiary hover:text-text-secondary",
+                  // Inactive tabs use text-secondary (#4A4A5A → 8.46:1 on
+                  // page surface) rather than text-tertiary (#7E7E92 →
+                  // 3.92:1, below WCAG AA small-text floor of 4.5:1).
+                  // The active/inactive hierarchy is still clear via the
+                  // font-weight delta (semibold vs medium).
+                  : "font-medium text-text-secondary hover:text-text-primary",
               )}
             >
               {tab.label}

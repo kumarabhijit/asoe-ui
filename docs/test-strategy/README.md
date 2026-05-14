@@ -9,7 +9,10 @@ against the regression-test rule below.
 
 The other files in this folder (`cases-cursor-pagination-tracking.md`,
 `csa-one-task-tracking.md`) track specific deferral / migration
-decisions; this README is the overview.
+decisions; this README is the overview. `UX_ACCESSIBILITY.md` is
+the sister strategy doc covering the UX, a11y, and screen-clutter
+test patterns — read it once if you ship pages or interactive
+components.
 
 ## The test pyramid
 
@@ -321,3 +324,4 @@ or it won't run on PR.
 | Deliverable-completeness — source lock (Gap 7 Pattern A) | `tests/architectural/cases_workspace_render_guard.test.ts` ("renders the three-pane workspace" assertion) |
 | Deliverable-completeness — behavioural e2e (Gap 7 Pattern B) | `tests/browser/cases-workspace-three-pane.spec.ts` |
 | Hook unit test | `tests/hooks/useCases.test.ts` |
+| UX / a11y patterns | `docs/test-strategy/UX_ACCESSIBILITY.md` |

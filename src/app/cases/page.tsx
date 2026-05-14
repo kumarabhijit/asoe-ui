@@ -191,7 +191,7 @@ export default function CasesPage() {
 
 function WorkspaceFallback() {
   return (
-    <main className="p-32 max-w-[1280px] mx-auto">
+    <main id="main-content" className="p-32 max-w-[1280px] mx-auto">
       <div role="status" className="text-text-tertiary py-24" aria-live="polite">
         Loading cases…
       </div>
@@ -384,6 +384,7 @@ function CasesWorkspace() {
 
   return (
     <main
+      id="main-content"
       className={cn(
         "max-w-[1800px] mx-auto p-24",
         "grid gap-24",

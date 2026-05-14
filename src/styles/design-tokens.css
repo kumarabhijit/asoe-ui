@@ -243,6 +243,10 @@
   --z-modal:    40;
   --z-toast:    50;
   --z-tooltip:  60;
+  /* Skip-link must sit above every other surface, including a
+     modal the user might have left focus inside. Higher than
+     --z-tooltip on purpose. */
+  --z-skip-link: 100;
 
 
   /* ── ICON SIZE ───────────────────────────────────────────────────────── */
@@ -250,6 +254,27 @@
   --icon-md:  20px;
   --icon-lg:  24px;
 
+}
+
+
+/* ============================================================================
+   REDUCED MOTION — collapse every motion duration to 0 when the user has
+   `prefers-reduced-motion: reduce` set at the OS level. This is the single
+   token-level switch: every component reads --dur-* via Tailwind
+   (transitionDuration: var(--dur-*)) or directly, so flipping the values
+   here cascades to Sidebar slides, Toast bounces, badge transitions, and
+   Dialog entrances without per-component opt-in. WCAG 2.3.3 (AAA) but
+   AA-friendly; respects the OS preference and is locked by
+   tests/browser/viewport-and-motion.spec.ts.
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0ms;
+    --dur-fast:    0ms;
+    --dur-normal:  0ms;
+    --dur-slow:    0ms;
+  }
 }
 
 
