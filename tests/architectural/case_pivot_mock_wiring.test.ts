@@ -44,11 +44,16 @@ describe("case-pivot mock wiring", () => {
   });
 
   it("casesApi.list() returns a case for every exception", async () => {
+    // Multi-issue cases mean exceptions can outnumber cases (one case
+    // with N attached records), so we don't lock cases.length >= excs.length.
+    // The invariant that matters: every exception's parent_case_id
+    // resolves to a case in the list — otherwise the queue→case link
+    // 404s on click.
     const [{ data: excs }, { items: cases }] = await Promise.all([
       exceptionsApi.list(),
       casesApi.list(),
     ]);
-    expect(cases.length).toBeGreaterThanOrEqual(excs.length);
+    expect(cases.length).toBeGreaterThan(0);
     const caseIds = new Set(cases.map((c) => c.case_id));
     for (const exc of excs) {
       expect(
@@ -105,11 +110,65 @@ describe("case-pivot mock wiring", () => {
     // CaseDetailPanel auto-fires onSelectRecord(records[0].id) and the
     // page replaces the URL with ?record=<id>. The fetched record id
     // must resolve through exceptionsApi.get to load the analysis.
+    //
+    // Multi-issue cases mean we can't assume cases[0] is single-record;
+    // pick the first case whose getRecords returns exactly one item.
     const { items: cases } = await casesApi.list();
-    const single = cases[0];
-    const { items } = await casesApi.getRecords(single.case_id);
-    expect(items.length).toBe(1);
-    const detail = await exceptionsApi.get(items[0].id);
-    expect(detail.id).toBe(items[0].id);
+    let single: { case_id: string; record_id: string } | null = null;
+    for (const c of cases) {
+      const { items } = await casesApi.getRecords(c.case_id);
+      if (items.length === 1) {
+        single = { case_id: c.case_id, record_id: items[0].id };
+        break;
+      }
+    }
+    expect(
+      single,
+      "no single-record case found — auto-mount path is no longer " +
+        "exercised by the mock data layer",
+    ).not.toBeNull();
+    const detail = await exceptionsApi.get(single!.record_id);
+    expect(detail.id).toBe(single!.record_id);
   });
+
+  it("multi-issue cases surface N>1 records to the picker", async () => {
+    // Companion to the single-record auto-mount lock above. The
+    // RecordListPane is the case-detail picker the operator uses
+    // when one PO carries several coincident exceptions
+    // (e.g. price hold + back-order + duplicate retry on the same
+    // Walmart Q1 reset PO). If the mock data layer ever collapses
+    // back to a 1:1 record-per-case mapping, this lock starts failing
+    // — preview-mode operators would lose coverage of the
+    // multi-record disposition workflow.
+    const { items: cases } = await casesApi.list();
+    const recordSets = await Promise.all(
+      cases.map((c) =>
+        casesApi.getRecords(c.case_id).then((r) => ({
+          case_id: c.case_id,
+          record_ids: r.items.map((i) => i.id),
+        })),
+      ),
+    );
+    const multiCases = recordSets.filter((m) => m.record_ids.length > 1);
+    expect(
+      multiCases.length,
+      "mock data layer has no multi-record cases — RecordListPane's " +
+        "picker, the case-status aggregation, and the operator's " +
+        "'choose a record to act on' workflow are uncovered in preview",
+    ).toBeGreaterThanOrEqual(1);
+    // Every record on a multi-issue case must be independently
+    // fetchable — the picker is useless if the operator clicks a row
+    // and the detail panel can't load.
+    const allMultiRecordIds = multiCases.flatMap((m) =>
+      m.record_ids.map((id) => ({ case_id: m.case_id, record_id: id })),
+    );
+    const details = await Promise.all(
+      allMultiRecordIds.map(({ record_id }) => exceptionsApi.get(record_id)),
+    );
+    details.forEach((detail, i) => {
+      const { case_id, record_id } = allMultiRecordIds[i];
+      expect(detail.id).toBe(record_id);
+      expect(detail.parent_case_id).toBe(case_id);
+    });
+  }, 30000);
 });

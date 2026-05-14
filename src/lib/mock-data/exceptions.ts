@@ -223,6 +223,154 @@ export const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-026", tenant_id: "acme-corp", order_id: "EML-PO-2026-0042", event_type: "EMAIL_ORDER_ENTRY_REQUEST", intent: "MANUAL_ORDER_INTAKE", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "EmailOrderEntryRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-04-30T10:12:00Z", updated_at: "2026-04-30T10:13:30Z", account_id: "acct-southeast-distrib", account_name: "Southeast Beverage Distributors",
   },
+
+  /* ── Multi-issue case fixtures ────────────────────────────────────
+     Three realistic CPG-supply-chain clusters in which one buyer PO
+     produces multiple coincident exception records. They share a
+     `parent_case_id` so `casesApi.getRecords(case_id).items.length > 1`,
+     exercising the RecordListPane picker, the case-status aggregation
+     in `MOCK_CASES`, and the operator's "pick a record to act on"
+     workflow.
+
+     The picker auto-mount path (single-record cases) is still
+     exercised by the existing 26 fixtures whose `parent_case_id`
+     defaults to `case-for-<exc id>` via the post-mutation below.
+
+     Case 1 — Walmart Q1 reset PO PO-WMT-Q1-RESET-001:
+       exc-027  PRICE_HOLD_RELEASE  escalate band, YELLOW
+       exc-028  BACK_ORDER          single-DC OOS, YELLOW
+       exc-029  DUPLICATE_PO        buyer-system retry, YELLOW
+
+     Case 2 — Costco end-of-quarter PO PO-COST-EOQ-2026Q1:
+       exc-030  OVER_MAX            club-pack ceiling breach, YELLOW
+       exc-031  PALLET_CONFIG       layer/pallet mis-alignment, YELLOW
+
+     Case 3 — Kroger week-15 replenishment PO PO-KR-WK15-2026:
+       exc-032  MIN_ORDER_QTY       below MOQ for two SKUs, YELLOW
+       exc-033  DELIVERY_DELAY      carrier slip 5+ days, YELLOW
+     ─────────────────────────────────────────────────────────────── */
+
+  // Case 1 / record 1 — escalate-band price hold release.
+  {
+    id: "exc-027",
+    tenant_id: "acme-corp",
+    order_id: "PO-WMT-Q1-RESET-001",
+    event_type: "EDI_850_PRICE_HOLD",
+    intent: "PRICE_HOLD_RELEASE",
+    lifecycle_state: "PENDING_REVIEW",
+    shadow_verdict: "YELLOW",
+    selected_recipe: "PriceHoldReleaseRecipe.py",
+    final_status: "MANUAL_REVIEW_REQUIRED",
+    created_at: "2026-05-04T07:10:00Z",
+    updated_at: "2026-05-04T07:11:30Z",
+    account_id: "acct-walmart",
+    account_name: "Walmart",
+    parent_case_id: "case-multi-WMT-Q1RESET",
+  },
+  // Case 1 / record 2 — primary DC OOS triggers back-order.
+  {
+    id: "exc-028",
+    tenant_id: "acme-corp",
+    order_id: "PO-WMT-Q1-RESET-001",
+    event_type: "BACK_ORDER_OOS",
+    intent: "BACK_ORDER",
+    lifecycle_state: "PENDING_REVIEW",
+    shadow_verdict: "YELLOW",
+    selected_recipe: "BackOrderResolutionRecipe.py",
+    final_status: "MANUAL_REVIEW_REQUIRED",
+    created_at: "2026-05-04T07:12:00Z",
+    updated_at: "2026-05-04T07:14:00Z",
+    account_id: "acct-walmart",
+    account_name: "Walmart",
+    parent_case_id: "case-multi-WMT-Q1RESET",
+  },
+  // Case 1 / record 3 — buyer EDI system retransmitted the PO 18h later.
+  {
+    id: "exc-029",
+    tenant_id: "acme-corp",
+    order_id: "PO-WMT-Q1-RESET-001-R2",
+    event_type: "EDI_850_DUPLICATE_PO",
+    intent: "DUPLICATE_PO",
+    lifecycle_state: "PENDING_REVIEW",
+    shadow_verdict: "YELLOW",
+    selected_recipe: "DuplicatePORecipe.py",
+    final_status: "MANUAL_REVIEW_REQUIRED",
+    created_at: "2026-05-05T01:30:00Z",
+    updated_at: "2026-05-05T01:31:00Z",
+    account_id: "acct-walmart",
+    account_name: "Walmart",
+    parent_case_id: "case-multi-WMT-Q1RESET",
+  },
+
+  // Case 2 / record 1 — quantity blew through club-pack ceiling.
+  {
+    id: "exc-030",
+    tenant_id: "acme-corp",
+    order_id: "PO-COST-EOQ-2026Q1",
+    event_type: "OVER_MAX_QTY",
+    intent: "OVER_MAX",
+    lifecycle_state: "PENDING_REVIEW",
+    shadow_verdict: "YELLOW",
+    selected_recipe: "OverMaxTrimRecipe.py",
+    final_status: "MANUAL_REVIEW_REQUIRED",
+    created_at: "2026-05-06T11:00:00Z",
+    updated_at: "2026-05-06T11:02:00Z",
+    account_id: "acct-costco",
+    account_name: "Costco",
+    parent_case_id: "case-multi-COST-EOQ",
+  },
+  // Case 2 / record 2 — pallet build doesn't align with Costco layer spec.
+  {
+    id: "exc-031",
+    tenant_id: "acme-corp",
+    order_id: "PO-COST-EOQ-2026Q1",
+    event_type: "PALLET_CONFIG_VIOLATION",
+    intent: "PALLET_CONFIG",
+    lifecycle_state: "PENDING_REVIEW",
+    shadow_verdict: "YELLOW",
+    selected_recipe: "PalletAlignmentRecipe.py",
+    final_status: "MANUAL_REVIEW_REQUIRED",
+    created_at: "2026-05-06T11:03:00Z",
+    updated_at: "2026-05-06T11:04:30Z",
+    account_id: "acct-costco",
+    account_name: "Costco",
+    parent_case_id: "case-multi-COST-EOQ",
+  },
+
+  // Case 3 / record 1 — two SKUs below MOQ on the weekly replenishment.
+  {
+    id: "exc-032",
+    tenant_id: "acme-corp",
+    order_id: "PO-KR-WK15-2026",
+    event_type: "MIN_ORDER_QTY",
+    intent: "MIN_ORDER_QTY",
+    lifecycle_state: "PENDING_REVIEW",
+    shadow_verdict: "YELLOW",
+    selected_recipe: "MOQRoundUpRecipe.py",
+    final_status: "MANUAL_REVIEW_REQUIRED",
+    created_at: "2026-05-07T06:40:00Z",
+    updated_at: "2026-05-07T06:42:00Z",
+    account_id: "acct-kroger",
+    account_name: "Kroger",
+    parent_case_id: "case-multi-KR-WK15",
+  },
+  // Case 3 / record 2 — primary carrier slipped 5+ days; ATP push-out band.
+  {
+    id: "exc-033",
+    tenant_id: "acme-corp",
+    order_id: "PO-KR-WK15-2026",
+    event_type: "DELIVERY_DELAY",
+    intent: "DELIVERY_DELAY",
+    lifecycle_state: "PENDING_REVIEW",
+    shadow_verdict: "YELLOW",
+    selected_recipe: "DeliveryDelayResolutionRecipe.py",
+    final_status: "MANUAL_REVIEW_REQUIRED",
+    created_at: "2026-05-07T06:45:00Z",
+    updated_at: "2026-05-07T06:47:00Z",
+    account_id: "acct-kroger",
+    account_name: "Kroger",
+    parent_case_id: "case-multi-KR-WK15",
+  },
 ];
 
 // S15a — every record is attached to a case. Mirror asoe2's
@@ -235,6 +383,13 @@ export const MOCK_EXCEPTIONS: ExceptionSummary[] = [
 // rendering only the case header (the picker had no rows, so the
 // inline ExceptionDetailPanel — and with it AgentReasoningCard,
 // the HITL action ribbon, and DiagnosticsSection — never mounted).
+//
+// Multi-issue fixtures (exc-027..exc-033) set an explicit shared
+// `parent_case_id` at construction time so multiple records resolve
+// onto one OrderCase. The mutation below only fills the default for
+// rows that did not declare one, preserving the multi-record wiring.
 MOCK_EXCEPTIONS.forEach((e) => {
-  e.parent_case_id = `case-for-${e.id}`;
+  if (!e.parent_case_id) {
+    e.parent_case_id = `case-for-${e.id}`;
+  }
 });

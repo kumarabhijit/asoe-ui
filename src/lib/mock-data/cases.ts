@@ -103,12 +103,79 @@ export function caseFromMockException(exc: ExceptionSummary): OrderCase {
 }
 
 /**
- * Mock cases — one per MOCK_EXCEPTIONS entry, derived deterministically
- * so `casesApi.get(case-for-<excId>)` resolves and `casesApi.getRecords`
- * returns a populated `items` array. Pre-S15a this list held three
- * standalone demo cases with no attached records; that left the case
- * detail surface rendering only the header (Verdict 2026-04-22
- * Guardrail #6 — no "no records" placeholder, so the inline ribbon
- * silently never mounted).
+ * Aggregate per-record `CaseStatus` values into a single case-level
+ * status. The case detail surface treats the case as still active if
+ * ANY attached record is still awaiting a human; only when every
+ * record has reached a terminal state does the case close. Order:
+ *   OPEN_AWAITING_HUMAN  >  BLOCKED  >  FAILED  >  RESOLVED
+ *
+ * Multi-record cases (e.g. one PO with a price hold + a back-order +
+ * a duplicate retry) thus stay OPEN_AWAITING_HUMAN until every
+ * sibling record is dispositioned, matching the asoe2 backend's
+ * case-state aggregation pattern.
  */
-export const MOCK_CASES: OrderCase[] = MOCK_EXCEPTIONS.map(caseFromMockException);
+const CASE_STATUS_PRIORITY: Record<CaseStatus, number> = {
+  OPEN_AGENT_PROCESSING: 5,
+  OPEN_AWAITING_BUYER: 4,
+  OPEN_AWAITING_ERP: 4,
+  OPEN_AWAITING_HUMAN: 3,
+  BLOCKED: 2,
+  FAILED: 1,
+  RESOLVED: 0,
+};
+
+function aggregateCaseStatus(records: readonly ExceptionSummary[]): CaseStatus {
+  let dominant: CaseStatus = "RESOLVED";
+  for (const r of records) {
+    const s = caseFromMockException(r).status;
+    if (CASE_STATUS_PRIORITY[s] > CASE_STATUS_PRIORITY[dominant]) {
+      dominant = s;
+    }
+  }
+  return dominant;
+}
+
+/**
+ * Mock cases — one per distinct `parent_case_id` across MOCK_EXCEPTIONS.
+ * Pre-multi-issue this list was a 1:1 map (`MOCK_EXCEPTIONS.map(...)`);
+ * post-multi-issue we group by `parent_case_id` so a single PO with
+ * several coincident exception records collapses onto ONE OrderCase
+ * with N attached records. `casesApi.getRecords(case_id).items` then
+ * returns all sibling records, which the RecordListPane renders as a
+ * picker.
+ *
+ * Pre-S15a this list held three standalone demo cases with no attached
+ * records; that left the case detail surface rendering only the header
+ * (Verdict 2026-04-22 Guardrail #6 — no "no records" placeholder, so
+ * the inline ribbon silently never mounted).
+ */
+export const MOCK_CASES: OrderCase[] = (() => {
+  const byCaseId = new Map<string, ExceptionSummary[]>();
+  for (const exc of MOCK_EXCEPTIONS) {
+    const cid = exc.parent_case_id;
+    if (!cid) continue;
+    const bucket = byCaseId.get(cid);
+    if (bucket) bucket.push(exc);
+    else byCaseId.set(cid, [exc]);
+  }
+  return Array.from(byCaseId.entries()).map(([caseId, records]) => {
+    // The lead record seeds the case shape (source, source_channel,
+    // case_type, customer_po_number, etc.). Sibling records carry the
+    // same PO + tenant by construction; the only field that needs
+    // cross-record aggregation is `status` (and the derived
+    // `closed_at`). The case_id comes from the grouping key
+    // (`parent_case_id`) rather than `caseFromMockException`'s
+    // default `case-for-<lead-id>` so multi-record cases land on
+    // their declared shared id (e.g. `case-multi-WMT-Q1RESET`).
+    const lead = records[0];
+    const base = caseFromMockException(lead);
+    const status = aggregateCaseStatus(records);
+    const isClosed = status === "RESOLVED" || status === "BLOCKED";
+    return {
+      ...base,
+      case_id: caseId,
+      status,
+      closed_at: isClosed ? base.closed_at : null,
+    };
+  });
+})();
