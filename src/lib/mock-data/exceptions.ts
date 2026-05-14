@@ -232,25 +232,31 @@ export const MOCK_EXCEPTIONS: ExceptionSummary[] = [
      in `MOCK_CASES`, and the operator's "pick a record to act on"
      workflow.
 
+     Each cluster intentionally carries a MIX of per-record outcomes
+     so the middle-pane picker shows the pipeline's individual
+     decisions across siblings (some auto-resolved, some still
+     awaiting a human, some blocked). The case aggregator status
+     stays OPEN_AWAITING_HUMAN while any sibling is in review.
+
      The picker auto-mount path (single-record cases) is still
      exercised by the existing 26 fixtures whose `parent_case_id`
      defaults to `case-for-<exc id>` via the post-mutation below.
 
      Case 1 — Walmart Q1 reset PO PO-WMT-Q1-RESET-001:
-       exc-027  PRICE_HOLD_RELEASE  escalate band, YELLOW
-       exc-028  BACK_ORDER          single-DC OOS, YELLOW
-       exc-029  DUPLICATE_PO        buyer-system retry, YELLOW
+       exc-027  PRICE_HOLD_RELEASE  YELLOW — escalate band, needs manager
+       exc-028  BACK_ORDER          GREEN  — auto split-shipment executed
+       exc-029  DUPLICATE_PO        RED    — auto-blocked retransmit
 
      Case 2 — Costco end-of-quarter PO PO-COST-EOQ-2026Q1:
-       exc-030  OVER_MAX            club-pack ceiling breach, YELLOW
-       exc-031  PALLET_CONFIG       layer/pallet mis-alignment, YELLOW
+       exc-030  OVER_MAX            YELLOW — above auto-trim threshold
+       exc-031  PALLET_CONFIG       GREEN  — auto pallet-align executed
 
      Case 3 — Kroger week-15 replenishment PO PO-KR-WK15-2026:
-       exc-032  MIN_ORDER_QTY       below MOQ for two SKUs, YELLOW
-       exc-033  DELIVERY_DELAY      carrier slip 5+ days, YELLOW
+       exc-032  MIN_ORDER_QTY       YELLOW — one SKU below 50% MOQ
+       exc-033  DELIVERY_DELAY      GREEN  — auto re-route to FedEx
      ─────────────────────────────────────────────────────────────── */
 
-  // Case 1 / record 1 — escalate-band price hold release.
+  // Case 1 / record 1 — escalate-band price hold release. YELLOW.
   {
     id: "exc-027",
     tenant_id: "acme-corp",
@@ -267,42 +273,45 @@ export const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     account_name: "Walmart",
     parent_case_id: "case-multi-WMT-Q1RESET",
   },
-  // Case 1 / record 2 — primary DC OOS triggers back-order.
+  // Case 1 / record 2 — primary DC OOS triggers back-order; auto split-shipment.
+  // GREEN — the agent resolved this leg autonomously; operator's
+  // attention belongs on the YELLOW price-hold sibling, not here.
   {
     id: "exc-028",
     tenant_id: "acme-corp",
     order_id: "PO-WMT-Q1-RESET-001",
     event_type: "BACK_ORDER_OOS",
     intent: "BACK_ORDER",
-    lifecycle_state: "PENDING_REVIEW",
-    shadow_verdict: "YELLOW",
+    lifecycle_state: "RESOLVED",
+    shadow_verdict: "GREEN",
     selected_recipe: "BackOrderResolutionRecipe.py",
-    final_status: "MANUAL_REVIEW_REQUIRED",
+    final_status: "COMPLETE",
     created_at: "2026-05-04T07:12:00Z",
-    updated_at: "2026-05-04T07:14:00Z",
+    updated_at: "2026-05-04T07:14:30Z",
     account_id: "acct-walmart",
     account_name: "Walmart",
     parent_case_id: "case-multi-WMT-Q1RESET",
   },
-  // Case 1 / record 3 — buyer EDI system retransmitted the PO 18h later.
+  // Case 1 / record 3 — buyer EDI system retransmitted 18h later; auto-blocked.
+  // RED — DuplicatePO auto-block fired, 855 ack queued against the original PO.
   {
     id: "exc-029",
     tenant_id: "acme-corp",
     order_id: "PO-WMT-Q1-RESET-001-R2",
     event_type: "EDI_850_DUPLICATE_PO",
     intent: "DUPLICATE_PO",
-    lifecycle_state: "PENDING_REVIEW",
-    shadow_verdict: "YELLOW",
+    lifecycle_state: "BLOCKED",
+    shadow_verdict: "RED",
     selected_recipe: "DuplicatePORecipe.py",
-    final_status: "MANUAL_REVIEW_REQUIRED",
+    final_status: "BLOCKED",
     created_at: "2026-05-05T01:30:00Z",
-    updated_at: "2026-05-05T01:31:00Z",
+    updated_at: "2026-05-05T01:31:30Z",
     account_id: "acct-walmart",
     account_name: "Walmart",
     parent_case_id: "case-multi-WMT-Q1RESET",
   },
 
-  // Case 2 / record 1 — quantity blew through club-pack ceiling.
+  // Case 2 / record 1 — quantity blew through club-pack ceiling. YELLOW.
   {
     id: "exc-030",
     tenant_id: "acme-corp",
@@ -320,24 +329,27 @@ export const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     parent_case_id: "case-multi-COST-EOQ",
   },
   // Case 2 / record 2 — pallet build doesn't align with Costco layer spec.
+  // GREEN — auto pallet-align rounded both SKUs down to 6 full pallets
+  // each. The OVER_MAX sibling (exc-030) still needs a manager decision
+  // before the order ships, but the pallet plan is locked in.
   {
     id: "exc-031",
     tenant_id: "acme-corp",
     order_id: "PO-COST-EOQ-2026Q1",
     event_type: "PALLET_CONFIG_VIOLATION",
     intent: "PALLET_CONFIG",
-    lifecycle_state: "PENDING_REVIEW",
-    shadow_verdict: "YELLOW",
+    lifecycle_state: "RESOLVED",
+    shadow_verdict: "GREEN",
     selected_recipe: "PalletAlignmentRecipe.py",
-    final_status: "MANUAL_REVIEW_REQUIRED",
+    final_status: "COMPLETE",
     created_at: "2026-05-06T11:03:00Z",
-    updated_at: "2026-05-06T11:04:30Z",
+    updated_at: "2026-05-06T11:05:00Z",
     account_id: "acct-costco",
     account_name: "Costco",
     parent_case_id: "case-multi-COST-EOQ",
   },
 
-  // Case 3 / record 1 — two SKUs below MOQ on the weekly replenishment.
+  // Case 3 / record 1 — two SKUs below MOQ. YELLOW (one needs a KNMT waiver).
   {
     id: "exc-032",
     tenant_id: "acme-corp",
@@ -354,19 +366,21 @@ export const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     account_name: "Kroger",
     parent_case_id: "case-multi-KR-WK15",
   },
-  // Case 3 / record 2 — primary carrier slipped 5+ days; ATP push-out band.
+  // Case 3 / record 2 — primary carrier slipped 5+ days; auto re-routed.
+  // GREEN — Delivery delay recipe swapped to the FedEx Express direct
+  // lane. ETA recovers to within 1 day of plan; freight uplift $480.
   {
     id: "exc-033",
     tenant_id: "acme-corp",
     order_id: "PO-KR-WK15-2026",
     event_type: "DELIVERY_DELAY",
     intent: "DELIVERY_DELAY",
-    lifecycle_state: "PENDING_REVIEW",
-    shadow_verdict: "YELLOW",
+    lifecycle_state: "RESOLVED",
+    shadow_verdict: "GREEN",
     selected_recipe: "DeliveryDelayResolutionRecipe.py",
-    final_status: "MANUAL_REVIEW_REQUIRED",
+    final_status: "COMPLETE",
     created_at: "2026-05-07T06:45:00Z",
-    updated_at: "2026-05-07T06:47:00Z",
+    updated_at: "2026-05-07T06:47:30Z",
     account_id: "acct-kroger",
     account_name: "Kroger",
     parent_case_id: "case-multi-KR-WK15",

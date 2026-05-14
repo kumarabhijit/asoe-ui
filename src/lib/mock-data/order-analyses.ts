@@ -1427,12 +1427,12 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
   },
 
   "exc-028": {
-    diagnosis: "Walmart ordered 1,600 CS of the Q1-reset SKU but Bentonville DC has only 1,280 CS on hand. Gap of 320 CS (20%). Memphis NDC carries 400 CS with a 2-day transit lane; an inbound production order for 800 CS is due in 6 days.",
-    confidence: 86,
-    risk: "HIGH",
+    diagnosis: "Walmart ordered 1,600 CS of the Q1-reset SKU but Bentonville DC had only 1,280 CS on hand (320 CS / 20% gap). Agent split the shipment: 1,280 CS ex-Bentonville released for outbound; 320 CS ex-Memphis NDC on the 2-day transfer lane. Planogram window preserved; freight uplift $102.40 within the GREEN tolerance band.",
+    confidence: 94,
+    risk: "LOW",
     resolution: "SPLIT_SHIPMENT",
     root_cause: "Bentonville pre-shipped Q4 closeout volume against the new planogram, depleting safety stock below the Q1 reset wave demand. Mid-month production run not yet scheduled.",
-    recommendation: "Split shipment: 1,280 CS ex-Bentonville now, 320 CS ex-Memphis NDC on the 2-day transfer lane. Avoids planogram-window slip with $0.32/CS freight uplift.",
+    recommendation: "No action required — auto-resolved. Split shipment executed: 1,280 CS from Bentonville, 320 CS from Memphis NDC.",
     entity_profile: {
       customer_name: "Walmart Inc",
       bp_number: "BP-WMT-001",
@@ -1508,12 +1508,12 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
   },
 
   "exc-029": {
-    diagnosis: "PO PO-WMT-Q1-RESET-001-R2 arrived 18h after the original PO-WMT-Q1-RESET-001. Identical line items, quantities, and ship-to. Almost certainly Walmart's EDI re-transmission after their order acknowledgement window expired without an 855 from us — not a buyer-side duplicate.",
-    confidence: 93,
+    diagnosis: "PO PO-WMT-Q1-RESET-001-R2 arrived 18h after the original PO-WMT-Q1-RESET-001 with identical line items, quantities, and ship-to. RED — DuplicatePORecipe auto-blocked the retransmission; a courtesy 855 ack was queued against the original PO and Walmart's EDI ops were notified. No human action required for THIS record; the original PO remains in pricing review on its sibling exc-027.",
+    confidence: 97,
     risk: "MEDIUM",
     resolution: "BLOCK_AND_NOTIFY",
-    root_cause: "Buyer EDI VAN auto-retried after missing 855 ack within the 12h SLA. The original PO is still in the duplicate-detection window (48h) and is the canonical record.",
-    recommendation: "Block the R2 retry, send a courtesy 855 against the original PO, and notify Walmart's EDI ops that the retry was caught.",
+    root_cause: "Buyer EDI VAN auto-retried after missing 855 ack within the 12h SLA. The original PO is the canonical record; the R2 retry was caught by the 48h duplicate-detection window.",
+    recommendation: "Blocked and notified — no operator action on this record. Resolve the price-hold escalation on the sibling exc-027 to release the original PO.",
     entity_profile: {
       customer_name: "Walmart Inc",
       bp_number: "BP-WMT-001",
@@ -1560,10 +1560,10 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       },
       detection_method: "Identical customer + SKU + qty + ship-to within the 48-hour window; PO suffix '-R2' matches Walmart's retransmission convention.",
       days_between: 0.77,
-      confidence: 93,
-      recommended_action: "Block SO-WMT-Q1RESET-001-R2; send 855 ack against the original PO.",
+      confidence: 97,
+      recommended_action: "Auto-blocked SO-WMT-Q1RESET-001-R2; 855 ack sent against the original PO.",
       cancellation_target: "SO-WMT-Q1RESET-001-R2",
-      autonomy_applied: "L2 — Review required, original PO is still mid-review (price hold + back-order on the same case).",
+      autonomy_applied: "L3 — Auto-blocked. Exact retransmission of an in-window canonical PO; the case still owes a decision on the price-hold sibling (exc-027).",
     },
     order_comparison: {
       orders: [
@@ -1649,12 +1649,12 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
   },
 
   "exc-031": {
-    diagnosis: "Two SKUs on the same Costco EOQ PO arrive with quantities that don't tile to Costco's club-pack pallet spec (300 CS/pallet, 60 CS/layer). SKU-COST-EOQ-A lands at 2,000 CS — 6 full pallets + 200 loose; SKU-COST-EOQ-B at 2,000 CS — 6 full pallets + 200 loose. Costco rejects partial pallets at receiving.",
-    confidence: 95,
-    risk: "MEDIUM",
+    diagnosis: "Two SKUs on the same Costco EOQ PO arrived with quantities that didn't tile to Costco's club-pack pallet spec (300 CS/pallet, 60 CS/layer). PalletAlignmentRecipe rounded both SKUs down to 1,800 CS / 6 full pallets each. Plan is locked in and waiting on the sibling OVER_MAX decision (exc-030) before SAP write-back fires.",
+    confidence: 96,
+    risk: "LOW",
     resolution: "PALLET_ALIGN",
-    root_cause: "Buyer-side ordering quantum doesn't enforce Costco's own pallet spec. Compounds with the over-max issue on the same PO — trim should target full-pallet quanta, not just the contract ceiling.",
-    recommendation: "Coordinate with the trim plan on the over-max record: target 1,800 CS / 6 full pallets per SKU. Saves 4 broken-pallet handling charges at receiving (~$520).",
+    root_cause: "Buyer-side ordering quantum doesn't enforce Costco's own pallet spec. The agent's quanta (1,800 CS) match the OVER_MAX trim ceiling, so when the manager approves exc-030 the pallet plan applies in one VA02 transaction.",
+    recommendation: "No action required for the pallet alignment — auto-resolved. Apply the OVER_MAX trim decision on exc-030; the pallet plan will flow through with it.",
     entity_profile: {
       customer_name: "Costco Wholesale Corp",
       bp_number: "BP-COST-001",
@@ -1763,12 +1763,12 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
   },
 
   "exc-033": {
-    diagnosis: "Same Kroger WK-15 PO is now 5 days behind plan on the dispatch leg. Carrier reports a Midwest hub re-route after equipment failure at the Indianapolis cross-dock; estimated recovery is 5-7 days without intervention. SLA breach at risk.",
-    confidence: 87,
-    risk: "HIGH",
+    diagnosis: "Kroger WK-15 PO was 5 days behind plan after a DHL equipment failure at the Indianapolis cross-dock. DeliveryDelayResolutionRecipe re-routed the load via FedEx Express on the Chicago → Cincinnati direct lane. ETA recovered to within 1 day of plan; freight uplift $480 within the GREEN auto-route tolerance band.",
+    confidence: 92,
+    risk: "LOW",
     resolution: "ALTERNATE_ROUTING",
     root_cause: "Primary carrier (DHL Ground) equipment failure at the Indianapolis cross-dock on 2026-05-05; the WK-15 replenishment lane funnels through that hub.",
-    recommendation: "Switch to FedEx Express on the Chicago → Cincinnati direct lane. ETA recovers to within 1 day of plan; freight +$480 against the WK-15 contract.",
+    recommendation: "No action required — auto-resolved. FedEx Express booking confirmed; tracking updated in the carrier portal.",
     entity_profile: {
       customer_name: "Kroger Co",
       bp_number: "BP-KRG-003",
