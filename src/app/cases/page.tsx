@@ -618,6 +618,11 @@ function CasesWorkspace() {
             policyHits={policyHits}
             selectedRecordId={selectedRecordId}
             onSelectRecord={handleSelectRecord}
+            // The workspace mounts `RecordListPane` as its own
+            // middle column at xl; suppress the inline picker to
+            // avoid double-rendering (and a `data-testid` collision
+            // that would flake Playwright strict-mode locators).
+            showInlineRecordList={false}
           />
         )}
       </section>

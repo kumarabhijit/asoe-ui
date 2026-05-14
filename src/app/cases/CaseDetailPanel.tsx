@@ -34,6 +34,7 @@ import type { ExceptionDetailResponse } from "@/types/api";
 import { STATUS_LABEL, lastActivityLabel, sourceChannelLabel } from "@/lib/cases";
 import { useSlaTicker } from "@/hooks/useSlaTicker";
 import ExceptionDetailPanel from "../exceptions/ExceptionDetailPanel";
+import { RecordListPane } from "./RecordListPane";
 
 import { slaSnapshot } from "./page";
 
@@ -94,6 +95,24 @@ export interface CaseDetailPanelProps {
   selectedRecordId?: string;
   /** Picker click handler — flips selection (and the URL query). */
   onSelectRecord?: (recordId: string) => void;
+  /**
+   * Whether to render the records picker INSIDE this panel.
+   *
+   * ADR-041 P3d-remaining (2026-05-14) lifted the picker into a
+   * dedicated middle column in the `/cases` workspace
+   * (`RecordListPane`). The workspace passes
+   * `showInlineRecordList={false}` so the picker isn't double-
+   * rendered. The focused `/cases/[id]` view + any other surface
+   * mounting `CaseDetailPanel` standalone keeps the default
+   * `true`, so the picker stays accessible when no outer column
+   * exists.
+   *
+   * Below the workspace's `xl` breakpoint (1280px) the workspace
+   * collapses the outer middle column; the inline picker is the
+   * fallback path tracked as P3e (a per-breakpoint toggle that's
+   * not in scope here).
+   */
+  showInlineRecordList?: boolean;
 }
 
 export function CaseDetailPanel({
@@ -102,6 +121,7 @@ export function CaseDetailPanel({
   attachedRecords,
   selectedRecordId,
   onSelectRecord,
+  showInlineRecordList = true,
 }: CaseDetailPanelProps) {
   // PO #20 (issue #133): tick the SLA snapshot once a minute so the
   // header countdown stays live without a refetch.
@@ -316,20 +336,22 @@ export function CaseDetailPanel({
         </section>
       )}
 
-      {/* ── Attached records (lifted into the middle pane) ────────
-          ADR-041 P3d-remaining (2026-05-14): the picker now lives
-          in `RecordListPane.tsx` as the workspace's middle column.
-          `CaseDetailPanel` is the right pane and surfaces only the
-          case context + Compliance hits + the selected record's
-          HITL ribbon.
-
-          For deep-link contexts that mount `CaseDetailPanel` outside
-          the workspace (e.g. the focused `/cases/[id]` view that has
-          no queue chrome), a lightweight inline picker would be
-          useful — that's queued as P3e. Today the focused view
-          inherits the workspace's responsive collapse: below 1024px
-          the page stacks vertically so the picker re-appears
-          beneath the case header. */}
+      {/* ── Attached records (ADR-041 P3d-remaining inline fallback) ─
+          When `CaseDetailPanel` is mounted standalone (focused view
+          at `/cases/[id]`, or any other surface that doesn't ship
+          its own outer record-list column), the picker stays here
+          so the operator can pick a record. The `/cases` workspace
+          passes `showInlineRecordList={false}` because it mounts
+          `RecordListPane` as a dedicated middle column at xl
+          (1280px+). */}
+      {showInlineRecordList && hasAttachedRecords && (
+        <RecordListPane
+          caseId={orderCase.case_id}
+          records={records}
+          selectedRecordId={selectedRecordId}
+          onSelectRecord={onSelectRecord}
+        />
+      )}
 
       {/* Selected-record HITL surface — mounts the full ExceptionDetailPanel
           (HeaderRibbon + ContextStrip + AgentAnalysis + EvidenceGrid +

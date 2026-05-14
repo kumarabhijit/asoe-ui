@@ -39,8 +39,6 @@ import {
   BACKEND_URL,
 } from "./_helpers";
 
-test.use({ viewport: { width: 1400, height: 900 } });
-
 test.describe.configure({ mode: "serial" });
 
 test.beforeEach(async ({ request }) => {
@@ -53,6 +51,15 @@ test("three-pane workspace mounts at xl: case-queue | records | detail", async (
   page,
   request,
 }) => {
+  // Set viewport explicitly above the `xl` (1280px) breakpoint so
+  // the third column track is active. Using `page.setViewportSize`
+  // rather than `test.use({ viewport })` because the latter has
+  // strict placement rules (must be inside `test.describe` and
+  // before `test.describe.configure`) and the playwright.config
+  // already declares the default viewport — this is a per-test
+  // override that's safe to apply in the body.
+  await page.setViewportSize({ width: 1400, height: 900 });
+
   const token = await backendToken(request, USERS.MANAGER);
   // Seed a YELLOW exception so the queue is non-empty and the
   // record's HITL ribbon will have action buttons to mount.

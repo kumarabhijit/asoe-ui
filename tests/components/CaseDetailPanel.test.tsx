@@ -125,26 +125,30 @@ describe("CaseDetailPanel — picker lifted into RecordListPane (ADR-041 P3d-rem
     };
   }
 
-  it("does NOT render an inline picker — that's RecordListPane's job now", () => {
+  it("suppresses the inline picker when showInlineRecordList={false}", () => {
     // ADR-041 P3d-remaining (2026-05-14) lifted the picker out as
-    // the workspace's middle column. CaseDetailPanel keeps the
-    // auto-mount effect (which signals the parent via
-    // onSelectRecord) but no longer renders the radio-group itself.
+    // the workspace's middle column. CaseDetailPanel still renders
+    // an inline picker by DEFAULT (preserves the focused
+    // `/cases/[id]` view + below-xl widths where the workspace
+    // collapses the middle column), but the three-pane workspace
+    // at /cases passes `showInlineRecordList={false}` to suppress
+    // the second mount. This test locks that suppression contract.
     // The picker-render contract is tested in
     // `tests/components/RecordListPane.test.tsx`.
     render(
       <CaseDetailPanel
         orderCase={mockCase()}
         attachedRecords={[mockRecord({ id: "exc-A", order_id: "PO-A" })]}
+        showInlineRecordList={false}
       />,
     );
     expect(
       screen.queryByRole("region", { name: /attached records/i }),
-      "the inline records section was lifted to RecordListPane",
+      "the inline records section was suppressed by showInlineRecordList={false}",
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("radiogroup", { name: /select a record/i }),
-      "the picker now lives in RecordListPane",
+      "the picker now lives in RecordListPane (workspace) — not in the suppressed inline render",
     ).not.toBeInTheDocument();
   });
 

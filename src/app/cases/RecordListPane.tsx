@@ -64,7 +64,7 @@ export function RecordListPane({
     >
       <div className="p-16 border-b border-border-subtle">
         <h2 className="text-heading font-semibold text-text-primary m-0 mb-4">
-          Records
+          Attached records
         </h2>
         <p className="text-caption text-text-tertiary leading-normal">
           {records.length === 1
