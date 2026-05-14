@@ -57,6 +57,84 @@ async function collectVerdicts(): Promise<Set<string>> {
 // The mock api delays each call ~400ms; with 25 exceptions a full
 // walk takes ~10s. Bump timeout per test rather than globally so the
 // rest of the suite stays snappy.
+/**
+ * Regression lock for the Verdict 2026-04-22 partial-truth invariant on
+ * classifier confidence: the value the AgentReasoningCard renders
+ * (`OrderAnalysis.confidence / 100`) and the value the Pipeline
+ * timeline renders (`trace.executed_nodes[classify].decision.confidence`)
+ * must agree, because they describe the same agent decision on the same
+ * record. Before this lock the shared `_yellowHitlTrace` /
+ * `_greenAutoResolvedTrace` / `_redBlockedTrace` helpers hardcoded
+ * a sample confidence (0.86 / 0.91 / 0.94) regardless of the record,
+ * so the AgentReasoningCard reading 90% would sit next to a Pipeline
+ * timeline reading 86% on the same exception detail page.
+ *
+ * Failure mode if this regresses: a SOX-relevant detail surface
+ * silently displays two disagreeing confidence values for one decision.
+ */
+describe("Verdict 2026-04-22 — confidence sync", () => {
+  it("trace classify-node confidence matches OrderAnalysis.confidence for every mock record", async () => {
+    const list = await exceptionsApi.list();
+    const mismatches: string[] = [];
+    for (const summary of list.data) {
+      const [trace, analysis] = await Promise.all([
+        exceptionsApi.trace(summary.id).catch(() => null),
+        exceptionsApi.orderAnalysis(summary.id).catch(() => null),
+      ]);
+      if (!trace || !analysis) continue;
+      if (typeof analysis.confidence !== "number") continue;
+      const classifyNode = trace.executed_nodes?.find(
+        (n) => n.node === "classify",
+      );
+      const traceConfidence = classifyNode?.decision?.confidence;
+      if (typeof traceConfidence !== "number") continue;
+      // Allow a small float tolerance — analysis.confidence is integer
+      // 0-100 and the trace stores 0-1, so the only legal difference
+      // is rounding (analysis 90 → trace 0.90 exactly).
+      const expected = analysis.confidence / 100;
+      if (Math.abs(traceConfidence - expected) > 0.005) {
+        mismatches.push(
+          `${summary.id}: analysis=${analysis.confidence}% trace=${(traceConfidence * 100).toFixed(1)}%`,
+        );
+      }
+    }
+    expect(
+      mismatches,
+      "Pipeline timeline and AgentReasoningCard disagree on classifier " +
+        "confidence for these records — partial-truth state on a SOX-relevant " +
+        "surface (Verdict 2026-04-22):\n" + mismatches.join("\n"),
+    ).toEqual([]);
+  }, 30000);
+
+  it("trace ingest-node order_id matches the exception order_id for every mock record", async () => {
+    // Companion lock — the same hardcoded-template bug also leaked
+    // example order ids (SO-1042, PO-EDM-SKU-001) into every record's
+    // trace ingest step. Lock the per-record alignment.
+    const list = await exceptionsApi.list();
+    const mismatches: string[] = [];
+    for (const summary of list.data) {
+      const trace = await exceptionsApi.trace(summary.id).catch(() => null);
+      if (!trace) continue;
+      const ingestNode = trace.executed_nodes?.find(
+        (n) => n.node === "ingest",
+      );
+      const traceOrderId = ingestNode?.decision?.order_id;
+      if (typeof traceOrderId !== "string") continue;
+      if (traceOrderId !== summary.order_id) {
+        mismatches.push(
+          `${summary.id}: summary=${summary.order_id} trace=${traceOrderId}`,
+        );
+      }
+    }
+    expect(
+      mismatches,
+      "Pipeline timeline shows a different order_id than the record's " +
+        "summary for these mocks — same partial-truth class as confidence drift:\n" +
+        mismatches.join("\n"),
+    ).toEqual([]);
+  }, 30000);
+});
+
 describe("ADR-027 — mock verdict coverage", () => {
   it("every required verdict appears on at least one mock trace", async () => {
     const seen = await collectVerdicts();
