@@ -239,10 +239,28 @@ function CasesWorkspace() {
 
   // useCases doesn't take a status filter; apply it client-side so
   // the chip toolbar stays responsive without an extra round-trip.
-  const cases = useMemo<OrderCase[]>(() => {
-    if (!filters.status) return rawCases;
-    return rawCases.filter((c) => c.status === filters.status);
-  }, [rawCases, filters.status]);
+  //
+  // Pin-selection guard (UX architect 2026-05-13 panel ruling): if
+  // `selectedCaseId` is set and the case doesn't match the active
+  // filter (e.g., its status flipped from PENDING_REVIEW to RESOLVED
+  // after a WS-driven refetch), keep it visible at the top of the
+  // list rather than yanking the operator's row out from under them.
+  // The visual treatment (`isPinned`) distinguishes the pin from a
+  // regular filter match.
+  const cases = useMemo<{ case_: OrderCase; isPinned: boolean }[]>(() => {
+    const filtered = filters.status
+      ? rawCases.filter((c) => c.status === filters.status)
+      : rawCases;
+    const wrapped = filtered.map((c) => ({ case_: c, isPinned: false }));
+    if (
+      selectedCaseId
+      && !filtered.some((c) => c.case_id === selectedCaseId)
+    ) {
+      const pinned = rawCases.find((c) => c.case_id === selectedCaseId);
+      if (pinned) return [{ case_: pinned, isPinned: true }, ...wrapped];
+    }
+    return wrapped;
+  }, [rawCases, filters.status, selectedCaseId]);
 
   /* ── WS silent refresh wiring ───────────────────────────────── */
   useWebSocket({
@@ -330,8 +348,17 @@ function CasesWorkspace() {
   // sort order stay live without a re-fetch.
   const tickNow = useSlaTicker();
   const sorted = useMemo(() => {
+    // Sort by SLA urgency (most-urgent first). The pinned row's
+    // sort position is the same as it would be without pinning —
+    // visual treatment alone distinguishes it. Filter-pinned rows
+    // therefore stay near the top of the SLA-sorted list because
+    // SLA-driven sort + pin both favour "most attention-worthy".
     return [...cases]
-      .map((c) => ({ case_: c, sla: slaSnapshot(c, tickNow) }))
+      .map(({ case_, isPinned }) => ({
+        case_,
+        isPinned,
+        sla: slaSnapshot(case_, tickNow),
+      }))
       .sort((a, b) => {
         const aMs = a.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
         const bMs = b.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
@@ -431,7 +458,7 @@ function CasesWorkspace() {
               tabIndex={0}
               className="m-0 p-0 list-none"
             >
-              {sorted.map(({ case_, sla }) => {
+              {sorted.map(({ case_, sla, isPinned }) => {
                 const isSelected = case_.case_id === selectedCaseId;
                 return (
                   <li key={case_.case_id} className="border-b border-border-subtle">
@@ -441,6 +468,7 @@ function CasesWorkspace() {
                       role="option"
                       aria-selected={isSelected}
                       data-keyboard-nav-id={case_.case_id}
+                      data-pinned={isPinned || undefined}
                       onClick={() => handleSelectCase(case_.case_id)}
                       className={cn(
                         "w-full text-left py-12 px-16 flex flex-col gap-4",
@@ -471,6 +499,20 @@ function CasesWorkspace() {
                           <Clock size={10} aria-hidden className="mr-4" />
                           {sla.label}
                         </Badge>
+                        {isPinned && (
+                          // Pin-selection guard — the selected case
+                          // doesn't match the active filter but stays
+                          // visible so the operator's cursor isn't
+                          // yanked. The badge tells them "this is
+                          // your row even though it's filtered out".
+                          <Badge
+                            variant="info"
+                            size="sm"
+                            aria-label="Pinned because selected"
+                          >
+                            Pinned
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-8">
                         <span className="font-mono text-body text-text-primary truncate">

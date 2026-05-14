@@ -95,4 +95,36 @@ describe("/cases workspace — case-switch race invariants", () => {
         "auto-mount effect writes the wrong record id into the URL",
     ).toMatch(/orderCase\.case_id\s*===\s*selectedCaseId/);
   });
+
+  it("pins the selected case in the visible queue across filter mismatches", () => {
+    // The UX architect flagged "agent mutates the selected record's
+    // status while the operator is on it" as a real incident. When
+    // a WS-driven refetch lands and the selected case no longer
+    // matches the active status filter, the operator's row must
+    // stay visible (pinned) — yanking it out from under the cursor
+    // is the foot-gun.
+    //
+    // Pattern: the `cases` useMemo must read `selectedCaseId` and,
+    // when the filter doesn't include it, prepend the pinned row.
+    // We assert two source-level invariants the fix encoded.
+    //
+    // (a) The cases-shaping memo lists `selectedCaseId` in its
+    // deps. Without it, the memo can't re-pin when the URL changes.
+    expect(
+      src,
+      "cases useMemo must depend on selectedCaseId for the " +
+        "pin-selection refresh to fire",
+    ).toMatch(
+      /const cases = useMemo[\s\S]*?\}, \[[^\]]*selectedCaseId[^\]]*\]\)/,
+    );
+
+    // (b) The memo body produces an `isPinned: true` row when the
+    // selected case is missing from the filtered list. This is the
+    // observable artefact — without it the row vanishes.
+    expect(
+      src,
+      "pin-selection branch missing — selected case can vanish " +
+        "from the queue when filter / WS refetch excludes it",
+    ).toMatch(/isPinned:\s*true/);
+  });
 });
