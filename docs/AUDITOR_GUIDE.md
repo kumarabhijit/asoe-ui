@@ -219,7 +219,19 @@ Per Section 11.3, the UI ensures inclusive access to compliance-critical functio
 
 **How to verify:** Check `src/components/ui/Badge.tsx` (icon per variant), `src/components/ui/Toast.tsx` (aria-live), `src/components/ui/Sidebar.tsx` (dialog role).
 
-**CI enforcement (Phase 10):** `jest-axe` accessibility tests on all status-related components.
+**CI enforcement (PR #163 — UX/A11y test bundle):** A layered set of permanent gates locks WCAG 2.1 AA across the layers an auditor cares about — token, component, page composition, and live operator journey. Full pattern catalogue in `docs/test-strategy/UX_ACCESSIBILITY.md`.
+
+| Layer | What it locks | Test file |
+|---|---|---|
+| Design tokens | WCAG contrast ratios on shipped foreground/background pairs across light + dark themes | `tests/accessibility/design_tokens_contrast.test.ts` |
+| Component | `vitest-axe` sweep on every top-level interactive component (Badge, Button, Input, Sidebar, MetricTile, AgentReasoningCard, NavBar, Toast, ThemeToggle, EvidenceBlock, EventsTimeline, Dialog, DropdownMenu, Select, status-panel sections) | `tests/accessibility/component_sweep.test.tsx` + `tests/accessibility/status_components.test.tsx` |
+| Source-level | Z-index ladder discipline, skip-to-main link + landmark plumbing on every authenticated page, StatusAnnouncer mount, `MAX_PRIMARY_ACTIONS=3` budget on AgentReasoningCard | `tests/architectural/ux_clutter_invariants.test.ts` |
+| Focus management | Sidebar focus-on-open / ESC close / `aria-modal`; skip-link reachability via first Tab | `tests/accessibility/keyboard_focus.test.tsx` |
+| Page composition | `@axe-core/playwright` sweep on every authenticated route with per-route ratchet baseline (regressions fail; existing debt tolerated and listed) | `tests/browser/a11y-route-sweep.spec.ts` |
+| Viewport + motion | No horizontal overflow at 1280/1440/1920; `prefers-reduced-motion` collapses the `--dur-*` ladder to 0ms | `tests/browser/viewport-and-motion.spec.ts` |
+| Operator journey | Login → /cases → record action via keyboard only with `data-testid="status-announcer"` aria-live mutation asserted at the announcement step | `tests/browser/keyboard-only-journey.spec.ts` |
+
+Known shortfalls recorded explicitly (auditor visibility): white-on-dark-mode-brand button → 3.32:1 (above large-text floor, below small-text floor — token-darkening pass tracked); small-caption uses of `text-text-tertiary` / `text-text-quaternary` across every route held by `ROUTE_BASELINE` in the route-axe spec (regressions fail; current per-route counts ratchet down as design-system cleanup lands).
 
 **SOC2 relevance:** Availability — all authorized users can operate the system.
 
