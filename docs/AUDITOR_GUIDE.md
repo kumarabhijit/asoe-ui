@@ -147,10 +147,10 @@ Intent values, lifecycle states, recipe names, and shadow verdicts are **never h
 
 | What | Source | UI File |
 |---|---|---|
-| Intent filter options | `health.allowed_intents[]` | `src/app/exceptions/CaseListPane.tsx` (V5.1.1) |
-| Lifecycle state filter options | `health.lifecycle_states[]` | `src/app/exceptions/ExceptionListPane.tsx` (legacy detail-route consumer) |
-| Case status filter options | `health.allowed_case_statuses[]` (Phase 28.5.x §D1) | `src/app/exceptions/CaseListPane.tsx`; cluster grouping + STATUS_LABEL consolidated in `src/lib/cases.ts` |
-| Case source filter options | `health.allowed_case_sources[]` (Phase 28.5.x §D1) | `src/app/exceptions/CaseListPane.tsx` + `src/app/inbox/page.tsx` |
+| Intent filter options | `health.allowed_intents[]` | _Currently no surface mounts an intent filter — the ADR-041 P4 cleanup retired `CaseListPane`. When intent filtering returns on `/cases` it will source from `useHealth().allowed_intents`._ |
+| Lifecycle state filter options | `health.lifecycle_states[]` | _The legacy `ExceptionListPane` was retired in P4. Status filtering on `/cases/page.tsx` sources from `useHealth().allowed_case_statuses` instead._ |
+| Case status filter options | `health.allowed_case_statuses[]` | `src/app/cases/page.tsx` (workspace queue filter); cluster grouping + STATUS_LABEL in `src/lib/cases.ts` |
+| Case source filter options | `health.allowed_case_sources[]` (`ALLOWED_CASE_SOURCES` re-exported from `src/lib/api.ts`) | `src/app/cases/page.tsx` (workspace filter chips) + `src/app/inbox/page.tsx` |
 | Badge variant mapping | Default fallback for unknown values | `src/components/ui/Badge.tsx` |
 
 **Test:** Adding a new intent or lifecycle state in `asoe2` requires **zero** UI code changes.

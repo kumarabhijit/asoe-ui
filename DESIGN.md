@@ -13,14 +13,16 @@ src/
 ├── app/                          # Next.js App Router pages
 │   ├── layout.tsx                # Root layout (skip-to-main link + Providers wrapper)
 │   ├── providers.tsx             # Client-side providers (SessionProvider + ToastProvider)
-│   ├── page.tsx                  # Root redirect → /exceptions
+│   ├── page.tsx                  # Root redirect → /home (issue #133 PO #5/#6 operational landing)
 │   ├── login/page.tsx            # Multi-step login (email → password → SSO redirect)
 │   ├── auth/callback/page.tsx    # SSO callback handler
-│   ├── exceptions/
-│   │   ├── page.tsx              # Exception Queue — three-pane Outlook master-detail layout + WebSocket wiring
-│   │   ├── ExceptionListPane.tsx # Middle pane: compact card list with search + filters + left border indicators
-│   │   ├── CaseListPane.tsx      # V5.1.1 (Phase 28.5.x) — case-projected master-detail queue. Cluster filter chips (Live / Waiting / Terminal) + intent multi-select + source filter + URL-synced search + sort toggle + role="listbox" rows. Replaces the V5.1 inline source-only queue on /exceptions.
-│   │   ├── ExceptionDetailPanel.tsx  # Right pane: orchestrator composing 13 layer sub-components
+│   ├── home/page.tsx             # Operational landing surface (post-#133)
+│   ├── cases/
+│   │   ├── page.tsx              # ADR-041 P3 — canonical case workspace. Two-pane: queue (left, 360px) + case detail (right, flex). URL-driven via ?case=<caseId>&record=<recordId>. SLA-sorted queue with filter chips, keyboard nav (j/k arrows, Home/End), pin-selection guard, WS-driven silent refresh via useCases().
+│   │   ├── CaseDetailPanel.tsx   # Right-pane content — slim context strip (when record mounted) or full case header (otherwise) + attached-records picker + inline ExceptionDetailPanel.
+│   │   └── [id]/page.tsx         # Focused single-case view (deep-link target — no queue chrome). Mounts the same CaseDetailPanel.
+│   ├── exceptions/               # ADR-041 P4 — queue route retired. next.config.mjs redirects /exceptions and /exceptions/:path* → /cases (permanent: true). The directory survives only because the per-record enrichment sections + ExceptionDetailPanel live here; no `page.tsx` / `error.tsx` / `loading.tsx` route files remain.
+│   │   ├── ExceptionDetailPanel.tsx  # Orchestrator composing 13 layer sub-components; mounted inline by CaseDetailPanel
 │   │   ├── HeaderRibbon.tsx      # Layer 1: breadcrumb context, lifecycle/verdict badges, total value
 │   │   ├── ContextStrip.tsx      # Layer 2: Entity Profile + Impact Metrics (collapsible)
 │   │   ├── AgentAnalysisSection.tsx  # Layer 3: Problem / Root Cause / Recommendation narratives
@@ -36,10 +38,12 @@ src/
 │   │   ├── DeliveryDelaySection.tsx       # Data-presence enrichment: planned vs projected ETA, days-late, ranked alternate options
 │   │   ├── PriceHoldSection.tsx           # Data-presence enrichment: PO vs SAP price, signed variance, tolerance/hard-block strip, recipe action
 │   │   ├── EdiMismatchSection.tsx         # Data-presence enrichment: sub_type badge, expected vs received cards, classification, autonomy
-│   │   ├── shared.tsx            # CollapsibleHeader, fmtPrice helpers
-│   │   └── [id]/page.tsx         # Full-page exception detail (standalone route)
+│   │   ├── EmailSourceSection.tsx         # Data-presence enrichment: source email substrate (ADR-034 Phase G.2)
+│   │   ├── EmailOrderEntrySection.tsx     # Data-presence enrichment: classified email order intake
+│   │   ├── OverrideChooserDialog.tsx      # Modal: pick action / reason / notes for an Override decision
+│   │   └── shared.tsx            # CollapsibleHeader, fmtPrice helpers
 │   ├── dashboard/page.tsx        # Analytics dashboard (Layout B) + recent activity feed
-│   ├── inbox/page.tsx            # Customer Inbox — AI email triage (two-pane layout)
+│   ├── inbox/page.tsx            # Customer Inbox — AI email triage (redirects to /cases?source=manual_order per #133 PO #9)
 │   ├── settings/page.tsx         # Settings page (Phase 9 stub — admin, SSO, agent config)
 │   └── api/auth/[...nextauth]/route.ts  # NextAuth API route
 ├── components/ui/                # Reusable UI components (Section 11.2)
@@ -48,12 +52,16 @@ src/
 │   ├── Badge.tsx                 # Tinted bg + icon + text, verdict/lifecycle/rootCause helpers
 │   ├── Button.tsx                # 5 variants (brand/neutral/success/ghost/destructive)
 │   ├── Card.tsx                  # Borderless shadow-elevated container
+│   ├── CaseViewBanner.tsx        # Banner identifying /inbox or /exceptions as filtered views of /cases (legacy — /exceptions retired in P4)
+│   ├── ChromeBoundary.tsx        # Authenticated-route NavBar + sign-out wrapper
+│   ├── EvidenceBlock.tsx         # Audit-bearing field renderer enforcing the three presence states
 │   ├── GapBar.tsx                # Horizontal ordered-vs-available/max bar with gap highlight (shortfall/excess modes)
 │   ├── GravitationalOrbs.tsx     # Canvas animated background (login page)
 │   ├── Input.tsx                 # Label + input + error + right icon
 │   ├── Logo.tsx                  # ASOE brand mark with optional tagline
 │   ├── MetricTile.tsx            # KPI: icon + label + monospace value + subtitle
 │   ├── NavBar.tsx                # 56px glass surface, tabs, agent status pulse
+│   ├── PolicyHitBadge.tsx        # L1 rule names render plain; L2 LLM-derived concerns carry the AI badge
 │   ├── PricingWaterfall.tsx      # Vertical pricing condition chain timeline
 │   ├── Sidebar.tsx               # 480px slide-right intervention panel
 │   ├── Toast.tsx                 # 4.5s auto-dismiss, status-colored, solid-fill
@@ -62,22 +70,32 @@ src/
 ├── hooks/
 │   ├── useAuth.ts                # Wraps NextAuth session with typed user + visibleTabs, assignedAccounts
 │   ├── useErpProfile.ts          # ERP-vendor-aware label resolver (useIntentLabel, useSubTypeLabel)
+│   ├── useExceptionActions.ts    # HITL handlers (approve / reject / escalate / override / cosign / reanalyze)
 │   ├── useHealth.ts              # Fetches runtime enums from /api/v1/health
-│   ├── useKeyboardListNav.ts     # V5.1.1 (Phase 28.5.x §D5) — ArrowUp/Down + j/k + Home/End on a sorted single-select listbox. Consumed by CaseListPane + ExceptionListPane.
+│   ├── useKeyboardListNav.ts     # ArrowUp/Down + j/k + Home/End on a sorted single-select listbox. Consumed by /cases workspace queue (ADR-041 P3c).
 │   ├── useManualOrderCases.ts    # `useCases` + `useManualOrderCases` — fetch /api/v1/cases with WS-driven invalidation; exposes refetch() and isCaseInvalidationEvent helper
-│   ├── useSavedViews.ts          # v2 storage shape (Phase 28.5.x §D4) with `surface` discriminator and one-shot v1→v2 migration on first read
-│   └── useWebSocket.ts           # Section 8 protocol with reconnection backoff
+│   ├── useSavedViews.ts          # v2 storage shape with `surface` discriminator (legacy CaseListPane consumer; retained for the inbox-filtered case-list view)
+│   ├── useSignOut.ts             # NextAuth signOut + redirect to /login
+│   ├── useSlaTicker.ts           # 1-minute interval for live SLA-band recalculation without re-fetch
+│   └── useWebSocket.ts           # Section 8 protocol with reconnection backoff + Section 8.4 polling fallback
 ├── config/
-│   └── erp-label-map.ts          # Per-vendor (SAP / Oracle / Salesforce / GENERIC) display-label maps for intents + EDI sub_types
+│   ├── erp-label-map.ts          # Per-vendor (SAP / Oracle / Salesforce / GENERIC) display-label maps for intents + EDI sub_types
+│   └── nav-tabs.ts               # Single source of truth for NavBar tabs (ADR-041 P2 dropped "Exception Queue"; Home / Cases / Performance / Settings remain)
 ├── lib/
-│   ├── api.ts                    # API client: auth + health + exceptions + line items + cases (with V5.1.1 query params)
+│   ├── api.ts                    # API client — handler surface for auth + health + exceptions + line items + cases + pipeline + workflow + policy. Bulk mock fixtures live in mock-data/ (ADR-041 P5; api.ts shrunk 3894 → 2146 lines).
 │   ├── auth.ts                   # NextAuth options (credentials provider, JWT callbacks)
-│   ├── cases.ts                  # V5.1.1 (Phase 28.5.x §D1) — single STATUS_LABEL + CASE_STATUS_CLUSTERS + isAwaitingHuman / clusterFor helpers. Retires four duplicate maps + two hardcoded literal comparisons.
+│   ├── cases.ts                  # STATUS_LABEL + CASE_STATUS_CLUSTERS + isAwaitingHuman / clusterFor / sourceChannelLabel / lastActivityLabel helpers
+│   ├── mock-data/                # ADR-041 P5 — bulk mock fixtures extracted from api.ts
+│   │   ├── order-analyses.ts     # MOCK_ORDER_ANALYSES (~1350 lines) — keyed by ExceptionSummary.id
+│   │   ├── exceptions.ts         # MOCK_EXCEPTIONS + the S15a parent_case_id forEach wiring in module scope
+│   │   ├── cases.ts              # caseFromMockException + MOCK_CASES (derived 1:1 from MOCK_EXCEPTIONS)
+│   │   └── line-items.ts         # MOCK_LINE_ITEMS
 │   ├── roles.ts                  # RBAC permissions aligned with asoe2/api/deps.py
 │   └── utils.ts                  # cn() — Tailwind class merge utility (clsx + tailwind-merge)
 ├── types/
 │   ├── auth.ts                   # AuthUser, LoginResponse, Role (← asoe2 schemas)
-│   ├── exceptions.ts             # Intent, LifecycleState, ShadowVerdict, ExceptionSummary,
+│   ├── cases.ts                  # OrderCase, CaseSource, CaseType (EMAIL_ENTRY | BLOCK — ADR-041 P1), EmailClassification, CaseStatus, SlaSnapshot
+│   ├── exceptions.ts             # Intent, LifecycleState, ShadowVerdict, ExceptionSummary (with sap_block_code? — ADR-041 P1),
 │   │                             # LineItem, PricingWaterfallStep, OrderAnalysis (UI display types)
 │   ├── api.ts                    # ResolveRequest/Response, StatsResponse, PaginatedResponse
 │   └── websocket.ts              # WSEvent, PipelineProgressPayload, WSAuthMessage
@@ -125,56 +143,46 @@ src/
 
 ## 3. Page Architecture
 
-### Exception Queue (`/exceptions`) — Three-Pane Outlook Master-Detail
+### Inline Exception Detail (`ExceptionDetailPanel`)
+
+`ExceptionDetailPanel` is the per-record HITL surface — `HeaderRibbon`
+→ `ContextStrip` → `AgentReasoningCard` (Layer 1/2) → enrichment
+sections → `EvidenceGrid` → `DiagnosticsSection`. Pre-S15a it had its
+own route (`/exceptions/[id]`); post-S15a it mounts **inline** inside
+`CaseDetailPanel` on the `/cases` workspace (see the `/cases` section
+below for the workspace layout). The `/exceptions` queue route was
+retired in ADR-041 P4; `next.config.mjs` redirects bookmarks.
 
 ```
-NavBar (sticky top, 56px)
-├── Tabs: Customer Inbox | Exception Queue | Dashboard | Settings
-├── Agent status badge + user avatar
-┌──────────────────────────┬─┬────────────────────────────────────────┐
-│ Middle Pane (List)       │↔│ Right Pane (Detail)                    │
-│ ExceptionListPane        │ │ ExceptionDetailPanel                   │
-│ ┌──────────────────────┐ │ │ ┌──────────────────────────────────┐   │
-│ │ Title + count + ⟳    │ │ │ │ Header Ribbon (breadcrumb-style) │   │
-│ │ Compact metrics      │ │ │ │ SO-1001 > Customer > Location >  │   │
-│ │ Search input         │ │ │ │ Primary SKU or "N Lines"         │   │
-│ │ State + Intent filter│ │ │ ├──────────────┬───────────────────┤   │
-│ ├──────────────────────┤ │ │ │ Entity       │ Impact & Risk     │   │
-│ │ Exception Card ●     │ │ │ │ Profile      │ Metrics           │   │
-│ │ Exception Card       │ │ │ ├──────────────┴───────────────────┤   │
-│ │ Exception Card       │ │ │ │ Agent Analysis                   │   │
-│ │ ...                  │ │ │ │ (Problem / Root Cause / Reco)    │   │
-│ └──────────────────────┘ │ │ │ AgentReasoningCard (Layer 1/2)   │   │
-│                          │ │ │ ▸ Evidence Detail [collapsed]     │   │
-│ 35% (resizable)          │ │ │ Pipeline Progress                 │   │
-│                          │ │ │ Trace Evidence tabs               │   │
-│                          │ │ └──────────────────────────────────┘   │
-└──────────────────────────┴─┴────────────────────────────────────────┘
+ExceptionDetailPanel (mounted inline inside CaseDetailPanel's right pane)
+┌──────────────────────────────────┐
+│ Header Ribbon (breadcrumb-style) │
+│ SO-1001 > Customer > Location >  │
+│ Primary SKU or "N Lines"         │
+├──────────────┬───────────────────┤
+│ Entity       │ Impact & Risk     │
+│ Profile      │ Metrics           │
+├──────────────┴───────────────────┤
+│ Agent Analysis                   │
+│ (Problem / Root Cause / Reco)    │
+│ AgentReasoningCard (Layer 1/2)   │
+│ ▸ Evidence Detail [collapsed]    │
+│ Pipeline Progress                │
+│ Trace Evidence tabs              │
+└──────────────────────────────────┘
 ```
 
-**Resizable panes:** `react-resizable-panels` (Group/Panel/Separator). Panel sizes persisted per session. Default 35/65 split.
+**Mount surfaces:**
+- `/cases?case=<id>&record=<rid>` — workspace; `CaseDetailPanel` selects the record and mounts this panel.
+- `/cases/<id>?record=<rid>` — focused single-case view (deep-link target with no queue chrome).
 
-**Lifted state:** `selectedExceptionId` in parent `page.tsx`. Selecting a card updates the right pane without page reload.
+**Data flow:** `exceptionsApi.get(id)` + `exceptionsApi.orderAnalysis(id)` is the critical path (Phase 8.13). `lineItems` background-warms after first paint; `trace` is lazy-loaded the first time the operator opens the Diagnostics pane (`onFirstOpen` callback on `DiagnosticsSection`). Re-collapsing doesn't re-fetch.
 
-**Filter URL sync:** Filter state (`filterState`, `filterIntent`, `searchQuery`) synced to URL search params (`?state=X&intent=Y&q=Z`) via `useSearchParams`. Persists across page refresh and is shareable. "Filters active" indicator with "Clear all" button shown when any filter is set.
+**Queue ↔ detail flow:** The queue is the `/cases` workspace left pane (see Cases section below). Keyboard navigation (`ArrowDown` / `j` / `ArrowUp` / `k` / `Home` / `End`) is wired via `useKeyboardListNav` on the queue listbox; clicking or keyboard-selecting a row sets `?case=` (and auto-mounts `?record=`), which drives the inline panel. The hook bails when the active element is an input / textarea / select / contenteditable / Radix popover.
 
-**Error handling:** Fetch errors tracked via `error` state. Distinct UI for error (retry button) vs empty (filter hint) vs loading (skeletons).
+**Detail-pane header labels:** `HeaderRibbon` prefixes the lifecycle and shadow-verdict badges with explicit labels — `Current State: <lifecycle>` and `Audit Result: <verdict>` — so reviewers don't have to learn which colored pill maps to which thing.
 
-**Data flow:** `exceptionsApi.list()` + `exceptionsApi.stats()` → list state → render. Filters trigger re-fetch. First item auto-selected and pre-fetched. Subsequent selections trigger on-demand fetch — but the critical path is `exceptionsApi.get(id)` + `exceptionsApi.orderAnalysis(id)` only (Phase 8.13). `lineItems` is background-warmed after first paint; `trace` is lazy-loaded the first time the operator opens the Diagnostics pane (`onFirstOpen` callback on `DiagnosticsSection`). Re-collapsing doesn't re-fetch.
-
-**Recency sort (Phase 8.13):** The list pane is sorted by `updated_at` descending with `created_at` desc as tiebreaker — most-recent-first, Outlook-style. Sort lives in `page.tsx` (not the API client) so the order stays stable across silent WebSocket refreshes.
-
-**Keyboard navigation (Phase 8.13 — Outlook parity):** A document-level `keydown` listener in `page.tsx` moves selection through the sorted+filtered list:
-- `ArrowDown` / `j` — next row
-- `ArrowUp` / `k` — previous row
-- `Home` — first row
-- `End` — last row
-
-Bails when the active element is an input / textarea / select / contenteditable / Radix popover, so search and filter selects keep their native key handling. After selection moves, focus also moves (`el.focus({ preventScroll: true })`) so the `:focus-visible` brand outline (`globals.css:56-58`) tracks selection — without this, the previously-clicked card kept the outline and looked "still highlighted." Cards carry a `data-exception-id={exc.id}` attribute so the handler can `scrollIntoView` + `focus` them.
-
-**Detail-pane header labels (Phase 8.13):** `HeaderRibbon` prefixes the lifecycle and shadow-verdict badges with explicit labels — `Current State: <lifecycle>` and `Audit Result: <verdict>` — so reviewers don't have to learn which colored pill maps to which thing. The list-card surface (`ExceptionListPane`) intentionally drops the verdict pill for density; the explicit `Audit Result:` label in the detail pane is what preserves the partial-truth guard.
-
-**Polymorphic detail view:** The right pane (`ExceptionDetailPanel.tsx`) orchestrates 13 sub-components decomposed along the **5-layer axis** (not the intent axis). Each sub-component is intent-agnostic — driven by data presence, not intent strings:
+**Polymorphic detail view:** `ExceptionDetailPanel.tsx` orchestrates 13 sub-components decomposed along the **5-layer axis** (not the intent axis). Each sub-component is intent-agnostic — driven by data presence, not intent strings:
 
 | Layer | Sub-Component | File | Purpose |
 |---|---|---|---|
@@ -232,11 +240,9 @@ Adding a new enrichment section requires only: (1) add the type to `OrderAnalysi
 
 **Execution-error rendering:** When `lifecycle_state === "FAILED"`, the panel renders an `executionError` branch ("Pipeline failed at <node>") with the trace explanation and timestamp. This is distinct from a RED shadow verdict (which is a compliance decision, not a runtime crash) and from the "Shadow has not yet completed" fallback (which previously rendered for every FAILED state and was misleading — the failure may be at any node, not just shadow). `AgentReasoningCard` consumes `executionError !== undefined` to drive the FAILED banner. (See `ui_architecture.md` §9 drift register entry on `executionError` rendering.)
 
-**Action feedback:** All mutations show toast notifications (success/error) via `useToast()`. List auto-refreshes after any action via `onActionComplete` callback.
+**Action feedback:** All mutations show toast notifications (success/error) via `useToast()`. The workspace auto-refreshes after any action via `onActionComplete` callback (parent re-fetches the case + records).
 
-**WebSocket wiring:** The page orchestrator connects via `useWebSocket` and routes events to the detail panel via `onRefreshRef`. `pipeline_progress` events update the WaterfallStepper in real-time. `exception_update` and `task_complete` events refresh both the list and the currently viewed exception.
-
-**List indicators:** Exception cards show left border color: blue=selected, green=auto-resolved (GREEN verdict + terminal state), transparent otherwise. Terminal lifecycle state cards with GREEN verdict show a "Resolved" badge.
+**WebSocket wiring:** Page-level WS subscription lives on `/cases/page.tsx` post-ADR-041 (the deleted `/exceptions/page.tsx` previously owned it). `case_*` events trigger silent `useCases.refetch()`; `exception_update` + `task_complete` refresh the currently viewed exception via `onRefreshRef`. `pipeline_progress` updates the `WaterfallStepper` inside `DiagnosticsSection`.
 
 **Governance:** No "Execute Recipe" button. Human acts as Review Authority (Approve/Reject/Escalate via AgentReasoningCard). Shadow Verdict displayed as read-only badge.
 
@@ -282,67 +288,68 @@ Page Content (max-width 1440px)
 
 Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 
-### Cases (`/cases`) — Case-Centric Primary Surface (ADR-038 Phase H.6, primitive)
+### Cases (`/cases`) — Two-Pane Workspace (ADR-041 P3, canonical queue + detail)
 
 ```
-NavBar (shared; /cases not yet listed in NavBar — direct URL only)
-Page Content (max-width 1440px)
-├── Page Header (case count + filter chips per source)
-├── List View
+NavBar (shared; "Cases" tab is the canonical queue surface — ADR-041 P2 dropped "Exception Queue")
+Page Content (max-width 1600px) — CSS grid lg:grid-cols-[360px_minmax(0,1fr)]
+                                 (single column below 1024px)
+├── Left Pane (360px): Case Queue
+│   ├── Header (title + count + filter chips per source)
 │   ├── Filter chips iterating ALLOWED_CASE_SOURCES
 │   │   (manual_order, automated_order)
-│   ├── SLA-driven sort (default: nearest sla_deadline first)
-│   └── Case rows — case_id, source, source_channel,
-│       customer_po_number, sla_deadline, status, tier
-└── /cases/[id] — CaseDetailPanel (thin wrapper)
-    ├── Case header — source, source_channel, sla_deadline,
-    │   status, tier, bundle_version_at_open
-    └── EvidenceBlock per audit-bearing field
+│   ├── Status filter (client-side, applied on top of the cursor-walked list)
+│   ├── role="listbox" / role="option" rows with
+│   │   data-keyboard-nav-id for useKeyboardListNav drive
+│   ├── SLA-driven sort (nearest sla_deadline first; useSlaTicker
+│   │   re-evaluates every 60s without a refetch)
+│   └── Pin-selection guard (ADR-041 P3d) — if `selectedCaseId` is
+│       set and falls out of the filter (e.g., status flipped to
+│       RESOLVED via WS-driven refetch), the row stays visible at
+│       the top with a "Pinned" badge so the operator's cursor
+│       isn't yanked.
+└── Right Pane (flex, min-h 60vh): Case Workspace
+    ├── Empty state: "Select a case from the queue to open its workspace."
+    ├── Loading state: detailLoading guard
+    └── Mounted (orderCase.case_id === selectedCaseId — render guard):
+        CaseDetailPanel
+        ├── Slim case-context strip (when a record is mounted — PR #154)
+        │   OR full case header card (when no record selected)
+        ├── Compliance hits section (policy hits aggregated by getRecords)
+        ├── Attached records picker (role="radiogroup")
+        └── Inline ExceptionDetailPanel for the selected record
+            (HeaderRibbon → ContextStrip → AgentReasoningCard +
+             enrichment sections → EvidenceGrid → DiagnosticsSection)
 ```
 
-**Data flow:** `casesApi.list()` / `casesApi.get(case_id)` / `casesApi.getRecords(case_id)` → state → render. `getRecords` is the Phase 28.5.x §28.5 attached-record loader; `/cases/[id]` Promise.all-loads the case header + records list and hands the aggregated `policy_hits` to `CaseDetailPanel` for the L1/L2 PolicyHitBadge surface.
+**URL state:** `?case=<caseId>&record=<recordId>` drives selection. Click handlers use `router.replace` so back/forward + reload preserve cursor position. Switching cases drops the prior `?record=` so the auto-mount picks the new case's first record.
+
+**Data flow:**
+- Queue — `useCases(filters.source)` (cursor-walking hook with silent-refetch contract).
+- WS silent refresh — `useWebSocket({ onEvent: isCaseInvalidationEvent → refetch, onReconnect: refetch, onPollFallback: refetch })`. Restores the silent live refresh that lived on the deleted `/exceptions/page.tsx`.
+- Right pane — `Promise.all([casesApi.get(caseId), casesApi.getRecords(caseId)])`. State is cleared eagerly when `selectedCaseId` changes to prevent the case-switch race (`setOrderCase(null); setRecords([])` before the new fetch — ADR-041 P3c).
+
+**Case-switch race fix:** Two layers of defense, both source-locked:
+1. **State clear in the parent useEffect** — `setOrderCase(null) / setRecords([]) / setPolicyHits([])` at the top of the `[selectedCaseId]` effect, before `setDetailLoading(true)` + fetch.
+2. **JSX render guard** — `CaseDetailPanel` only mounts when `orderCase.case_id === selectedCaseId`. So even if a render slips through with stale state, the panel can't auto-mount with mismatched data and write the wrong `?record=` back into the URL.
+
+**Keyboard nav:** `useKeyboardListNav` mounted with the sorted row list + `selectedCaseId` + `handleSelectCase`. ArrowUp / ArrowDown / j / k / Home / End drive selection; selected row scrolls into view + receives DOM focus.
+
+**A11y:** `role="listbox"` on the queue, `role="option"` on each row with `aria-selected`. `tabIndex={0}` on the listbox so `:focus-visible` tracks the keyboard cursor. The slim context strip uses `aria-label="Case context"`; the full header uses `aria-label="Case header"`.
 
 **Architectural locks:**
-* `tests/architectural/cases_no_per_intent_dispatch.test.ts` — `CaseDetailPanel` is a dumb projector (Guardrail #1 / Guardrail #6). It does **not** dispatch on intent; section components mount via the existing data-presence pattern, identical to `ExceptionDetailPanel`.
-* `slaSnapshot()` band thresholds (<2h `at_risk`, 2–24h `today`, >24h `comfortable`) are exported from `src/app/cases/page.tsx` as a pure helper so they can be reused by other surfaces (e.g., the dashboard's case-queue widget when that lands).
+* `tests/architectural/cases_workspace_render_guard.test.ts` — three invariants: (1) the fetch useEffect clears `orderCase`/`records` BEFORE `casesApi.get`; (2) `CaseDetailPanel` only renders when `orderCase.case_id === selectedCaseId`; (3) the `cases` useMemo lists `selectedCaseId` in deps AND produces an `isPinned: true` row when the filter excludes the selection.
+* `tests/architectural/case_pivot_mock_wiring.test.ts` — every mock case has `case_type ∈ {EMAIL_ENTRY, BLOCK}` + EMAIL_ENTRY carries `email_classification` (ADR-041 P1).
+* `tests/architectural/cases_no_per_intent_dispatch.test.ts` — `CaseDetailPanel` is a dumb projector (Guardrail #1 / Guardrail #6); sections mount via data-presence.
+* `tests/browser/cases-workspace-case-switch.spec.ts` — operator-journey browser e2e: drives two queue clicks in sequence, asserts URL `?record=` always belongs to URL `?case=`.
 
-**Direction notice for the broader rollout** — see `ui_architecture.md` §13.
+**`/cases/[id]` (focused single-case view):** Survives for notification deep-links + bookmark contexts that prefer a clean case viewport without the queue chrome. Mounts the same `CaseDetailPanel`. Two surfaces, two intents: `/cases?case=<id>` is the workspace; `/cases/<id>` is focus.
 
-### Exception Queue V5.1.1 (`/exceptions` mounts `CaseListPane`)
+**`slaSnapshot()`** band thresholds (<2h `at_risk`, 2–24h `today`, >24h `comfortable`) are exported from `src/app/cases/page.tsx` as a pure helper so other surfaces (home page, chrome banner) consume them.
 
-V5.1.1 (Phase 28.5.x Item 3) ships `CaseListPane` on `/exceptions` to replace the V5.1 source-only inline queue. Binding decisions doc: `asoe2/docs/workshops/2026-05-11-case-list-pane-decisions.md`.
+### `/exceptions` — RETIRED (ADR-041 P4)
 
-```
-NavBar (shared component)
-Page Header (breadcrumb, refresh button)
-Metrics strip (total / SLA breached / awaiting review / resolved)
-Two-Pane Content
-├── Left (460px): CaseListPane
-│   ├── Header (title + count + saved-views menu + refresh)
-│   ├── Search box (URL-synced `?q=`)
-│   ├── Cluster filter chips (Live / Waiting / Terminal),
-│   │   per-status sub-chips on demand
-│   ├── Source filter chip (single-value, manual_order / automated_order)
-│   ├── Intent multi-select chips (from useHealth().allowed_intents)
-│   ├── Sort toggle (SLA urgency / Recently opened)
-│   └── Case rows — role="option" inside role="listbox", with
-│       data-keyboard-nav-id for useKeyboardListNav drive
-└── Right (flex): Case header summary + "Open case" → /cases/{id}
-```
-
-**Filter pipeline:** Backend evaluates `source / status / intents / since / q` query params (PR #137 asoe2). The UI ALSO applies them client-side (idempotent — both sides are pure subset operations) so chip toggles repaint immediately without waiting for the refetch round-trip.
-
-**Saved views:** `useSavedViews("cases")` returns surface-scoped views. "My queue" is opt-in via the "Save current as default" tile (operator-resolved D4 product call — no auto-apply on first login).
-
-**Keyboard nav:** `useKeyboardListNav` is mounted with the sorted row list + `selectedId` setter + the listbox container ref. ArrowUp / ArrowDown / j / k / Home / End drive selection; the row that takes selection scrolls into view + receives DOM focus so `:focus-visible` tracks.
-
-**A11y:** `role="listbox"` on the container, `role="option"` on each row with `aria-selected`. The `<input type="search">` carries `aria-label="Search cases"`. vitest-axe locks at `tests/accessibility/case_list_pane.test.tsx`.
-
-**URL sync:** Filter + sort state sync to `?status=A,B&intents=X,Y&source=manual_order&since=7d&q=needle&sort=recent` so shared URLs preserve the operator's view (Compliance ask from D2).
-
-**Architectural locks:**
-* `tests/architectural/openapi_drift.test.ts` — `casesApi.list`'s declared query params match the backend OpenAPI artifact.
-* `tests/contract/test_navigation_chrome.test.ts` — the role swap (`role="option"` inside `role="listbox"`) is asserted via file-scan on both `CaseListPane.tsx` and `inbox/page.tsx`.
+`next.config.mjs::redirects()` permanently redirects `/exceptions` and `/exceptions/:path*` → `/cases`. The route files (`page.tsx`, `error.tsx`, `loading.tsx`, `ExceptionListPane.tsx`, `CaseListPane.tsx`, `SavedViewsMenu.tsx`, `searchParser.ts`) were deleted. The directory survives only because the per-record enrichment sections + `ExceptionDetailPanel` live there; they're mounted inline by `CaseDetailPanel`. A future P5/P6 follow-on may move them under `src/app/cases/_components/`.
 
 ---
 
@@ -354,14 +361,16 @@ Two-Pane Content
 | `ShadowVerdict` | `ShadowStatus` enum | exceptions.ts |
 | `TerminalStatus` | `TerminalStatus` enum — 7 values; `AUDIT_CONTEXT_MISSING` is the registry-enforced audit-gap status emitted by `api/analysis_composer.py` | exceptions.ts |
 | `CaseSource` / `CaseStatus` / `CaseTier` | Mirrors of `OrderCase` Literals (asoe2 `contracts/models.py`) — case-level vocabulary (`manual_order` / `automated_order`, T1/T2/T3) | cases.ts |
-| `OrderCase` | `OrderCase` Pydantic model (asoe2 `contracts/models.py`) — case_id, source, source_channel, sla_deadline, tier, bundle_version_at_open, status, customer_po_number, sales_order_id, edi_transaction_id, source_email_id | cases.ts |
+| `OrderCase` | `OrderCase` Pydantic model (asoe2 `contracts/models.py`) — case_id, source, source_channel, **case_type (EMAIL_ENTRY \| BLOCK — ADR-041 P1)**, **email_classification? (NEW_ORDER \| ORDER_CHANGE \| INQUIRY \| COMPLAINT \| OTHER — required when EMAIL_ENTRY, null when BLOCK)**, sla_deadline, tier, bundle_version_at_open, status, customer_po_number, sales_order_id, edi_transaction_id, source_email_id | cases.ts |
+| `CaseType` | `Literal["EMAIL_ENTRY", "BLOCK"]` — orthogonal to `CaseSource` per the ADR-041 modeller's pushback. `source` answers "how did the order originate?"; `case_type` answers "why did ASOE materialise this case?". | cases.ts |
+| `EmailClassification` | `Literal["NEW_ORDER", "ORDER_CHANGE", "INQUIRY", "COMPLAINT", "OTHER"]` — per-intake classification for EMAIL_ENTRY cases (1:1 with the email). | cases.ts |
 | `CaseEvent` | Per-case event log entry (timestamp, event_type, actor, payload) | cases.ts |
 | `SlaSnapshot` / `SlaBand` | UI-only SLA computation (band thresholds <2h `at_risk`, 2–24h `today`, >24h `comfortable`) — derived from `OrderCase.sla_deadline` via `slaSnapshot()` exported from `src/app/cases/page.tsx` | cases.ts |
 | `LifecycleState` | `LIFECYCLE_STATES` list — `EXECUTING` removed, `PENDING_COSIGN` added (Phase 2 #5 four-eyes staging state) | exceptions.ts |
 | `PipelineNode` | 11 node names from orchestration/nodes.py (incl. build_analysis) | exceptions.ts |
 | `OrderEvent` | `OrderEvent` model | exceptions.ts |
 | `ComplianceDecision` | `ComplianceDecision` model | exceptions.ts |
-| `ExceptionSummary` | `ExceptionSummary` schema (+ `account_id`, `account_name`) | exceptions.ts |
+| `ExceptionSummary` | `ExceptionSummary` schema (+ `account_id`, `account_name`, `parent_case_id?`, **`sap_block_code?` — raw SAP block reason code on BLOCK-parented records, ADR-041 P1**) | exceptions.ts |
 | `ExceptionDetail` | `ExceptionDetailResponse` schema | exceptions.ts |
 | `TraceRecord` | `TraceResponse` schema | exceptions.ts |
 | `HealthResponse` | Health endpoint response — extended with `allowed_resolution_actions`, `allowed_override_reason_tags`, and `allowed_override_reason_tags_by_intent` | exceptions.ts |
@@ -417,7 +426,7 @@ Two-Pane Content
 
 ## 5. API Client (`src/lib/api.ts`)
 
-Maps to Section 6.2 REST endpoints:
+Maps to Section 6.2 REST endpoints. ADR-041 P5 extracted bulk mock fixtures into `src/lib/mock-data/` (`order-analyses.ts`, `exceptions.ts`, `cases.ts`, `line-items.ts`); `api.ts` shrunk from 3894 to 2146 lines and now contains only the handler surface + mutable session state (`MOCK_PENDING_OVERRIDES`, `MOCK_REANALYSIS_HISTORY`, `MOCK_IDEMPOTENCY`, etc.) that handlers mutate.
 
 | API Method | Backend Endpoint | Section |
 |---|---|---|
