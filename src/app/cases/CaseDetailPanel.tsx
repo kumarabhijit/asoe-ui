@@ -34,6 +34,7 @@ import type { ExceptionDetailResponse } from "@/types/api";
 import { STATUS_LABEL, lastActivityLabel, sourceChannelLabel } from "@/lib/cases";
 import { useSlaTicker } from "@/hooks/useSlaTicker";
 import ExceptionDetailPanel from "../exceptions/ExceptionDetailPanel";
+import { RecordListPane } from "./RecordListPane";
 
 import { slaSnapshot } from "./page";
 
@@ -94,6 +95,24 @@ export interface CaseDetailPanelProps {
   selectedRecordId?: string;
   /** Picker click handler — flips selection (and the URL query). */
   onSelectRecord?: (recordId: string) => void;
+  /**
+   * Whether to render the records picker INSIDE this panel.
+   *
+   * ADR-041 P3d-remaining (2026-05-14) lifted the picker into a
+   * dedicated middle column in the `/cases` workspace
+   * (`RecordListPane`). The workspace passes
+   * `showInlineRecordList={false}` so the picker isn't double-
+   * rendered. The focused `/cases/[id]` view + any other surface
+   * mounting `CaseDetailPanel` standalone keeps the default
+   * `true`, so the picker stays accessible when no outer column
+   * exists.
+   *
+   * Below the workspace's `xl` breakpoint (1280px) the workspace
+   * collapses the outer middle column; the inline picker is the
+   * fallback path tracked as P3e (a per-breakpoint toggle that's
+   * not in scope here).
+   */
+  showInlineRecordList?: boolean;
 }
 
 export function CaseDetailPanel({
@@ -102,6 +121,7 @@ export function CaseDetailPanel({
   attachedRecords,
   selectedRecordId,
   onSelectRecord,
+  showInlineRecordList = true,
 }: CaseDetailPanelProps) {
   // PO #20 (issue #133): tick the SLA snapshot once a minute so the
   // header countdown stays live without a refetch.
@@ -316,69 +336,21 @@ export function CaseDetailPanel({
         </section>
       )}
 
-      {/* ── Attached records stack (Phase 28.5.x §28.5) ──────────── */}
-      {hasAttachedRecords && (
-        <section
-          aria-label="Attached records"
-          className="bg-surface-primary border border-border rounded-md p-16 shadow-xs"
-        >
-          <div className="flex items-center gap-8 mb-12">
-            <h2 className="text-heading font-semibold text-text-primary m-0">
-              Attached records
-            </h2>
-            <span className="ml-auto text-caption text-text-tertiary">
-              {records.length}
-            </span>
-          </div>
-          <p className="text-caption text-text-tertiary leading-normal mb-12">
-            Per-event records (extraction, validation findings, agent
-            decisions) attached to{" "}
-            <code className="font-mono">{orderCase.case_id}</code>.
-            {records.length > 1 ? " Pick one to act on." : null}
-          </p>
-          <ul
-            role="radiogroup"
-            aria-label="Select a record to act on"
-            className="m-0 p-0 list-none divide-y divide-border-subtle"
-          >
-            {records.map((record) => {
-              const isSelected = record.id === selectedRecordId;
-              return (
-                <li key={record.id}>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    onClick={() => onSelectRecord?.(record.id)}
-                    data-testid={`record-picker-row-${record.id}`}
-                    className={[
-                      "w-full flex items-center gap-12 py-12 px-8 rounded-sm text-left",
-                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
-                      isSelected
-                        ? "bg-surface-row-active"
-                        : "hover:bg-surface-secondary",
-                    ].join(" ")}
-                  >
-                    <Badge variant={isSelected ? "info" : "neutral"} size="sm">
-                      {record.intent ?? "UNCLASSIFIED"}
-                    </Badge>
-                    <span className="font-mono text-body text-text-primary">
-                      {record.order_id ?? record.id}
-                    </span>
-                    <span className="ml-auto text-caption text-text-tertiary">
-                      {record.lifecycle_state}
-                    </span>
-                    <ChevronRight
-                      size={14}
-                      aria-hidden
-                      className="text-text-tertiary"
-                    />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+      {/* ── Attached records (ADR-041 P3d-remaining inline fallback) ─
+          When `CaseDetailPanel` is mounted standalone (focused view
+          at `/cases/[id]`, or any other surface that doesn't ship
+          its own outer record-list column), the picker stays here
+          so the operator can pick a record. The `/cases` workspace
+          passes `showInlineRecordList={false}` because it mounts
+          `RecordListPane` as a dedicated middle column at xl
+          (1280px+). */}
+      {showInlineRecordList && hasAttachedRecords && (
+        <RecordListPane
+          caseId={orderCase.case_id}
+          records={records}
+          selectedRecordId={selectedRecordId}
+          onSelectRecord={onSelectRecord}
+        />
       )}
 
       {/* Selected-record HITL surface — mounts the full ExceptionDetailPanel

@@ -48,16 +48,44 @@ describe("CSA one-task flow (S15a)", () => {
     ).toMatch(/<ExceptionDetailPanel\s+exceptionId=\{[^}]+\}/);
   });
 
-  it("CaseDetailPanel surfaces a record picker for multi-record cases", () => {
-    const src = readFileSync(CASE_DETAIL_PANEL, "utf-8");
-    // role="radiogroup" + role="radio" + onSelectRecord — the picker
-    // contract the operator interacts with when the case has more
-    // than one attached record. Single-record cases short-circuit
-    // through an auto-select effect so the picker never gates the
-    // happy path.
-    expect(src).toMatch(/role=["']radiogroup["']/);
-    expect(src).toMatch(/role=["']radio["']/);
-    expect(src).toMatch(/onSelectRecord/);
+  it("the record picker is mounted by the /cases workspace (RecordListPane — ADR-041 P3d-remaining)", () => {
+    // ADR-041 P3d-remaining (2026-05-14) lifted the picker out of
+    // `CaseDetailPanel` into `RecordListPane` so the workspace can
+    // render it as the middle column of a three-pane layout. The
+    // contract moved with it:
+    //   * The picker component still exists and uses
+    //     role="radiogroup" + role="radio" + onSelectRecord.
+    //   * The `/cases/page.tsx` workspace mounts it as a sibling
+    //     of `CaseDetailPanel` (not nested inside).
+    //   * `CaseDetailPanel` still receives + forwards
+    //     `onSelectRecord` because it owns the single-record
+    //     auto-mount effect (the picker is a pure renderer).
+    const recordListPane = readFileSync(
+      path.resolve(__dirname, "../../src/app/cases/RecordListPane.tsx"),
+      "utf-8",
+    );
+    expect(recordListPane).toMatch(/role=["']radiogroup["']/);
+    expect(recordListPane).toMatch(/role=["']radio["']/);
+    expect(recordListPane).toMatch(/onSelectRecord/);
+
+    const page = readFileSync(
+      path.resolve(__dirname, "../../src/app/cases/page.tsx"),
+      "utf-8",
+    );
+    expect(
+      page,
+      "the workspace page must mount RecordListPane (the lifted picker)",
+    ).toMatch(/<RecordListPane[\s>]/);
+    expect(
+      page,
+      "the workspace page must import RecordListPane",
+    ).toMatch(/import\s+\{\s*RecordListPane\s*\}/);
+
+    const detailPanel = readFileSync(CASE_DETAIL_PANEL, "utf-8");
+    expect(
+      detailPanel,
+      "CaseDetailPanel must still accept onSelectRecord because it owns the single-record auto-mount effect",
+    ).toMatch(/onSelectRecord/);
   });
 
   it("/cases/[id] page reads ?record=<id> and threads it into CaseDetailPanel", () => {

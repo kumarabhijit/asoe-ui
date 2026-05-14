@@ -107,7 +107,7 @@ describe("CaseDetailPanel — Compliance hits section", () => {
 });
 
 
-describe("CaseDetailPanel — Attached records stack (Phase 28.5.x)", () => {
+describe("CaseDetailPanel — picker lifted into RecordListPane (ADR-041 P3d-remaining)", () => {
   function mockRecord(over: Partial<{ id: string; order_id: string; intent: string }> = {}): ExceptionDetail {
     return {
       id: over.id ?? "exc-A",
@@ -125,59 +125,42 @@ describe("CaseDetailPanel — Attached records stack (Phase 28.5.x)", () => {
     };
   }
 
-  it("hides the section when no attached records are passed", () => {
-    render(<CaseDetailPanel orderCase={mockCase()} />);
-    expect(
-      screen.queryByRole("region", { name: /attached records/i }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("hides the section when attached records is empty", () => {
-    render(<CaseDetailPanel orderCase={mockCase()} attachedRecords={[]} />);
-    expect(
-      screen.queryByRole("region", { name: /attached records/i }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("renders one picker row per record and fires onSelectRecord when clicked", async () => {
-    // S15a — rows are no longer Links to /exceptions/{id}; they are
-    // radio-style picker buttons that flip the parent's
-    // selectedRecordId. The parent (CaseDetailPage) reflects the
-    // selection into the ?record=<id> URL query.
-    const onSelectRecord = vi.fn();
+  it("suppresses the inline picker when showInlineRecordList={false}", () => {
+    // ADR-041 P3d-remaining (2026-05-14) lifted the picker out as
+    // the workspace's middle column. CaseDetailPanel still renders
+    // an inline picker by DEFAULT (preserves the focused
+    // `/cases/[id]` view + below-xl widths where the workspace
+    // collapses the middle column), but the three-pane workspace
+    // at /cases passes `showInlineRecordList={false}` to suppress
+    // the second mount. This test locks that suppression contract.
+    // The picker-render contract is tested in
+    // `tests/components/RecordListPane.test.tsx`.
     render(
       <CaseDetailPanel
         orderCase={mockCase()}
-        attachedRecords={[
-          mockRecord({ id: "exc-A", order_id: "PO-A" }),
-          {
-            ...mockRecord({
-              id: "exc-B", order_id: "PO-B", intent: "DUPLICATE_PO",
-            }),
-            lifecycle_state: "RESOLVED",
-          },
-        ]}
-        onSelectRecord={onSelectRecord}
+        attachedRecords={[mockRecord({ id: "exc-A", order_id: "PO-A" })]}
+        showInlineRecordList={false}
       />,
     );
     expect(
-      screen.getByRole("region", { name: /attached records/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("PO-A")).toBeInTheDocument();
-    expect(screen.getByText("PO-B")).toBeInTheDocument();
-    expect(screen.getByText("CONTRACTUAL_CORRECTION")).toBeInTheDocument();
-    expect(screen.getByText("DUPLICATE_PO")).toBeInTheDocument();
-    const radios = screen.getAllByRole("radio");
-    expect(radios).toHaveLength(2);
-    await userEvent.click(radios[1]);
-    expect(onSelectRecord).toHaveBeenCalledWith("exc-B");
+      screen.queryByRole("region", { name: /attached records/i }),
+      "the inline records section was suppressed by showInlineRecordList={false}",
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("radiogroup", { name: /select a record/i }),
+      "the picker now lives in RecordListPane (workspace) — not in the suppressed inline render",
+    ).not.toBeInTheDocument();
   });
 
-  it("auto-selects the only record on a single-record case", () => {
+  it("still fires the single-record auto-mount via onSelectRecord", () => {
     // The CSA's "one task end-to-end" happy path: a single attached
     // record means no picking — the ribbon mounts on first paint.
-    // CaseDetailPanel signals the auto-mount via onSelectRecord; the
-    // page-level URL sync writes ?record=<id> in response.
+    // CaseDetailPanel owns the effect (it's the consumer of the
+    // selection), so the auto-mount still fires whether the picker
+    // is visible in a separate pane or not. This preserves the
+    // focused `/cases/[id]` view (no queue chrome, no record-list
+    // pane mounted) and below-xl widths where the workspace
+    // collapses the middle column.
     const onSelectRecord = vi.fn();
     render(
       <CaseDetailPanel

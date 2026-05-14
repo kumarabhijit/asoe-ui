@@ -265,6 +265,19 @@ Required gates on every PR:
     Pydantic `model_validator` on the same entity. See
     `tests/architectural/case_pivot_mock_wiring.test.ts`.
 
+  * **New deliverable that other files mount** (pane, surface,
+    section component, route file) requires a
+    deliverable-completeness lock that asserts the EXPECTED
+    STRUCTURE — behavioural tests can't catch "the feature was
+    supposed to ship but wasn't built". Add both a source-grep
+    lock (Pattern A) and a behavioural completeness e2e (Pattern B);
+    verify by removing the deliverable locally and confirming
+    both fail. Reference impls:
+    `tests/architectural/cases_workspace_render_guard.test.ts`
+    ("renders the three-pane workspace" assertion) +
+    `tests/browser/cases-workspace-three-pane.spec.ts`. See
+    `docs/test-strategy/README.md` Gap 7.
+
 ## Definition of Done
 
 A task is done only if:

@@ -204,6 +204,82 @@ Required for merge. The case-switch fix in PR #158 followed this —
 the architectural lock fails on the pre-fix commit; passes on the
 fix.
 
+### Gap 7 — Deliverable completeness: behavioural tests can't catch feature absence
+
+**Symptom:** The PO asked _"I can't find the 3-pane view; is this a
+real bug or because of absence of mock data?"_. The third pane
+**hadn't been built** — the records picker still lived inside
+`CaseDetailPanel`'s right pane after P3a shipped two-pane. Every
+behavioural test passed because the existing layout still worked
+correctly. The systemic gap was that no test asserted the
+**EXPECTED STRUCTURE** of the workspace; feature absence was
+invisible to the suite.
+
+This is a distinct failure mode from Gaps 1–6. The other gaps cover
+"the feature shipped but is wrong in some way". Gap 7 covers "the
+feature was supposed to ship but wasn't built at all" — and you
+can't catch that with assertions about behaviour, because the
+absent feature has no behaviour to assert.
+
+**Pattern A — source-level structural lock (the cheap canary):**
+For any deliverable that adds a new component / pane / surface
+mounted by another file, add a source-grep that asserts the
+mount + the import. Fails at vitest speed (~1s) if the structure
+regresses.
+
+```ts
+// tests/architectural/<surface>_structure.test.ts
+const src = readFileSync(PAGE_PATH, "utf-8");
+
+it("renders the three-pane workspace: queue + record-list + detail", () => {
+  expect(src).toMatch(/aria-label=["']Case queue["']/);
+  expect(src).toMatch(/<RecordListPane[\s>]/);
+  expect(src).toMatch(/aria-label=["']Case workspace["']/);
+  // Plus the CSS grid track template at the relevant breakpoint:
+  expect(src).toMatch(/xl:grid-cols-\[[^\]]+_[^\]]+_[^\]]+\]/);
+  // Plus the import (defends against `<RecordListPane>` JSX that
+  // would tsc-error if the import vanished — the import lock is
+  // faster + more explicit at the structure level).
+  expect(src).toMatch(/import\s+\{\s*RecordListPane\s*\}/);
+});
+```
+
+**Pattern B — behavioural completeness e2e (the visible-to-CSR check):**
+A browser spec that drives the real DOM at the right breakpoint and
+asserts every expected wrapper mounts + the selection cascade
+reaches the deepest pane.
+
+```ts
+// tests/browser/<surface>-structure.spec.ts
+test.use({ viewport: { width: 1400, height: 900 } });
+
+test("three-pane workspace mounts at xl", async ({ page }) => {
+  await loginAs(page, USERS.MANAGER);
+  await page.goto("/cases");
+  await page.locator("[role=option]").first().click();
+  await expect(page.locator("[aria-label='Case queue']")).toBeVisible();
+  await expect(page.locator("[aria-label='Attached records']")).toBeVisible();
+  await expect(page.locator("[aria-label='Case workspace']")).toBeVisible();
+});
+```
+
+**Verify the lock by removing the deliverable.** Just like the
+per-bug regression rule (Gap 6): `git stash; git checkout HEAD~1
+-- <file>; vitest <new-test>` must fail. This proves the lock
+actually catches the absence, not just the presence.
+
+**When to apply:** New deliverable lands that other files mount
+(e.g. a new pane, a new section, a new route, a new contract
+endpoint). The "did this thing exist?" question MUST have a test
+answer; otherwise its absence is silent.
+
+Reference impls (ADR-041 P3d-remaining shipped 2026-05-14):
+
+* `tests/architectural/cases_workspace_render_guard.test.ts` — the
+  "renders the three-pane workspace" lock (Pattern A).
+* `tests/browser/cases-workspace-three-pane.spec.ts` — the
+  behavioural completeness e2e (Pattern B).
+
 ## Standing gates (today's enforcement)
 
 | Gate | Where | Catches |
@@ -241,4 +317,7 @@ or it won't run on PR.
 | Operator-journey browser e2e | `tests/browser/cases-workspace-case-switch.spec.ts` |
 | Single-action browser e2e | `tests/browser/escalate.spec.ts` |
 | Component contract test | `tests/components/CaseDetailPanel.test.tsx` |
+| Lifted-pane contract test | `tests/components/RecordListPane.test.tsx` |
+| Deliverable-completeness — source lock (Gap 7 Pattern A) | `tests/architectural/cases_workspace_render_guard.test.ts` ("renders the three-pane workspace" assertion) |
+| Deliverable-completeness — behavioural e2e (Gap 7 Pattern B) | `tests/browser/cases-workspace-three-pane.spec.ts` |
 | Hook unit test | `tests/hooks/useCases.test.ts` |
