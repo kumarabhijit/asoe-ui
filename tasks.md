@@ -1047,3 +1047,226 @@ plan and `asoe2/tasks.md` Phase 27 for the backend-side tracking.
 - [ ] Compliance ratification of ADR-038 §7.4 (compaction)
       and §8.5 (governance) — pending workshop.
 
+## PHASE 15 — ADR-041: case-centric workspace consolidation + test-strategy gates
+
+ADR-041 expanded the case-pivot ADR-038/S15a started, retired the
+duplicate `/exceptions` queue surface in favour of a single
+`/cases` workspace, surfaced the EMAIL_ENTRY / BLOCK case-type
+axis the PO requested, and closed the test-strategy gaps the
+post-mortem of the case-switch race surfaced. Shipped across 10
+merged PRs (asoe2 #152, #153, #154, #155; asoe-ui #153, #154,
+#155, #156, #157, #158, #159, #160).
+
+### 15.1 P1 — case_type / email_classification / sap_block_code
+- [x] **`OrderCase.case_type`** (`Literal["EMAIL_ENTRY", "BLOCK"]`)
+      added in `asoe2/contracts/models.py`. Defaults from
+      `source` via `infer_case_type()` (mode="before" validator)
+      so all ~30 existing fixtures keep working unmodified.
+- [x] **`OrderCase.email_classification`**
+      (`Literal["NEW_ORDER", "ORDER_CHANGE", "INQUIRY",
+      "COMPLAINT", "OTHER"]`) — required when
+      `case_type == "EMAIL_ENTRY"`, forced None when BLOCK.
+      Pydantic `model_validator` enforces.
+- [x] **`ExceptionRecord.sap_block_code`** — raw SAP block
+      reason code on BLOCK-parented records (1:N — one SAP order
+      can carry multiple simultaneous codes). Distinct from
+      `intent` (the classified business vocabulary).
+- [x] **UI types mirrored** — `CaseType`, `EmailClassification`
+      on `src/types/cases.ts`; `sap_block_code?` on
+      `ExceptionSummary` in `src/types/exceptions.ts`. Mock-data
+      `caseFromMockException` sets `case_type` from `event_type`.
+- [x] **Architectural locks** — 15 new pytest invariants
+      (`tests/test_case_type_invariants.py`) plus the UI mock
+      `case_pivot_mock_wiring.test.ts` gained a 6th case_type
+      invariant.
+
+### 15.2 P2 — retire `/exceptions` queue surface
+- [x] **NavBar tab removed** (`src/config/nav-tabs.ts` +
+      `src/components/ui/ChromeBoundary.tsx`). Legacy
+      `visible_tabs: "exceptions"` from asoe2 quietly no-ops
+      because the tab is no longer in the array — Guardrail #1
+      preserved.
+- [x] **`next.config.mjs` redirect** — `/exceptions` and
+      `/exceptions/:path*` → `/cases` (permanent: true post-P4).
+- [x] **`ExceptionListPane.tsx`** deleted (architect-confirmed
+      dead code).
+
+### 15.3 P3a — two-pane workspace at `/cases`
+- [x] **`/cases/page.tsx` rewritten** as a `Suspense`-wrapped
+      master-detail layout. Queue on the left (~360px), case
+      detail on the right (flex). CSS grid `lg:grid-cols-[360px_minmax(0,1fr)]`
+      stacks vertically below 1024px.
+- [x] **URL-driven** — `?case=<caseId>&record=<recordId>`
+      reads via `useSearchParams`; click handlers update via
+      `router.replace` so back/forward + reload preserve the
+      selection.
+- [x] **Queue rows** — `role="option"` inside `role="listbox"`
+      with `aria-selected` on the active row. Selected row
+      gets `bg-surface-row-active`.
+- [x] **`/cases/[id]` survives** as a focused single-case view
+      for notification deep-links (no queue chrome). Two
+      surfaces, two intents.
+
+### 15.4 P3b — WS silent live refresh restored
+- [x] **Switched from direct `casesApi.list()` to `useCases()`** —
+      cursor-walking hook with silent-refetch contract.
+- [x] **`useWebSocket` wired** —
+      `onEvent: isCaseInvalidationEvent → refetch`,
+      `onReconnect: refetch`, `onPollFallback: refetch`.
+      Restores the WS-driven live refresh that lived on the
+      deleted `/exceptions/page.tsx`.
+- [x] **Status filter applied client-side** via `useMemo`
+      (the hook doesn't take a status param; filtering on the
+      workspace is cheap enough to do post-fetch).
+
+### 15.5 P3c — keyboard nav + case-switch race fix
+- [x] **`useKeyboardListNav` wired** to the queue —
+      `↓`/`j` next, `↑`/`k` prev, `Home`/`End` first/last.
+      Hook gates on typing-in-input and Cmd/Ctrl combos so
+      OS hotkeys aren't swallowed.
+- [x] **`data-keyboard-nav-id` + `tabIndex={0}`** on the
+      listbox so the hook's `scrollIntoView` lookup works and
+      `:focus-visible` follows selection.
+- [x] **Case-switch race fix** — clear `orderCase` / `records` /
+      `policyHits` eagerly at the top of the
+      `[selectedCaseId]` fetch effect, AND a JSX render guard
+      `orderCase.case_id === selectedCaseId` so
+      `CaseDetailPanel` never mounts with stale prior-case
+      data. Two layers of defense against the
+      "many cases don't show detailed view" bug.
+- [x] **Architectural lock + browser e2e** —
+      `cases_workspace_render_guard.test.ts` greps the source
+      for the state-clear ordering and the render guard;
+      `cases-workspace-case-switch.spec.ts` drives two queue
+      clicks in sequence and verifies the URL's `?record=`
+      always belongs to the URL's `?case=`. Both fail on the
+      pre-fix commit; pass post-fix.
+
+### 15.6 P3d slice — pin-selection guard
+- [x] **Selected case stays visible** when the active filter
+      excludes it (e.g., status flipped to RESOLVED via WS-
+      driven refetch). `cases` useMemo prepends the pinned row
+      with `isPinned: true`; the row gets a `Pinned` badge and
+      a `data-pinned` attribute.
+- [x] **Architectural lock** — third invariant in
+      `cases_workspace_render_guard.test.ts` asserts the memo
+      depends on `selectedCaseId` AND produces an
+      `isPinned: true` row. Verified failure on pre-fix.
+
+### 15.7 P3d — remaining (deferred)
+- [ ] **Lift the record picker** out of `CaseDetailPanel` into
+      a third column (true three-pane: case-list |
+      record-list | record-detail).
+- [ ] **Responsive collapse rules** below 1280px (right pane
+      overlays middle) and below 1024px (middle becomes a
+      popover/sheet).
+- [ ] **Restore page-level `case_invalidation_silent_refresh` +
+      `ws_polling_fallback` test locks** — currently
+      tombstones pointing at the retired `/exceptions/page.tsx`.
+      Want re-pointing at `/cases/page.tsx`'s WS wiring now
+      that it's restored.
+
+### 15.8 P4 — cleanup sprint
+- [x] **Deleted `/exceptions/page.tsx`, `error.tsx`,
+      `loading.tsx`, `CaseListPane.tsx`, `SavedViewsMenu.tsx`,
+      `searchParser.ts`** — orphaned by P2's redirect.
+- [x] **Deleted tests** for the retired components
+      (`tests/accessibility/case_list_pane.test.tsx`,
+      `tests/components/searchParser.test.ts`).
+- [x] **Refactored 5 architectural locks** that pointed at
+      the deleted page — re-pointed at `/cases/page.tsx`
+      where the contract carries over, tombstoned with notes
+      where it doesn't.
+- [x] **Net deletion** ~2600 lines. `next.config.mjs` redirect
+      flipped to `permanent: true`.
+
+### 15.9 P5 — extract bulk mock fixtures from `api.ts`
+- [x] **`src/lib/mock-data/order-analyses.ts`** (1364 lines).
+- [x] **`src/lib/mock-data/exceptions.ts`** (240 lines) — the
+      S15a `parent_case_id` forEach wiring lives in the new
+      file's module scope so consumers see the wired form.
+- [x] **`src/lib/mock-data/cases.ts`** (114 lines) —
+      `caseFromMockException` + `MOCK_CASES` derived from
+      `MOCK_EXCEPTIONS`.
+- [x] **`src/lib/mock-data/line-items.ts`** (103 lines).
+- [x] **`src/lib/api.ts`: 3894 → 2146 lines (45% reduction).**
+      Zero consumers needed updating — every `MOCK_*`
+      identifier is referenced from within api.ts only.
+
+### 15.10 P5 — follow-on (deferred)
+- [ ] Extract the **`MOCK_TRACE_*` dispatcher** (~600 lines —
+      `MOCK_TRACE_BASE_TIME`, four canonical verdict-coverage
+      builders, `MOCK_TRACE_ENRICHMENT`, default dispatcher)
+      into `src/lib/mock-data/traces.ts`. Intricate enough
+      that clean extraction wants its own focused PR.
+
+### 15.11 P6 — Azure deploy automation (asoe2)
+- [x] **`.github/workflows/deploy-azure.yml`** wraps the
+      existing `scripts/deploy-azure.sh`. Triggers on push to
+      `main` after `pytest tests/` passes for the same SHA
+      (via `lewagon/wait-on-check-action`).
+- [x] **OIDC federated identity** (`azure/login@v2`) — no
+      long-lived `AZURE_CREDENTIALS` JSON; rotation is
+      automatic.
+- [x] **Health-check + automatic rollback** — polls
+      `/api/v1/health` for 60s; on failure runs
+      `az containerapp revision deactivate` so ACA resumes
+      routing to the prior revision.
+- [x] **`workflow_dispatch`** for manual re-runs of a specific
+      SHA + optional `deploy_ui` flag.
+- [x] **`docs/deploy-azure-container-apps.md`** gained a new
+      section listing the 6 required secrets (`AZURE_*` OIDC
+      triple + `PG_ADMIN_PASSWORD` + `ANTHROPIC_API_KEY` +
+      `ASOE_JWT_SECRET`) and 4 variables (`AZURE_RESOURCE_GROUP`
+      / `_LOCATION` / `_ACR_NAME` / `_APP_NAME`).
+- [x] **asoe-ui stays on Vercel** — DevOps panel reviewed; two-
+      cloud is intentional. Vercel's preview-per-PR is
+      genuinely better than ASA for this surface.
+
+### 15.12 Test-strategy gap closure
+After the case-switch race shipped, the PO asked how we'd ensure
+this class of bug gets caught going forward. The post-mortem
+identified six systemic gaps; the closure landed in this phase.
+- [x] **`docs/test-strategy/README.md`** (asoe-ui) — the 6-layer
+      test pyramid, the 6 gap categories with copy-paste
+      templates anchored to reference impls, mandatory new-test
+      checklist, reference-impls table.
+- [x] **`docs/test-strategy/README.md`** (asoe2) — backend
+      companion: 6-layer pyramid for the Python side, three
+      required gates (per-bug regression test, `model_validator`
+      invariant unit tests, deterministic recipe test path),
+      gap-closure patterns + reference impls.
+- [x] **CLAUDE.md gates** in both repos — bug-fix PRs MUST
+      include a regression test that fails on the parent commit
+      (with verify-failure procedure); state-machine surfaces
+      require both a source-level architectural lock AND a
+      multi-step operator-journey browser e2e; mock-data layer
+      changes require a matching architectural lock mirroring
+      backend Pydantic validators.
+
+### 15.13 Cross-cutting wins (during the marathon, not numbered phases)
+- [x] **PR #152** (asoe2) — `GET /api/v1/cases/{id}` visibility
+      aligned with `GET /api/v1/exceptions/{id}`: tenant-only
+      on the detail path (no `_scope_to_user` filter). Closes
+      the asymmetry where an analyst could read a child
+      exception but got 404 on the parent case. Paired with
+      `should_materialise() -> True` so every record has a
+      parent case.
+- [x] **PR #153 invariant test** (asoe2) —
+      `tests/test_routes_cases.py::TestDetailVisibilityInvariant`
+      locks `visible(exception) → visible(parent_case)` across
+      analyst / manager / viewer / assigned-analyst / partner.
+- [x] **PR #154 slim case-context strip** (asoe-ui) — when an
+      inline record ribbon is mounted in `CaseDetailPanel`, the
+      case header collapses into a slim context strip
+      (case_id · channel · SLA · PO · status · `Case details`
+      disclosure) so the record's HITL ribbon becomes the
+      primary visual weight.
+- [x] **PR #155 mock-data wiring** (asoe-ui) — closed the
+      "many cases don't show detailed view" precursor: every
+      `MOCK_EXCEPTIONS` entry gets `parent_case_id` and
+      `MOCK_CASES` is derived from `MOCK_EXCEPTIONS.map(...)`
+      so `casesApi.getRecords(case_id)` returns a populated
+      list. `tests/architectural/case_pivot_mock_wiring.test.ts`
+      locks the invariants.
+

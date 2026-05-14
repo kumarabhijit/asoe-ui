@@ -11,7 +11,7 @@ The UI is a **control tower where the system is the primary actor**. Agents clas
 ```bash
 npm install
 npm run dev
-# Navigate to http://localhost:3000/exceptions
+# Navigate to http://localhost:3000/cases
 # Login: jane@acme.com / password
 ```
 
@@ -37,7 +37,7 @@ The mock API (`src/lib/api.ts`) is seeded so you can exercise every governance f
 - **Four-eyes cosign:** exception IDs `exc-001` and `exc-010` are seeded in `MOCK_FINANCIAL_IMPACT_USD` above the cosign threshold ($25K and $42.5K respectively). Sign in as one manager, click `Override…` and submit an override — the record transitions to `PENDING_COSIGN` and the cosign banner appears. Sign in as a **different** manager/admin (via the `UserSwitcher` in the nav) to see `[Approve cosign]` / `[Reject cosign]`. The initiator sees a read-only "Awaiting cosign" message (segregation of duties).
 - **Escalate:** available to analyst+ via the `exceptions:escalate` permission; wired to `exceptionsApi.escalate()`.
 - **Re-analyze:** YELLOW / RED / FAILED records show a `Re-analyze` button (manager+). Mandatory reason. Capped at 3 attempts.
-- **Case-centric primary surface:** the V5.1 reshape (Phase 28.5) projects `/inbox` and `/exceptions` from `casesApi.list()` rather than the legacy `exceptionsApi.list`. `/exceptions` mounts the V5.1.1 `CaseListPane` (cluster filter chips Live / Waiting / Terminal, intent multi-select, source filter, URL-synced search, sort toggle, keyboard nav with `role="listbox"`/`role="option"` rows). `/cases/{id}` carries the attached-records stack + aggregated L1/L2 PolicyHitBadge section (Phase 28.5.x §28.5 attached-record loader).
+- **Case-centric workspace at `/cases` (ADR-041, 2026-05-13):** two-pane operator workspace — queue on the left (SLA-sorted, filter chips, j/k keyboard nav, pin-selection guard), case detail on the right with the inline HITL action ribbon. URL-driven via `?case=<caseId>&record=<recordId>` so back/forward + reload preserve cursor position. `/exceptions` is permanently redirected to `/cases`. `/cases/{id}` is the focused single-case deep-link target (no queue chrome).
 
 Every mutating call sends a client-generated `Idempotency-Key` (UUID v4) so repeated clicks are safe.
 
@@ -51,7 +51,7 @@ Every mutating call sends a client-generated `Idempotency-Key` (UUID v4) so repe
 | Styling | Tailwind CSS + CSS custom properties (`design-tokens.css`) + CVA (class-variance-authority) |
 | Components | Shadcn/ui (Select, DropdownMenu, Dialog) + 15 custom agent-first components |
 | Dark Mode | System-default via `next-themes` (`prefers-color-scheme`) |
-| Layout | react-resizable-panels (three-pane Outlook master-detail) |
+| Layout | CSS grid two-pane workspace at `/cases` (queue + inline detail) |
 | Icons | Lucide React (16/20/24px — never emoji) |
 | Auth | NextAuth.js → FastAPI auth endpoints (`asoe2`) |
 | Validation | Zod |
@@ -67,17 +67,18 @@ asoe-ui/
 │   ├── app/                      # Pages (Next.js App Router)
 │   │   ├── layout.tsx            # Root layout (skip-to-main, Providers wrapper)
 │   │   ├── providers.tsx         # Client-side providers (SessionProvider + ToastProvider)
-│   │   ├── exceptions/           # Exception Queue (three-pane Outlook) + 13 decomposed detail sub-components
-│   │   ├── cases/                # Case-centric primary surface (ADR-038 Phase H.6 primitive — mock-mode only until asoe2 /api/v1/cases/* lands)
+│   │   ├── home/                 # Operational landing surface
+│   │   ├── cases/                # Canonical case workspace (ADR-041 P3) — two-pane, URL-driven `?case=&record=`, inline `CaseDetailPanel` + `ExceptionDetailPanel`
+│   │   ├── exceptions/           # `/exceptions` route retired (ADR-041 P4 redirect to `/cases`); directory survives only because the per-record enrichment sections + `ExceptionDetailPanel` live here
 │   │   ├── dashboard/            # Analytics dashboard + recent activity feed
-│   │   ├── inbox/                # Customer Inbox (AI email triage, two-pane)
+│   │   ├── inbox/                # Customer Inbox redirect to `/cases?source=manual_order`
 │   │   ├── settings/             # Settings page (Phase 9 stub — admin, SSO, agent config)
 │   │   ├── login/                # Multi-step login (email → password → SSO)
 │   │   └── auth/callback/        # SSO callback handler
-│   ├── components/ui/            # 15 reusable components (Section 11.2)
-│   ├── hooks/                    # useAuth, useHealth, useWebSocket
-│   ├── lib/                      # API client, auth config, RBAC
-│   ├── types/                    # TypeScript types (mirrors asoe2 + UI display types)
+│   ├── components/ui/            # ~20 reusable components (Section 11.2)
+│   ├── hooks/                    # useAuth, useHealth, useWebSocket, useKeyboardListNav, useCases, useSlaTicker
+│   ├── lib/                      # API client (handler surface) + `lib/mock-data/` (extracted fixtures — ADR-041 P5), auth config, RBAC
+│   ├── types/                    # TypeScript types (mirrors asoe2 + UI display types — incl. ADR-041 `CaseType` / `EmailClassification` / `sap_block_code`)
 │   └── styles/                   # design-tokens.css (45+ CSS custom properties)
 ├── docs/
 │   └── AUDITOR_GUIDE.md          # Frontend compliance controls (SOX/SOC2)
@@ -107,7 +108,8 @@ asoe-ui/
 | `DESIGN.md` | Engineers | Code-to-architecture map (components, pages, types, API client) |
 | `ui_architecture.md` | Engineers / Architects | UI architecture extraction — alignment, drift register, proposed backend changes |
 | `docs/AUDITOR_GUIDE.md` | Auditors | 10 frontend compliance controls (RBAC, session, trace, tenancy) |
-| `tasks.md` | Team | Phase-based progress (Phases 0-8.10 complete, 9-11 pending) |
+| `tasks.md` | Team | Phase-based progress (Phases 0-8.13, 12-15 complete; 9-11 pending) |
+| `docs/test-strategy/README.md` | Engineers | Test pyramid + gap-closure patterns (ADR-041 codification of the test-strategy gates added to CLAUDE.md) |
 | `consol_arch.md` | All | Platform architecture — Section 11 is a stub pointer to `ui_architecture.md` |
 
 ---
