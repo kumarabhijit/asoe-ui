@@ -141,6 +141,39 @@ describe("/cases workspace — case-switch race invariants", () => {
     ).toMatch(/import\s+\{\s*RecordListPane\s*\}\s+from\s+["']\.\/RecordListPane["']/);
   });
 
+  it("inline records picker is reachable on multi-record cases below the xl breakpoint", () => {
+    // The workspace's outer middle pane (RecordListPane as a
+    // dedicated column) is wrapped in `hidden xl:block` so it only
+    // appears at >=1280px. Below xl, the operator's only path to
+    // the records picker is the inline RecordListPane inside
+    // CaseDetailPanel.
+    //
+    // Pre-fix the workspace passed `showInlineRecordList={false}`
+    // unconditionally, which suppressed the inline picker at every
+    // viewport. Result: on a 1024-1279px screen (the most common
+    // laptop width), a deep-link to `/cases?case=case-multi-XYZ`
+    // showed only two panes (queue + case header) with no way to
+    // pick a record. The Agent Recommendation card stayed hidden
+    // unless the operator already knew the record id and typed it
+    // into `?record=` by hand. P3e gap documented in the
+    // CaseDetailPanel jsdoc.
+    //
+    // Lock the fix shape: the workspace mounts CaseDetailPanel with
+    // `showInlineRecordList={true}` AND `inlineRecordListHiddenAtXl={true}`
+    // so the inline picker shows below xl and CaseDetailPanel hides
+    // it at xl+ (avoiding double-render with the outer middle pane).
+    expect(
+      src,
+      "workspace must enable the inline records picker so it's " +
+        "reachable below the xl breakpoint (closes P3e gap)",
+    ).toMatch(/showInlineRecordList=\{true\}/);
+    expect(
+      src,
+      "workspace must hide the inline picker AT xl+ to avoid " +
+        "double-rendering with the outer RecordListPane column",
+    ).toMatch(/inlineRecordListHiddenAtXl=\{true\}/);
+  });
+
   it("pins the selected case in the visible queue across filter mismatches", () => {
     // The UX architect flagged "agent mutates the selected record's
     // status while the operator is on it" as a real incident. When

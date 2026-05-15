@@ -620,10 +620,19 @@ function CasesWorkspace() {
             selectedRecordId={selectedRecordId}
             onSelectRecord={handleSelectRecord}
             // The workspace mounts `RecordListPane` as its own
-            // middle column at xl; suppress the inline picker to
-            // avoid double-rendering (and a `data-testid` collision
-            // that would flake Playwright strict-mode locators).
-            showInlineRecordList={false}
+            // middle column AT xl; below xl that middle column is
+            // collapsed (`hidden xl:block`) and the operator has no
+            // way to pick a record on a multi-record case. Keep the
+            // inline picker enabled and let CaseDetailPanel hide it
+            // at xl+ via the responsive utility. Both RecordListPane
+            // instances stay in the DOM at every viewport — only one
+            // is display-visible per breakpoint (`hidden xl:block`
+            // vs `xl:hidden`). Tests selecting the picker by
+            // `aria-label` / `data-testid` must scope to `:visible`
+            // (Playwright strict mode counts DOM nodes, not
+            // visibility). Closes the P3e gap.
+            showInlineRecordList={true}
+            inlineRecordListHiddenAtXl={true}
           />
         )}
       </section>
