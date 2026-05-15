@@ -113,6 +113,15 @@ export interface CaseDetailPanelProps {
    * not in scope here).
    */
   showInlineRecordList?: boolean;
+  /** When `true`, the inline picker is hidden AT and above the
+   *  workspace's `xl` breakpoint (1280px) and visible below it.
+   *  The `/cases` workspace passes `true` because its outer middle
+   *  column takes over at xl+; below xl, the outer column is
+   *  collapsed (`hidden xl:block`) and the inline picker is the
+   *  only way the operator can choose a record. Closes the P3e
+   *  gap. Default `false` so standalone consumers (focused
+   *  `/cases/[id]`) keep showing the picker at every viewport. */
+  inlineRecordListHiddenAtXl?: boolean;
 }
 
 export function CaseDetailPanel({
@@ -122,6 +131,7 @@ export function CaseDetailPanel({
   selectedRecordId,
   onSelectRecord,
   showInlineRecordList = true,
+  inlineRecordListHiddenAtXl = false,
 }: CaseDetailPanelProps) {
   // PO #20 (issue #133): tick the SLA snapshot once a minute so the
   // header countdown stays live without a refetch.
@@ -345,12 +355,14 @@ export function CaseDetailPanel({
           `RecordListPane` as a dedicated middle column at xl
           (1280px+). */}
       {showInlineRecordList && hasAttachedRecords && (
-        <RecordListPane
-          caseId={orderCase.case_id}
-          records={records}
-          selectedRecordId={selectedRecordId}
-          onSelectRecord={onSelectRecord}
-        />
+        <div className={inlineRecordListHiddenAtXl ? "xl:hidden" : undefined}>
+          <RecordListPane
+            caseId={orderCase.case_id}
+            records={records}
+            selectedRecordId={selectedRecordId}
+            onSelectRecord={onSelectRecord}
+          />
+        </div>
       )}
 
       {/* Selected-record HITL surface — mounts the full ExceptionDetailPanel
