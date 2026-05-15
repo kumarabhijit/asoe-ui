@@ -543,17 +543,40 @@ function _node(
   };
 }
 
+/* ── Per-record overrides for the verdict-template trace helpers.
+   The shared helpers below hardcode example values for fields the
+   trace surface should reflect from the actual record (order_id,
+   intent, skill_name, classifier confidence). Without these
+   overrides, every YELLOW record's pipeline timeline reports
+   confidence=0.86 regardless of what the AgentReasoningCard renders
+   from `OrderAnalysis.confidence` — a Verdict 2026-04-22 partial-
+   truth violation. `_defaultExecutedNodes` derives these from the
+   ExceptionSummary + MOCK_ORDER_ANALYSES; the hand-crafted
+   MOCK_TRACE_ENRICHMENT call sites pass them via `_overridesFromId`. */
+interface _TraceOverrides {
+  orderId?: string;
+  intent?: string;
+  skillName?: string;
+  /** 0-1 fraction. Maps to OrderAnalysis.confidence / 100. */
+  confidence?: number;
+}
+
 function _greenAutoResolvedTrace(
   recipeName: string,
+  overrides: _TraceOverrides = {},
 ): import("@/types/api").ExecutedNode[] {
+  const orderId = overrides.orderId ?? "SO-1042";
+  const intent = overrides.intent ?? "CONTRACTUAL_CORRECTION";
+  const skillName = overrides.skillName ?? "pricing-discrepancy";
+  const confidence = overrides.confidence ?? 0.91;
   return [
-    _node("ingest", 0, 4, { decision: { order_id: "SO-1042" } }),
+    _node("ingest", 0, 4, { decision: { order_id: orderId } }),
     _node("classify", 4, 38, {
-      decision: { intent: "CONTRACTUAL_CORRECTION", confidence: 0.91 },
+      decision: { intent, confidence },
       exit_verdict: "ok",
     }),
     _node("load_skill", 42, 6, {
-      decision: { skill_name: "pricing-discrepancy" },
+      decision: { skill_name: skillName },
     }),
     _node("validate_circuit_breaker", 48, 2, {
       decision: { update_count: 1, batch_total_variance: 110 },
@@ -606,15 +629,20 @@ function _greenAutoResolvedTrace(
 
 function _yellowHitlTrace(
   recipeName: string,
+  overrides: _TraceOverrides = {},
 ): import("@/types/api").ExecutedNode[] {
+  const orderId = overrides.orderId ?? "SO-1042";
+  const intent = overrides.intent ?? "CONTRACTUAL_CORRECTION";
+  const skillName = overrides.skillName ?? "pricing-discrepancy";
+  const confidence = overrides.confidence ?? 0.86;
   return [
-    _node("ingest", 0, 4, { decision: { order_id: "SO-1042" } }),
+    _node("ingest", 0, 4, { decision: { order_id: orderId } }),
     _node("classify", 4, 36, {
-      decision: { intent: "CONTRACTUAL_CORRECTION", confidence: 0.86 },
+      decision: { intent, confidence },
       exit_verdict: "ok",
     }),
     _node("load_skill", 40, 6, {
-      decision: { skill_name: "pricing-discrepancy" },
+      decision: { skill_name: skillName },
     }),
     _node("validate_circuit_breaker", 46, 2, {
       decision: { update_count: 1, batch_total_variance: 1100 },
@@ -656,15 +684,20 @@ function _yellowHitlTrace(
 
 function _redBlockedTrace(
   recipeName: string,
+  overrides: _TraceOverrides = {},
 ): import("@/types/api").ExecutedNode[] {
+  const orderId = overrides.orderId ?? "PO-EDM-SKU-001";
+  const intent = overrides.intent ?? "EDI_MISMATCH";
+  const skillName = overrides.skillName ?? "edi-mismatch";
+  const confidence = overrides.confidence ?? 0.94;
   return [
-    _node("ingest", 0, 4, { decision: { order_id: "PO-EDM-SKU-001" } }),
+    _node("ingest", 0, 4, { decision: { order_id: orderId } }),
     _node("classify", 4, 31, {
-      decision: { intent: "EDI_MISMATCH", confidence: 0.94 },
+      decision: { intent, confidence },
       exit_verdict: "ok",
     }),
     _node("load_skill", 35, 5, {
-      decision: { skill_name: "edi-mismatch" },
+      decision: { skill_name: skillName },
     }),
     _node("validate_circuit_breaker", 40, 2, {
       decision: { update_count: 1, batch_total_variance: 0 },
@@ -904,6 +937,24 @@ function _defaultExecutedNodes(
   exc: ExceptionSummary,
 ): import("@/types/api").ExecutedNode[] {
   const recipe = exc.selected_recipe ?? "GenericRecipe.py";
+  // Per-record overrides for the verdict-template traces. The
+  // classifier confidence is sourced from the matching
+  // OrderAnalysis fixture (0-100) and normalised to 0-1 so it
+  // matches what AgentReasoningCard renders from
+  // `analysis.confidence`. Without this, every YELLOW record's
+  // pipeline timeline reports confidence=0.86 regardless of the
+  // recommendation card — a Verdict 2026-04-22 partial-truth
+  // violation.
+  const analysis = MOCK_ORDER_ANALYSES[exc.id];
+  const overrides: _TraceOverrides = {
+    orderId: exc.order_id,
+    intent: exc.intent,
+    skillName: exc.intent?.toLowerCase().replace(/_/g, "-"),
+    confidence:
+      typeof analysis?.confidence === "number"
+        ? analysis.confidence / 100
+        : undefined,
+  };
 
   // FAILED records: the lifecycle reflects the canonical halt cases
   // already covered by the explicit Phase A.0 traces. Default to the
@@ -916,7 +967,7 @@ function _defaultExecutedNodes(
 
   // RED-shadowed records halt at shadow_audit with the RED verdict.
   if (exc.shadow_verdict === "RED" || exc.final_status === "BLOCKED") {
-    return _redBlockedTrace(recipe);
+    return _redBlockedTrace(recipe, overrides);
   }
 
   // YELLOW-shadowed records halt at shadow_audit with the YELLOW
@@ -927,7 +978,7 @@ function _defaultExecutedNodes(
     || exc.final_status === "MANUAL_REVIEW_REQUIRED"
     || exc.final_status === "REJECTED"
   ) {
-    return _yellowHitlTrace(recipe);
+    return _yellowHitlTrace(recipe, overrides);
   }
 
   // GREEN auto-resolved (COMPLETE, RESOLVED, CLOSED).
@@ -937,7 +988,7 @@ function _defaultExecutedNodes(
     || exc.lifecycle_state === "RESOLVED"
     || exc.lifecycle_state === "CLOSED"
   ) {
-    return _greenAutoResolvedTrace(recipe);
+    return _greenAutoResolvedTrace(recipe, overrides);
   }
 
   // INGESTED / CLASSIFYING / AUDITING — the run hasn't reached a
@@ -993,7 +1044,27 @@ function _defaultExecutedNodes(
   // Fallback: return the green path. Better to show *something* than
   // a banner; the banner is reserved for backends that legitimately
   // didn't write executed_nodes (live-mode pre-Phase-B records).
-  return _greenAutoResolvedTrace(recipe);
+  return _greenAutoResolvedTrace(recipe, overrides);
+}
+
+/** Look up `_TraceOverrides` for an exception id from the MOCK_*
+ *  fixtures. Used by the hand-crafted MOCK_TRACE_ENRICHMENT entries
+ *  below so they inherit the same per-record overrides
+ *  `_defaultExecutedNodes` applies — keeping the AgentReasoningCard
+ *  (analysis.confidence) and the Pipeline timeline (trace.classify.
+ *  decision.confidence) in lock-step for the same decision. */
+function _overridesFromId(id: string): _TraceOverrides {
+  const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
+  const analysis = MOCK_ORDER_ANALYSES[id];
+  return {
+    orderId: exc?.order_id,
+    intent: exc?.intent,
+    skillName: exc?.intent?.toLowerCase().replace(/_/g, "-"),
+    confidence:
+      typeof analysis?.confidence === "number"
+        ? analysis.confidence / 100
+        : undefined,
+  };
 }
 
 const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
@@ -1012,7 +1083,7 @@ const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
     ],
     customer_email_draft:
       "Hi [Buyer name],\n\nThank you for PO 4500020017. We noticed that two line items were priced against our Q4 promotional rate (Q4-WMT-021), which expired 12/31. We've adjusted those lines to your current contract rate (PR00) — an 11% difference from the PO price.\n\nNo action is needed on your side; this correction is within your contract's published auto-adjust band. Confirmation will follow shortly.\n\nBest,\n[CSR name]",
-    executed_nodes: _yellowHitlTrace("PriceAdjustmentRecipe.py"),
+    executed_nodes: _yellowHitlTrace("PriceAdjustmentRecipe.py", _overridesFromId("exc-002")),
   },
   "exc-013": {
     narrative:
@@ -1029,20 +1100,20 @@ const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
     ],
     customer_email_draft:
       "Hi [Buyer name],\n\nWe received PO [PO#] for 40 cases of SKU-7800 (Organic Kombucha 6pk). The contracted minimum is 50 cases, which would also unlock your next volume-tier rate.\n\nWith your approval, we'll round the order up to 50 cases at the better unit price. Total net change: +$285 at a ~4% lower $/case. Alternately, we can hold and wait for a revised PO — please confirm.\n\nBest,\n[CSR name]",
-    executed_nodes: _yellowHitlTrace("MOQRoundUpRecipe.py"),
+    executed_nodes: _yellowHitlTrace("MOQRoundUpRecipe.py", _overridesFromId("exc-013")),
   },
   // GREEN autonomous-resolved sample (Phase D acceptance trace #1)
   "exc-011": {
-    executed_nodes: _greenAutoResolvedTrace("BackOrderResolutionRecipe.py"),
+    executed_nodes: _greenAutoResolvedTrace("BackOrderResolutionRecipe.py", _overridesFromId("exc-011")),
   },
   // GREEN autonomous-resolved on the price-hold-release path (uses
   // the same trace shape; recipe label differs).
   "exc-017": {
-    executed_nodes: _greenAutoResolvedTrace("PriceHoldReleaseRecipe.py"),
+    executed_nodes: _greenAutoResolvedTrace("PriceHoldReleaseRecipe.py", _overridesFromId("exc-017")),
   },
   // RED BLOCKED sample (Phase D acceptance trace #3)
   "exc-019": {
-    executed_nodes: _redBlockedTrace("EdiMismatchRecipe.py"),
+    executed_nodes: _redBlockedTrace("EdiMismatchRecipe.py", _overridesFromId("exc-019")),
   },
   // FAILED at classify — cross-check disagreement halt (Phase D
   // acceptance trace #4 — the SMK-CB-001 canonical case).
@@ -1080,7 +1151,7 @@ const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
       "Confirm the intended ship-to with the buyer (Atlanta-North or Atlanta-South DC).",
       "Re-run validation with the resolved ship-to and approve.",
     ],
-    executed_nodes: _yellowHitlTrace("EmailOrderEntryRecipe.py"),
+    executed_nodes: _yellowHitlTrace("EmailOrderEntryRecipe.py", _overridesFromId("exc-026")),
   },
 };
 
