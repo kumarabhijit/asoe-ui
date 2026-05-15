@@ -79,17 +79,29 @@ test("three-pane workspace mounts at xl: case-queue | records | detail", async (
   await page.locator("[role=option]").first().click();
 
   // (a) Three pane wrappers all mounted.
+  //
+  // The records picker (RecordListPane) renders TWICE in the
+  // responsive DOM: as the dedicated middle column (visible at xl
+  // via `hidden xl:block`) and as the CaseDetailPanel inline
+  // fallback (P3e — `display:none` at xl via `xl:hidden`). Both
+  // carry `aria-label='Attached records'`, so an unscoped locator
+  // matches two elements and trips Playwright strict mode. Scope
+  // to `:visible` so the assertion targets the xl middle column —
+  // which is what "three-pane workspace mounts at xl" means.
   await expect(page.locator("[aria-label='Case queue']")).toBeVisible();
   await expect(
-    page.locator("[aria-label='Attached records']"),
+    page.locator("[aria-label='Attached records']:visible"),
     "middle records pane (lifted into RecordListPane) must mount " +
       "at xl ≥ 1280px",
   ).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("[aria-label='Case workspace']")).toBeVisible();
 
-  // (b) The records pane has at least one row.
+  // (b) The records pane has at least one row. Scoped to the
+  // visible picker for the same responsive-duplication reason.
   await expect(
-    page.locator("[aria-label='Attached records'] [role='radio']").first(),
+    page
+      .locator("[aria-label='Attached records']:visible [role='radio']")
+      .first(),
   ).toBeVisible();
 
   // (c) The right pane's inline ribbon mounted (auto-mount fired
