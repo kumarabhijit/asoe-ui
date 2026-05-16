@@ -174,6 +174,35 @@ describe("/cases workspace — case-switch race invariants", () => {
     ).toMatch(/inlineRecordListHiddenAtXl=\{true\}/);
   });
 
+  it("selection URL writes use scroll:false so the queue keeps its position", () => {
+    // Bug: clicking a queue row (or a record in the picker) jumped
+    // the viewport to the top of the document. Root cause — Next.js
+    // App Router scrolls to top on every `router.replace`/`push` by
+    // default. The `/cases` workspace is an in-place state machine:
+    // selection is a URL write, not a page navigation, so the
+    // viewport must stay put. On a long, SLA-sorted queue the
+    // scroll-to-top makes the operator lose the row they just
+    // clicked.
+    //
+    // Lock: every `router.replace(` in the page must pass
+    // `scroll: false`. Asserted by matching each call's options
+    // object. Fails on the parent commit where the calls had no
+    // second argument.
+    const replaceCalls = src.match(/router\.replace\([\s\S]*?\)\s*;/g) ?? [];
+    expect(
+      replaceCalls.length,
+      "expected at least the case-select + record-select " +
+        "router.replace calls",
+    ).toBeGreaterThanOrEqual(2);
+    for (const call of replaceCalls) {
+      expect(
+        call,
+        "router.replace without `scroll: false` — selection will " +
+          "yank the viewport to the top of the document:\n" + call,
+      ).toMatch(/scroll:\s*false/);
+    }
+  });
+
   it("pins the selected case in the visible queue across filter mismatches", () => {
     // The UX architect flagged "agent mutates the selected record's
     // status while the operator is on it" as a real incident. When
