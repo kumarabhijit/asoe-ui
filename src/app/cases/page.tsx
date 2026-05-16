@@ -323,12 +323,20 @@ function CasesWorkspace() {
   }, [selectedCaseId]);
 
   /* ── URL writes ─────────────────────────────────────────────── */
+  // `scroll: false` on every router.replace below — selection is an
+  // in-place workspace update, not a page navigation. Next.js App
+  // Router scrolls to the top of the document by default on every
+  // router.replace/push; without this flag, clicking a queue row (or
+  // a record in the picker) yanks the viewport to the top and the
+  // operator loses their place in a long, SLA-sorted list.
   const handleSelectCase = useCallback(
     (caseId: string) => {
       // Drop the `record` param when switching cases — the new case
       // has its own records; the auto-mount effect in CaseDetailPanel
       // will pick the right one.
-      router.replace(`/cases?case=${encodeURIComponent(caseId)}`);
+      router.replace(`/cases?case=${encodeURIComponent(caseId)}`, {
+        scroll: false,
+      });
     },
     [router],
   );
@@ -339,6 +347,7 @@ function CasesWorkspace() {
       router.replace(
         `/cases?case=${encodeURIComponent(selectedCaseId)}` +
           `&record=${encodeURIComponent(recordId)}`,
+        { scroll: false },
       );
     },
     [router, selectedCaseId],
