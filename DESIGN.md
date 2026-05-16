@@ -18,8 +18,9 @@ src/
 │   ├── auth/callback/page.tsx    # SSO callback handler
 │   ├── home/page.tsx             # Operational landing surface (post-#133)
 │   ├── cases/
-│   │   ├── page.tsx              # ADR-041 P3 — canonical case workspace. Two-pane: queue (left, 360px) + case detail (right, flex). URL-driven via ?case=<caseId>&record=<recordId>. SLA-sorted queue with filter chips, keyboard nav (j/k arrows, Home/End), pin-selection guard, WS-driven silent refresh via useCases().
-│   │   ├── CaseDetailPanel.tsx   # Right-pane content — slim context strip (when record mounted) or full case header (otherwise) + attached-records picker + inline ExceptionDetailPanel.
+│   │   ├── page.tsx              # ADR-041 P3 — canonical case workspace. Three-pane at xl (≥1280px): queue (left, 320px) + record-list (middle, 280px) + case detail (right, flex); two-pane at lg, single column below. URL-driven via ?case=<caseId>&record=<recordId> — both writes use router.replace with `scroll: false` so row selection keeps the queue scroll position. SLA-sorted queue with filter chips, keyboard nav (j/k arrows, Home/End), pin-selection guard, WS-driven silent refresh via useCases().
+│   │   ├── CaseDetailPanel.tsx   # Right-pane content — slim context strip (when record mounted) or full case header (otherwise) + inline attached-records picker + inline ExceptionDetailPanel. `inlineRecordListHiddenAtXl` prop: when true the inline picker is xl:hidden so it acts as the below-xl fallback for the middle column (P3e).
+│   │   ├── RecordListPane.tsx    # Middle-pane attached-records picker (role="radiogroup"). Rendered as the dedicated xl column by page.tsx and as the below-xl inline fallback by CaseDetailPanel.
 │   │   └── [id]/page.tsx         # Focused single-case view (deep-link target — no queue chrome). Mounts the same CaseDetailPanel.
 │   ├── exceptions/               # ADR-041 P4 — queue route retired. next.config.mjs redirects /exceptions and /exceptions/:path* → /cases (permanent: true). The directory survives only because the per-record enrichment sections + ExceptionDetailPanel live here; no `page.tsx` / `error.tsx` / `loading.tsx` route files remain.
 │   │   ├── ExceptionDetailPanel.tsx  # Orchestrator composing 13 layer sub-components; mounted inline by CaseDetailPanel
@@ -86,9 +87,9 @@ src/
 │   ├── auth.ts                   # NextAuth options (credentials provider, JWT callbacks)
 │   ├── cases.ts                  # STATUS_LABEL + CASE_STATUS_CLUSTERS + isAwaitingHuman / clusterFor / sourceChannelLabel / lastActivityLabel helpers
 │   ├── mock-data/                # ADR-041 P5 — bulk mock fixtures extracted from api.ts
-│   │   ├── order-analyses.ts     # MOCK_ORDER_ANALYSES (~1350 lines) — keyed by ExceptionSummary.id
-│   │   ├── exceptions.ts         # MOCK_EXCEPTIONS + the S15a parent_case_id forEach wiring in module scope
-│   │   ├── cases.ts              # caseFromMockException + MOCK_CASES (derived 1:1 from MOCK_EXCEPTIONS)
+│   │   ├── order-analyses.ts     # MOCK_ORDER_ANALYSES (~1750 lines) — keyed by ExceptionSummary.id
+│   │   ├── exceptions.ts         # MOCK_EXCEPTIONS + the S15a parent_case_id forEach wiring in module scope. Includes 3 multi-issue clusters (7 records sharing a parent_case_id) for the records-picker workflow.
+│   │   ├── cases.ts              # caseFromMockException + MOCK_CASES (grouped by parent_case_id; aggregateCaseStatus rolls per-record status up to the case by dominance order)
 │   │   └── line-items.ts         # MOCK_LINE_ITEMS
 │   ├── roles.ts                  # RBAC permissions aligned with asoe2/api/deps.py
 │   └── utils.ts                  # cn() — Tailwind class merge utility (clsx + tailwind-merge)
@@ -288,13 +289,17 @@ Page Content (max-width 1440px)
 
 Multi-step: email → password → SSO redirect. Uses `signIn()` from NextAuth.
 
-### Cases (`/cases`) — Two-Pane Workspace (ADR-041 P3, canonical queue + detail)
+### Cases (`/cases`) — Three-Pane Workspace (ADR-041 P3 / P3d-remaining / P3e, canonical queue + records + detail)
 
 ```
 NavBar (shared; "Cases" tab is the canonical queue surface — ADR-041 P2 dropped "Exception Queue")
-Page Content (max-width 1600px) — CSS grid lg:grid-cols-[360px_minmax(0,1fr)]
-                                 (single column below 1024px)
-├── Left Pane (360px): Case Queue
+Page Content (max-width 1800px) — CSS grid:
+  xl ≥1280px  xl:grid-cols-[320px_280px_minmax(0,1fr)]  (queue | record-list | detail)
+  lg 1024-1279px  lg:grid-cols-[360px_minmax(0,1fr)]    (queue | detail; record-list collapses)
+  <1024px  single column
+├── Middle Pane (280px, xl only): RecordListPane — attached-records picker.
+│   Below xl the picker re-emerges inline inside CaseDetailPanel (P3e — see below).
+├── Left Pane (320-360px): Case Queue
 │   ├── Header (title + count + filter chips per source)
 │   ├── Filter chips iterating ALLOWED_CASE_SOURCES
 │   │   (manual_order, automated_order)
@@ -322,7 +327,9 @@ Page Content (max-width 1600px) — CSS grid lg:grid-cols-[360px_minmax(0,1fr)]
              enrichment sections → EvidenceGrid → DiagnosticsSection)
 ```
 
-**URL state:** `?case=<caseId>&record=<recordId>` drives selection. Click handlers use `router.replace` so back/forward + reload preserve cursor position. Switching cases drops the prior `?record=` so the auto-mount picks the new case's first record.
+**URL state:** `?case=<caseId>&record=<recordId>` drives selection. Click handlers use `router.replace` with `{ scroll: false }` — selection is an in-place workspace update, not a page navigation; without the flag Next.js App Router scrolls the viewport to the top of the document on every URL write and the operator loses their place in a long, SLA-sorted queue. Back/forward + reload preserve cursor position. Switching cases drops the prior `?record=` so the auto-mount picks the new case's first record.
+
+**Records picker (P3e):** `RecordListPane` renders both as the dedicated xl middle column (page.tsx, `hidden xl:block`) and as the below-xl inline fallback inside `CaseDetailPanel` (`xl:hidden` when `inlineRecordListHiddenAtXl` is set). Both instances stay in the DOM at every viewport — only one is `display`-visible per breakpoint — so tests selecting the picker by `aria-label` / `data-testid` must scope to `:visible`.
 
 **Data flow:**
 - Queue — `useCases(filters.source)` (cursor-walking hook with silent-refetch contract).
@@ -338,8 +345,9 @@ Page Content (max-width 1600px) — CSS grid lg:grid-cols-[360px_minmax(0,1fr)]
 **A11y:** `role="listbox"` on the queue, `role="option"` on each row with `aria-selected`. `tabIndex={0}` on the listbox so `:focus-visible` tracks the keyboard cursor. The slim context strip uses `aria-label="Case context"`; the full header uses `aria-label="Case header"`.
 
 **Architectural locks:**
-* `tests/architectural/cases_workspace_render_guard.test.ts` — three invariants: (1) the fetch useEffect clears `orderCase`/`records` BEFORE `casesApi.get`; (2) `CaseDetailPanel` only renders when `orderCase.case_id === selectedCaseId`; (3) the `cases` useMemo lists `selectedCaseId` in deps AND produces an `isPinned: true` row when the filter excludes the selection.
-* `tests/architectural/case_pivot_mock_wiring.test.ts` — every mock case has `case_type ∈ {EMAIL_ENTRY, BLOCK}` + EMAIL_ENTRY carries `email_classification` (ADR-041 P1).
+* `tests/architectural/cases_workspace_render_guard.test.ts` — source-grep invariants: (1) the fetch useEffect clears `orderCase`/`records` BEFORE `casesApi.get`; (2) `CaseDetailPanel` only renders when `orderCase.case_id === selectedCaseId`; (3) the `cases` useMemo lists `selectedCaseId` in deps AND produces an `isPinned: true` row when the filter excludes the selection; (4) the three-pane workspace structure (queue + RecordListPane + case-workspace + xl three-column grid); (5) the inline records picker is enabled + `inlineRecordListHiddenAtXl` so it's reachable below xl (P3e); (6) every `router.replace` carries `scroll: false`.
+* `tests/architectural/case_pivot_mock_wiring.test.ts` — every mock case has `case_type ∈ {EMAIL_ENTRY, BLOCK}` + EMAIL_ENTRY carries `email_classification` (ADR-041 P1); every exception resolves to a case; at least one multi-record case exists and every sibling record is independently fetchable.
+* `tests/architectural/mock_verdict_coverage.test.ts` — every conditional-gate verdict is exercised by a mock trace; the pipeline-timeline classify confidence + ingest order_id match the record's `OrderAnalysis.confidence` / `order_id` (no partial-truth drift between the timeline and the AgentReasoningCard).
 * `tests/architectural/cases_no_per_intent_dispatch.test.ts` — `CaseDetailPanel` is a dumb projector (Guardrail #1 / Guardrail #6); sections mount via data-presence.
 * `tests/browser/cases-workspace-case-switch.spec.ts` — operator-journey browser e2e: drives two queue clicks in sequence, asserts URL `?record=` always belongs to URL `?case=`.
 

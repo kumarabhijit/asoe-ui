@@ -1153,13 +1153,17 @@ merged PRs (asoe2 #152, #153, #154, #155; asoe-ui #153, #154,
       depends on `selectedCaseId` AND produces an
       `isPinned: true` row. Verified failure on pre-fix.
 
-### 15.7 P3d — remaining (deferred)
-- [ ] **Lift the record picker** out of `CaseDetailPanel` into
+### 15.7 P3d — remaining
+- [x] **Lift the record picker** out of `CaseDetailPanel` into
       a third column (true three-pane: case-list |
-      record-list | record-detail).
-- [ ] **Responsive collapse rules** below 1280px (right pane
-      overlays middle) and below 1024px (middle becomes a
-      popover/sheet).
+      record-list | record-detail). `RecordListPane` mounted as
+      the dedicated xl middle column (ADR-041 P3d-remaining,
+      2026-05-14). Below-xl reachability closed by P3e — see
+      15.15.
+- [x] **Responsive collapse rules** — xl (≥1280px) full
+      three-pane; lg (1024-1279px) two-pane with the picker
+      re-emerging inline; single column below 1024px. Closed
+      by P3d-remaining + P3e (15.15).
 - [ ] **Restore page-level `case_invalidation_silent_refresh` +
       `ws_polling_fallback` test locks** — currently
       tombstones pointing at the retired `/exceptions/page.tsx`.
@@ -1269,4 +1273,66 @@ identified six systemic gaps; the closure landed in this phase.
       so `casesApi.getRecords(case_id)` returns a populated
       list. `tests/architectural/case_pivot_mock_wiring.test.ts`
       locks the invariants.
+
+### 15.14 Multi-issue mock case coverage (PR #165 — asoe-ui)
+Real CPG POs routinely trip several coincident exceptions on one
+order, but every mock case had exactly one record — the
+`RecordListPane` picker workflow was uncovered in preview mode.
+- [x] **Three multi-issue clusters, 7 records** in
+      `src/lib/mock-data/exceptions.ts` — Walmart Q1 reset
+      (PRICE_HOLD_RELEASE + BACK_ORDER + DUPLICATE_PO), Costco
+      EOQ (OVER_MAX + PALLET_CONFIG), Kroger WK-15
+      (MIN_ORDER_QTY + DELIVERY_DELAY). Each cluster carries a
+      realistic verdict mix — some GREEN auto-resolved, some
+      YELLOW awaiting human, one RED blocked — so the picker
+      shows the pipeline's per-record decisions.
+- [x] **`MOCK_CASES` regrouped** — `cases.ts` now groups
+      `MOCK_EXCEPTIONS` by `parent_case_id` (was a 1:1
+      `.map`); `aggregateCaseStatus` rolls per-record
+      `CaseStatus` up to the case by dominance order
+      (`OPEN_AWAITING_HUMAN > BLOCKED > FAILED > RESOLVED`).
+- [x] **Matching fixtures** — `order-analyses.ts` +
+      `line-items.ts` gain 7 entries keyed by the new
+      exception ids.
+- [x] **Architectural lock** — `case_pivot_mock_wiring.test.ts`
+      asserts at least one case has N>1 records and every
+      sibling record is independently fetchable; the 1:1
+      assumption (`cases.length >= excs.length`) was removed.
+- [x] **Pipeline-timeline confidence/order_id sync** — the
+      mock trace verdict-template helpers (`_yellowHitlTrace`
+      etc.) hardcoded sample `confidence` / `order_id` /
+      `intent`; any record routed through the default
+      dispatcher inherited them, so the Diagnostics timeline
+      disagreed with the `AgentReasoningCard` confidence.
+      Helpers now take a `_TraceOverrides` arg sourced from the
+      record + `MOCK_ORDER_ANALYSES[id].confidence`. Locks in
+      `mock_verdict_coverage.test.ts`. (Drift D33.)
+
+### 15.15 P3e — inline records picker reachable below xl (PR #168 — asoe-ui)
+- [x] **`CaseDetailPanel` gains `inlineRecordListHiddenAtXl`** —
+      when true the inline `RecordListPane` is `xl:hidden`, so
+      it serves as the below-1280px fallback for the collapsed
+      middle column. The `/cases` workspace passes
+      `showInlineRecordList={true}` + `inlineRecordListHiddenAtXl={true}`.
+- [x] Pre-fix, a deep-link to a multi-record case on a
+      1024-1279px screen showed no picker anywhere — the Agent
+      Recommendation card stayed hidden unless the operator
+      hand-typed a record id into `?record=`.
+- [x] **Arch lock** in `cases_workspace_render_guard.test.ts`;
+      `cases-workspace-three-pane` browser e2e updated to scope
+      records-pane locators to `:visible` (both `RecordListPane`
+      instances stay in the DOM at every viewport — CSS
+      `display` toggle, not unmount). (Drift D31.)
+
+### 15.16 Queue scroll position preserved on row select (PR #169 — asoe-ui)
+- [x] **`router.replace` calls pass `{ scroll: false }`** —
+      `handleSelectCase` / `handleSelectRecord`. Next.js App
+      Router scrolls to the top of the document on every URL
+      write by default; the `/cases` workspace is an in-place
+      state machine, so selection must keep the queue scroll
+      position.
+- [x] **Regression lock** — `cases_workspace_render_guard.test.ts`
+      asserts every `router.replace(` in `page.tsx` carries
+      `scroll: false`; verified it fails on the parent commit.
+      (Drift D32.)
 
