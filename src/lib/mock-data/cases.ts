@@ -65,6 +65,11 @@ export function caseFromMockException(exc: ExceptionSummary): OrderCase {
     switch (exc.lifecycle_state) {
       case "RESOLVED":
       case "CLOSED":
+      case "REJECTED":
+        // REJECTED is a settled child — a NO_ACTION disposition is a
+        // completed human decision (resolved_by stamped, audited as
+        // EXCEPTION_RESOLVED). Terminal-closed for the case roll-up,
+        // so it must not hold an otherwise-resolved case open.
         return "RESOLVED";
       case "BLOCKED":
         return "BLOCKED";
