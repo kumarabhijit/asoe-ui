@@ -1706,8 +1706,7 @@ export interface components {
             id: string;
             /** Intent */
             intent?: string | null;
-            /** Lifecycle State */
-            lifecycle_state: string;
+            lifecycle_state: components["schemas"]["LifecycleState"];
             /** Order Id */
             order_id: string;
             /** Parent Case Id */
@@ -1771,8 +1770,7 @@ export interface components {
             id: string;
             /** Intent */
             intent?: string | null;
-            /** Lifecycle State */
-            lifecycle_state: string;
+            lifecycle_state: components["schemas"]["LifecycleState"];
             /** Order Id */
             order_id: string;
             /** Parent Case Id */
@@ -1904,7 +1902,7 @@ export interface components {
             /** Kill Switch */
             kill_switch: boolean;
             /** Lifecycle States */
-            lifecycle_states: string[];
+            lifecycle_states: components["schemas"]["LifecycleState"][];
             /**
              * Status
              * @default ok
@@ -1986,6 +1984,18 @@ export interface components {
             /** Qty */
             qty: number;
         };
+        /**
+         * LifecycleState
+         * @description The 12-state per-exception lifecycle (architecture_v3.md §9.1).
+         *
+         *     A ``str`` enum, so existing string comparisons keep working — this
+         *     type simply gives the lifecycle vocabulary the same compile-time
+         *     footing as ``TerminalStatus`` / ``Intent`` / ``ShadowStatus``. See
+         *     ``docs/STATUS_MODEL.md`` for how it relates to ``final_status``
+         *     (``TerminalStatus``) and the case-level ``CaseStatus``.
+         * @enum {string}
+         */
+        LifecycleState: "INGESTED" | "CLASSIFYING" | "AUDITING" | "PENDING_REVIEW" | "ESCALATED" | "PENDING_ADMIN_REVIEW" | "PENDING_COSIGN" | "RESOLVED" | "FAILED" | "BLOCKED" | "REJECTED" | "CLOSED";
         /**
          * LineAnalysis
          * @description Analysis details for a single line item.

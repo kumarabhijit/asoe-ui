@@ -55,6 +55,24 @@ const UI_LIFECYCLE_VALUES: readonly LifecycleState[] = [
   "CLOSED",
 ] as const;
 
+/**
+ * The 12 members of asoe2's `LifecycleState(str, Enum)`. `LIFECYCLE_STATES`
+ * is single-sourced from this enum (`[s.value for s in LifecycleState]`),
+ * so the enum is the canonical thing to parse.
+ */
+function backendLifecycleStates(src: string): string[] {
+  const header = src.match(/class LifecycleState\(str, Enum\):/);
+  if (!header || header.index === undefined) {
+    throw new Error(
+      "Could not parse LifecycleState from asoe2/contracts/models.py",
+    );
+  }
+  const after = src.slice(header.index);
+  const stop = after.slice(1).search(/\nclass |\n[A-Z_]+[: ]/);
+  const body = stop >= 0 ? after.slice(0, stop + 1) : after;
+  return [...body.matchAll(/^\s+[A-Z_]+ = "([A-Z_]+)"/gm)].map((m) => m[1]);
+}
+
 describe("EXECUTING lifecycle state — retired (Phase 19)", () => {
   it("UI LifecycleState union does not include EXECUTING", () => {
     expect(UI_LIFECYCLE_VALUES as readonly string[]).not.toContain("EXECUTING");
@@ -70,36 +88,27 @@ describe("EXECUTING lifecycle state — retired (Phase 19)", () => {
     );
   });
 
-  it("asoe2's LIFECYCLE_STATES does not include EXECUTING (parity backstop)", () => {
+  it("asoe2's LifecycleState does not include EXECUTING (parity backstop)", () => {
     if (!existsSync(ASOE2_MODELS_PATH)) {
       console.warn(
         `skipping EXECUTING-in-backend parity — asoe2 not found at ${ASOE2_MODELS_PATH}`,
       );
       return;
     }
-    const src = readFileSync(ASOE2_MODELS_PATH, "utf-8");
-    // Match the LIFECYCLE_STATES list literal — between `LIFECYCLE_STATES: List[str] = [` and `]`.
-    const match = src.match(/LIFECYCLE_STATES\s*:\s*List\[str\]\s*=\s*\[([\s\S]*?)\]/);
-    if (!match) {
-      throw new Error(
-        "Could not parse LIFECYCLE_STATES from asoe2/contracts/models.py",
-      );
-    }
-    const values = [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    const values = backendLifecycleStates(readFileSync(ASOE2_MODELS_PATH, "utf-8"));
     expect(values).not.toContain("EXECUTING");
   });
 
-  it("UI lifecycle union matches asoe2's LIFECYCLE_STATES exactly", () => {
+  it("UI lifecycle union matches asoe2's LifecycleState exactly", () => {
     if (!existsSync(ASOE2_MODELS_PATH)) {
       console.warn(
         `skipping LifecycleState parity — asoe2 not found at ${ASOE2_MODELS_PATH}`,
       );
       return;
     }
-    const src = readFileSync(ASOE2_MODELS_PATH, "utf-8");
-    const match = src.match(/LIFECYCLE_STATES\s*:\s*List\[str\]\s*=\s*\[([\s\S]*?)\]/);
-    if (!match) throw new Error("LIFECYCLE_STATES parse failed");
-    const backend = new Set([...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+    const parsed = backendLifecycleStates(readFileSync(ASOE2_MODELS_PATH, "utf-8"));
+    expect(parsed.length, "expected 12 LifecycleState members").toBe(12);
+    const backend = new Set(parsed);
     const ui = new Set<string>(UI_LIFECYCLE_VALUES);
     const onlyBackend = [...backend].filter((v) => !ui.has(v));
     const onlyUi = [...ui].filter((v) => !backend.has(v));
