@@ -71,6 +71,15 @@ describe("lifecycleVariant — Guardrail #2 fallback", () => {
     expect(lifecycleVariant("AUDITING")).toBe("warning");
   });
 
+  it("maps PENDING_COSIGN to warning — a high-value override parked for a second reviewer is an action-pending state, not an inert one (STATUS_MODEL.md §1 12-state lifecycle)", () => {
+    // Regression: PENDING_COSIGN is a valid LifecycleState (exceptions.ts)
+    // but was absent from the switch, falling through to the neutral
+    // default. A cosign-parked exception then rendered an inert grey
+    // badge instead of the amber action-pending treatment its peer
+    // PENDING_* states get — backend state and UI presentation drifted.
+    expect(lifecycleVariant("PENDING_COSIGN")).toBe("warning");
+  });
+
   it("maps BLOCKED, REJECTED, FAILED to error", () => {
     expect(lifecycleVariant("BLOCKED")).toBe("error");
     expect(lifecycleVariant("REJECTED")).toBe("error");
