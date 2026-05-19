@@ -322,6 +322,38 @@ function CasesWorkspace() {
     };
   }, [selectedCaseId]);
 
+  /* ── Post-action refresh ────────────────────────────────────── */
+  // A HITL action on the inline-mounted record mutates that record's
+  // `lifecycle_state`, which rolls up into `OrderCase.status`
+  // (STATUS_MODEL.md §3). Re-fetch the selected case + its records so
+  // the header status badge and the RecordListPane rows reflect the
+  // new state, and `refetch()` the queue so the left pane agrees.
+  // Unlike the selection-change effect this does NOT null out state
+  // first — it overwrites in place, so the panel never unmounts and
+  // the operator keeps their scroll position.
+  const refreshCaseDetail = useCallback(async () => {
+    const caseId = selectedCaseId;
+    if (!caseId) return;
+    const [c, r] = await Promise.all([
+      casesApi.get(caseId),
+      casesApi.getRecords(caseId).catch(() => ({
+        items: [] as ExceptionDetailResponse[],
+        total: 0,
+        aggregated_policy_hits: [] as string[],
+      })),
+    ]);
+    if (c) {
+      setOrderCase(c);
+      setRecords(r.items);
+      setPolicyHits(r.aggregated_policy_hits);
+    }
+  }, [selectedCaseId]);
+
+  const handleRecordActionComplete = useCallback(() => {
+    refetch();
+    void refreshCaseDetail();
+  }, [refetch, refreshCaseDetail]);
+
   /* ── URL writes ─────────────────────────────────────────────── */
   // `scroll: false` on every router.replace below — selection is an
   // in-place workspace update, not a page navigation. Next.js App
@@ -628,6 +660,7 @@ function CasesWorkspace() {
             policyHits={policyHits}
             selectedRecordId={selectedRecordId}
             onSelectRecord={handleSelectRecord}
+            onRecordActionComplete={handleRecordActionComplete}
             // The workspace mounts `RecordListPane` as its own
             // middle column AT xl; below xl that middle column is
             // collapsed (`hidden xl:block`) and the operator has no

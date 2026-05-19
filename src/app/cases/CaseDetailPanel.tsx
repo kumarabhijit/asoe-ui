@@ -96,6 +96,21 @@ export interface CaseDetailPanelProps {
   /** Picker click handler — flips selection (and the URL query). */
   onSelectRecord?: (recordId: string) => void;
   /**
+   * Invoked after a HITL action (disposition / override / escalate /
+   * cosign / reanalyze) on the inline-mounted record succeeds.
+   *
+   * The mutated record's `lifecycle_state` rolls up into
+   * `OrderCase.status` (STATUS_MODEL.md §3) — so the action changes
+   * state the case header badge, the `RecordListPane` rows, and the
+   * outer queue all project. Without this seam the inner
+   * `ExceptionDetailPanel` refreshes its own `detail` while every
+   * other pane keeps showing the pre-action status until an unrelated
+   * WebSocket event happens to arrive. The `/cases` workspace wires
+   * this to a case-detail + queue refetch so all panes stay
+   * consistent. Optional — standalone consumers may omit it.
+   */
+  onRecordActionComplete?: () => void;
+  /**
    * Whether to render the records picker INSIDE this panel.
    *
    * ADR-041 P3d-remaining (2026-05-14) lifted the picker into a
@@ -130,6 +145,7 @@ export function CaseDetailPanel({
   attachedRecords,
   selectedRecordId,
   onSelectRecord,
+  onRecordActionComplete,
   showInlineRecordList = true,
   inlineRecordListHiddenAtXl = false,
 }: CaseDetailPanelProps) {
@@ -378,7 +394,10 @@ export function CaseDetailPanel({
           data-testid="case-selected-record-detail"
           className="bg-surface-primary border border-border rounded-md p-16 shadow-xs"
         >
-          <ExceptionDetailPanel exceptionId={selectedRecord.id} />
+          <ExceptionDetailPanel
+            exceptionId={selectedRecord.id}
+            onActionComplete={onRecordActionComplete}
+          />
         </section>
       )}
     </div>
