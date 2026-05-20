@@ -54,12 +54,14 @@ test.beforeEach(async ({ request }) => {
 });
 
 /**
- * Locate the queue row for a given case id. The page renders rows
- * with `role="option"`; each row contains the case id as a `<code>`
- * element so we filter by that.
+ * Locate the queue row for a given case id. Each row is a `<button
+ * role="option">` whose DOM id is `case-row-${case_id}` (set on
+ * `src/app/cases/page.tsx`). The visible text on the row is the
+ * customer PO / sales-order id, NOT the case UUID, so the stable
+ * locator is the DOM id rather than a `hasText` filter.
  */
 function queueRow(page: Page, caseId: string): Locator {
-  return page.locator('[role="option"]').filter({ hasText: caseId });
+  return page.locator(`#case-row-${caseId}`);
 }
 
 /** Pull the case id off the URL once selection lands. */
@@ -109,20 +111,15 @@ test("disposition on the selected record re-projects status in BOTH the queue ro
   await page.waitForURL(/case=[^&]+.*record=/, { timeout: 15_000 });
   expect(urlCaseId(page)).toBe(caseId);
 
-  // The case workspace mounted — the HITL ribbon is the canonical
-  // sign (Re-analyze is vocabulary-stable across verdicts).
-  await expect(
-    page.getByRole("button", { name: /re-analyze/i }).first(),
-  ).toBeVisible({ timeout: 15_000 });
-
-  // The case header (right pane) ALSO shows "Awaiting review"
-  // pre-action. Scope away from the queue row to avoid the queue's
-  // own copy of the label.
+  // The case workspace mounted — assert via the case-context status
+  // label, which is the right-pane partner of the queue row's status.
+  // (The HITL ribbon varies by verdict — Re-analyze isn't always
+  // rendered on GREEN records; the case-context label is.)
   const caseWorkspace = page.getByRole("region", { name: /case workspace/i });
   await expect(
     caseWorkspace.getByText(/awaiting review/i).first(),
     "case header must show OPEN_AWAITING_HUMAN as 'Awaiting review' pre-action",
-  ).toBeVisible({ timeout: 10_000 });
+  ).toBeVisible({ timeout: 15_000 });
 
   // ── Disposition: Override → RESOLVED ────────────────────────────
   // We use Override (rather than Approve) because the seeded record
