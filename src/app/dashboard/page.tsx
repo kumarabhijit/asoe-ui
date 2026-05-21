@@ -6,7 +6,7 @@
  */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSignOut } from "@/hooks/useSignOut";
 import { intentLabelFor } from "@/config/erp-label-map";
@@ -29,6 +29,8 @@ import { Badge, verdictVariant, lifecycleVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { isCaseInvalidationEvent } from "@/hooks/useManualOrderCases";
 import { exceptionsApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { StatsResponse } from "@/types/api";
@@ -63,19 +65,42 @@ export default function DashboardPage() {
 
   useEffect(() => { document.title = "Performance — ASOE"; }, []);
 
-  useEffect(() => {
-    async function fetch() {
-      try {
-        const data = await exceptionsApi.stats();
-        setStats(data);
-      } catch (err) {
-        console.error("Failed to fetch stats:", err);
-      } finally {
-        setLoading(false);
-      }
+  // Initial-load flag so silent live refreshes don't flash a spinner
+  // under the operator's cursor. Mirrors the `useCases` pattern that
+  // /cases + /home use for their WS-driven refreshes.
+  const refetchStats = useCallback(async (silent: boolean) => {
+    try {
+      const data = await exceptionsApi.stats();
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+    } finally {
+      if (!silent) setLoading(false);
     }
-    fetch();
   }, []);
+
+  useEffect(() => {
+    void refetchStats(false);
+  }, [refetchStats]);
+
+  // Live refresh on backend case state-changes. The stats payload is
+  // a roll-up of LifecycleState and CaseStatus distributions — any
+  // case_* WS event (open / update / close) mutates those totals.
+  // Mirrors the `/cases` + `/home` pattern: WS-driven silent refresh
+  // with `onReconnect` + `onPollFallback` keeping the surface live
+  // when the socket drops. Closes the Guardrail #4 "static screen
+  // requiring manual refresh" gap the STATUS_MODEL audit flagged.
+  const silentRefetch = useCallback(() => {
+    void refetchStats(true);
+  }, [refetchStats]);
+
+  useWebSocket({
+    onEvent: (ev) => {
+      if (isCaseInvalidationEvent(ev)) silentRefetch();
+    },
+    onReconnect: silentRefetch,
+    onPollFallback: silentRefetch,
+  });
 
   const autoResolvedPct = stats && stats.total_exceptions > 0
     ? Math.round((stats.auto_resolved / stats.total_exceptions) * 100)
