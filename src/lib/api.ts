@@ -44,7 +44,7 @@ import { ROLE_PERMISSIONS } from "./roles";
 // directly.
 import { MOCK_ORDER_ANALYSES } from "./mock-data/order-analyses";
 import { MOCK_EXCEPTIONS } from "./mock-data/exceptions";
-import { MOCK_CASES } from "./mock-data/cases";
+import { deriveMockCases } from "./mock-data/cases";
 import { MOCK_LINE_ITEMS } from "./mock-data/line-items";
 import type { OrderCase } from "@/types/cases";
 
@@ -1409,9 +1409,17 @@ export const exceptionsApi = {
       throw new Error("NOTES_REQUIRED: cosign notes are mandatory (SOX).");
     }
 
-    // Bug fix: bump updated_at on the underlying entry so a followup
-    // refreshDetail() refetch sees the new ts.
+    // Mutate the underlying MOCK_EXCEPTIONS row so a followup
+    // refetch reads the cosign outcome. Approve drives to RESOLVED;
+    // reject restores the lifecycle the override was staged from.
+    // (See the parallel comment on `disposition` for the historical
+    // why — same fix.)
     const ts = new Date().toISOString();
+    const nextLifecycle = request.approve
+      ? "RESOLVED"
+      : pending.from_lifecycle_state;
+    exc.lifecycle_state = nextLifecycle;
+    if (request.approve) exc.final_status = "COMPLETE";
     exc.updated_at = ts;
 
     let response: ExceptionDetailResponse;
@@ -1535,16 +1543,21 @@ export const exceptionsApi = {
       resolution_data: {},
       updated_at: ts,
     };
-    // Bug fix: bump updated_at on the underlying MOCK_EXCEPTIONS
-    // entry so the followup detail re-fetch sees the new ts. We
-    // intentionally DON'T mutate lifecycle_state / final_status
-    // here: those mutations would leak across tests in the shared
-    // MOCK_EXCEPTIONS array (a disposition() in one test would
-    // change exc-002's lifecycle and break a later escalate() test
-    // on the same id). The response still carries the new
-    // lifecycle for the immediate UI render; the re-fetch then
-    // reverts — matches pre-fix behaviour for everything except
-    // the timestamp.
+    // Mutate the underlying MOCK_EXCEPTIONS entry so the followup
+    // refetch (handleRecordActionComplete on /cases, the WS-driven
+    // refetch on /home + /dashboard) sees the new lifecycle.
+    //
+    // Historical note: this used to mutate only `updated_at` to
+    // avoid cross-test leak in the shared MOCK_EXCEPTIONS array.
+    // That trade-off was fine until PR #174 wired post-action
+    // refetch on /cases — at which point the refetch read the
+    // un-mutated row and "reverted" the queue + case header to
+    // PENDING_REVIEW, surfacing as "Approve / Override doesn't
+    // work" on the Vercel mock preview. We now mutate fully and
+    // restore the seed between tests via `resetMockExceptions()`
+    // wired into `tests/setup.ts`.
+    exc.lifecycle_state = newLifecycle;
+    exc.final_status = response.final_status;
     exc.updated_at = ts;
     emitMockCaseEvent({
       type: caseEventTypeForLifecycle(newLifecycle),
@@ -1587,11 +1600,10 @@ export const exceptionsApi = {
         "Escalate not permitted in this state (requires PENDING_REVIEW, FAILED, or BLOCKED).",
       );
     }
-    // Bug fix: bump updated_at on the underlying entry so a followup
-    // refreshDetail() refetch sees the new ts (matches reanalyze /
-    // disposition fix).
+    // Mutate the underlying MOCK_EXCEPTIONS row so a followup
+    // refetch reads the new lifecycle. (See the parallel comment
+    // on `disposition` for the historical why — same fix.)
     const ts = new Date().toISOString();
-    exc.updated_at = ts;
     const response: ExceptionDetailResponse = {
       ...exc,
       lifecycle_state: "ESCALATED",
@@ -1599,6 +1611,8 @@ export const exceptionsApi = {
       resolution_notes: `ESCALATED: ${request.reason}`,
       updated_at: ts,
     };
+    exc.lifecycle_state = "ESCALATED";
+    exc.updated_at = ts;
     emitMockCaseEvent({
       type: "case_update",
       case_id: `case-for-${exc.id}`,
@@ -2104,7 +2118,7 @@ export const casesApi = {
       });
     }
     await new Promise((r) => setTimeout(r, MOCK_DELAY));
-    let items: CaseListItem[] = MOCK_CASES.map((c) => ({
+    let items: CaseListItem[] = deriveMockCases().map((c) => ({
       ...c,
       child_intents: [],  // mock-mode placeholder; live API computes
     }));
@@ -2161,7 +2175,7 @@ export const casesApi = {
       return http<OrderCase>(`/api/v1/cases/${encodeURIComponent(case_id)}`);
     }
     await new Promise((r) => setTimeout(r, MOCK_DELAY));
-    return MOCK_CASES.find((c) => c.case_id === case_id) ?? null;
+    return deriveMockCases().find((c) => c.case_id === case_id) ?? null;
   },
 
   /**
