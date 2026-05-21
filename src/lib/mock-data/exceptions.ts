@@ -407,3 +407,47 @@ MOCK_EXCEPTIONS.forEach((e) => {
     e.parent_case_id = `case-for-${e.id}`;
   }
 });
+
+// Snapshot the initial fixture state AFTER the parent_case_id
+// mutation lands so `resetMockExceptions()` restores rows in their
+// canonical wired-up form. The clones are frozen-equivalent: we
+// JSON-roundtrip on snapshot capture so a later mutation on a
+// MOCK_EXCEPTIONS row never leaks back into the snapshot, and we
+// JSON-roundtrip again on every reset so callers don't end up
+// sharing object identity with the snapshot. (Structured clone is
+// the natural fit, but it isn't available in jsdom's older
+// environments that some legacy tests pin.)
+const _INITIAL_MOCK_EXCEPTIONS: ReadonlyArray<ExceptionSummary> = JSON.parse(
+  JSON.stringify(MOCK_EXCEPTIONS),
+);
+
+/**
+ * Restore `MOCK_EXCEPTIONS` to its seeded fixture state.
+ *
+ * Why this exists: the mock action paths in `src/lib/api.ts`
+ * (`disposition` / `escalate` / `cosign`) mutate the underlying
+ * row's `lifecycle_state` and `updated_at` so a subsequent
+ * `get()` / `casesApi.list()` re-fetch sees the new state — the
+ * same parity the live asoe2 backend gives. Without mutation the
+ * UI's post-action refetch would revert the queue + case header
+ * + `/home` tiles back to the pre-action lifecycle (the bug PR
+ * #175 fixes). With mutation, vitest tests that touch the same
+ * fixture id across cases need a reset between tests; this helper
+ * is that reset.
+ *
+ * Wired into `tests/setup.ts`'s top-level `beforeEach` so every
+ * test starts from the seeded baseline. Production code paths
+ * never call this — it's a test-only helper.
+ *
+ * Mutates `MOCK_EXCEPTIONS` in place (splice + push) rather than
+ * reassigning the binding so consumers holding a long-lived
+ * reference to the array (caseFromMockException, scenario-driven
+ * unit tests) still observe the reset.
+ */
+export function resetMockExceptions(): void {
+  MOCK_EXCEPTIONS.splice(
+    0,
+    MOCK_EXCEPTIONS.length,
+    ...JSON.parse(JSON.stringify(_INITIAL_MOCK_EXCEPTIONS)),
+  );
+}

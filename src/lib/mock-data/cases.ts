@@ -154,7 +154,23 @@ function aggregateCaseStatus(records: readonly ExceptionSummary[]): CaseStatus {
  * (Verdict 2026-04-22 Guardrail #6 — no "no records" placeholder, so
  * the inline ribbon silently never mounted).
  */
-export const MOCK_CASES: OrderCase[] = (() => {
+/**
+ * Re-derive `OrderCase[]` from the live `MOCK_EXCEPTIONS` array.
+ *
+ * Called on every `casesApi.list` / `casesApi.get` in mock mode so
+ * the queue + case header reflect mutations made by mock action
+ * paths (`disposition` / `escalate` / `cosign`). Pre-2026-05-21
+ * this lived in an IIFE evaluated once at module load, which left
+ * the case projection frozen at the seed state — the operator
+ * clicked Approve, the underlying row's lifecycle moved to
+ * RESOLVED, but the queue still read `MOCK_CASES` (snapshotted at
+ * boot) and rendered "Awaiting review" forever.
+ *
+ * Cost is O(records) = O(33) for the seed fixture; the work is
+ * trivial compared to the artificial `MOCK_DELAY` callers already
+ * wait on.
+ */
+export function deriveMockCases(): OrderCase[] {
   const byCaseId = new Map<string, ExceptionSummary[]>();
   for (const exc of MOCK_EXCEPTIONS) {
     const cid = exc.parent_case_id;
@@ -183,4 +199,12 @@ export const MOCK_CASES: OrderCase[] = (() => {
       closed_at: isClosed ? base.closed_at : null,
     };
   });
-})();
+}
+
+/**
+ * Backwards-compatibility re-export. Existing call sites read
+ * `MOCK_CASES` as an immutable boot-time snapshot — they get the
+ * seed-state cases. Mock action paths must NOT consume this; they
+ * call `deriveMockCases()` directly.
+ */
+export const MOCK_CASES: OrderCase[] = deriveMockCases();

@@ -1,8 +1,24 @@
 import "@testing-library/jest-dom/vitest";
 import * as matchers from "vitest-axe/matchers";
-import { expect, vi } from "vitest";
+import { beforeEach, expect, vi } from "vitest";
+
+import { __resetMockIdempotencyCache } from "@/lib/api";
+import { resetMockExceptions } from "@/lib/mock-data/exceptions";
 
 expect.extend(matchers);
+
+// Mock action paths in src/lib/api.ts (disposition / escalate /
+// cosign) now mutate the underlying MOCK_EXCEPTIONS row so the
+// Vercel mock preview reflects the action in the queue / case
+// header / dashboard tiles (matching the live asoe2 backend). The
+// trade-off is cross-test fixture leak: a disposition() on exc-002
+// in one test would change its lifecycle and break a later
+// escalate() test on the same id. Reset the seed between tests so
+// the leak window is the test body only.
+beforeEach(() => {
+  resetMockExceptions();
+  __resetMockIdempotencyCache();
+});
 
 // jsdom does not implement window.matchMedia. next-themes and a
 // handful of other libraries (and our own reduced-motion checks)
