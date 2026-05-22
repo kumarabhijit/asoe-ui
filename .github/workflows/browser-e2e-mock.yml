@@ -1,0 +1,65 @@
+# Mock-mode browser-driven e2e (Playwright).
+#
+# Companion to browser-e2e.yml. That workflow drives the UI against a
+# live asoe2 backend; this one drives the UI in MOCK mode — the data
+# path the Vercel preview (and any backendless `next dev`) actually
+# runs. Mock mode is self-contained, so this job needs neither the
+# asoe2 checkout nor Python: just node + Chromium + `next dev`.
+#
+# Catches the class of "the mock fixture is missing a field the live
+# backend provides" and "mock mutations don't survive a reload" bugs
+# that are structurally invisible to the live-backend suite.
+name: Browser E2E (mock mode)
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/browser-mock/**'
+      - 'tests/browser/_helpers.ts'
+      - 'package*.json'
+      - 'playwright.mock.config.ts'
+      - '.github/workflows/browser-e2e-mock.yml'
+  workflow_dispatch:
+
+jobs:
+  browser-e2e-mock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout asoe-ui
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run mock-mode browser e2e
+        env:
+          CI: '1'
+        run: npm run test:browser:mock
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-mock
+          path: playwright-report-mock/
+          retention-days: 14
+
+      - name: Upload test-results (traces, videos, screenshots)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results-mock
+          path: test-results/
+          retention-days: 7

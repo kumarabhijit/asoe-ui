@@ -22,6 +22,7 @@
     "test:browser": "playwright test",
     "test:browser:ui": "playwright test --ui",
     "test:browser:headed": "playwright test --headed",
+    "test:browser:mock": "playwright test --config=playwright.mock.config.ts",
     "flows:matrix": "tsx e2e/journey-matrix.ts",
     "flows:gen": "tsx e2e/flows-gen.ts",
     "flows:coverage": "tsx scripts/coverage-report.ts",
