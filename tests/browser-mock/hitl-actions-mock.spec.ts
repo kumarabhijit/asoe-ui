@@ -1,0 +1,186 @@
+/**
+ * MOCK-MODE operator-journey regressions for two defects that the
+ * live-backend e2e suite structurally could not catch.
+ *
+ * Why this file exists (the coverage gap it closes):
+ *
+ *   1. The live suite (playwright.config.ts) runs with
+ *      NEXT_PUBLIC_USE_REAL_API=1, so it never exercises src/lib/api.ts's
+ *      mock branches — the data path the Vercel preview actually runs.
+ *      `tests/browser/cases-workspace-action-propagation.spec.ts` even
+ *      AVOIDS the Approve button with a comment ("Approve would short-
+ *      circuit with 'No recipe recommendation'") — a known-broken path
+ *      papered over rather than asserted. In mock mode the mock
+ *      `exceptionsApi.get` returned no `recommended_action`, so Approve
+ *      was a no-op for EVERY record. This file drives Approve to Resolved.
+ *
+ *   2. Mock mutations live in an in-memory array that re-seeds on every
+ *      full page load. A live-backend test can't see the resulting bug
+ *      (a real DB persists), so the "action reverts on reload" defect
+ *      was invisible. This file reloads mid-journey and asserts the
+ *      action stuck.
+ *
+ * No backend: mock mode is self-contained, so this spec needs only the
+ * `next dev` server booted by playwright.mock.config.ts.
+ */
+import { test, expect, type Page } from "@playwright/test";
+
+import { loginAs, USERS } from "../browser/_helpers";
+
+// Deterministic seeds from src/lib/mock-data/exceptions.ts:
+//   exc-002 — DUPLICATE_PO, YELLOW, PENDING_REVIEW. Its order analysis
+//             recommends BLOCK_AND_NOTIFY (→ "Block and notify" button).
+//   exc-007 — CREDIT_BLOCK, YELLOW, PENDING_REVIEW. Analysis → ALLOW_BOTH.
+const APPROVE_CASE = "case-for-exc-002";
+const APPROVE_RECORD = "exc-002";
+const OVERRIDE_CASE = "case-for-exc-007";
+const OVERRIDE_RECORD = "exc-007";
+
+const workspace = (page: Page) =>
+  page.getByRole("region", { name: /case workspace/i });
+
+/** Read a /home KPI tile value by its label. */
+async function tileValue(page: Page, label: string): Promise<number> {
+  const raw = await page.evaluate((wanted) => {
+    const spans = Array.from(
+      document.querySelectorAll("span.text-heading.font-mono"),
+    );
+    for (const v of spans) {
+      const lbl = v.parentElement?.querySelector("span.text-label")?.textContent?.trim();
+      if (lbl === wanted) return v.textContent?.trim() ?? null;
+    }
+    return null;
+  }, label);
+  expect(raw, `KPI tile "${label}" must render`).not.toBeNull();
+  return Number(raw);
+}
+
+async function openCase(page: Page, caseId: string, recordId: string) {
+  await page.goto(`/cases`);
+  const row = page.locator(`#case-row-${caseId}`);
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await row.click();
+  await page.waitForURL(new RegExp(`record=${recordId}`), { timeout: 20_000 });
+  // Wait for the HITL ribbon to mount (Override… is present on every
+  // verdict for the admin role, so it's the stable mount sentinel).
+  await expect(
+    workspace(page).getByRole("button", { name: /choose different action/i }).first(),
+  ).toBeVisible({ timeout: 20_000 });
+}
+
+test.describe("mock-mode HITL actions", () => {
+  test("Approve drives a YELLOW record to Resolved (no 'no recommendation' dead-end)", async ({
+    page,
+  }) => {
+    await loginAs(page, USERS.MANAGER);
+    await openCase(page, APPROVE_CASE, APPROVE_RECORD);
+
+    await expect(
+      workspace(page).getByText(/awaiting review/i).first(),
+      "case header projects PENDING_REVIEW pre-action",
+    ).toBeVisible();
+
+    // The primary action button carries the recipe's recommendation as
+    // its label — for exc-002 that's BLOCK_AND_NOTIFY → "Block and
+    // notify". Before the fix this label was the bare fallback and the
+    // click dead-ended on a "No recipe recommendation" warning toast.
+    const approve = workspace(page)
+      .getByRole("button", { name: /block and notify/i })
+      .first();
+    await expect(
+      approve,
+      "the recipe recommendation must surface as the primary action — " +
+        "absence of this label is the Approve no-op bug",
+    ).toBeVisible({ timeout: 15_000 });
+    await approve.click();
+
+    await workspace(page)
+      .getByRole("button", { name: /confirm approval/i })
+      .first()
+      .click();
+
+    // The dead-end warning must NOT appear.
+    await expect(
+      page.getByText(/no recipe recommendation/i),
+      "Approve must not short-circuit on a missing recommendation",
+    ).toHaveCount(0, { timeout: 10_000 });
+
+    // Success toast + the case header re-projects to Resolved.
+    await expect(
+      page.getByText(new RegExp(`exception ${APPROVE_RECORD} approved`, "i")).first(),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      workspace(page).getByText(/^resolved$/i).first(),
+      "case header must re-project to Resolved after Approve",
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("an Override survives a full page reload on /home (reload resilience)", async ({
+    page,
+  }) => {
+    await loginAs(page, USERS.MANAGER);
+
+    // Baseline /home "Awaiting review" count. The tile renders "0"
+    // until useCases finishes its fetch, so poll until the seeded
+    // count settles (the fixture always has open work).
+    await page.goto("/home");
+    await expect(page.getByText("Awaiting review").first()).toBeVisible({
+      timeout: 30_000,
+    });
+    let before = 0;
+    await expect
+      .poll(
+        async () => {
+          before = await tileValue(page, "Awaiting review");
+          return before;
+        },
+        { timeout: 20_000 },
+      )
+      .toBeGreaterThan(0);
+
+    // Override exc-007 → Resolved.
+    await openCase(page, OVERRIDE_CASE, OVERRIDE_RECORD);
+    await workspace(page)
+      .getByRole("button", { name: /choose different action/i })
+      .first()
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible({ timeout: 8_000 });
+    // Pick the first real option in each select (index 0 is the
+    // "Select…" placeholder). Sourcing values dynamically keeps the
+    // spec free of hardcoded enum literals (Guardrail #2).
+    const actionSel = dialog.getByLabel(/resolution action/i);
+    const actionVal = await actionSel.locator("option").nth(1).getAttribute("value");
+    await actionSel.selectOption(actionVal);
+    const reasonSel = dialog.getByLabel(/reason categor/i);
+    const reasonVal = await reasonSel.locator("option").nth(1).getAttribute("value");
+    await reasonSel.selectOption(reasonVal);
+    await dialog.getByLabel(/notes/i).fill("mock e2e — drive to resolved");
+    await dialog.getByRole("button", { name: /confirm override/i }).click();
+    await expect(dialog).toBeHidden({ timeout: 10_000 });
+    await expect(
+      workspace(page).getByText(/^resolved$/i).first(),
+    ).toBeVisible({ timeout: 10_000 });
+
+    // Soft-nav to /home: count drops by one.
+    await page.getByRole("link", { name: /^home$/i }).first().click();
+    await page.waitForURL(/\/home/, { timeout: 15_000 });
+    await expect(page.getByText("Awaiting review").first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect
+      .poll(() => tileValue(page, "Awaiting review"), { timeout: 15_000 })
+      .toBe(before - 1);
+
+    // The regression: a FULL RELOAD must NOT revert the count. Pre-fix
+    // the in-memory mutation was lost and the tile snapped back to
+    // `before`; the localStorage overlay now replays it.
+    await page.reload();
+    await expect(page.getByText("Awaiting review").first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect
+      .poll(() => tileValue(page, "Awaiting review"), { timeout: 15_000 })
+      .toBe(before - 1);
+  });
+});
