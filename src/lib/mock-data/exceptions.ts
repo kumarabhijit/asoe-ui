@@ -421,6 +421,98 @@ const _INITIAL_MOCK_EXCEPTIONS: ReadonlyArray<ExceptionSummary> = JSON.parse(
   JSON.stringify(MOCK_EXCEPTIONS),
 );
 
+/* ── Reload-resilient mock mutations ───────────────────────────────────
+   The mock action paths (`disposition` / `escalate` / `cosign` in
+   src/lib/api.ts) mutate the in-memory MOCK_EXCEPTIONS row so the
+   queue / case header / `/home` tiles reflect the action. That works
+   within a single browser session, but the array re-initialises to
+   seed on every full page load — so on the Vercel mock preview an
+   operator who Approved/Overrode a record, then RELOADED (or opened
+   `/home` in a fresh tab), saw the record snap back to "Awaiting
+   review". Backend state and UI drifted again, just across a reload
+   instead of across a pane.
+
+   The fix is a small localStorage overlay: each lifecycle mutation is
+   persisted by exception id and replayed onto the seed at module load.
+   It is browser-only (no-ops under SSR / when storage is unavailable)
+   and deliberately narrow — only the lifecycle-projection fields the
+   case roll-up reads. It is NOT a general mock-state store. */
+const OVERLAY_KEY = "asoe:mock-exception-overlay:v1";
+
+type ExceptionMutationPatch = Partial<
+  Pick<ExceptionSummary, "lifecycle_state" | "final_status" | "updated_at">
+>;
+
+function overlayStorage(): Storage | null {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return null;
+    return window.localStorage;
+  } catch {
+    // Access to localStorage can throw (privacy mode, sandboxed iframe).
+    return null;
+  }
+}
+
+function readOverlay(): Record<string, ExceptionMutationPatch> {
+  const ls = overlayStorage();
+  if (!ls) return {};
+  try {
+    const raw = ls.getItem(OVERLAY_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Replay persisted lifecycle mutations onto the live MOCK_EXCEPTIONS rows. */
+function applyOverlay(): void {
+  const overlay = readOverlay();
+  for (const exc of MOCK_EXCEPTIONS) {
+    const patch = overlay[exc.id];
+    if (patch) Object.assign(exc, patch);
+  }
+}
+
+/**
+ * Persist a lifecycle mutation so it survives a page reload. Called by
+ * the mock action paths in `src/lib/api.ts` after they mutate the
+ * in-memory row. No-ops outside the browser (SSR / tests without a
+ * window) and on any storage error — persistence is best-effort, the
+ * in-memory mutation remains the source of truth for the session.
+ */
+export function persistMockExceptionMutation(
+  id: string,
+  patch: ExceptionMutationPatch,
+): void {
+  const ls = overlayStorage();
+  if (!ls) return;
+  try {
+    const overlay = readOverlay();
+    overlay[id] = { ...overlay[id], ...patch };
+    ls.setItem(OVERLAY_KEY, JSON.stringify(overlay));
+  } catch {
+    // Quota / serialisation failures are non-fatal — drop the persist.
+  }
+}
+
+/** Clear the persisted overlay. Used by the per-test reset. */
+export function clearMockExceptionOverlay(): void {
+  const ls = overlayStorage();
+  if (!ls) return;
+  try {
+    ls.removeItem(OVERLAY_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+// Replay any persisted mutations on top of the freshly-seeded rows.
+// Runs once at module load (browser only); the _INITIAL snapshot above
+// is captured BEFORE this so `resetMockExceptions()` always restores
+// the pristine seed, never the overlay-modified state.
+applyOverlay();
+
 /**
  * Restore `MOCK_EXCEPTIONS` to its seeded fixture state.
  *
@@ -445,6 +537,9 @@ const _INITIAL_MOCK_EXCEPTIONS: ReadonlyArray<ExceptionSummary> = JSON.parse(
  * unit tests) still observe the reset.
  */
 export function resetMockExceptions(): void {
+  // Drop the reload-resilience overlay too, otherwise a mutation
+  // persisted in one test would replay into the next.
+  clearMockExceptionOverlay();
   MOCK_EXCEPTIONS.splice(
     0,
     MOCK_EXCEPTIONS.length,
