@@ -43,7 +43,10 @@ import { ROLE_PERMISSIONS } from "./roles";
 // touch this — it hits `/api/v1/exceptions/{id}/analysis`
 // directly.
 import { MOCK_ORDER_ANALYSES } from "./mock-data/order-analyses";
-import { MOCK_EXCEPTIONS } from "./mock-data/exceptions";
+import {
+  MOCK_EXCEPTIONS,
+  persistMockExceptionMutation,
+} from "./mock-data/exceptions";
 import { deriveMockCases } from "./mock-data/cases";
 import { MOCK_LINE_ITEMS } from "./mock-data/line-items";
 import type { OrderCase } from "@/types/cases";
@@ -1318,13 +1321,25 @@ export const exceptionsApi = {
         reanalysis_history: MOCK_REANALYSIS_HISTORY[id] ?? [],
       };
     }
+    // The recipe's recommended action lives on `resolution_data`
+    // (the live backend's build_analysis writes it there). The mock
+    // sources it from the order analysis's top-level `resolution`
+    // field — the same enum the operator sees in the Agent
+    // Recommendation card. Without it, `useExceptionActions.handleApprove`
+    // has nothing to endorse and short-circuits with "No recipe
+    // recommendation — use Override", so Approve appears to do nothing
+    // on the mock preview.
+    const recommended = MOCK_ORDER_ANALYSES[id]?.resolution;
     return {
       ...exc,
-      resolution_data: exc.final_status === "COMPLETE" ? {
-        credit_amount: 1250.00,
-        applied_condition: "YK07",
-        new_net_price: 85.00,
-      } : {},
+      resolution_data: {
+        ...(exc.final_status === "COMPLETE" ? {
+          credit_amount: 1250.00,
+          applied_condition: "YK07",
+          new_net_price: 85.00,
+        } : {}),
+        ...(recommended ? { recommended_action: recommended } : {}),
+      },
       resolved_by: exc.lifecycle_state === "RESOLVED" ? "system" : undefined,
       resolved_action: undefined,
       resolution_notes: undefined,
@@ -1421,6 +1436,11 @@ export const exceptionsApi = {
     exc.lifecycle_state = nextLifecycle;
     if (request.approve) exc.final_status = "COMPLETE";
     exc.updated_at = ts;
+    persistMockExceptionMutation(id, {
+      lifecycle_state: nextLifecycle,
+      ...(request.approve ? { final_status: "COMPLETE" as const } : {}),
+      updated_at: ts,
+    });
 
     let response: ExceptionDetailResponse;
     if (request.approve) {
@@ -1559,6 +1579,14 @@ export const exceptionsApi = {
     exc.lifecycle_state = newLifecycle;
     exc.final_status = response.final_status;
     exc.updated_at = ts;
+    // Persist so the disposition survives a page reload (otherwise the
+    // queue / case header / /home tiles snap back to the seed lifecycle
+    // on the next full load — the cross-reload half of the state-drift).
+    persistMockExceptionMutation(id, {
+      lifecycle_state: newLifecycle,
+      final_status: response.final_status,
+      updated_at: ts,
+    });
     emitMockCaseEvent({
       type: caseEventTypeForLifecycle(newLifecycle),
       case_id: `case-for-${exc.id}`,
@@ -1613,6 +1641,10 @@ export const exceptionsApi = {
     };
     exc.lifecycle_state = "ESCALATED";
     exc.updated_at = ts;
+    persistMockExceptionMutation(id, {
+      lifecycle_state: "ESCALATED",
+      updated_at: ts,
+    });
     emitMockCaseEvent({
       type: "case_update",
       case_id: `case-for-${exc.id}`,
