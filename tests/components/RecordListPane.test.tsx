@@ -185,6 +185,62 @@ describe("RecordListPane — picker behaviour", () => {
     expect(onSelectRecord).toHaveBeenLastCalledWith("exc-C");
   });
 
+  it("stops handled arrow keys from leaking to document-level listeners", () => {
+    // Regression: the queue's document-level useKeyboardListNav fired
+    // on the SAME ArrowDown, moving the case selection (and dropping
+    // ?record=) while the operator was arrow-navigating the record
+    // list. The pane must stopPropagation for keys it owns.
+    const docSpy = vi.fn();
+    document.addEventListener("keydown", docSpy);
+    try {
+      render(
+        <RecordListPane
+          caseId="case-PHB"
+          records={[
+            mockRecord({ id: "exc-A", order_id: "PO-A" }),
+            mockRecord({ id: "exc-B", order_id: "PO-B" }),
+          ]}
+          selectedRecordId="exc-A"
+          onSelectRecord={vi.fn()}
+        />,
+      );
+      const group = screen.getByRole("radiogroup", {
+        name: /select a record/i,
+      });
+      fireEvent.keyDown(group, { key: "ArrowDown" });
+      expect(
+        docSpy,
+        "ArrowDown must not reach document — it would also drive the queue",
+      ).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener("keydown", docSpy);
+    }
+  });
+
+  it("lets unhandled keys (Tab) pass through to document", () => {
+    // Only the nav keys are owned; Tab must still bubble so focus can
+    // leave the pane.
+    const docSpy = vi.fn();
+    document.addEventListener("keydown", docSpy);
+    try {
+      render(
+        <RecordListPane
+          caseId="case-PHB"
+          records={[mockRecord({ id: "exc-A", order_id: "PO-A" })]}
+          selectedRecordId="exc-A"
+          onSelectRecord={vi.fn()}
+        />,
+      );
+      const group = screen.getByRole("radiogroup", {
+        name: /select a record/i,
+      });
+      fireEvent.keyDown(group, { key: "Tab" });
+      expect(docSpy).toHaveBeenCalled();
+    } finally {
+      document.removeEventListener("keydown", docSpy);
+    }
+  });
+
   it("ArrowUp clamps at the top edge (no wrap, no spurious select)", () => {
     const onSelectRecord = vi.fn();
     render(

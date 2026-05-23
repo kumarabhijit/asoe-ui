@@ -100,8 +100,13 @@ export function RecordListPane({
       default:
         return;
     }
-    if (next === selectedIdx) return;
+    // Own this key: prevent the browser's default scroll AND stop it
+    // bubbling to the queue's document-level useKeyboardListNav, which
+    // would otherwise ALSO move the case selection (and drop ?record=)
+    // when the operator is arrow-navigating THIS pane.
     event.preventDefault();
+    event.stopPropagation();
+    if (next === selectedIdx) return;
     const nextId = ids[next];
     if (nextId !== selectedRecordId) onSelectRecord?.(nextId);
     requestAnimationFrame(() => {

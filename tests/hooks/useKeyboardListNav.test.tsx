@@ -178,6 +178,35 @@ describe("useKeyboardListNav — no-hijack guards", () => {
     fireEvent.keyDown(document, { key: "ArrowDown" });
     expect(onSelect).not.toHaveBeenCalled();
   });
+
+  it("does not hijack arrows when focus is in another interactive region", () => {
+    // Regression: the queue's document-level handler used to fire even
+    // when focus was inside the /cases record-list radiogroup pane, so
+    // arrow-navigating the record list ALSO moved the queue selection
+    // (and dropped ?record= from the URL). Focus inside a sibling
+    // radiogroup/listbox/grid/menu/tree must be left alone.
+    const onSelect = vi.fn();
+    const { container } = render(
+      <>
+        <div role="radiogroup" aria-label="Other pane">
+          <button role="radio" data-testid="other-radio">
+            r
+          </button>
+        </div>
+        <Harness
+          items={[{ id: "a" }, { id: "b" }]}
+          selectedId="a"
+          onSelect={onSelect}
+        />
+      </>,
+    );
+    const radio = container.querySelector<HTMLButtonElement>(
+      "[data-testid='other-radio']",
+    )!;
+    radio.focus();
+    fireEvent.keyDown(radio, { key: "ArrowDown" });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
 });
 
 

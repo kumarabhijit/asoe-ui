@@ -97,6 +97,26 @@ export function useKeyboardListNav<T>({
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (isTypingTarget(event.target)) return;
 
+      // Don't hijack arrows when focus is inside ANOTHER interactive
+      // region (e.g. the `/cases` record-list radiogroup pane). This
+      // handler is document-level so it would otherwise drive THIS
+      // list while the operator is arrow-navigating a different pane —
+      // yanking the queue selection out from under a record-list arrow
+      // press (and dropping the record from the URL). Focus inside the
+      // hook's own container still flows through.
+      const target = event.target;
+      const container = containerRef.current;
+      if (
+        target instanceof HTMLElement &&
+        container &&
+        !container.contains(target) &&
+        target.closest(
+          '[role="radiogroup"], [role="listbox"], [role="grid"], [role="menu"], [role="tree"]',
+        )
+      ) {
+        return;
+      }
+
       const ids = items.map(getId);
       const idx = selectedId ? ids.indexOf(selectedId) : -1;
       let next = idx;
