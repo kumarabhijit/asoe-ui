@@ -2,32 +2,21 @@
  * /cases workspace usability regressions (MOCK MODE).
  *
  * Partner browser e2e for the source-level locks in
- * `tests/architectural/cases_workspace_render_guard.test.ts`
- * ("locks the workspace to the viewport…" + "makes the queue a single
- * Tab stop…") and the hook unit tests in
- * `tests/hooks/useKeyboardListNav.test.tsx`. Per the test-strategy
- * rule, a state-machine surface gets BOTH a source lock and a
- * multi-step operator-journey browser e2e — this is the latter.
+ * `tests/architectural/cases_workspace_render_guard.test.ts` and the
+ * jsdom behavioural tests (`useKeyboardListNav`, `RecordListPane`,
+ * `usePaneFocusCycle`). Per the test-strategy rule, a state-machine
+ * surface gets BOTH a source lock and a multi-step operator-journey
+ * browser e2e — this is the latter.
  *
- * The three usability defects this guards (all reachable from the
- * /cases page, the primary CSR work surface):
- *
- *   1. Navigation — primary nav tabs were <button>s, not links: no
- *      Cmd/Ctrl/middle-click into a new tab, AT announced "button".
- *      Fixed by rendering Next <Link>s (NavBar.tsx).
- *
- *   2. Focus loss — the queue listbox moved DOM focus onto each <option>
- *      row. That made every row a Tab stop and dropped focus to <body>
- *      when a filter change unmounted the focused row. Fixed by
- *      anchoring focus on the listbox container + roving via
- *      aria-activedescendant (useKeyboardListNav.ts + page.tsx
- *      tabIndex={-1} options).
- *
- *   3. Scrolling — the workspace had no viewport height bound, so the
- *      panes' overflow-y-auto never engaged and the whole document
- *      scrolled (dragging the action ribbon out of view). Fixed by
- *      pinning <main> to calc(100vh - nav) and clipping its overflow
- *      at lg+ (page.tsx).
+ * Scope note: the precise keyboard FOCUS movements (which element
+ * holds `document.activeElement` after a key) are exercised
+ * deterministically in jsdom, where there is no real layout/raf race.
+ * Here we assert the things only a REAL browser can confirm and jsdom
+ * cannot: anchor (vs button) nav semantics, the responsive CSS layout
+ * (viewport-locked panes, independent scroll containers), the roving
+ * `tabindex` wiring, and the URL outcomes of keyboard selection. These
+ * are non-timing-dependent (DOM attributes, computed styles, URL), so
+ * they're stable in CI.
  *
  * Mock mode: self-contained (next dev, no backend). Run via
  * `npm run test:browser:mock`.
@@ -36,111 +25,82 @@ import { test, expect } from "@playwright/test";
 
 import { loginAs, USERS } from "../browser/_helpers";
 
+// A known multi-record case in the mock fixtures (3 attached records),
+// so the middle record-list pane renders with several rows.
+const MULTI_RECORD_CASE = "case-multi-WMT-Q1RESET";
+
 test.describe("/cases usability (mock mode)", () => {
   test.beforeEach(async ({ page }) => {
+    // 1440 is comfortably past the xl breakpoint (1280) so the
+    // three-pane layout (incl. the record-list column) is active.
     await page.setViewportSize({ width: 1440, height: 900 });
     await loginAs(page, USERS.MANAGER);
     await page.goto("/cases");
-    // Queue populated (mock fixtures always seed open work).
     await expect(page.getByRole("option").first()).toBeVisible({
       timeout: 30_000,
     });
   });
 
   test("primary nav tabs are real links, not buttons", async ({ page }) => {
-    // Each nav destination must be an <a href> (supports open-in-new-tab
-    // / middle-click and announces as a link). Select by href, not
-    // label — labels are product copy (e.g. the /dashboard tab reads
-    // "Performance", not "Dashboard").
+    // Each nav destination is an <a href> (supports open-in-new-tab /
+    // middle-click and announces as a link). Select by href, not label
+    // — labels are product copy (e.g. the /dashboard tab reads
+    // "Performance").
     const nav = page.locator("nav").first();
-    const dashboardLink = nav.locator('a[href="/dashboard"]');
-    await expect(dashboardLink).toHaveCount(1);
+    await expect(nav.locator('a[href="/dashboard"]')).toHaveCount(1);
 
     // The active tab (/cases) carries aria-current=page.
-    const casesLink = nav.locator('a[href="/cases"]');
-    await expect(casesLink).toHaveAttribute("aria-current", "page");
+    await expect(nav.locator('a[href="/cases"]')).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
 
     // Plain click still soft-navigates (Next <Link>).
-    await dashboardLink.click();
+    await nav.locator('a[href="/dashboard"]').click();
     await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
   });
 
-  test("arrow-key nav anchors focus on the listbox, never <body>", async ({
+  test("the queue is a single Tab stop (listbox tabbable, rows roved out)", async ({
     page,
   }) => {
+    const listbox = page.getByRole("listbox", { name: /^cases$/i });
+    await expect(listbox).toHaveAttribute("tabindex", "0");
+    // Every option row is removed from the Tab order (roving via
+    // aria-activedescendant) — pre-fix each <button role=option> was
+    // its own Tab stop.
+    const tabbableRows = listbox.locator('[role="option"][tabindex="0"]');
+    await expect(tabbableRows).toHaveCount(0);
+    const rows = listbox.locator('[role="option"]');
+    expect(await rows.count()).toBeGreaterThan(0);
+  });
+
+  test("queue arrow-key selection updates the URL (?case=)", async ({
+    page,
+  }) => {
+    // Focus the listbox (not a text field), press ArrowDown — the
+    // document-level handler selects a case and writes ?case=. Asserts
+    // the URL outcome, not focus, so it's timing-stable.
     const listbox = page.getByRole("listbox", { name: /^cases$/i });
     await listbox.focus();
     await page.keyboard.press("ArrowDown");
-    // Let the selection land (arrow nav writes ?case= via router.replace).
     await page.waitForURL(/case=/, { timeout: 15_000 });
-
-    // Focus must rest on the listbox container — not an <option> row,
-    // and crucially not <body> (which is where the old row-focus model
-    // landed once a row unmounted).
-    const active = await page.evaluate(() => ({
-      role: document.activeElement?.getAttribute("role") ?? null,
-      isBody: document.activeElement === document.body,
-    }));
-    expect(active.isBody).toBe(false);
-    expect(active.role).toBe("listbox");
   });
 
-  test("the queue is a single Tab stop (rows are not individually tabbable)", async ({
+  test("the record-list pane is a single Tab stop with arrow-key selection", async ({
     page,
   }) => {
-    const listbox = page.getByRole("listbox", { name: /^cases$/i });
-    await listbox.focus();
-    await page.keyboard.press("Tab");
-
-    // One Tab must move focus OUT of the listbox entirely. Pre-fix the
-    // option <button>s were each a Tab stop, so Tab landed on the next
-    // row instead of leaving the pane.
-    const stillInsideListbox = await page.evaluate(() => {
-      const lb = document.querySelector('[role="listbox"]');
-      return lb ? lb.contains(document.activeElement) : false;
-    });
-    expect(stillInsideListbox).toBe(false);
-  });
-
-  test("F6 moves focus out of the queue into another pane", async ({
-    page,
-  }) => {
-    // Open a case so the detail pane (and, at xl, the record-list pane)
-    // exist as F6 targets.
-    await page.getByRole("option").first().click();
-    await page.waitForURL(/case=/, { timeout: 15_000 });
-
-    const listbox = page.getByRole("listbox", { name: /^cases$/i });
-    await listbox.focus();
-    await page.keyboard.press("F6");
-
-    const stillInQueue = await page.evaluate(() => {
-      const lb = document.querySelector(
-        '[role="listbox"][aria-label="Cases"]',
-      );
-      if (!lb) return false;
-      return lb === document.activeElement || lb.contains(document.activeElement);
-    });
-    expect(
-      stillInQueue,
-      "F6 must move focus out of the queue to the next pane",
-    ).toBe(false);
-  });
-
-  test("the record list is a single Tab stop with arrow-key selection", async ({
-    page,
-  }) => {
-    // Deep-link to a known multi-record case (3 attached records).
-    await page.goto("/cases?case=case-multi-WMT-Q1RESET");
+    await page.goto(`/cases?case=${MULTI_RECORD_CASE}`);
     const group = page
       .getByRole("radiogroup", { name: /select a record/i })
       .first();
     await expect(group).toBeVisible({ timeout: 30_000 });
 
-    // Exactly one radio is in the Tab order (roving tabindex).
+    // Roving tabindex: exactly one radio is in the Tab order.
     await expect(group.locator('[role="radio"][tabindex="0"]')).toHaveCount(1);
+    expect(await group.locator('[role="radio"]').count()).toBeGreaterThan(1);
 
-    // Arrow-key selection updates the URL ?record=.
+    // Arrow-key selection updates the URL ?record= (URL outcome, not
+    // focus — timing-stable).
     await group.locator('[role="radio"][tabindex="0"]').focus();
     await page.keyboard.press("ArrowDown");
     await page.waitForURL(/record=/, { timeout: 15_000 });
@@ -154,8 +114,7 @@ test.describe("/cases usability (mock mode)", () => {
     // scrollbar — each pane scrolls on its own.
     const docScrolls = await page.evaluate(() => {
       const doc = document.documentElement;
-      // +2 absorbs sub-pixel rounding.
-      return doc.scrollHeight - doc.clientHeight > 2;
+      return doc.scrollHeight - doc.clientHeight > 2; // +2 for rounding
     });
     expect(
       docScrolls,
@@ -163,9 +122,7 @@ test.describe("/cases usability (mock mode)", () => {
         "viewport-locked and each pane scrolls its own overflow",
     ).toBe(false);
 
-    // The queue's scroll container must be a real independent scroller
-    // (overflow-y: auto), so a long queue scrolls without moving the
-    // detail pane.
+    // The queue's scroll container is a real independent scroller.
     const queueScroller = page
       .locator('[aria-label="Case queue"] div.overflow-y-auto')
       .first();
@@ -173,5 +130,31 @@ test.describe("/cases usability (mock mode)", () => {
       (el) => getComputedStyle(el).overflowY,
     );
     expect(["auto", "scroll"]).toContain(overflowY);
+  });
+
+  test("the record-list (middle) pane is its own independent scroller", async ({
+    page,
+  }) => {
+    // Regression for "the middle pane needs scrolling to the top to
+    // reach" — `xl:contents` makes the <aside> the direct grid child so
+    // it stretches to the locked row height and scrolls its own list,
+    // instead of overflowing and getting clipped by the workspace.
+    await page.goto(`/cases?case=${MULTI_RECORD_CASE}`);
+    const group = page
+      .getByRole("radiogroup", { name: /select a record/i })
+      .first();
+    await expect(group).toBeVisible({ timeout: 30_000 });
+    const overflowY = await group.evaluate(
+      (el) => getComputedStyle(el).overflowY,
+    );
+    expect(["auto", "scroll"]).toContain(overflowY);
+    // And the document still does not scroll with the middle pane open.
+    const docScrolls = await page.evaluate(
+      () =>
+        document.documentElement.scrollHeight -
+          document.documentElement.clientHeight >
+        2,
+    );
+    expect(docScrolls).toBe(false);
   });
 });
