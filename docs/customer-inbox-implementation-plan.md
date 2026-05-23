@@ -59,9 +59,14 @@ Reuse the existing two-/three-pane `/cases` workspace
    to the `/cases` queue, calling `casesApi.list({ case_type:
    "EMAIL_ENTRY" })` once the backend filter (ADR-042 §2.2) lands.
    No new route; `/inbox` stays a redirect.
-2. **Detail tabs:** the prototype's nine tabs map onto
-   `CaseDetailPanel` sections, shown by data presence (not type
-   `switch`), consistent with the existing data-presence pattern.
+2. **Mount point (panel correction):** the new sections attach
+   **inside `ExceptionDetailPanel`'s data-presence section list**
+   (alongside `PriceHoldSection` / `EdiMismatchSection` /
+   `DiagnosticsSection`) for the selected record — NOT on the
+   `CaseDetailPanel` header (`CaseDetailPanel` only *mounts*
+   `ExceptionDetailPanel` per record). Sections are shown by data
+   presence (not a type `switch`) and are **lazy-loaded** (each is a
+   heavy chunk; follow the `PipelineDAG` ~12KB lazy ceiling).
 
 ## 4. New components (colocated under `src/app/cases/`)
 
@@ -69,11 +74,11 @@ Reuse the existing two-/three-pane `/cases` workspace
 |---|---|---|---|
 | `EntitiesSection.tsx` | extracted entities | `analysis.entities` | §4.3 |
 | `SapDataSection.tsx` | SAP master/order lookup | `analysis.sap_data` | §4.3 |
-| `OrderEntrySection.tsx` | extract → editable form → validate → submit-to-ERP | `OrderEntryExtraction` + `PATCH/submit` endpoints | §4.6 |
-| `Edi850Section.tsx` | Decoded / Raw X12 / Segment-map (read-only) | `GET /cases/{id}/edi-850` | §4.5 |
-| `ChangeAnalysisSection.tsx` | lifecycle bar, change-items, 10 constraint cards, agent timings, 3 scenarios, decision panel | `ConstraintEvaluation` + `ChangeDecision` | §4.4 |
-| `ConstraintGraphSection.tsx` | dependency graph (use `dagre`, already a dep) | topology + per-case projection | §6.6 |
-| `KnowledgeGraphSection.tsx` | entity-relationship graph (`dagre`) | `KnowledgeGraphPayload` | §6.5 |
+| `OrderEntrySection.tsx` | extract → editable form → validate → submit-to-ERP. 4-state machine (idle/extracting/done/error) owned by a new **`useOrderExtraction`** hook (mirror `useExceptionActions`); correction tracking via `logOrderCorrection`. **Do not** recompute pallet/validation client-side (Guardrail #6) — backend supplies validated values. | `OrderEntryExtraction` + `PATCH/submit` endpoints | §4.6 |
+| `Edi850Section.tsx` | Decoded / Raw X12 / Segment-map (read-only); fine as one component | `GET /cases/{id}/edi-850` | §4.5 |
+| `ChangeAnalysis*` (**split**, panel correction) | one section is a section-of-sections — split into `LifecycleBar`, `ChangeItemsGrid`, `ConstraintList` (**variable N**, not fixed 10), `ScenarioList` (**variable M**, not fixed 3), `ChangeDecisionPanel`. Drop agent timings (cosmetic, not audit-bearing). | `ConstraintEvaluation` + `ChangeDecision` | §4.4 |
+| `ConstraintGraphSection.tsx` | layered DAG (REQUEST→ITEMS→CONSTRAINTS→SOURCES→DECISION) — reuse the existing `PipelineDAG` dagre→SVG scaffold | per-case projection of trace/topology | §6.6 |
+| `KnowledgeGraphSection.tsx` | entity-relationship web (Sender/Email/SO/SKU/BP) — **NOT dagre** (layered layout is wrong for a cyclic entity graph); use force/radial or hand-positioned **SVG** (matching the prototype), design tokens, never canvas | `KnowledgeGraphPayload` | §6.5 |
 | `DraftReplyPanel.tsx` | AI draft → edit → approve & send | `DraftReply` + reply endpoints, via existing disposition/cosign flow | §4.3 |
 | `IntakePipelineView.tsx` | 6-step intake flow | `GET /api/v1/pipeline/topology` + WS steps (`WaterfallStepper`) | §4.7 |
 | `SimulateInboundModal.tsx` | inject test scenarios (sandbox only) | `POST /sandbox/simulate-inbound` | §4.8 |
@@ -90,22 +95,33 @@ Shared primitives still owed from gap-analysis §9.1 Phase A
   lock (`tests/architectural/case_pivot_mock_wiring.test.ts` style)
   for any backend `model_validator`.
 * `src/types/*`: regenerate from `asoe2/openapi/asoe2.openapi.json`.
-  Keep `*AnalysisData` rich (Guardrail #7).
-* Real-time: extend `useWebSocket` consumption for pipeline-step and
-  draft/sent events; drive `WaterfallStepper` + `ActivityIndicator`.
+  Keep `*AnalysisData` rich (Guardrail #7). **Phase 0 fix:** reconcile
+  the hand-written `src/types/exceptions.ts` autonomy union
+  (`"L1"|"L2"|"L3"`) against `src/types/generated.ts` (`"L1"…"L4"`) —
+  the new L4 surfaces will trip this drift.
+* Real-time (panel correction): new pipeline-step and draft/sent
+  event types must be added to the existing
+  `isCaseInvalidationEvent` predicate so they flow through the
+  `refetch()` / `refreshCaseDetail` seam in
+  `src/app/cases/page.tsx` — do **not** invent local optimistic
+  state for submit / draft-send; reuse the overwrite-in-place
+  `refreshCaseDetail` path. Drive `WaterfallStepper` +
+  `ActivityIndicator` from those events.
 
 ## 6. Phasing (mirrors ADR-042 §3)
 
+**MLS = Phases 0–3.** Draft Reply pulled ahead of the graphs.
+
 | Phase | asoe-ui deliverable |
 |---|---|
-| 0 | type-gen from new OpenAPI; `case_type=EMAIL_ENTRY` filter wiring; shared primitives |
+| 0 | type-gen from new OpenAPI; reconcile L3-vs-L4 type drift; `health.allowed_autonomy_levels` wiring; `case_type=EMAIL_ENTRY` filter; shared primitives |
 | 1 | Inbox lens (filter chip + master-detail) |
 | 2 | `EntitiesSection`, `SapDataSection`, AI-analysis enrichment via `AgentReasoningCard` |
-| 3 | `OrderEntrySection` (4 states: idle/extracting/done/error; correction tracking) |
-| 4 | `Edi850Section` (3 sub-views) |
-| 5 | `ChangeAnalysisSection` + `ConstraintGraphSection` |
-| 6 | `KnowledgeGraphSection` |
-| 7 | `DraftReplyPanel` + `IntakePipelineView` + `SimulateInboundModal` |
+| 3 | `OrderEntrySection` + `useOrderExtraction` (4 states; correction tracking) — **MLS completes** |
+| 4 | `DraftReplyPanel` + `IntakePipelineView` + `SimulateInboundModal` |
+| 5 | `Edi850Section` (3 sub-views) |
+| 6 | split `ChangeAnalysis*` (variable cardinality) |
+| 7 | `ConstraintGraphSection` (dagre) + `KnowledgeGraphSection` (radial/SVG) — deferrable |
 | 8 | hardening: axe, contract snapshots, docs |
 
 ## 7. Test gates (per `CLAUDE.md` Definition of Done)
@@ -117,25 +133,84 @@ Shared primitives still owed from gap-analysis §9.1 Phase A
   EMAIL_ENTRY case → run extraction → edit a field → approve & send
   draft → assert status flip; reference
   `tests/browser/cases-workspace-case-switch.spec.ts`.
-* **Mock-data locks** mirroring any new backend validator.
-* **Accessibility:** new route/lens added to
-  `e2e/contract/authenticated-routes.ts`; new top-level components
-  added to `tests/accessibility/component_sweep.test.tsx`.
-* **Contract snapshots:** `npm run verify:reason-tags`,
-  `verify:ui-routes`, `verify-types` all green.
-* **Bug-fix PRs** include a regression test that fails on the parent
-  commit.
+* **Mock-data locks** mirroring **each** backend `model_validator`
+  — every new endpoint adds a `MOCK_*` fixture in
+  `src/lib/mock-data/*`, so each needs the matching lock.
+* **Accessibility:** the EMAIL_ENTRY lens is filter state, **not a
+  new route** — it gets browser-e2e coverage rather than a
+  `e2e/contract/authenticated-routes.ts` entry. New top-level
+  components under `src/components/ui/` go in
+  `tests/accessibility/component_sweep.test.tsx`.
+* **Contract snapshots:** `verify-types` is the load-bearing one
+  (regenerate from OpenAPI); `verify:reason-tags` only matters if
+  reason-tag vocab changes; `verify:ui-routes` for any route change.
+* **Bug-fix PRs** include a regression test that **fails on the
+  parent commit** — run the `git stash` / `git checkout HEAD~1`
+  verification ritual (CLAUDE.md) and paste both results into the PR.
 
-## 8. Open decisions (defer to ADR-042 §5)
+## 8. Autonomy L1–L4 ordering (Product directive)
 
-* Autonomy L1–L4 semantics — adopt `contracts/policy.py` ordering;
-  discard the prototype's inverted labels.
+Product has decided to **adopt the prototype's L1–L4 ordering**
+(L1 = most autonomous → L4 = human). Today
+`src/lib/cases.ts::AUTONOMY_LEVEL_DESCRIPTIONS` hardcodes the
+*opposite* (L1 "Block automatically" … L4 "Fully automated"), which
+matches the backend's current `contracts/policy.py`.
+
+**This is a backend/policy decision, not a UI override** (CLAUDE.md:
+"the UI displays what the backend decides"). The frontend must NOT
+flip the ordering with a hardcoded map — that would entrench a
+Guardrail #1 violation. Instead:
+
+1. The backend serves an ordered, self-describing list in the health
+   payload: `allowed_autonomy_levels: { level, label, rank }[]`
+   (added in ADR-042 Phase 0, under `autonomy_vocab_version` v2).
+2. `useHealth()` (already consumed in `src/app/cases/page.tsx`)
+   exposes it. `autonomyLevelLabel(level, health)` becomes a lookup
+   (mirroring `pickQuickActionReasonTag(intent, health)` in
+   `cases.ts`, which already takes `health` and returns `null` when
+   absent). `AUTONOMY_LEVEL_DESCRIPTIONS` shrinks to a transition
+   fallback, like `STATUS_LABEL`.
+3. Any UI that **orders** autonomy (matrix, sort, stepper) sorts by
+   `rank` — never by parsing the `Ln` string.
+
+Net: Product's preferred ordering is implemented once, server-side,
+and every surface follows automatically. See ADR-042 §5 for the
+audit-safety controls (versioned vocab, no historical mutation,
+compliance sign-off).
+
+## 9. Other open decisions
+
+* `invoice_query` has no `email_classification` target (ADR-042 §5b)
+  — backend decision; UI just renders whatever `useHealth` lists.
+* Constraint Graph + Knowledge Graph are evidence-richness and
+  partly duplicate the existing pipeline trace/topology — deferrable
+  (ADR-042 §3 re-prioritisation).
 * Demo niceties (open-in-new-tab, right-click menu, copy-sender):
   proposed drop/defer.
 * Out of scope here: Quota, Performance, Admin, CSR Chat
   (gap-analysis §5/§6).
 
+## 10. Panel review (2026-05-23)
+
+Folded in from the four-lens review (Architect / Compliance /
+Frontend / Domain):
+* Sections mount inside `ExceptionDetailPanel` (lazy), not the case
+  header (§3).
+* `ChangeAnalysis*` split; render variable-cardinality constraints /
+  scenarios; agent timings dropped (§4).
+* Knowledge graph uses radial/SVG, not dagre; constraint graph
+  reuses the `PipelineDAG` dagre scaffold (§4).
+* `useOrderExtraction` hook for the 4-state machine; no client-side
+  pallet recompute (Guardrail #6); reuse the `refreshCaseDetail` /
+  `isCaseInvalidationEvent` seam for WS + writes (§4, §5).
+* Autonomy ordering resolved server-side via
+  `health.allowed_autonomy_levels` (rank) — Product's prototype
+  ordering honoured without a hardcoded UI map (§8).
+* Phase 0 resolves the L3-vs-L4 type drift; MLS = Phases 0–3; Draft
+  Reply pulled ahead of graphs (§6).
+
 ---
 
 *Paired with asoe2 ADR-042. Generated 2026-05-23 from the AgenticOM
-prototype Customer Inbox analysis.*
+prototype Customer Inbox analysis; revised after the 2026-05-23
+expert panel review.*
