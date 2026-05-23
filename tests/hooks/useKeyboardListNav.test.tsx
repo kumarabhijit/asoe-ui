@@ -207,6 +207,52 @@ describe("useKeyboardListNav — no-hijack guards", () => {
     fireEvent.keyDown(radio, { key: "ArrowDown" });
     expect(onSelect).not.toHaveBeenCalled();
   });
+
+  it("does not hijack keys when focus is on another pane (the detail section)", () => {
+    // Regression: the /cases detail pane is a plain focusable <section>
+    // (tabIndex=-1), not a radiogroup/listbox. When the operator F6'd
+    // into it and pressed ArrowDown to SCROLL, the queue's document
+    // handler swallowed the key (preventDefault), jumped the queue to
+    // another case, and stole focus back. Any focused element outside
+    // the queue container — regardless of role — must be left alone.
+    const onSelect = vi.fn();
+    const { container } = render(
+      <>
+        <section tabIndex={-1} data-testid="detail-pane">
+          detail
+        </section>
+        <Harness
+          items={[{ id: "a" }, { id: "b" }, { id: "c" }]}
+          selectedId="a"
+          onSelect={onSelect}
+        />
+      </>,
+    );
+    const detail = container.querySelector<HTMLElement>(
+      "[data-testid='detail-pane']",
+    )!;
+    detail.focus();
+    for (const key of ["ArrowDown", "ArrowUp", "Home", "End", "j", "k"]) {
+      fireEvent.keyDown(detail, { key });
+    }
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("still drives the queue when focus is loose (on <body>)", () => {
+    // The Outlook-inbox convenience: before the operator has Tabbed/F6'd
+    // anywhere (focus on <body>), arrows still drive the queue.
+    const onSelect = vi.fn();
+    render(
+      <Harness
+        items={[{ id: "a" }, { id: "b" }]}
+        selectedId="a"
+        onSelect={onSelect}
+      />,
+    );
+    // Nothing focused → document.activeElement is <body>.
+    fireEvent.keyDown(document, { key: "ArrowDown" });
+    expect(onSelect).toHaveBeenLastCalledWith("b");
+  });
 });
 
 
