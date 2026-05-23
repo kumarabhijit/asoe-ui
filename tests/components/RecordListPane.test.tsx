@@ -24,7 +24,7 @@
  * `CaseDetailPanel`'s contract (see `CaseDetailPanel.test.tsx`).
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { RecordListPane } from "@/app/cases/RecordListPane";
@@ -119,6 +119,89 @@ describe("RecordListPane — picker behaviour", () => {
     );
     await userEvent.click(screen.getAllByRole("radio")[1]);
     expect(onSelectRecord).toHaveBeenCalledWith("exc-B");
+  });
+
+  it("is a single Tab stop: roving tabindex puts only one radio in tab order", () => {
+    // Regression for the "can't switch panes with Tab" report — when
+    // every radio was tabbable, Tab walked all rows instead of moving
+    // to the next pane. APG radiogroup roving tabindex: exactly one
+    // radio carries tabIndex=0.
+    const { rerender } = render(
+      <RecordListPane
+        caseId="case-PHB"
+        records={[
+          mockRecord({ id: "exc-A", order_id: "PO-A" }),
+          mockRecord({ id: "exc-B", order_id: "PO-B" }),
+          mockRecord({ id: "exc-C", order_id: "PO-C" }),
+        ]}
+      />,
+    );
+    let radios = screen.getAllByRole("radio");
+    // No selection → the FIRST row is the tab stop.
+    expect(radios.map((r) => r.getAttribute("tabindex"))).toEqual([
+      "0",
+      "-1",
+      "-1",
+    ]);
+
+    // Selection → the SELECTED row becomes the tab stop.
+    rerender(
+      <RecordListPane
+        caseId="case-PHB"
+        records={[
+          mockRecord({ id: "exc-A", order_id: "PO-A" }),
+          mockRecord({ id: "exc-B", order_id: "PO-B" }),
+          mockRecord({ id: "exc-C", order_id: "PO-C" }),
+        ]}
+        selectedRecordId="exc-B"
+      />,
+    );
+    radios = screen.getAllByRole("radio");
+    expect(radios.map((r) => r.getAttribute("tabindex"))).toEqual([
+      "-1",
+      "0",
+      "-1",
+    ]);
+  });
+
+  it("ArrowDown / ArrowUp move the selection within the pane", () => {
+    const onSelectRecord = vi.fn();
+    render(
+      <RecordListPane
+        caseId="case-PHB"
+        records={[
+          mockRecord({ id: "exc-A", order_id: "PO-A" }),
+          mockRecord({ id: "exc-B", order_id: "PO-B" }),
+          mockRecord({ id: "exc-C", order_id: "PO-C" }),
+        ]}
+        selectedRecordId="exc-A"
+        onSelectRecord={onSelectRecord}
+      />,
+    );
+    const group = screen.getByRole("radiogroup", { name: /select a record/i });
+    fireEvent.keyDown(group, { key: "ArrowDown" });
+    expect(onSelectRecord).toHaveBeenLastCalledWith("exc-B");
+    fireEvent.keyDown(group, { key: "End" });
+    expect(onSelectRecord).toHaveBeenLastCalledWith("exc-C");
+  });
+
+  it("ArrowUp clamps at the top edge (no wrap, no spurious select)", () => {
+    const onSelectRecord = vi.fn();
+    render(
+      <RecordListPane
+        caseId="case-PHB"
+        records={[
+          mockRecord({ id: "exc-A", order_id: "PO-A" }),
+          mockRecord({ id: "exc-B", order_id: "PO-B" }),
+        ]}
+        selectedRecordId="exc-A"
+        onSelectRecord={onSelectRecord}
+      />,
+    );
+    const group = screen.getByRole("radiogroup", { name: /select a record/i });
+    fireEvent.keyDown(group, { key: "ArrowUp" });
+    // Already at the top → next === current → no re-select.
+    expect(onSelectRecord).not.toHaveBeenCalled();
   });
 
   it("emits `data-keyboard-nav-id` per row so useKeyboardListNav can drive", () => {

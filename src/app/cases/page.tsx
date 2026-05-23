@@ -38,6 +38,7 @@ import { ALLOWED_CASE_SOURCES, casesApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useKeyboardListNav } from "@/hooks/useKeyboardListNav";
+import { usePaneFocusCycle } from "@/hooks/usePaneFocusCycle";
 import { useSlaTicker } from "@/hooks/useSlaTicker";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import {
@@ -418,6 +419,21 @@ function CasesWorkspace() {
     enabled: sorted.length > 0,
   });
 
+  // ── Cross-pane focus (F6 / Shift+F6) ────────────────────────
+  // Tab walks the controls inside the focused pane; F6 jumps to the
+  // next pane. Only visible panes participate, so the cycle is
+  // queue ↔ detail below xl (record-list column collapsed) and
+  // queue ↔ record-list ↔ detail at xl+. The record-list ref is the
+  // dedicated xl column's radiogroup; the detail section is made
+  // focusable (tabIndex=-1) below.
+  const recordListRef = useRef<HTMLUListElement | null>(null);
+  const detailRef = useRef<HTMLElement | null>(null);
+  const paneRefs = useMemo(
+    () => [queueRef, recordListRef, detailRef],
+    [],
+  );
+  usePaneFocusCycle(paneRefs);
+
   return (
     <main
       id="main-content"
@@ -464,6 +480,12 @@ function CasesWorkspace() {
           </h1>
           <p className="text-caption text-text-tertiary leading-normal">
             Sorted by SLA. Select one to open its workspace on the right.
+          </p>
+          {/* Discoverable keyboard affordances (Material UX — surface
+              shortcuts where the interaction lives). */}
+          <p className="mt-4 text-label text-text-quaternary leading-normal">
+            <kbd className="font-sans">↑</kbd>/<kbd className="font-sans">↓</kbd>{" "}
+            move · <kbd className="font-sans">F6</kbd> switch panes
           </p>
         </div>
 
@@ -627,21 +649,36 @@ function CasesWorkspace() {
         && orderCase
         && orderCase.case_id === selectedCaseId
         && records.length > 0 && (
-        <div className="hidden xl:block">
+        // `xl:contents` (not `xl:block`) so the RecordListPane <aside>
+        // becomes the direct grid child at xl and STRETCHES to the
+        // viewport-locked row height — letting its own list scroll
+        // independently. With a plain block wrapper the aside sized to
+        // its content and a long record list was clipped by the
+        // workspace's `overflow-hidden`, so the operator couldn't reach
+        // the lower records without the whole layout fighting them.
+        <div className="hidden xl:contents">
           <RecordListPane
             caseId={orderCase.case_id}
             records={records}
             selectedRecordId={selectedRecordId}
             onSelectRecord={handleSelectRecord}
+            groupRef={recordListRef}
           />
         </div>
       )}
 
       {/* ── Right pane: case workspace ──────────────────────── */}
       <section
+        ref={detailRef}
         aria-label="Case workspace"
+        // tabIndex=-1 so F6 can land focus on the pane as a region;
+        // from there Tab reaches the action ribbon. No focus ring on
+        // the section itself (it's a large container) — the controls
+        // inside carry their own focus-visible rings.
+        tabIndex={-1}
         className={cn(
           "bg-surface-primary border border-border rounded-md shadow-xs p-24",
+          "focus:outline-none",
           // Below lg: give the empty/detail state a comfortable minimum
           // height in normal document flow. At lg+: the pane is a grid
           // cell stretched to the viewport-locked row, so it scrolls its

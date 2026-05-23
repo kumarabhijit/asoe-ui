@@ -256,6 +256,49 @@ describe("/cases workspace — case-switch race invariants", () => {
     ).toMatch(/role=["']option["'][\s\S]*?tabIndex=\{-1\}/);
   });
 
+  it("middle record-list column is an independent scroller (xl:contents)", () => {
+    // Bug: the middle pane was wrapped in `hidden xl:block`. A block
+    // wrapper isn't the grid child, so the RecordListPane <aside>
+    // didn't inherit the viewport-locked row height — a long record
+    // list overflowed and got clipped by the workspace's
+    // `overflow-hidden`, so the operator couldn't reach the lower
+    // records without fighting the layout. `xl:contents` promotes the
+    // <aside> to the direct grid child so it stretches and scrolls on
+    // its own.
+    expect(
+      src,
+      "the middle record-list wrapper must use `xl:contents` (not " +
+        "`xl:block`) so the pane stretches to the locked row height " +
+        "and scrolls independently",
+    ).toMatch(/hidden xl:contents/);
+    expect(
+      src,
+      "the page must hand RecordListPane a `groupRef` so the pane is " +
+        "an F6 focus target",
+    ).toMatch(/groupRef=\{recordListRef\}/);
+  });
+
+  it("supports F6 cross-pane focus switching", () => {
+    // Bug ("can't switch between panes with a keyboard shortcut"):
+    // Tab walked every row, and there was no shortcut to jump between
+    // the queue / record-list / detail panes. usePaneFocusCycle binds
+    // F6 / Shift+F6 across the pane refs; the detail section is made a
+    // focus target with tabIndex={-1}.
+    expect(
+      src,
+      "usePaneFocusCycle must be imported",
+    ).toMatch(/import\s+\{\s*usePaneFocusCycle\s*\}\s+from\s+["']@\/hooks\/usePaneFocusCycle["']/);
+    expect(
+      src,
+      "usePaneFocusCycle must be wired with the pane refs",
+    ).toMatch(/usePaneFocusCycle\(/);
+    expect(
+      src,
+      "the case-workspace section must be focusable (tabIndex={-1}) " +
+        "so F6 can land on it",
+    ).toMatch(/aria-label=["']Case workspace["'][\s\S]{0,500}?tabIndex=\{-1\}/);
+  });
+
   it("pins the selected case in the visible queue across filter mismatches", () => {
     // The UX architect flagged "agent mutates the selected record's
     // status while the operator is on it" as a real incident. When

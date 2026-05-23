@@ -102,6 +102,50 @@ test.describe("/cases usability (mock mode)", () => {
     expect(stillInsideListbox).toBe(false);
   });
 
+  test("F6 moves focus out of the queue into another pane", async ({
+    page,
+  }) => {
+    // Open a case so the detail pane (and, at xl, the record-list pane)
+    // exist as F6 targets.
+    await page.getByRole("option").first().click();
+    await page.waitForURL(/case=/, { timeout: 15_000 });
+
+    const listbox = page.getByRole("listbox", { name: /^cases$/i });
+    await listbox.focus();
+    await page.keyboard.press("F6");
+
+    const stillInQueue = await page.evaluate(() => {
+      const lb = document.querySelector(
+        '[role="listbox"][aria-label="Cases"]',
+      );
+      if (!lb) return false;
+      return lb === document.activeElement || lb.contains(document.activeElement);
+    });
+    expect(
+      stillInQueue,
+      "F6 must move focus out of the queue to the next pane",
+    ).toBe(false);
+  });
+
+  test("the record list is a single Tab stop with arrow-key selection", async ({
+    page,
+  }) => {
+    // Deep-link to a known multi-record case (3 attached records).
+    await page.goto("/cases?case=case-multi-WMT-Q1RESET");
+    const group = page
+      .getByRole("radiogroup", { name: /select a record/i })
+      .first();
+    await expect(group).toBeVisible({ timeout: 30_000 });
+
+    // Exactly one radio is in the Tab order (roving tabindex).
+    await expect(group.locator('[role="radio"][tabindex="0"]')).toHaveCount(1);
+
+    // Arrow-key selection updates the URL ?record=.
+    await group.locator('[role="radio"][tabindex="0"]').focus();
+    await page.keyboard.press("ArrowDown");
+    await page.waitForURL(/record=/, { timeout: 15_000 });
+  });
+
   test("the workspace is viewport-locked: panes scroll, the document does not", async ({
     page,
   }) => {
