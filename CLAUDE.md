@@ -274,8 +274,8 @@ Required gates on every PR:
     verify by removing the deliverable locally and confirming
     both fail. Reference impls:
     `tests/architectural/cases_workspace_render_guard.test.ts`
-    ("renders the three-pane workspace" assertion) +
-    `tests/browser/cases-workspace-three-pane.spec.ts`. See
+    ("renders the two-pane workspace" assertion) +
+    `tests/browser/cases-workspace-two-pane.spec.ts`. See
     `docs/test-strategy/README.md` Gap 7.
 
 ## Definition of Done

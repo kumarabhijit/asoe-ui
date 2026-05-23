@@ -31,8 +31,8 @@ const MULTI_RECORD_CASE = "case-multi-WMT-Q1RESET";
 
 test.describe("/cases usability (mock mode)", () => {
   test.beforeEach(async ({ page }) => {
-    // 1440 is comfortably past the xl breakpoint (1280) so the
-    // three-pane layout (incl. the record-list column) is active.
+    // A wide desktop viewport so the two-pane layout (queue + detail
+    // with the record-list picker stacked on top) is active.
     await page.setViewportSize({ width: 1440, height: 900 });
     await loginAs(page, USERS.MANAGER);
     await page.goto("/cases");
@@ -132,23 +132,23 @@ test.describe("/cases usability (mock mode)", () => {
     expect(["auto", "scroll"]).toContain(overflowY);
   });
 
-  test("the record-list (middle) pane is its own independent scroller", async ({
+  test("the record-list picker is stacked inside the detail pane", async ({
     page,
   }) => {
-    // Regression for "the middle pane needs scrolling to the top to
-    // reach" — `xl:contents` makes the <aside> the direct grid child so
-    // it stretches to the locked row height and scrolls its own list,
-    // instead of overflowing and getting clipped by the workspace.
+    // Two-pane layout: there is no dedicated record-list column — the
+    // picker is stacked at the top of the detail pane (full width, no
+    // truncated labels) and scrolls together with the detail content.
     await page.goto(`/cases?case=${MULTI_RECORD_CASE}`);
     const group = page
       .getByRole("radiogroup", { name: /select a record/i })
       .first();
     await expect(group).toBeVisible({ timeout: 30_000 });
-    const overflowY = await group.evaluate(
-      (el) => getComputedStyle(el).overflowY,
+    // The picker lives INSIDE the Case workspace pane.
+    const insideDetail = await group.evaluate(
+      (el) => !!el.closest('section[aria-label="Case workspace"]'),
     );
-    expect(["auto", "scroll"]).toContain(overflowY);
-    // And the document still does not scroll with the middle pane open.
+    expect(insideDetail).toBe(true);
+    // And the document still does not scroll (panes are viewport-locked).
     const docScrolls = await page.evaluate(
       () =>
         document.documentElement.scrollHeight -
@@ -161,12 +161,9 @@ test.describe("/cases usability (mock mode)", () => {
   test("F6 cycles into the detail pane and the pane shows a focus ring", async ({
     page,
   }) => {
-    // Bug report: "with F6 I can move queue → middle but not middle →
-    // detail". F6 actually DID move focus to the detail <section> all
-    // along — but the section had no focus-visible ring (unlike the
-    // queue + record-list panes), so the operator couldn't tell focus
-    // landed and read the hop as broken. Assert BOTH: focus reaches the
-    // detail region AND it is visibly indicated.
+    // F6 jumps focus queue → detail (two-pane workspace). The detail
+    // <section> must paint a focus-visible ring so the operator can
+    // tell focus landed — without it the hop reads as broken.
     await page.goto(`/cases?case=${MULTI_RECORD_CASE}`);
     const detail = page.locator('section[aria-label="Case workspace"]');
     await expect(detail).toBeVisible({ timeout: 30_000 });
@@ -181,11 +178,10 @@ test.describe("/cases usability (mock mode)", () => {
       (el) => getComputedStyle(el).boxShadow,
     );
 
-    // Start in the queue, then F6 → middle → detail.
+    // Start in the queue, then F6 → detail.
     await page.evaluate(() =>
       document.querySelector<HTMLElement>('[role="listbox"]')?.focus(),
     );
-    await page.keyboard.press("F6");
     await page.keyboard.press("F6");
 
     // Focus reached the detail region.
@@ -231,11 +227,10 @@ test.describe("/cases usability (mock mode)", () => {
       { timeout: 30_000 },
     );
 
-    // F6 → middle → detail.
+    // F6 → detail.
     await page.evaluate(() =>
       document.querySelector<HTMLElement>('[role="listbox"]')?.focus(),
     );
-    await page.keyboard.press("F6");
     await page.keyboard.press("F6");
     expect(
       await page.evaluate(

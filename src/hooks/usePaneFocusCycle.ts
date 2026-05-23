@@ -2,11 +2,12 @@
  * usePaneFocusCycle — move keyboard focus between the panes of a
  * multi-pane workspace with F6 / Shift+F6.
  *
- * The `/cases` workspace is a three-pane master-detail surface (queue
- * | record list | case detail). Tab walks through the controls WITHIN
- * the focused pane; F6 is the canonical "jump to the next pane / region"
- * shortcut (the WAI-ARIA pattern browsers and IDEs use), so an operator
- * can cross the workspace without tabbing through every row.
+ * The `/cases` workspace is a two-pane master-detail surface (queue |
+ * case detail; the record-list picker is stacked at the top of the
+ * detail pane). Tab walks through the controls WITHIN the focused pane;
+ * F6 is the canonical "jump to the next pane / region" shortcut (the
+ * WAI-ARIA pattern browsers and IDEs use), so an operator can cross the
+ * workspace without tabbing through every row.
  *
  * Contract:
  *   * `refs` is the ordered list of pane focus targets (the queue
