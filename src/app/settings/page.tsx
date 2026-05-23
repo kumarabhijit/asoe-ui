@@ -72,10 +72,6 @@ export default function SettingsPage() {
       <NavBar
         tabs={filteredTabs}
         activeTab="settings"
-        onTabChange={(id) => {
-          const tab = NAV_TABS.find((t) => t.id === id);
-          if (tab?.href) router.push(tab.href);
-        }}
         userName={userName}
         userInitials={userInitials}
         userTitle={userTitle}

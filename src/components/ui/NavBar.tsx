@@ -63,17 +63,30 @@ export function NavBar({
         <Logo size="sm" />
       </Link>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation — real <Link>s, not buttons. Primary
+          navigation destinations must be anchors so Cmd/Ctrl/middle-
+          click open in a new tab, the browser shows the URL on hover,
+          and AT announces "link" (Material nav guidance / WCAG link
+          vs button semantics). Next's <Link> still does client-side
+          soft-nav on a plain click. `onTabChange` is an optional
+          side-effect hook (analytics) — navigation is owned by the
+          href, so callers must NOT also router.push or the click
+          double-navigates. */}
       <div className="flex items-center gap-4 flex-1 ml-16">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
-            <button
+            <Link
               key={tab.id}
+              href={tab.href}
               onClick={() => onTabChange?.(tab.id)}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "relative bg-transparent border-none cursor-pointer px-12 py-8 text-body font-sans whitespace-nowrap transition-colors duration-fast",
+                "relative no-underline px-12 py-8 text-body font-sans whitespace-nowrap transition-colors duration-fast",
+                // Visible keyboard focus indicator — the old <button>
+                // tabs had none, so keyboard users couldn't tell which
+                // tab was focused (WCAG 2.4.7 Focus Visible).
+                "rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
                 isActive
                   ? "font-semibold text-text-primary"
                   // Inactive tabs use text-secondary (#4A4A5A → 8.46:1 on
@@ -88,7 +101,7 @@ export function NavBar({
               {isActive && (
                 <span className="absolute -bottom-px left-12 right-12 h-0.5 bg-brand rounded-full" />
               )}
-            </button>
+            </Link>
           );
         })}
       </div>

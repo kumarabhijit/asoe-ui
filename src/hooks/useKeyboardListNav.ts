@@ -3,11 +3,11 @@
  * (Phase 28.5.x §D5).
  *
  * Wires the canonical ArrowUp / ArrowDown / j / k / Home / End
- * keyboard contract onto a vertical list of items. Two consumers:
- * the legacy `ExceptionListPane` and the new `CaseListPane`. Both
- * implement `role="listbox"` with each row `role="option"` so a
- * screen reader announces the selection move; the hook drives the
- * focus / selection state.
+ * keyboard contract onto a vertical list of items. Consumed by the
+ * `/cases` queue listbox (`src/app/cases/page.tsx`), which renders
+ * `role="listbox"` with each row `role="option"` so a screen reader
+ * announces the selection move; the hook drives the focus /
+ * selection state.
  *
  * Contract:
  *   * `items` is the rendered sorted list (the hook does NOT sort).
@@ -18,11 +18,16 @@
  *   * `selectedId` / `onSelect` are the controlled selection
  *     surface. The hook never holds local state; the page owns the
  *     `useState`.
- *   * `containerRef` is the DOM node that wraps every row. The
- *     hook reads it for two purposes: detecting "did the focused
- *     element come from inside this list" (to suppress hijacking
- *     ArrowDown when the focus is in a search input) and calling
- *     `scrollIntoView` on the row that just took selection.
+ *   * `containerRef` is the `role="listbox"` DOM node that wraps
+ *     every row. On a selection move the hook `scrollIntoView`s the
+ *     newly-active row AND anchors DOM focus on the CONTAINER — not
+ *     the row. The container is the single Tab stop and a stable
+ *     focus target; the active row is announced through the
+ *     listbox's `aria-activedescendant`. Focusing the row instead
+ *     would make every row a Tab stop and drop focus to `<body>`
+ *     whenever a filter / refetch unmounted the focused row. So
+ *     consumers MUST wire `aria-activedescendant` on the container
+ *     and render options with `tabIndex={-1}`.
  *   * Each row has `data-keyboard-nav-id={getId(item)}` so
  *     scrollIntoView can find it by attribute query without the
  *     hook caring about which element type renders the row.
@@ -34,11 +39,6 @@
  * a Radix popover/dialog is open. Modifier-key combinations
  * (Cmd+ArrowDown = scroll to top, Cmd+K = command palette)
  * belong to the browser/OS and are not hijacked.
- *
- * Reference shape borrowed from `src/app/exceptions/ExceptionListPane.tsx`
- * which already implements `role="listbox"` + `role="option"`
- * correctly; the hook factors the keyboard logic out so the new
- * `CaseListPane` can reuse it.
  */
 "use client";
 
@@ -133,15 +133,18 @@ export function useKeyboardListNav<T>({
       requestAnimationFrame(() => {
         const container = containerRef.current;
         if (!container) return;
+        // Anchor DOM focus on the listbox CONTAINER, not the row.
+        // The container is the single Tab stop and a stable focus
+        // target; the active row is announced through the listbox's
+        // `aria-activedescendant`. Focusing the row instead made every
+        // row a Tab stop AND lost focus to <body> whenever a filter
+        // change or silent refetch unmounted the focused row. Anchoring
+        // on the container keeps keyboard nav alive across those churns.
+        container.focus({ preventScroll: true });
         const el = container.querySelector<HTMLElement>(
           `[data-keyboard-nav-id="${CSS.escape(nextId)}"]`,
         );
-        if (!el) return;
-        el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-        // Focus the newly-selected row so :focus-visible follows.
-        // `preventScroll` avoids racing the smooth scrollIntoView
-        // we just queued above.
-        el.focus({ preventScroll: true });
+        el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
       });
     }
 

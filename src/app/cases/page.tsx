@@ -151,7 +151,6 @@ export const requiresAuth = true;
 // shell (NavBar + Suspense wrapper) and a workspace (the searchParams-
 // reading body) so static rendering still works for the chrome.
 export default function CasesPage() {
-  const router = useRouter();
   const { user, visibleTabs } = useAuth();
   const { health } = useHealth();
   const handleSignOut = useSignOut();
@@ -171,10 +170,6 @@ export default function CasesPage() {
       <NavBar
         tabs={filteredTabs}
         activeTab="cases"
-        onTabChange={(id) => {
-          const tab = NAV_TABS.find((t) => t.id === id);
-          if (tab?.href) router.push(tab.href);
-        }}
         userName={userName}
         userInitials={userInitials}
         userTitle={userTitle}
@@ -445,6 +440,17 @@ function CasesWorkspace() {
         "grid-cols-1",
         "lg:grid-cols-[360px_minmax(0,1fr)]",
         "xl:grid-cols-[320px_280px_minmax(0,1fr)]",
+        // Viewport-locked master-detail (the "Outlook" pane pattern the
+        // layout tokens describe). Below `lg` the panes stack and use
+        // normal document flow so nothing is clipped on tablet/phone.
+        // At `lg`+ the workspace is pinned to the height left under the
+        // sticky nav and clips its own overflow, so each pane's
+        // `overflow-y-auto` actually engages and scrolls INDEPENDENTLY.
+        // Without this the grid row grew to its tallest pane, the
+        // per-pane `overflow-y-auto`/`min-h-0` never fired, and the
+        // whole document scrolled — dragging the selected case's action
+        // ribbon out of view on a long queue.
+        "lg:h-[calc(100vh-var(--nav-height))] lg:overflow-hidden",
       )}
     >
       {/* ── Left pane: queue ────────────────────────────────── */}
@@ -510,7 +516,12 @@ function CasesWorkspace() {
                 selectedCaseId ? `case-row-${selectedCaseId}` : undefined
               }
               tabIndex={0}
-              className="m-0 p-0 list-none"
+              // The listbox is the single Tab stop and the durable focus
+              // anchor; the active row is announced via
+              // aria-activedescendant, not by moving DOM focus onto each
+              // option (see useKeyboardListNav). So the visible focus
+              // ring lives here, on the container.
+              className="m-0 p-0 list-none rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ring"
             >
               {sorted.map(({ case_, sla, isPinned }) => {
                 const isSelected = case_.case_id === selectedCaseId;
@@ -521,12 +532,19 @@ function CasesWorkspace() {
                       type="button"
                       role="option"
                       aria-selected={isSelected}
+                      // Roving-out of the Tab order: the listbox container
+                      // is the one Tab stop; arrow keys move the active
+                      // option (announced via aria-activedescendant).
+                      // Without this every queue row was its own Tab stop
+                      // — a 50-row queue meant 50 Tab presses to cross the
+                      // pane (WCAG 2.4.3 Focus Order).
+                      tabIndex={-1}
                       data-keyboard-nav-id={case_.case_id}
                       data-pinned={isPinned || undefined}
                       onClick={() => handleSelectCase(case_.case_id)}
                       className={cn(
                         "w-full text-left py-12 px-16 flex flex-col gap-4",
-                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ring",
                         "transition-colors duration-fast",
                         isSelected
                           ? "bg-surface-row-active"
@@ -622,7 +640,14 @@ function CasesWorkspace() {
       {/* ── Right pane: case workspace ──────────────────────── */}
       <section
         aria-label="Case workspace"
-        className="bg-surface-primary border border-border rounded-md shadow-xs p-24 min-h-[60vh]"
+        className={cn(
+          "bg-surface-primary border border-border rounded-md shadow-xs p-24",
+          // Below lg: give the empty/detail state a comfortable minimum
+          // height in normal document flow. At lg+: the pane is a grid
+          // cell stretched to the viewport-locked row, so it scrolls its
+          // own overflow instead of pushing the document taller.
+          "min-h-[60vh] lg:min-h-0 lg:overflow-y-auto",
+        )}
       >
         {!selectedCaseId && (
           <div className="h-full flex flex-col items-center justify-center text-center gap-12 text-text-tertiary">

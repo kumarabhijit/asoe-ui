@@ -203,6 +203,59 @@ describe("/cases workspace — case-switch race invariants", () => {
     }
   });
 
+  it("locks the workspace to the viewport so panes scroll independently", () => {
+    // Bug ("scrolling issue"): the <main> grid had no height bound, so
+    // its row grew to the tallest pane and the per-pane
+    // `overflow-y-auto` / `min-h-0` never engaged. The whole document
+    // scrolled instead — dragging the selected case's action ribbon
+    // out of view on a long queue. The Outlook master-detail pattern
+    // requires the workspace to be pinned under the sticky nav and
+    // clip its own overflow at the multi-pane breakpoints, so each
+    // pane scrolls on its own.
+    //
+    // Below `lg` the panes stack in normal document flow (so nothing
+    // is clipped on tablet/phone); the lock only applies at `lg`+.
+    expect(
+      src,
+      "the workspace must be height-locked to the viewport under the " +
+        "nav at lg+ (lg:h-[calc(100vh-var(--nav-height))]) so the " +
+        "panes scroll independently instead of the whole document",
+    ).toMatch(/lg:h-\[calc\(100vh-var\(--nav-height\)\)\]/);
+    expect(
+      src,
+      "the height-locked workspace must clip its overflow at lg+ " +
+        "(lg:overflow-hidden) — otherwise the locked height does " +
+        "nothing and the document still scrolls",
+    ).toMatch(/lg:overflow-hidden/);
+
+    // The right pane (case workspace) must become its own scroll
+    // container at lg+; without this it overflows the locked main and
+    // re-introduces document scroll.
+    expect(
+      src,
+      "the case-workspace pane must scroll its own overflow at lg+ " +
+        "(lg:overflow-y-auto)",
+    ).toMatch(/lg:overflow-y-auto/);
+  });
+
+  it("makes the queue a single Tab stop (roving options, not N tab stops)", () => {
+    // Bug ("navigation / focus loss"): each queue row was a focusable
+    // <button> with no tabIndex override, so a 50-row queue was 50 Tab
+    // stops (WCAG 2.4.3). The correct listbox pattern is a single Tab
+    // stop on the container with the active option announced via
+    // aria-activedescendant. Lock: the listbox container is tabIndex=0
+    // with aria-activedescendant, and each option is tabIndex={-1}.
+    expect(
+      src,
+      "queue listbox must carry aria-activedescendant",
+    ).toMatch(/role=["']listbox["'][\s\S]*?aria-activedescendant=/);
+    expect(
+      src,
+      "the option rows must be tabIndex={-1} so the listbox is the " +
+        "single Tab stop (roving via aria-activedescendant)",
+    ).toMatch(/role=["']option["'][\s\S]*?tabIndex=\{-1\}/);
+  });
+
   it("pins the selected case in the visible queue across filter mismatches", () => {
     // The UX architect flagged "agent mutates the selected record's
     // status while the operator is on it" as a real incident. When

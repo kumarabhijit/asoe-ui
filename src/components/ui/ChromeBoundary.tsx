@@ -29,7 +29,6 @@
 
 "use client";
 
-import { useRouter } from "next/navigation";
 import { NavBar } from "@/components/ui/NavBar";
 import { useSignOut } from "@/hooks/useSignOut";
 
@@ -53,17 +52,12 @@ export interface ChromeBoundaryProps {
 }
 
 export function ChromeBoundary({ activeTab, children }: ChromeBoundaryProps) {
-  const router = useRouter();
   const handleSignOut = useSignOut();
   return (
     <div className="min-h-screen bg-surface-page flex flex-col">
       <NavBar
         tabs={NAV_TABS}
         activeTab={activeTab}
-        onTabChange={(id: string) => {
-          const tab = NAV_TABS.find((t) => t.id === id);
-          if (tab?.href) router.push(tab.href);
-        }}
         onSignOut={handleSignOut}
       />
       <main className="p-32 max-w-[1280px] mx-auto w-full">{children}</main>

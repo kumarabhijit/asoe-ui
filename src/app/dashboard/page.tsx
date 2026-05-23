@@ -7,7 +7,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { useSignOut } from "@/hooks/useSignOut";
 import { intentLabelFor } from "@/config/erp-label-map";
 import { useErpProfile } from "@/hooks/useErpProfile";
@@ -50,7 +49,6 @@ const RECENT_ACTIVITY = [
 export const requiresAuth = true;
 
 export default function DashboardPage() {
-  const router = useRouter();
   const { health } = useHealth();
   const { user, visibleTabs } = useAuth();
   const handleSignOut = useSignOut();
@@ -111,10 +109,6 @@ export default function DashboardPage() {
       <NavBar
         tabs={filteredTabs}
         activeTab="dashboard"
-        onTabChange={(id) => {
-          const tab = NAV_TABS.find((t) => t.id === id);
-          if (tab?.href) router.push(tab.href);
-        }}
         userName={userName}
         userInitials={userInitials}
         userTitle={userTitle}

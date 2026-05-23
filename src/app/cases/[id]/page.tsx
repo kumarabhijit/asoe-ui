@@ -111,10 +111,6 @@ export default function CaseDetailPage() {
         userName={userName}
         userInitials={userInitials}
         userTitle={userTitle}
-        onTabChange={(id: string) => {
-          const tab = NAV_TABS.find((t) => t.id === id);
-          if (tab?.href) router.push(tab.href);
-        }}
         onSignOut={handleSignOut}
       />
 
