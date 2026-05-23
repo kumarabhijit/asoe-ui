@@ -157,4 +157,50 @@ test.describe("/cases usability (mock mode)", () => {
     );
     expect(docScrolls).toBe(false);
   });
+
+  test("F6 cycles into the detail pane and the pane shows a focus ring", async ({
+    page,
+  }) => {
+    // Bug report: "with F6 I can move queue → middle but not middle →
+    // detail". F6 actually DID move focus to the detail <section> all
+    // along — but the section had no focus-visible ring (unlike the
+    // queue + record-list panes), so the operator couldn't tell focus
+    // landed and read the hop as broken. Assert BOTH: focus reaches the
+    // detail region AND it is visibly indicated.
+    await page.goto(`/cases?case=${MULTI_RECORD_CASE}`);
+    const detail = page.locator('section[aria-label="Case workspace"]');
+    await expect(detail).toBeVisible({ timeout: 30_000 });
+    await expect(
+      page.getByRole("radiogroup", { name: /select a record/i }).first(),
+    ).toBeVisible({ timeout: 30_000 });
+
+    // Baseline box-shadow with the pane NOT focused (the section always
+    // carries `shadow-xs`, so we compare against this rather than
+    // "none").
+    const shadowUnfocused = await detail.evaluate(
+      (el) => getComputedStyle(el).boxShadow,
+    );
+
+    // Start in the queue, then F6 → middle → detail.
+    await page.evaluate(() =>
+      document.querySelector<HTMLElement>('[role="listbox"]')?.focus(),
+    );
+    await page.keyboard.press("F6");
+    await page.keyboard.press("F6");
+
+    // Focus reached the detail region.
+    const activeLabel = await page.evaluate(
+      () => document.activeElement?.getAttribute("aria-label") ?? null,
+    );
+    expect(activeLabel).toBe("Case workspace");
+
+    // …and the region now paints a visible focus ring (Tailwind `ring-*`
+    // renders as an extra box-shadow layer on top of `shadow-xs`). On
+    // the parent commit the section had only `focus:outline-none`, so
+    // the focused box-shadow was identical to the unfocused one.
+    const shadowFocused = await detail.evaluate(
+      (el) => getComputedStyle(el).boxShadow,
+    );
+    expect(shadowFocused).not.toBe(shadowUnfocused);
+  });
 });

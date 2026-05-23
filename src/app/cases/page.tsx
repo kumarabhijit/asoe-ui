@@ -672,13 +672,15 @@ function CasesWorkspace() {
         ref={detailRef}
         aria-label="Case workspace"
         // tabIndex=-1 so F6 can land focus on the pane as a region;
-        // from there Tab reaches the action ribbon. No focus ring on
-        // the section itself (it's a large container) — the controls
-        // inside carry their own focus-visible rings.
+        // from there Tab reaches the action ribbon. Carries the same
+        // inset focus-visible ring as the queue + record-list panes so
+        // an F6 jump INTO this pane is visible — without it the operator
+        // can't tell focus reached the detail pane and reads F6 as
+        // broken for the middle→detail hop.
         tabIndex={-1}
         className={cn(
           "bg-surface-primary border border-border rounded-md shadow-xs p-24",
-          "focus:outline-none",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ring",
           // Below lg: give the empty/detail state a comfortable minimum
           // height in normal document flow. At lg+: the pane is a grid
           // cell stretched to the viewport-locked row, so it scrolls its
