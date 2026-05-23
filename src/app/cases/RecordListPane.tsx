@@ -22,6 +22,7 @@
 
 "use client";
 
+import { useRef, type KeyboardEvent, type RefObject } from "react";
 import { ChevronRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
@@ -40,6 +41,9 @@ export interface RecordListPaneProps {
   selectedRecordId?: string;
   /** Click handler — flips selection AND the URL `?record=` query. */
   onSelectRecord?: (recordId: string) => void;
+  /** Optional ref to the radiogroup `<ul>` so a parent can treat the
+   *  pane as a focus target (e.g. F6 pane cycling). */
+  groupRef?: RefObject<HTMLUListElement | null>;
 }
 
 // Single-record auto-mount lives in `CaseDetailPanel.tsx` (the
@@ -54,8 +58,65 @@ export function RecordListPane({
   records,
   selectedRecordId,
   onSelectRecord,
+  groupRef,
 }: RecordListPaneProps) {
+  const internalRef = useRef<HTMLUListElement | null>(null);
+  const listRef = groupRef ?? internalRef;
+
   if (records.length === 0) return null;
+
+  const ids = records.map((r) => r.id);
+  const selectedIdx = selectedRecordId ? ids.indexOf(selectedRecordId) : -1;
+  // Roving tabindex (APG radiogroup): exactly ONE radio is in the Tab
+  // order — the selected one, or the first when nothing is selected
+  // yet. This makes the whole pane a single Tab stop, so Tab moves
+  // cleanly to the next pane instead of walking every record row.
+  const rovingIdx = selectedIdx >= 0 ? selectedIdx : 0;
+
+  // Local keydown (not a document listener) so only the FOCUSED
+  // instance reacts — the page mounts this pane twice (the dedicated
+  // xl column + the inline picker inside CaseDetailPanel; one is
+  // display:none per breakpoint) and a document listener would
+  // double-fire across both.
+  function onKeyDown(event: KeyboardEvent<HTMLUListElement>) {
+    // Match the queue's useKeyboardListNav contract: when nothing is
+    // selected yet, the first Arrow/j/k press lands on the FIRST row.
+    let next = selectedIdx;
+    switch (event.key) {
+      case "ArrowDown":
+      case "j":
+        next = selectedIdx < 0 ? 0 : Math.min(selectedIdx + 1, ids.length - 1);
+        break;
+      case "ArrowUp":
+      case "k":
+        next = selectedIdx < 0 ? 0 : Math.max(selectedIdx - 1, 0);
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = ids.length - 1;
+        break;
+      default:
+        return;
+    }
+    // Own this key: prevent the browser's default scroll AND stop it
+    // bubbling to the queue's document-level useKeyboardListNav, which
+    // would otherwise ALSO move the case selection (and drop ?record=)
+    // when the operator is arrow-navigating THIS pane.
+    event.preventDefault();
+    event.stopPropagation();
+    if (next === selectedIdx) return;
+    const nextId = ids[next];
+    if (nextId !== selectedRecordId) onSelectRecord?.(nextId);
+    requestAnimationFrame(() => {
+      const el = listRef.current?.querySelector<HTMLElement>(
+        `[data-keyboard-nav-id="${CSS.escape(nextId)}"]`,
+      );
+      el?.focus();
+      el?.scrollIntoView({ block: "nearest" });
+    });
+  }
 
   return (
     <aside
@@ -78,11 +139,18 @@ export function RecordListPane({
       </div>
 
       <ul
+        ref={listRef}
         role="radiogroup"
         aria-label="Select a record to act on"
-        className="m-0 p-0 list-none divide-y divide-border-subtle flex-1 overflow-y-auto"
+        onKeyDown={onKeyDown}
+        // tabIndex=-1 keeps the group OUT of the Tab order (the roving
+        // radio is the Tab stop) while letting F6 pane-cycling land
+        // focus on the group programmatically; arrow keys then move the
+        // selection from here.
+        tabIndex={-1}
+        className="m-0 p-0 list-none divide-y divide-border-subtle flex-1 overflow-y-auto rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ring"
       >
-        {records.map((record) => {
+        {records.map((record, idx) => {
           const isSelected = record.id === selectedRecordId;
           return (
             <li key={record.id}>
@@ -90,12 +158,14 @@ export function RecordListPane({
                 type="button"
                 role="radio"
                 aria-checked={isSelected}
+                // Roving tabindex — only the active row is tabbable.
+                tabIndex={idx === rovingIdx ? 0 : -1}
                 onClick={() => onSelectRecord?.(record.id)}
                 data-testid={`record-picker-row-${record.id}`}
                 data-keyboard-nav-id={record.id}
                 className={[
                   "w-full flex items-center gap-12 py-12 px-16 text-left",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ring",
                   isSelected
                     ? "bg-surface-row-active"
                     : "hover:bg-surface-secondary",

@@ -37,7 +37,16 @@ function Harness({
     enabled,
   });
   return (
-    <div ref={ref} role="listbox" aria-label="Test listbox">
+    // Mirror the real /cases queue markup: the container is the single
+    // Tab stop (tabIndex=0) and the durable focus anchor; options are
+    // tabIndex=-1 and announced via aria-activedescendant.
+    <div
+      ref={ref}
+      role="listbox"
+      aria-label="Test listbox"
+      tabIndex={0}
+      data-testid="listbox-container"
+    >
       {items.map((item) => (
         <div
           key={item.id}
@@ -51,6 +60,11 @@ function Harness({
       ))}
     </div>
   );
+}
+
+/** Flush one rAF tick — the hook's focus/scroll side-effect runs there. */
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
 
@@ -163,6 +177,86 @@ describe("useKeyboardListNav — no-hijack guards", () => {
     render(<Harness items={[]} selectedId={null} onSelect={onSelect} />);
     fireEvent.keyDown(document, { key: "ArrowDown" });
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("does not hijack arrows when focus is in another interactive region", () => {
+    // Regression: the queue's document-level handler used to fire even
+    // when focus was inside the /cases record-list radiogroup pane, so
+    // arrow-navigating the record list ALSO moved the queue selection
+    // (and dropped ?record= from the URL). Focus inside a sibling
+    // radiogroup/listbox/grid/menu/tree must be left alone.
+    const onSelect = vi.fn();
+    const { container } = render(
+      <>
+        <div role="radiogroup" aria-label="Other pane">
+          <button role="radio" data-testid="other-radio">
+            r
+          </button>
+        </div>
+        <Harness
+          items={[{ id: "a" }, { id: "b" }]}
+          selectedId="a"
+          onSelect={onSelect}
+        />
+      </>,
+    );
+    const radio = container.querySelector<HTMLButtonElement>(
+      "[data-testid='other-radio']",
+    )!;
+    radio.focus();
+    fireEvent.keyDown(radio, { key: "ArrowDown" });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("useKeyboardListNav — focus anchoring", () => {
+  // Regression: the hook used to focus the freshly-selected ROW. That
+  // (a) made every row a Tab stop and (b) dropped focus to <body>
+  // whenever a filter change or silent refetch unmounted the focused
+  // row. Focus must land on the stable listbox CONTAINER instead, so
+  // keyboard nav survives the row churn.
+  it("moves DOM focus to the container, not the selected row", async () => {
+    const onSelect = vi.fn();
+    const items = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    const { getByTestId } = render(
+      <Harness items={items} selectedId="a" onSelect={onSelect} />,
+    );
+    fireEvent.keyDown(document, { key: "ArrowDown" });
+    expect(onSelect).toHaveBeenLastCalledWith("b");
+
+    await nextFrame();
+    const container = getByTestId("listbox-container");
+    expect(document.activeElement).toBe(container);
+    // The focused element must NOT be one of the option rows.
+    expect((document.activeElement as HTMLElement).getAttribute("role")).toBe(
+      "listbox",
+    );
+  });
+
+  it("keeps focus on the container after the selected row is removed", async () => {
+    const onSelect = vi.fn();
+    const items = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    const { getByTestId, rerender } = render(
+      <Harness items={items} selectedId="a" onSelect={onSelect} />,
+    );
+    fireEvent.keyDown(document, { key: "ArrowDown" }); // → "b"
+    await nextFrame();
+    const container = getByTestId("listbox-container");
+    expect(document.activeElement).toBe(container);
+
+    // Simulate a filter change that drops the now-selected row "b"
+    // (e.g. its status flips and the active status filter excludes it).
+    rerender(
+      <Harness
+        items={[{ id: "a" }, { id: "c" }]}
+        selectedId="b"
+        onSelect={onSelect}
+      />,
+    );
+    // Focus must still be on the container — not lost to <body>.
+    expect(document.activeElement).toBe(container);
+    expect(document.body).not.toBe(document.activeElement);
   });
 });
 

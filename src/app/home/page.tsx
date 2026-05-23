@@ -23,7 +23,6 @@
 
 import { Suspense, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useSignOut } from "@/hooks/useSignOut";
 import {
   AlertTriangle,
@@ -85,7 +84,6 @@ export default function HomePage() {
 }
 
 function HomePageInner() {
-  const router = useRouter();
   const { health } = useHealth();
   const { user, accessToken, visibleTabs } = useAuth();
   const handleSignOut = useSignOut();
@@ -153,10 +151,6 @@ function HomePageInner() {
       <NavBar
         tabs={filteredTabs}
         activeTab="home"
-        onTabChange={(id) => {
-          const tab = NAV_TABS.find((t) => t.id === id);
-          if (tab?.href) router.push(tab.href);
-        }}
         userName={userName}
         userInitials={userInitials}
         userTitle={userTitle}

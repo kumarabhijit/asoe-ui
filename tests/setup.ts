@@ -42,6 +42,20 @@ if (typeof window !== "undefined" && !window.matchMedia) {
   });
 }
 
+// jsdom does not implement Element.prototype.scrollIntoView. The
+// keyboard-navigation hook (useKeyboardListNav) calls it inside a
+// requestAnimationFrame after a selection move; a test that flushes
+// that frame would otherwise hit jsdom's "Not implemented" throw.
+// Stub a no-op so the side-effect is exercised without crashing.
+if (
+  typeof Element !== "undefined" &&
+  typeof Element.prototype.scrollIntoView !== "function"
+) {
+  Element.prototype.scrollIntoView = function scrollIntoView() {
+    /* no-op in jsdom */
+  };
+}
+
 // next-auth's client logger POSTs to `/api/auth/_log` on every
 // session event. The URL is relative, so undici's URL parser
 // throws `ERR_INVALID_URL` — surfaced by vitest as "Unhandled
