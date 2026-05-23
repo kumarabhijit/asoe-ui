@@ -164,14 +164,17 @@ export function CaseDetailPanel({
   // canonical action surface.
   const [showFullCaseHeader, setShowFullCaseHeader] = useState(false);
 
-  // Single-record cases auto-mount the ribbon — the picker step
-  // collapses to zero clicks. We surface this through onSelectRecord
-  // so the URL stays in sync and a subsequent record arrival (multi-
-  // record case loading in stages) re-renders the picker correctly.
+  // Auto-mount the first record's ribbon when no record is selected
+  // yet — for single- AND multi-record cases the operator lands
+  // directly on a work surface instead of an empty detail pane. We
+  // surface this through onSelectRecord so the URL stays the canonical
+  // selection (?record=) and a later record arrival (a multi-record
+  // case loading in stages) still resolves to the first row. A
+  // deep-linked ?record= wins via the selectedRecordId guard.
   useEffect(() => {
     if (!onSelectRecord) return;
     if (selectedRecordId) return;
-    if (records.length === 1) onSelectRecord(records[0].id);
+    if (records.length > 0) onSelectRecord(records[0].id);
   }, [onSelectRecord, selectedRecordId, records]);
 
   const selectedRecord = selectedRecordId

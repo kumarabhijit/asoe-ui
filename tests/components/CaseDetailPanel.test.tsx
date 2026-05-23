@@ -171,6 +171,45 @@ describe("CaseDetailPanel — picker lifted into RecordListPane (ADR-041 P3d-rem
     );
     expect(onSelectRecord).toHaveBeenCalledWith("only-exc");
   });
+
+  it("auto-mounts the FIRST record on a multi-record case", () => {
+    // Multi-record cases used to land on an empty detail pane until
+    // the operator picked a row. The detail pane for the first record
+    // now expands automatically — same zero-click landing as the
+    // single-record case.
+    const onSelectRecord = vi.fn();
+    render(
+      <CaseDetailPanel
+        orderCase={mockCase()}
+        attachedRecords={[
+          mockRecord({ id: "exc-first", order_id: "PO-1" }),
+          mockRecord({ id: "exc-second", order_id: "PO-2" }),
+          mockRecord({ id: "exc-third", order_id: "PO-3" }),
+        ]}
+        onSelectRecord={onSelectRecord}
+      />,
+    );
+    expect(onSelectRecord).toHaveBeenCalledTimes(1);
+    expect(onSelectRecord).toHaveBeenCalledWith("exc-first");
+  });
+
+  it("does NOT override a deep-linked record selection", () => {
+    // A deep link (?record=exc-second) wins — the auto-mount must not
+    // clobber an explicit selection back to the first row.
+    const onSelectRecord = vi.fn();
+    render(
+      <CaseDetailPanel
+        orderCase={mockCase()}
+        attachedRecords={[
+          mockRecord({ id: "exc-first", order_id: "PO-1" }),
+          mockRecord({ id: "exc-second", order_id: "PO-2" }),
+        ]}
+        selectedRecordId="exc-second"
+        onSelectRecord={onSelectRecord}
+      />,
+    );
+    expect(onSelectRecord).not.toHaveBeenCalled();
+  });
 });
 
 
