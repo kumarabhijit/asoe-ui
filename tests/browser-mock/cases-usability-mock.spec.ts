@@ -48,18 +48,20 @@ test.describe("/cases usability (mock mode)", () => {
   });
 
   test("primary nav tabs are real links, not buttons", async ({ page }) => {
-    // Each visible tab must be an <a> with an href so it supports
-    // open-in-new-tab / middle-click and announces as a link.
-    const dashboardTab = page.getByRole("link", { name: /^dashboard$/i });
-    await expect(dashboardTab).toBeVisible();
-    await expect(dashboardTab).toHaveAttribute("href", "/dashboard");
+    // Each nav destination must be an <a href> (supports open-in-new-tab
+    // / middle-click and announces as a link). Select by href, not
+    // label — labels are product copy (e.g. the /dashboard tab reads
+    // "Performance", not "Dashboard").
+    const nav = page.locator("nav").first();
+    const dashboardLink = nav.locator('a[href="/dashboard"]');
+    await expect(dashboardLink).toHaveCount(1);
 
-    // The active tab carries aria-current=page.
-    const casesTab = page.getByRole("link", { name: /^cases$/i });
-    await expect(casesTab).toHaveAttribute("aria-current", "page");
+    // The active tab (/cases) carries aria-current=page.
+    const casesLink = nav.locator('a[href="/cases"]');
+    await expect(casesLink).toHaveAttribute("aria-current", "page");
 
-    // Plain click still soft-navigates.
-    await dashboardTab.click();
+    // Plain click still soft-navigates (Next <Link>).
+    await dashboardLink.click();
     await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
   });
 
@@ -69,19 +71,18 @@ test.describe("/cases usability (mock mode)", () => {
     const listbox = page.getByRole("listbox", { name: /^cases$/i });
     await listbox.focus();
     await page.keyboard.press("ArrowDown");
+    // Let the selection land (arrow nav writes ?case= via router.replace).
+    await page.waitForURL(/case=/, { timeout: 15_000 });
 
     // Focus must rest on the listbox container — not an <option> row,
     // and crucially not <body> (which is where the old row-focus model
     // landed once a row unmounted).
-    const activeRole = await page.evaluate(
-      () => document.activeElement?.getAttribute("role") ?? null,
-    );
-    expect(activeRole).toBe("listbox");
-
-    const onBody = await page.evaluate(
-      () => document.activeElement === document.body,
-    );
-    expect(onBody).toBe(false);
+    const active = await page.evaluate(() => ({
+      role: document.activeElement?.getAttribute("role") ?? null,
+      isBody: document.activeElement === document.body,
+    }));
+    expect(active.isBody).toBe(false);
+    expect(active.role).toBe("listbox");
   });
 
   test("the queue is a single Tab stop (rows are not individually tabbable)", async ({
