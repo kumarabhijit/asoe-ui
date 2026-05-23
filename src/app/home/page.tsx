@@ -289,13 +289,17 @@ function HomePageInner() {
                       <Clock size={10} aria-hidden className="mr-4" />
                       {sla.label}
                     </Badge>
-                    <span className="font-mono text-body font-medium text-text-primary truncate">
+                    <span className="hidden min-w-0 flex-1 truncate font-mono text-body font-medium text-text-primary sm:block">
                       {orderRef}
                     </span>
-                    <span className="ml-auto text-caption text-text-tertiary">
+                    <span className="hidden shrink-0 whitespace-nowrap text-caption text-text-tertiary sm:inline-block">
                       {STATUS_LABEL[case_.status] ?? case_.status}
                     </span>
-                    <ChevronRight size={14} aria-hidden className="text-text-tertiary" />
+                    <ChevronRight
+                      size={14}
+                      aria-hidden
+                      className="ml-auto shrink-0 text-text-tertiary sm:ml-0"
+                    />
                   </Link>
                 </li>
               );
