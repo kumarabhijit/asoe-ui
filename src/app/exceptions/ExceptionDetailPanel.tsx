@@ -56,6 +56,7 @@ import { EdiMismatchSection } from "./EdiMismatchSection";
 import { EmailOrderEntrySection } from "./EmailOrderEntrySection";
 import { EmailSourceSection } from "./EmailSourceSection";
 import { EntitiesSection } from "./EntitiesSection";
+import { SapDataSection } from "./SapDataSection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -711,6 +712,13 @@ export default function ExceptionDetailPanel({
           {analysis?.entities_analysis && (
             <CollapsibleSection title="Entities">
               <EntitiesSection data={analysis.entities_analysis} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 2 — Customer Inbox SAP Data tab. Data-presence
+              gated; preview-only until the SAP-gateway adapter lands. */}
+          {analysis?.sap_data_analysis && (
+            <CollapsibleSection title="SAP Data">
+              <SapDataSection data={analysis.sap_data_analysis} />
             </CollapsibleSection>
           )}
 

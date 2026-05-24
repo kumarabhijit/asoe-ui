@@ -928,6 +928,7 @@ export interface components {
             risk: string;
             /** Root Cause */
             root_cause?: string | null;
+            sap_data_analysis?: components["schemas"]["SapDataAnalysisData"] | null;
         };
         /**
          * AsyncResolveResponse
@@ -2775,6 +2776,26 @@ export interface components {
             table?: string | null;
             /** Transaction */
             transaction: string;
+        };
+        /**
+         * SapDataAnalysisData
+         * @description SAP Data tab (ADR-042 Phase 2). Live SAP system-of-record context the
+         *     operator authorises against — which system, its validation state, and the
+         *     order's financial value. Projected by the composer from the SAP gateway
+         *     read; preview-only until that adapter lands. `system` / `validation_status`
+         *     / `order_value_usd` are audit-bearing (the decision applies to a specific
+         *     SAP order in a specific state at a specific value); `sap_doc_number` is a
+         *     contextual reference.
+         */
+        SapDataAnalysisData: {
+            /** Order Value Usd */
+            order_value_usd?: number | null;
+            /** Sap Doc Number */
+            sap_doc_number?: string | null;
+            /** System */
+            system: string;
+            /** Validation Status */
+            validation_status: string;
         };
         /** SeedFinancialImpactRequest */
         SeedFinancialImpactRequest: {

@@ -386,6 +386,19 @@ export interface OrderAnalysis {
    *  AI intake agent pulled from the email/attachments. Preview-only until
    *  the composer adapter lands. Mirrors `api/schemas.py::EntitiesAnalysisData`. */
   entities_analysis?: EntitiesAnalysisData;
+  /** ADR-042 Phase 2 — Customer Inbox SAP Data tab. Live SAP system-of-record
+   *  context. Preview-only until the SAP-gateway composer adapter lands.
+   *  Mirrors `api/schemas.py::SapDataAnalysisData`. */
+  sap_data_analysis?: SapDataAnalysisData;
+}
+
+/* ── SAP Data section (ADR-042 Phase 2) — mirrors api/schemas.py ── */
+
+export interface SapDataAnalysisData {
+  system: string;
+  validation_status: string;
+  order_value_usd?: number | null;
+  sap_doc_number?: string | null;
 }
 
 /* ── Entities section (ADR-042 Phase 2) — mirrors api/schemas.py ── */
