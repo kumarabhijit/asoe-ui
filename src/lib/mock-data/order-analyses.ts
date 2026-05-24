@@ -1893,6 +1893,14 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
     recommendation: "Auto-resolved",
     lines: [],
   },
+  "exc-047": {
+    diagnosis: "Uncategorised inbound email (trade-show booth invitation) — not an order-desk matter. Classified OTHER; routed to Marketing.",
+    confidence: 82,
+    risk: "LOW",
+    resolution: "Route to the Marketing team; no order action.",
+    recommendation: "Route to team",
+    lines: [],
+  },
 };
 
 // ADR-042 — merge the rich Customer-Inbox evidence section bundles onto their

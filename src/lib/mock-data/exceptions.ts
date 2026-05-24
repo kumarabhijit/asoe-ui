@@ -253,6 +253,9 @@ export const MOCK_EXCEPTIONS: ExceptionSummary[] = [
   {
     id: "exc-046", tenant_id: "acme-corp", order_id: "EDI-PO-2026-7781", event_type: "EMAIL_ORDER_ENTRY_REQUEST", intent: "MANUAL_ORDER_INTAKE", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "ManualOrderIntakeRecipe.py", final_status: "COMPLETE", created_at: "2026-05-22T07:10:00Z", updated_at: "2026-05-22T07:10:18Z", account_id: "acct-kroger", account_name: "Kroger",
   },
+  {
+    id: "exc-047", tenant_id: "acme-corp", order_id: "EML-GEN-2026-0071", event_type: "EMAIL_GENERAL", intent: "MANUAL_ORDER_INTAKE", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "GREEN", selected_recipe: "ReplyDraftRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-05-22T15:00:00Z", updated_at: "2026-05-22T15:02:00Z", account_id: "acct-southeast-distrib", account_name: "Southeast Beverage Distributors",
+  },
 
   /* ── Multi-issue case fixtures ────────────────────────────────────
      Three realistic CPG-supply-chain clusters in which one buyer PO

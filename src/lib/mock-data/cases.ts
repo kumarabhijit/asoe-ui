@@ -65,7 +65,9 @@ export function caseFromMockException(exc: ExceptionSummary): OrderCase {
         ? "INQUIRY"
         : exc.event_type?.includes("COMPLAINT")
           ? "COMPLAINT"
-          : "NEW_ORDER"
+          : exc.event_type?.includes("GENERAL") || exc.event_type?.includes("OTHER")
+            ? "OTHER"
+            : "NEW_ORDER"
     : null;
   const status: CaseStatus = (() => {
     switch (exc.lifecycle_state) {

@@ -452,6 +452,27 @@ export const INBOX_SECTION_BUNDLES: Record<string, Partial<InboxSections>> = {
       sapDoc: "5100012501",
     }),
   },
+  // Other — an uncategorised email (no order context); routed, not actioned.
+  "exc-047": {
+    entities_analysis: {
+      extracted: [
+        { key: "sender", value: "partnerships@beverage-expo.example", kind: "contact", confidence: 0.97, source_span: "From: partnerships@beverage-expo.example" },
+        { key: "topic", value: "Trade-show booth invitation", kind: "topic", confidence: 0.82, source_span: "Subject: Booth at Beverage Expo 2026" },
+      ],
+    },
+    draft_reply: {
+      status: "DRAFTED",
+      reason: null,
+      template_name: "route_to_team",
+      recipient: "partnerships@beverage-expo.example",
+      subject: "Re: Booth at Beverage Expo 2026",
+      body:
+        "Hello,\n\nThanks for reaching out — this isn't an order-desk matter, so I've forwarded your note to our Marketing team, who handle event partnerships. They'll follow up directly.\n\nAcme Beverages Order Desk",
+      edits_applied: [],
+      drafted_by: "analyst-2",
+      drafted_at: "2026-05-22T15:02:00Z",
+    },
+  },
   // Happy path — high-confidence EDI order, auto-resolved end-to-end.
   "exc-046": {
     order_entry_extraction: HAPPY_ORDER_ENTRY,
