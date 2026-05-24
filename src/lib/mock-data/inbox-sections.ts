@@ -309,6 +309,98 @@ const SE_KG = knowledgeGraphFor({
   sapDoc: "5100012344",
 });
 
+// ── Inquiry / complaint / happy-path fixtures ───────────────────────────────
+
+const INQUIRY_ENTITIES: EntitiesAnalysisData = {
+  extracted: [
+    { key: "order_ref", value: "SO-5100012344", kind: "order_id", confidence: 0.96, source_span: "re: order SO-5100012344" },
+    { key: "invoice_ref", value: "INV-2026-8841", kind: "invoice", confidence: 0.91, source_span: "invoice INV-2026-8841" },
+    { key: "customer", value: "Southeast Beverage Distributors", kind: "customer", confidence: 0.97, source_span: "From: ap@southeast-distrib.example" },
+  ],
+};
+
+const INQUIRY_SAP: SapDataAnalysisData = {
+  system: "S4H_PRD",
+  validation_status: "Order SO-5100012344 — delivered 2026-05-09; invoice cleared",
+  order_value_usd: 27216.0,
+  sap_doc_number: "5100012344",
+};
+
+const INQUIRY_DRAFT: DraftReply = {
+  status: "DRAFTED",
+  reason: null,
+  template_name: "order_status_response",
+  recipient: "ap@southeast-distrib.example",
+  subject: "Re: Status of order SO-5100012344",
+  body:
+    "Hello,\n\nThanks for checking in. Order SO-5100012344 was delivered on 2026-05-09 and invoice INV-2026-8841 has cleared in full. No action is needed on your side.\n\nLet us know if you'd like the POD or a copy of the invoice.\n\nAcme Beverages Order Desk",
+  edits_applied: [],
+  drafted_by: "analyst-2",
+  drafted_at: "2026-05-20T14:05:00Z",
+};
+
+const COMPLAINT_ENTITIES: EntitiesAnalysisData = {
+  extracted: [
+    { key: "order_ref", value: "SO-5100012501", kind: "order_id", confidence: 0.95, source_span: "order SO-5100012501" },
+    { key: "issue", value: "short shipment", kind: "issue", confidence: 0.9, source_span: "received 380 of 480 cases" },
+    { key: "material", value: "BEV-COLA-12PK", kind: "material", confidence: 0.93, source_span: "Cola 12pk" },
+  ],
+};
+
+const COMPLAINT_SAP: SapDataAnalysisData = {
+  system: "S4H_PRD",
+  validation_status: "Delivery 8100044122 — 380/480 CS confirmed; 100 CS short",
+  order_value_usd: 4147.2,
+  sap_doc_number: "5100012501",
+};
+
+const COMPLAINT_DRAFT: DraftReply = {
+  status: "DRAFTED",
+  reason: null,
+  template_name: "complaint_acknowledgement",
+  recipient: "buyer@walmart.example",
+  subject: "Re: Short shipment on SO-5100012501",
+  body:
+    "Hello,\n\nThank you for flagging this — we're sorry the BEV-COLA-12PK delivery arrived short (380 of 480 CS). We've opened a follow-up shipment for the missing 100 CS and a goodwill credit is under review.\n\nWe'll confirm the replacement ship date within one business day.\n\nAcme Beverages Customer Care",
+  edits_applied: [
+    { field: "body", before: "(template)", after: "goodwill credit is under review" },
+  ],
+  drafted_by: "analyst-3",
+  drafted_at: "2026-05-21T09:30:00Z",
+};
+
+const HAPPY_ORDER_ENTRY: OrderEntryExtraction = {
+  source_type: "EDI_850",
+  confidence: 0.97,
+  header: { customer_po: "EDI-PO-2026-7781", order_type: "ZOR", sales_org: "1000", dist_channel: "10", requested_date: "2026-05-26", ship_window_from: null, ship_window_to: null },
+  customer_name: "Kroger Co",
+  customer_bp: "300077",
+  line_items: [
+    { line_num: "001", material: "BEV-COLA-12PK", description: "Cola 12-pack case", quantity: 480, uom: "CS", unit_price: 8.64, mdm_matched: true },
+  ],
+  validation_flags: [
+    { field: "line 001", severity: "INFO", message: "Matched to material master; all fields validated." },
+  ],
+};
+
+const HAPPY_EDI = edi850({
+  poNumber: "EDI-PO-2026-7781", poDate: "2026-05-22",
+  buyerName: "Kroger Co", buyerId: "300077",
+  sellerName: "Acme Beverages Co", sellerId: "VENDOR-7788",
+  requestedDate: "2026-05-26",
+  lines: [
+    { line_num: "001", material: "BEV-COLA-12PK", description: "Cola 12-pack case", quantity: 480, uom: "CS", unit_price: 8.64 },
+  ],
+});
+
+const HAPPY_KG = knowledgeGraphFor({
+  orderId: "EDI-PO-2026-7781",
+  customerName: "Kroger Co",
+  customerBp: "300077",
+  materials: [{ id: "bev-cola-12pk", label: "BEV-COLA-12PK", detail: "480 CS" }],
+  sapDoc: "5100012799",
+});
+
 /** Section bundles keyed by exception id. Spread into MOCK_ORDER_ANALYSES. */
 export const INBOX_SECTION_BUNDLES: Record<string, Partial<InboxSections>> = {
   // New email order — extraction + EDI 850 + entities + SAP + draft + graph.
@@ -342,5 +434,36 @@ export const INBOX_SECTION_BUNDLES: Record<string, Partial<InboxSections>> = {
     change_analysis: changeAnalysisFor("sku_substitution"),
     knowledge_graph: SE_KG,
     entities_analysis: SE_ENTITIES,
+  },
+  // Inquiry — buyer asks about an order/invoice status (no order/EDI section).
+  "exc-044": {
+    entities_analysis: INQUIRY_ENTITIES,
+    sap_data_analysis: INQUIRY_SAP,
+    draft_reply: INQUIRY_DRAFT,
+  },
+  // Complaint — short shipment; acknowledgement draft + the affected order graph.
+  "exc-045": {
+    entities_analysis: COMPLAINT_ENTITIES,
+    sap_data_analysis: COMPLAINT_SAP,
+    draft_reply: COMPLAINT_DRAFT,
+    knowledge_graph: knowledgeGraphFor({
+      orderId: "SO-5100012501", customerName: "Walmart", customerBp: "300001",
+      materials: [{ id: "bev-cola-12pk", label: "BEV-COLA-12PK", detail: "380/480 CS" }],
+      sapDoc: "5100012501",
+    }),
+  },
+  // Happy path — high-confidence EDI order, auto-resolved end-to-end.
+  "exc-046": {
+    order_entry_extraction: HAPPY_ORDER_ENTRY,
+    edi_850_audit: HAPPY_EDI,
+    entities_analysis: {
+      extracted: [
+        { key: "customer_po", value: "EDI-PO-2026-7781", kind: "po", confidence: 0.99, source_span: "BEG*00*SA*EDI-PO-2026-7781" },
+        { key: "customer", value: "Kroger Co", kind: "customer", confidence: 0.99, source_span: "N1*BY*Kroger Co" },
+        { key: "material", value: "BEV-COLA-12PK", kind: "material", confidence: 0.98, source_span: "PO1*001*480*CS" },
+      ],
+    },
+    sap_data_analysis: { system: "S4H_PRD", validation_status: "SO created · ATP OK · credit clear · auto-confirmed", order_value_usd: 4147.2, sap_doc_number: "5100012799" },
+    knowledge_graph: HAPPY_KG,
   },
 };

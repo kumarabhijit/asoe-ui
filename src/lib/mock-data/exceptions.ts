@@ -241,6 +241,19 @@ export const MOCK_EXCEPTIONS: ExceptionSummary[] = [
     id: "exc-043", tenant_id: "acme-corp", order_id: "EML-CHG-2026-0054", event_type: "EMAIL_ORDER_CHANGE_REQUEST", intent: "MANUAL_ORDER_INTAKE", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "YELLOW", selected_recipe: "ChangeAnalysisRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-05-19T13:40:00Z", updated_at: "2026-05-19T13:41:12Z", account_id: "acct-kroger", account_name: "Kroger",
   },
 
+  /* ── ADR-042 Customer-Inbox — inquiry / complaint / happy-path fixtures.
+     Exercise the EMAIL_ENTRY lens classification chips (INQUIRY / COMPLAINT /
+     NEW_ORDER) and the auto-resolved happy path. ─────────────────────────── */
+  {
+    id: "exc-044", tenant_id: "acme-corp", order_id: "EML-INQ-2026-0061", event_type: "EMAIL_INQUIRY", intent: "MANUAL_ORDER_INTAKE", lifecycle_state: "PENDING_REVIEW", shadow_verdict: "GREEN", selected_recipe: "ReplyDraftRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-05-20T14:00:00Z", updated_at: "2026-05-20T14:05:00Z", account_id: "acct-southeast-distrib", account_name: "Southeast Beverage Distributors",
+  },
+  {
+    id: "exc-045", tenant_id: "acme-corp", order_id: "EML-CMP-2026-0062", event_type: "EMAIL_COMPLAINT", intent: "MANUAL_ORDER_INTAKE", lifecycle_state: "ESCALATED", shadow_verdict: "RED", selected_recipe: "ReplyDraftRecipe.py", final_status: "MANUAL_REVIEW_REQUIRED", created_at: "2026-05-21T09:25:00Z", updated_at: "2026-05-21T09:30:00Z", account_id: "acct-walmart", account_name: "Walmart",
+  },
+  {
+    id: "exc-046", tenant_id: "acme-corp", order_id: "EDI-PO-2026-7781", event_type: "EMAIL_ORDER_ENTRY_REQUEST", intent: "MANUAL_ORDER_INTAKE", lifecycle_state: "RESOLVED", shadow_verdict: "GREEN", selected_recipe: "ManualOrderIntakeRecipe.py", final_status: "COMPLETE", created_at: "2026-05-22T07:10:00Z", updated_at: "2026-05-22T07:10:18Z", account_id: "acct-kroger", account_name: "Kroger",
+  },
+
   /* ── Multi-issue case fixtures ────────────────────────────────────
      Three realistic CPG-supply-chain clusters in which one buyer PO
      produces multiple coincident exception records. They share a

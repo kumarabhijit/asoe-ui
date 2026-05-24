@@ -1867,6 +1867,32 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
     recommendation: "Partial fulfilment",
     lines: [],
   },
+
+  /* ── ADR-042 inquiry / complaint / happy-path (sections merged below) ── */
+  "exc-044": {
+    diagnosis: "Buyer A/P inquiry on the status of order SO-5100012344 and invoice INV-2026-8841. Both settled; an informational reply is all that's needed.",
+    confidence: 96,
+    risk: "LOW",
+    resolution: "Send the order-status response confirming delivery + cleared invoice.",
+    recommendation: "Send status response",
+    lines: [],
+  },
+  "exc-045": {
+    diagnosis: "Buyer complaint: short shipment on SO-5100012501 (received 380 of 480 CS). Replacement shipment + goodwill credit under review; escalated to Customer Care.",
+    confidence: 90,
+    risk: "HIGH",
+    resolution: "Acknowledge, open the replacement shipment, and route the credit for approval.",
+    recommendation: "Acknowledge + open replacement",
+    lines: [],
+  },
+  "exc-046": {
+    diagnosis: "EDI 850 order from Kroger, 0.97 extraction confidence, all floor checks green — auto-validated, confirmed in SAP, and resolved without human review.",
+    confidence: 97,
+    risk: "LOW",
+    resolution: "Auto-confirmed sales order SO-5100012799; no action required.",
+    recommendation: "Auto-resolved",
+    lines: [],
+  },
 };
 
 // ADR-042 — merge the rich Customer-Inbox evidence section bundles onto their

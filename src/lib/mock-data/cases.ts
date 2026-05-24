@@ -61,7 +61,11 @@ export function caseFromMockException(exc: ExceptionSummary): OrderCase {
   const email_classification: EmailClassification | null = isEmail
     ? exc.event_type?.includes("CHANGE")
       ? "ORDER_CHANGE"
-      : "NEW_ORDER"
+      : exc.event_type?.includes("INQUIRY")
+        ? "INQUIRY"
+        : exc.event_type?.includes("COMPLAINT")
+          ? "COMPLAINT"
+          : "NEW_ORDER"
     : null;
   const status: CaseStatus = (() => {
     switch (exc.lifecycle_state) {
