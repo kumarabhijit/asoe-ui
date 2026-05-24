@@ -909,6 +909,7 @@ export interface components {
             edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
             email_order_entry_analysis?: components["schemas"]["EmailOrderEntryAnalysisData"] | null;
             email_source?: components["schemas"]["EmailSourceData"] | null;
+            entities_analysis?: components["schemas"]["EntitiesAnalysisData"] | null;
             entity_profile?: components["schemas"]["EntityProfile"] | null;
             impact_metrics?: components["schemas"]["ImpactMetrics"] | null;
             /** Lines */
@@ -1646,6 +1647,17 @@ export interface components {
             subject: string;
         };
         /**
+         * EntitiesAnalysisData
+         * @description Entities tab (ADR-042 Phase 2). Contextual evidence — the extracted
+         *     entities the operator reviews; the binding control fields remain
+         *     `recommended_action` / `autonomy_level`. Projected by the composer from
+         *     the intake gateway's extraction; preview-only until that adapter lands.
+         */
+        EntitiesAnalysisData: {
+            /** Extracted */
+            extracted?: components["schemas"]["ExtractedEntity"][];
+        };
+        /**
          * EntityProfile
          * @description Master-data context for the exception's customer entity.
          *
@@ -1844,6 +1856,26 @@ export interface components {
             sub_spans?: components["schemas"]["GatewayCallSpan"][];
             /** Timestamp */
             timestamp: string;
+        };
+        /**
+         * ExtractedEntity
+         * @description A single structured value the AI intake agent pulled from the email
+         *     / attachments (ADR-042 Phase 2 — Entities section). `kind` is the
+         *     free-form category (order_id | material | date | po | invoice | qty | …);
+         *     `source_span` is the verbatim text it was extracted from (audit trail of
+         *     where a value came from).
+         */
+        ExtractedEntity: {
+            /** Confidence */
+            confidence?: number | null;
+            /** Key */
+            key: string;
+            /** Kind */
+            kind: string;
+            /** Source Span */
+            source_span?: string | null;
+            /** Value */
+            value: string;
         };
         /**
          * GatewayCallSpan
