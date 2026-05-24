@@ -57,7 +57,6 @@ import type {
 import type { ExceptionDetailResponse } from "@/types/api";
 
 import { CaseDetailPanel } from "./CaseDetailPanel";
-import { RecordListPane } from "./RecordListPane";
 import { NAV_TABS } from "@/config/nav-tabs";
 
 
@@ -421,17 +420,12 @@ function CasesWorkspace() {
 
   // ── Cross-pane focus (F6 / Shift+F6) ────────────────────────
   // Tab walks the controls inside the focused pane; F6 jumps to the
-  // next pane. Only visible panes participate, so the cycle is
-  // queue ↔ detail below xl (record-list column collapsed) and
-  // queue ↔ record-list ↔ detail at xl+. The record-list ref is the
-  // dedicated xl column's radiogroup; the detail section is made
-  // focusable (tabIndex=-1) below.
-  const recordListRef = useRef<HTMLUListElement | null>(null);
+  // next pane. The workspace is two panes — queue ↔ detail — with the
+  // record list stacked at the top of the detail pane (reached by Tab
+  // once focus is in the detail region). The detail section is made
+  // focusable (tabIndex=-1) below so F6 can land on it.
   const detailRef = useRef<HTMLElement | null>(null);
-  const paneRefs = useMemo(
-    () => [queueRef, recordListRef, detailRef],
-    [],
-  );
+  const paneRefs = useMemo(() => [queueRef, detailRef], []);
   usePaneFocusCycle(paneRefs);
 
   return (
@@ -440,22 +434,16 @@ function CasesWorkspace() {
       className={cn(
         "max-w-[1800px] mx-auto p-24",
         "grid gap-24",
-        // Three-pane workspace (ADR-041 P3d-remaining, 2026-05-14):
+        // Two-pane master-detail workspace:
         //   * <1024px  → single column; everything stacks vertically.
-        //     Tablet / phone falls back to the legacy queue-then-
-        //     detail flow.
-        //   * 1024-1280px (lg)  → two columns: queue + detail. The
-        //     record-list column collapses since the right pane's
-        //     attached-records picker still works inline; no operator
-        //     workflow loss.
-        //   * ≥1280px (xl) → full three pane: queue / record-list /
-        //     detail. The middle column ('Records') only renders when
-        //     `records.length > 0` (Guardrail #6 — pane returns null
-        //     and the grid track collapses to its 280px width with
-        //     nothing in it, which is harmless).
+        //     Tablet / phone falls back to the queue-then-detail flow.
+        //   * ≥1024px (lg)  → two columns: queue + detail. The attached-
+        //     records picker is stacked at the top of the detail pane
+        //     (full-width, no truncation) rather than a narrow dedicated
+        //     column — a dedicated 3rd column squeezed the record rows
+        //     and clipped their labels at common laptop widths.
         "grid-cols-1",
         "lg:grid-cols-[360px_minmax(0,1fr)]",
-        "xl:grid-cols-[320px_280px_minmax(0,1fr)]",
         // Viewport-locked master-detail (the "Outlook" pane pattern the
         // layout tokens describe). Below `lg` the panes stack and use
         // normal document flow so nothing is clipped on tablet/phone.
@@ -627,56 +615,16 @@ function CasesWorkspace() {
         </div>
       </aside>
 
-      {/* ── Middle pane: record list (ADR-041 P3d-remaining) ─────
-          Only mounts when a case is selected, its records have
-          loaded, AND the loaded `orderCase.case_id` matches the
-          URL `?case=` (same render-guard as the right pane — no
-          stale data leaks across a fast case-switch).
-
-          Layout: the column is collapsed below `xl` (1280px) per
-          the grid-template above; React skips this branch under
-          the breakpoint and the queue + detail share the two
-          remaining tracks. Above `xl` the middle column gets its
-          dedicated 280px track.
-
-          Below `xl` the inline picker re-emergence is a P3e
-          follow-on; today the middle column collapses and the
-          single-record auto-mount in `CaseDetailPanel` still
-          drives selection so the focused `/cases/[id]` view +
-          tablet widths continue to work. */}
-      {selectedCaseId
-        && !detailLoading
-        && orderCase
-        && orderCase.case_id === selectedCaseId
-        && records.length > 0 && (
-        // `xl:contents` (not `xl:block`) so the RecordListPane <aside>
-        // becomes the direct grid child at xl and STRETCHES to the
-        // viewport-locked row height — letting its own list scroll
-        // independently. With a plain block wrapper the aside sized to
-        // its content and a long record list was clipped by the
-        // workspace's `overflow-hidden`, so the operator couldn't reach
-        // the lower records without the whole layout fighting them.
-        <div className="hidden xl:contents">
-          <RecordListPane
-            caseId={orderCase.case_id}
-            records={records}
-            selectedRecordId={selectedRecordId}
-            onSelectRecord={handleSelectRecord}
-            groupRef={recordListRef}
-          />
-        </div>
-      )}
-
       {/* ── Right pane: case workspace ──────────────────────── */}
       <section
         ref={detailRef}
         aria-label="Case workspace"
         // tabIndex=-1 so F6 can land focus on the pane as a region;
-        // from there Tab reaches the action ribbon. Carries the same
-        // inset focus-visible ring as the queue + record-list panes so
-        // an F6 jump INTO this pane is visible — without it the operator
-        // can't tell focus reached the detail pane and reads F6 as
-        // broken for the middle→detail hop.
+        // from there Tab reaches the record-list picker (stacked at the
+        // top) and the action ribbon. Carries the same inset
+        // focus-visible ring as the queue pane so an F6 jump INTO this
+        // pane is visible — without it the operator can't tell focus
+        // reached the detail pane and reads F6 as broken.
         tabIndex={-1}
         className={cn(
           "bg-surface-primary border border-border rounded-md shadow-xs p-24",
@@ -725,20 +673,10 @@ function CasesWorkspace() {
             selectedRecordId={selectedRecordId}
             onSelectRecord={handleSelectRecord}
             onRecordActionComplete={handleRecordActionComplete}
-            // The workspace mounts `RecordListPane` as its own
-            // middle column AT xl; below xl that middle column is
-            // collapsed (`hidden xl:block`) and the operator has no
-            // way to pick a record on a multi-record case. Keep the
-            // inline picker enabled and let CaseDetailPanel hide it
-            // at xl+ via the responsive utility. Both RecordListPane
-            // instances stay in the DOM at every viewport — only one
-            // is display-visible per breakpoint (`hidden xl:block`
-            // vs `xl:hidden`). Tests selecting the picker by
-            // `aria-label` / `data-testid` must scope to `:visible`
-            // (Playwright strict mode counts DOM nodes, not
-            // visibility). Closes the P3e gap.
-            showInlineRecordList={true}
-            inlineRecordListHiddenAtXl={true}
+            // CaseDetailPanel renders the attached-records picker
+            // (RecordListPane) stacked at the top of this pane by
+            // default — the workspace no longer has a separate column
+            // for it, so the operator always picks a record here.
           />
         )}
       </section>

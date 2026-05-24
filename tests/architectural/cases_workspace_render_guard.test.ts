@@ -106,72 +106,57 @@ describe("/cases workspace — case-switch race invariants", () => {
   // missing deliverables fail loudly at unit-test speed.
   //
   // Pattern documented as Gap 7 in `docs/test-strategy/README.md`.
-  it("renders the three-pane workspace: case-queue + record-list + case-workspace", () => {
-    // (a) The three pane wrappers must all be referenced.
+  it("renders the two-pane workspace: case-queue + case-workspace", () => {
+    // (a) Both pane wrappers must be referenced.
     expect(
       src,
       "left pane: queue must be present (aria-label='Case queue')",
     ).toMatch(/aria-label=["']Case queue["']/);
     expect(
       src,
-      "middle pane: RecordListPane must be mounted by the page " +
-        "(ADR-041 P3d-remaining lift)",
-    ).toMatch(/<RecordListPane[\s>]/);
-    expect(
-      src,
       "right pane: case workspace must be present (aria-label='Case workspace')",
     ).toMatch(/aria-label=["']Case workspace["']/);
 
-    // (b) The CSS grid-template must declare three columns at the
-    // `xl` breakpoint so the middle column gets a dedicated track.
-    // Pattern: `xl:grid-cols-[<a>_<b>_<c>]` with three space- or
-    // underscore-separated values.
+    // (b) The CSS grid-template must declare TWO columns at lg+
+    // (queue + detail). Pattern: `lg:grid-cols-[<a>_<b>]`.
     expect(
       src,
-      "the workspace grid must declare three columns at xl breakpoint",
-    ).toMatch(/xl:grid-cols-\[[^\]]+_[^\]]+_[^\]]+\]/);
+      "the workspace grid must declare two columns at the lg breakpoint",
+    ).toMatch(/lg:grid-cols-\[[^\]]+_[^\]]+\]/);
 
-    // (c) The RecordListPane import must exist — guards against a
-    // refactor that removes the component reference but leaves the
-    // <RecordListPane ...> JSX (would be a TypeScript error, but
-    // the contract-of-existence lock is faster + more explicit).
+    // (c) …and it must NOT re-introduce a dedicated 3rd column at xl.
+    // The record list stacks on the detail pane; a 3rd column squeezed
+    // the record rows and clipped their labels at laptop widths.
     expect(
       src,
-      "RecordListPane must be imported from the cases route",
-    ).toMatch(/import\s+\{\s*RecordListPane\s*\}\s+from\s+["']\.\/RecordListPane["']/);
+      "the workspace must not declare a 3-column grid (the record list " +
+        "stacks on the detail pane, it is not a dedicated column)",
+    ).not.toMatch(/grid-cols-\[[^\]]+_[^\]]+_[^\]]+\]/);
   });
 
-  it("inline records picker is reachable on multi-record cases below the xl breakpoint", () => {
-    // The workspace's outer middle pane (RecordListPane as a
-    // dedicated column) is wrapped in `hidden xl:block` so it only
-    // appears at >=1280px. Below xl, the operator's only path to
-    // the records picker is the inline RecordListPane inside
-    // CaseDetailPanel.
-    //
-    // Pre-fix the workspace passed `showInlineRecordList={false}`
-    // unconditionally, which suppressed the inline picker at every
-    // viewport. Result: on a 1024-1279px screen (the most common
-    // laptop width), a deep-link to `/cases?case=case-multi-XYZ`
-    // showed only two panes (queue + case header) with no way to
-    // pick a record. The Agent Recommendation card stayed hidden
-    // unless the operator already knew the record id and typed it
-    // into `?record=` by hand. P3e gap documented in the
-    // CaseDetailPanel jsdoc.
-    //
-    // Lock the fix shape: the workspace mounts CaseDetailPanel with
-    // `showInlineRecordList={true}` AND `inlineRecordListHiddenAtXl={true}`
-    // so the inline picker shows below xl and CaseDetailPanel hides
-    // it at xl+ (avoiding double-render with the outer middle pane).
+  it("mounts the records picker inline on the detail pane (CaseDetailPanel)", () => {
+    // The two-pane workspace has no dedicated record-list column — the
+    // picker (RecordListPane) is stacked at the top of the detail pane
+    // by CaseDetailPanel, which renders it by default. The workspace
+    // must therefore NOT suppress it.
     expect(
       src,
-      "workspace must enable the inline records picker so it's " +
-        "reachable below the xl breakpoint (closes P3e gap)",
-    ).toMatch(/showInlineRecordList=\{true\}/);
+      "workspace must not pass showInlineRecordList={false} — the " +
+        "inline picker is the only path to choosing a record",
+    ).not.toMatch(/showInlineRecordList=\{false\}/);
+
+    const detailPanel = readFileSync(
+      path.resolve(__dirname, "../../src/app/cases/CaseDetailPanel.tsx"),
+      "utf-8",
+    );
     expect(
-      src,
-      "workspace must hide the inline picker AT xl+ to avoid " +
-        "double-rendering with the outer RecordListPane column",
-    ).toMatch(/inlineRecordListHiddenAtXl=\{true\}/);
+      detailPanel,
+      "CaseDetailPanel must mount RecordListPane (the inline picker)",
+    ).toMatch(/<RecordListPane[\s>]/);
+    expect(
+      detailPanel,
+      "CaseDetailPanel must import RecordListPane",
+    ).toMatch(/import\s+\{\s*RecordListPane\s*\}\s+from\s+["']\.\/RecordListPane["']/);
   });
 
   it("selection URL writes use scroll:false so the queue keeps its position", () => {
@@ -256,32 +241,10 @@ describe("/cases workspace — case-switch race invariants", () => {
     ).toMatch(/role=["']option["'][\s\S]*?tabIndex=\{-1\}/);
   });
 
-  it("middle record-list column is an independent scroller (xl:contents)", () => {
-    // Bug: the middle pane was wrapped in `hidden xl:block`. A block
-    // wrapper isn't the grid child, so the RecordListPane <aside>
-    // didn't inherit the viewport-locked row height — a long record
-    // list overflowed and got clipped by the workspace's
-    // `overflow-hidden`, so the operator couldn't reach the lower
-    // records without fighting the layout. `xl:contents` promotes the
-    // <aside> to the direct grid child so it stretches and scrolls on
-    // its own.
-    expect(
-      src,
-      "the middle record-list wrapper must use `xl:contents` (not " +
-        "`xl:block`) so the pane stretches to the locked row height " +
-        "and scrolls independently",
-    ).toMatch(/hidden xl:contents/);
-    expect(
-      src,
-      "the page must hand RecordListPane a `groupRef` so the pane is " +
-        "an F6 focus target",
-    ).toMatch(/groupRef=\{recordListRef\}/);
-  });
-
   it("supports F6 cross-pane focus switching", () => {
     // Bug ("can't switch between panes with a keyboard shortcut"):
     // Tab walked every row, and there was no shortcut to jump between
-    // the queue / record-list / detail panes. usePaneFocusCycle binds
+    // the queue and detail panes. usePaneFocusCycle binds
     // F6 / Shift+F6 across the pane refs; the detail section is made a
     // focus target with tabIndex={-1}.
     expect(

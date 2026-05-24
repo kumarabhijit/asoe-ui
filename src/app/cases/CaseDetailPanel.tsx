@@ -111,32 +111,14 @@ export interface CaseDetailPanelProps {
    */
   onRecordActionComplete?: () => void;
   /**
-   * Whether to render the records picker INSIDE this panel.
-   *
-   * ADR-041 P3d-remaining (2026-05-14) lifted the picker into a
-   * dedicated middle column in the `/cases` workspace
-   * (`RecordListPane`). The workspace passes
-   * `showInlineRecordList={false}` so the picker isn't double-
-   * rendered. The focused `/cases/[id]` view + any other surface
-   * mounting `CaseDetailPanel` standalone keeps the default
-   * `true`, so the picker stays accessible when no outer column
-   * exists.
-   *
-   * Below the workspace's `xl` breakpoint (1280px) the workspace
-   * collapses the outer middle column; the inline picker is the
-   * fallback path tracked as P3e (a per-breakpoint toggle that's
-   * not in scope here).
+   * Whether to render the attached-records picker INSIDE this panel.
+   * Default `true`: the `/cases` workspace and the focused
+   * `/cases/[id]` view both stack the picker (`RecordListPane`) at the
+   * top of this panel — there is no separate column for it. A consumer
+   * can pass `false` to suppress it (e.g. an embed that supplies its
+   * own picker).
    */
   showInlineRecordList?: boolean;
-  /** When `true`, the inline picker is hidden AT and above the
-   *  workspace's `xl` breakpoint (1280px) and visible below it.
-   *  The `/cases` workspace passes `true` because its outer middle
-   *  column takes over at xl+; below xl, the outer column is
-   *  collapsed (`hidden xl:block`) and the inline picker is the
-   *  only way the operator can choose a record. Closes the P3e
-   *  gap. Default `false` so standalone consumers (focused
-   *  `/cases/[id]`) keep showing the picker at every viewport. */
-  inlineRecordListHiddenAtXl?: boolean;
 }
 
 export function CaseDetailPanel({
@@ -147,7 +129,6 @@ export function CaseDetailPanel({
   onSelectRecord,
   onRecordActionComplete,
   showInlineRecordList = true,
-  inlineRecordListHiddenAtXl = false,
 }: CaseDetailPanelProps) {
   // PO #20 (issue #133): tick the SLA snapshot once a minute so the
   // header countdown stays live without a refetch.
@@ -365,23 +346,18 @@ export function CaseDetailPanel({
         </section>
       )}
 
-      {/* ── Attached records (ADR-041 P3d-remaining inline fallback) ─
-          When `CaseDetailPanel` is mounted standalone (focused view
-          at `/cases/[id]`, or any other surface that doesn't ship
-          its own outer record-list column), the picker stays here
-          so the operator can pick a record. The `/cases` workspace
-          passes `showInlineRecordList={false}` because it mounts
-          `RecordListPane` as a dedicated middle column at xl
-          (1280px+). */}
+      {/* ── Attached records picker ──────────────────────────────
+          Stacked at the top of the detail pane so the operator picks
+          which attached record to act on. Shown on every surface that
+          mounts CaseDetailPanel (the `/cases` workspace + the focused
+          `/cases/[id]` view). */}
       {showInlineRecordList && hasAttachedRecords && (
-        <div className={inlineRecordListHiddenAtXl ? "xl:hidden" : undefined}>
-          <RecordListPane
-            caseId={orderCase.case_id}
-            records={records}
-            selectedRecordId={selectedRecordId}
-            onSelectRecord={onSelectRecord}
-          />
-        </div>
+        <RecordListPane
+          caseId={orderCase.case_id}
+          records={records}
+          selectedRecordId={selectedRecordId}
+          onSelectRecord={onSelectRecord}
+        />
       )}
 
       {/* Selected-record HITL surface — mounts the full ExceptionDetailPanel

@@ -234,16 +234,14 @@ regresses.
 // tests/architectural/<surface>_structure.test.ts
 const src = readFileSync(PAGE_PATH, "utf-8");
 
-it("renders the three-pane workspace: queue + record-list + detail", () => {
+it("renders the two-pane workspace: queue + detail", () => {
   expect(src).toMatch(/aria-label=["']Case queue["']/);
-  expect(src).toMatch(/<RecordListPane[\s>]/);
   expect(src).toMatch(/aria-label=["']Case workspace["']/);
   // Plus the CSS grid track template at the relevant breakpoint:
-  expect(src).toMatch(/xl:grid-cols-\[[^\]]+_[^\]]+_[^\]]+\]/);
-  // Plus the import (defends against `<RecordListPane>` JSX that
-  // would tsc-error if the import vanished — the import lock is
-  // faster + more explicit at the structure level).
-  expect(src).toMatch(/import\s+\{\s*RecordListPane\s*\}/);
+  expect(src).toMatch(/lg:grid-cols-\[[^\]]+_[^\]]+\]/);
+  // …and NO dedicated 3rd column (the record list stacks on the
+  // detail pane, it is not its own grid track).
+  expect(src).not.toMatch(/grid-cols-\[[^\]]+_[^\]]+_[^\]]+\]/);
 });
 ```
 
@@ -256,13 +254,16 @@ reaches the deepest pane.
 // tests/browser/<surface>-structure.spec.ts
 test.use({ viewport: { width: 1400, height: 900 } });
 
-test("three-pane workspace mounts at xl", async ({ page }) => {
+test("two-pane workspace mounts", async ({ page }) => {
   await loginAs(page, USERS.MANAGER);
   await page.goto("/cases");
   await page.locator("[role=option]").first().click();
   await expect(page.locator("[aria-label='Case queue']")).toBeVisible();
-  await expect(page.locator("[aria-label='Attached records']")).toBeVisible();
   await expect(page.locator("[aria-label='Case workspace']")).toBeVisible();
+  // The records picker is stacked inside the detail pane:
+  await expect(
+    page.locator("section[aria-label='Case workspace'] [aria-label='Attached records']"),
+  ).toBeVisible();
 });
 ```
 
@@ -276,11 +277,11 @@ actually catches the absence, not just the presence.
 endpoint). The "did this thing exist?" question MUST have a test
 answer; otherwise its absence is silent.
 
-Reference impls (ADR-041 P3d-remaining shipped 2026-05-14):
+Reference impls:
 
 * `tests/architectural/cases_workspace_render_guard.test.ts` — the
-  "renders the three-pane workspace" lock (Pattern A).
-* `tests/browser/cases-workspace-three-pane.spec.ts` — the
+  "renders the two-pane workspace" lock (Pattern A).
+* `tests/browser/cases-workspace-two-pane.spec.ts` — the
   behavioural completeness e2e (Pattern B).
 
 ## Standing gates (today's enforcement)
@@ -321,7 +322,7 @@ or it won't run on PR.
 | Single-action browser e2e | `tests/browser/escalate.spec.ts` |
 | Component contract test | `tests/components/CaseDetailPanel.test.tsx` |
 | Lifted-pane contract test | `tests/components/RecordListPane.test.tsx` |
-| Deliverable-completeness — source lock (Gap 7 Pattern A) | `tests/architectural/cases_workspace_render_guard.test.ts` ("renders the three-pane workspace" assertion) |
-| Deliverable-completeness — behavioural e2e (Gap 7 Pattern B) | `tests/browser/cases-workspace-three-pane.spec.ts` |
+| Deliverable-completeness — source lock (Gap 7 Pattern A) | `tests/architectural/cases_workspace_render_guard.test.ts` ("renders the two-pane workspace" assertion) |
+| Deliverable-completeness — behavioural e2e (Gap 7 Pattern B) | `tests/browser/cases-workspace-two-pane.spec.ts` |
 | Hook unit test | `tests/hooks/useCases.test.ts` |
 | UX / a11y patterns | `docs/test-strategy/UX_ACCESSIBILITY.md` |
