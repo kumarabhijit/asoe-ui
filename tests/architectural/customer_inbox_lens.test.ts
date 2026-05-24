@@ -30,7 +30,7 @@ describe("Customer Inbox lens deliverable (page.tsx)", () => {
   });
 
   it("the filter is threaded into useCases via the caseType option", () => {
-    expect(PAGE).toMatch(/useCases\([^)]*caseType:\s*filters\.case_type/s);
+    expect(PAGE).toMatch(/useCases\([^)]*caseType:\s*filters\.case_type/);
   });
 
   it("CasesFilters carries the case_type axis", () => {
