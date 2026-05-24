@@ -52,8 +52,14 @@ From `CLAUDE.md`:
 
 ## 3. Surface design
 
-Reuse the existing two-/three-pane `/cases` workspace
-(`src/app/cases/page.tsx`, `CaseDetailPanel.tsx`, `RecordListPane.tsx`).
+Reuse the existing **two-pane** `/cases` workspace
+(`src/app/cases/page.tsx`, `CaseDetailPanel.tsx`). After `662c9d2`
+the layout is queue + detail (`lg:grid-cols-[360px_minmax(0,1fr)]`,
+single column below); the dedicated `RecordListPane` 3rd column was
+removed and the record picker (`RecordListPane`, still used) is now
+rendered **inline at the top of the detail pane** by
+`CaseDetailPanel`. F6 cycles queue ↔ detail; the record list is
+reached by Tab within the detail region.
 
 1. **Inbox lens:** add an "EMAIL_ENTRY / Customer Inbox" filter chip
    to the `/cases` queue, calling `casesApi.list({ case_type:
@@ -72,14 +78,14 @@ Reuse the existing two-/three-pane `/cases` workspace
 
 | Component | Renders | Backend source (ADR-042) | Gap-analysis ref |
 |---|---|---|---|
-| `EntitiesSection.tsx` | extracted entities | `analysis.entities` | §4.3 |
-| `SapDataSection.tsx` | SAP master/order lookup | `analysis.sap_data` | §4.3 |
-| `OrderEntrySection.tsx` | extract → editable form → validate → submit-to-ERP. 4-state machine (idle/extracting/done/error) owned by a new **`useOrderExtraction`** hook (mirror `useExceptionActions`); correction tracking via `logOrderCorrection`. **Do not** recompute pallet/validation client-side (Guardrail #6) — backend supplies validated values. | `OrderEntryExtraction` + `PATCH/submit` endpoints | §4.6 |
-| `Edi850Section.tsx` | Decoded / Raw X12 / Segment-map (read-only); fine as one component | `GET /cases/{id}/edi-850` | §4.5 |
-| `ChangeAnalysis*` (**split**, panel correction) | one section is a section-of-sections — split into `LifecycleBar`, `ChangeItemsGrid`, `ConstraintList` (**variable N**, not fixed 10), `ScenarioList` (**variable M**, not fixed 3), `ChangeDecisionPanel`. Drop agent timings (cosmetic, not audit-bearing). | `ConstraintEvaluation` + `ChangeDecision` | §4.4 |
-| `ConstraintGraphSection.tsx` | layered DAG (REQUEST→ITEMS→CONSTRAINTS→SOURCES→DECISION) — reuse the existing `PipelineDAG` dagre→SVG scaffold | per-case projection of trace/topology | §6.6 |
-| `KnowledgeGraphSection.tsx` | entity-relationship web (Sender/Email/SO/SKU/BP) — **NOT dagre** (layered layout is wrong for a cyclic entity graph); use force/radial or hand-positioned **SVG** (matching the prototype), design tokens, never canvas | `KnowledgeGraphPayload` | §6.5 |
-| `DraftReplyPanel.tsx` | AI draft → edit → approve & send | `DraftReply` + reply endpoints, via existing disposition/cosign flow | §4.3 |
+| `EntitiesSection.tsx` | extracted entities | `analysis.entities` (composer field) | §4.3 |
+| `SapDataSection.tsx` | SAP master/order lookup | `analysis.sap_data` (composer field) | §4.3 |
+| `OrderEntrySection.tsx` | extract → editable form → validate → submit-to-ERP. 4-state machine (idle/extracting/done/error) owned by a new **`useOrderExtraction`** hook (mirror `useExceptionActions`). **Submit + corrections go through the existing `/exceptions/{id}/disposition` (+ cosign) action surface — NOT a new `/cases` write verb** (fidelity correction; cases is read-only by design). **Do not** recompute pallet/validation client-side (Guardrail #6) — backend supplies validated values. | `analysis.order_entry` + `useExceptionActions` disposition | §4.6 |
+| `Edi850Section.tsx` | Decoded / Raw X12 / Segment-map (read-only); fine as one component | `analysis.edi_850` composer field (dedicated `GET` only on an ADR-031 trigger) | §4.5 |
+| `ChangeAnalysis*` (**split**, panel correction) | one section is a section-of-sections — split into `LifecycleBar`, `ChangeItemsGrid`, `ConstraintList` (**variable N**, not fixed 10), `ScenarioList` (**variable M**, not fixed 3), `ChangeDecisionPanel`. Drop agent timings (cosmetic, not audit-bearing). | `analysis.change_analysis` composer field | §4.4 |
+| `ConstraintGraphSection.tsx` | layered DAG (REQUEST→ITEMS→CONSTRAINTS→SOURCES→DECISION) — reuse the existing `PipelineDAG` dagre→SVG scaffold | reuse `/exceptions/{id}/trace` + topology (no new surface) | §6.6 |
+| `KnowledgeGraphSection.tsx` | entity-relationship web (Sender/Email/SO/SKU/BP) — **NOT dagre** (layered layout is wrong for a cyclic entity graph); use force/radial or hand-positioned **SVG** (matching the prototype), design tokens, never canvas. **Deferrable** (no backend source exists — `knowledge/` is the skill/policy KB, not a graph producer; needs a net-new derived projection). | net-new derived projection (deferred) | §6.5 |
+| `DraftReplyPanel.tsx` | AI draft → edit → approve & send. **Send is a disposition action** (`/exceptions/{id}/disposition` + cosign), not a new reply endpoint. | `analysis.draft_reply` + `useExceptionActions` disposition | §4.3 |
 | `IntakePipelineView.tsx` | 6-step intake flow | `GET /api/v1/pipeline/topology` + WS steps (`WaterfallStepper`) | §4.7 |
 | `SimulateInboundModal.tsx` | inject test scenarios (sandbox only) | `POST /sandbox/simulate-inbound` | §4.8 |
 
@@ -89,11 +95,17 @@ Shared primitives still owed from gap-analysis §9.1 Phase A
 
 ## 5. Data & types
 
-* `src/lib/api.ts` (single client): add typed methods for every new
-  endpoint — never `fetch()` in pages/sections. Mirror the mock
-  layer in `src/lib/mock-data/*` and add the matching architectural
-  lock (`tests/architectural/case_pivot_mock_wiring.test.ts` style)
-  for any backend `model_validator`.
+* `src/lib/api.ts` (single client): **reads** come from the unified
+  `OrderAnalysis` composer payload by default (a dedicated
+  per-section `GET` is added only when an ADR-031 trigger fires);
+  **writes** (order-entry submit, corrections, reply send) go
+  through the existing `casesApi` / `useExceptionActions`
+  **disposition + cosign** methods — do NOT add bespoke `/cases`
+  write-verb clients (fidelity correction). Never `fetch()` in
+  pages/sections. Mirror the mock layer in `src/lib/mock-data/*` and
+  add the matching architectural lock
+  (`tests/architectural/case_pivot_mock_wiring.test.ts` style) for
+  any backend `model_validator`.
 * `src/types/*`: regenerate from `asoe2/openapi/asoe2.openapi.json`.
   Keep `*AnalysisData` rich (Guardrail #7). **Phase 0 fix:** reconcile
   the hand-written `src/types/exceptions.ts` autonomy union
@@ -208,6 +220,23 @@ Frontend / Domain):
   ordering honoured without a hardcoded UI map (§8).
 * Phase 0 resolves the L3-vs-L4 type drift; MLS = Phases 0–3; Draft
   Reply pulled ahead of graphs (§6).
+
+## 11. Architecture-fidelity audit (2026-05-23)
+
+Caught the plan drifting from current architecture; corrected above:
+* **Two-pane:** `662c9d2` collapsed the 3-column layout to two panes
+  (record picker inline in the detail pane). §3 updated;
+  `RecordListPane` is the inline picker, not a 3rd column.
+* **Writes via disposition:** order-entry submit, corrections, and
+  reply send route through the existing `/exceptions/{id}/disposition`
+  (+ cosign) action surface, not bespoke `/cases` write verbs
+  (cases is read-only by design). §4, §5.
+* **Reads composer-first:** sections render `analysis.*` composer
+  fields; a per-section `GET` is added only on an ADR-031 trigger.
+  §4, §5.
+* **Knowledge Graph has no backend source** (`knowledge/` is the
+  skill/policy KB, not a graph producer) → net-new derived
+  projection, deferred. §4, §9.
 
 ---
 
