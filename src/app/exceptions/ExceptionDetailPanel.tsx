@@ -55,6 +55,7 @@ import { PriceHoldSection } from "./PriceHoldSection";
 import { EdiMismatchSection } from "./EdiMismatchSection";
 import { EmailOrderEntrySection } from "./EmailOrderEntrySection";
 import { EmailSourceSection } from "./EmailSourceSection";
+import { EntitiesSection } from "./EntitiesSection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -703,6 +704,13 @@ export default function ExceptionDetailPanel({
           {analysis?.email_order_entry_analysis && (
             <CollapsibleSection title="Email Order Intake">
               <EmailOrderEntrySection data={analysis.email_order_entry_analysis} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 2 — Customer Inbox Entities tab. Data-presence
+              gated; preview-only until the composer adapter lands. */}
+          {analysis?.entities_analysis && (
+            <CollapsibleSection title="Entities">
+              <EntitiesSection data={analysis.entities_analysis} />
             </CollapsibleSection>
           )}
 

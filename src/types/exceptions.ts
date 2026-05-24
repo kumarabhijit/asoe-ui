@@ -382,6 +382,27 @@ export interface OrderAnalysis {
    *  CSA sees both the source email and the agent's recommendation
    *  on a single detail surface. */
   email_source?: EmailSourceData;
+  /** ADR-042 Phase 2 — Customer Inbox Entities tab. Extracted entities the
+   *  AI intake agent pulled from the email/attachments. Preview-only until
+   *  the composer adapter lands. Mirrors `api/schemas.py::EntitiesAnalysisData`. */
+  entities_analysis?: EntitiesAnalysisData;
+}
+
+/* ── Entities section (ADR-042 Phase 2) — mirrors api/schemas.py ── */
+
+/** A single structured value extracted from the email / attachments.
+ *  `kind` is the category (order_id | material | date | po | invoice | qty | …);
+ *  `source_span` is the verbatim text it came from (provenance). */
+export interface ExtractedEntity {
+  key: string;
+  value: string;
+  kind: string;
+  confidence?: number | null;
+  source_span?: string | null;
+}
+
+export interface EntitiesAnalysisData {
+  extracted: ExtractedEntity[];
 }
 
 /* ── Price Hold Release enrichment types (UI-only, not backend contract) ── */
