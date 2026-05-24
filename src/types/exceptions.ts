@@ -512,7 +512,10 @@ export interface EmailOrderEntryAnalysisData {
   classification: EmailOrderEntryClassification;
   /** Recipe-recommended action — must be a member of ResolutionAction. */
   recommended_action: ResolutionAction;
-  autonomy_level: "L1" | "L2" | "L3";
+  // L4 (full autonomy) is valid for email-order-entry only — parity with
+  // generated.ts::EmailOrderEntryAnalysisData (ADR-042 Phase-0). EDI-mismatch
+  // stays L1–L3. Locked by tests/architectural/autonomy_union_parity.test.ts.
+  autonomy_level: "L1" | "L2" | "L3" | "L4";
   /** Typed validation-failure codes from the validation suite. */
   validation_failures: string[];
   /** Names of the floor checks that breached, if any. */
