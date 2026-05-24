@@ -3409,6 +3409,8 @@ export interface operations {
             query?: {
                 /** @description Filter by case source (manual_order | automated_order) */
                 source?: string | null;
+                /** @description Filter by case_type (EMAIL_ENTRY | BLOCK). Orthogonal to source (ADR-041 §1); drives the Customer Inbox EMAIL_ENTRY lens (ADR-042). */
+                case_type?: string | null;
                 /** @description Filter by case status. Multi-value via comma-separated list (e.g. status=OPEN_AWAITING_HUMAN,OPEN_AWAITING_BUYER). Any-match: a case in any of the listed statuses passes. */
                 status?: string | null;
                 /** @description Filter by child-record intent (Phase 28.5.x §D2). Multi-value via comma-separated list (e.g. intents=DUPLICATE_PO,CONTRACTUAL_CORRECTION). Any-match: a case with at least one child carrying one of the listed intents passes. */
