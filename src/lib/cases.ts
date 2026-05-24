@@ -15,7 +15,7 @@
  * No `.tsx` file should ever switch on a status literal.
  */
 import type { CaseStatus } from "@/types/cases";
-import type { HealthResponse } from "@/types/exceptions";
+import type { AutonomyLevelInfo, HealthResponse } from "@/types/exceptions";
 
 /**
  * The seven case statuses grouped into three operator-meaningful
@@ -127,6 +127,11 @@ export function sourceChannelLabel(channel: string | null | undefined): string {
  *   `asoe2/contracts/policy.py` — DUPLICATE_PO_AUTONOMY_LEVELS,
  *   EMAIL_ORDER_ENTRY_AUTONOMY_LEVELS.
  */
+// Transition fallback only (ADR-042 §5 item 2). The authoritative autonomy
+// vocabulary — labels AND ordering — now comes from
+// `health.allowed_autonomy_levels` (rank-sorted), so the UI never hardcodes
+// the ladder (Guardrail #1). This map survives only for the window before a
+// caller has a health payload.
 const AUTONOMY_LEVEL_DESCRIPTIONS: Readonly<Record<string, string>> = {
   L1: "Block automatically — operator decides",
   L2: "Recommend — operator approves",
@@ -134,8 +139,35 @@ const AUTONOMY_LEVEL_DESCRIPTIONS: Readonly<Record<string, string>> = {
   L4: "Fully automated — audit only",
 };
 
-export function autonomyLevelLabel(level: string | null | undefined): string {
+type HealthAutonomy = Pick<HealthResponse, "allowed_autonomy_levels"> | null | undefined;
+
+/**
+ * The autonomy ladder ordered most-autonomous first, driven by the `rank`
+ * the backend serves on `health.allowed_autonomy_levels` (ADR-042 §5/§8 —
+ * higher rank == more automation). Returns `[]` in the transition window
+ * before the backend ships the field. The UI sorts by this, never by a
+ * hardcoded map (Guardrail #1).
+ */
+export function autonomyLevelsByRank(health: HealthAutonomy): AutonomyLevelInfo[] {
+  const levels = health?.allowed_autonomy_levels ?? [];
+  return [...levels].sort((a, b) => b.rank - a.rank);
+}
+
+/**
+ * Plain-language label for an autonomy level. Prefers the backend-served
+ * label from `health.allowed_autonomy_levels` (Guardrail #1); falls back to
+ * the transition map when no health payload is supplied, and finally to the
+ * bare code so the UI never crashes on an unknown level.
+ */
+export function autonomyLevelLabel(
+  level: string | null | undefined,
+  health?: HealthAutonomy,
+): string {
   if (!level) return "Unknown autonomy";
+  const fromHealth = health?.allowed_autonomy_levels?.find(
+    (l) => l.level === level,
+  )?.label;
+  if (fromHealth) return `${level} — ${fromHealth}`;
   const desc = AUTONOMY_LEVEL_DESCRIPTIONS[level];
   return desc ? `${level} — ${desc}` : level;
 }

@@ -994,6 +994,23 @@ export interface components {
             user?: components["schemas"]["UserProfile"] | null;
         };
         /**
+         * AutonomyLevelInfo
+         * @description One autonomy tier for the UI to render/sort (ADR-042 §5/§8).
+         *
+         *     `rank` is the degree of automation (higher == more autonomous) under the
+         *     active `autonomy_vocab_version`; the UI orders the ladder by `rank` rather
+         *     than hardcoding a map (asoe-ui Guardrail #1). Display vocabulary only —
+         *     not the engine's gating semantics.
+         */
+        AutonomyLevelInfo: {
+            /** Label */
+            label: string;
+            /** Level */
+            level: string;
+            /** Rank */
+            rank: number;
+        };
+        /**
          * BackOrderAnalysisData
          * @description BackOrderResolutionRecipe → UI `backorder_analysis`.
          *
@@ -1915,6 +1932,8 @@ export interface components {
          * @description GET /api/v1/health
          */
         HealthResponse: {
+            /** Allowed Autonomy Levels */
+            allowed_autonomy_levels?: components["schemas"]["AutonomyLevelInfo"][];
             /** Allowed Case Sources */
             allowed_case_sources?: string[];
             /** Allowed Case Statuses */
@@ -1931,6 +1950,11 @@ export interface components {
             allowed_recipes: string[];
             /** Allowed Resolution Actions */
             allowed_resolution_actions: string[];
+            /**
+             * Autonomy Vocab Version
+             * @default
+             */
+            autonomy_vocab_version: string;
             /** Explain Mode */
             explain_mode: boolean;
             /** Kill Switch */

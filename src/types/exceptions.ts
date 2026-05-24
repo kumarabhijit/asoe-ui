@@ -1114,4 +1114,29 @@ export interface HealthResponse {
    * in `src/lib/api.ts` is retired and this is the only source.
    */
   allowed_case_sources?: string[];
+  /**
+   * ADR-042 §5/§8 — the version the `allowed_autonomy_levels` rows resolve
+   * under (asoe2/contracts/autonomy.py::CURRENT_AUTONOMY_VOCAB_VERSION).
+   * Records stamp their own version; this is the current display set.
+   */
+  autonomy_vocab_version?: string;
+  /**
+   * ADR-042 §5/§8 — the autonomy ladder the UI renders. The UI sorts by
+   * `rank` (degree of automation, higher == more autonomous) and reads
+   * `label` from here rather than a hardcoded map (Guardrail #1). Defaults
+   * to `[]` until the backend ships the field — UI falls back to the
+   * transition map in `src/lib/cases.ts` in that window.
+   */
+  allowed_autonomy_levels?: AutonomyLevelInfo[];
+}
+
+/**
+ * ADR-042 §5/§8 — one autonomy tier (mirrors
+ * `asoe2/api/schemas.py::AutonomyLevelInfo`). Display vocabulary only — not
+ * the engine's gating semantics.
+ */
+export interface AutonomyLevelInfo {
+  level: string;
+  label: string;
+  rank: number;
 }
