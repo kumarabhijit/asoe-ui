@@ -50,7 +50,15 @@ describe("isCaseInvalidationEvent", () => {
     expect(isCaseInvalidationEvent(event("case_close"))).toBe(true);
   });
 
-  it("returns false for every per-event subject type", () => {
+  // ADR-042 Phase 4 — re-homed strategy gate #5. The AI Draft Reply live
+  // events mutate the record a case projects, so they MUST invalidate the
+  // list view (they carry exception_id, not case_id).
+  it("returns true for the reply_drafted / reply_sent events", () => {
+    expect(isCaseInvalidationEvent(event("reply_drafted"))).toBe(true);
+    expect(isCaseInvalidationEvent(event("reply_sent"))).toBe(true);
+  });
+
+  it("returns false for every non-invalidating per-event subject type", () => {
     for (const t of [
       "pipeline_progress",
       "exception_update",

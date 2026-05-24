@@ -19,7 +19,12 @@ export type WSEventType =
   // the case list on these. Carry `case_id` rather than `exception_id`.
   | "case_open"
   | "case_update"
-  | "case_close";
+  | "case_close"
+  // ADR-042 Phase 4 — AI Draft Reply live events. Carry `exception_id`.
+  // `useCases` invalidates the list on these too (a drafted/sent reply
+  // changes the record the case projects).
+  | "reply_drafted"
+  | "reply_sent";
 
 export interface WSEvent {
   type: WSEventType;
@@ -40,7 +45,9 @@ export interface WSEvent {
     | ReanalysisStartedPayload
     | CaseOpenedPayload
     | CaseUpdatedPayload
-    | CaseClosedPayload;
+    | CaseClosedPayload
+    | ReplyDraftedPayload
+    | ReplySentPayload;
 }
 
 /* ── Payload types ─────────────────────────────────────────────────── */
@@ -112,6 +119,26 @@ export interface CaseUpdatedPayload {
 export interface CaseClosedPayload {
   status: string;
   closed_at: string;
+}
+
+/* ── AI Draft Reply events (ADR-042 Phase 4) ───────────────────────── */
+// The reply body is not carried on the wire (large, human-facing); fetch the
+// record detail (resolution_data.reply_draft / reply_sent) on invalidation.
+
+export interface ReplyDraftedPayload {
+  status: string; // DRAFTED | REJECTED
+  template_name?: string;
+  recipient?: string;
+  subject?: string;
+  drafted_by?: string;
+}
+
+export interface ReplySentPayload {
+  status: string; // SENT | FAILED
+  recipient?: string;
+  subject?: string;
+  delivered?: boolean;
+  sent_by?: string;
 }
 
 /* ── Auth message (first message after connect) ────────────────────── */

@@ -154,11 +154,13 @@ export function useManualOrderCases(
 }
 
 /**
- * Returns true when the WS event is a case-level invalidation
- * trigger (`case_open` / `case_update` / `case_close`). Page-level
- * `useWebSocket` handlers compose this with their own
- * pipeline-progress / exception-update logic and call
- * `useCases().refetch()` whenever it returns true.
+ * Returns true when the WS event is a case-list invalidation trigger.
+ * Covers the case-level events (`case_open` / `case_update` / `case_close`)
+ * and the ADR-042 Phase 4 AI Draft Reply events (`reply_drafted` /
+ * `reply_sent`) — a drafted or sent buyer reply mutates the record a case
+ * projects, so the list view must refetch. Page-level `useWebSocket`
+ * handlers compose this with their own pipeline-progress / exception-update
+ * logic and call `useCases().refetch()` whenever it returns true.
  *
  * Kept as a pure helper rather than a hook so the page handler can
  * remain a single useCallback without an extra subscription.
@@ -168,5 +170,7 @@ export function isCaseInvalidationEvent(event: WSEvent): boolean {
     event.type === "case_open"
     || event.type === "case_update"
     || event.type === "case_close"
+    || event.type === "reply_drafted"
+    || event.type === "reply_sent"
   );
 }
