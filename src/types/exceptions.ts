@@ -390,6 +390,49 @@ export interface OrderAnalysis {
    *  context. Preview-only until the SAP-gateway composer adapter lands.
    *  Mirrors `api/schemas.py::SapDataAnalysisData`. */
   sap_data_analysis?: SapDataAnalysisData;
+  /** ADR-042 Phase 3 — Customer Inbox Order Entry tab (extracted order form).
+   *  Preview-only until the extraction-gateway composer adapter lands.
+   *  Mirrors `api/schemas.py::OrderEntryExtraction`. */
+  order_entry_extraction?: OrderEntryExtraction;
+}
+
+/* ── Order Entry section (ADR-042 Phase 3) — mirrors api/schemas.py ── */
+
+export interface OrderEntryHeader {
+  customer_po?: string | null;
+  order_type?: string | null;
+  sales_org?: string | null;
+  dist_channel?: string | null;
+  ship_window_from?: string | null;
+  ship_window_to?: string | null;
+  requested_date?: string | null;
+}
+
+export interface OrderEntryLineItem {
+  line_num: string;
+  material: string;
+  description?: string | null;
+  quantity: number;
+  uom?: string | null;
+  unit_price?: number | null;
+  mdm_matched?: boolean | null;
+}
+
+export interface OrderEntryValidationFlag {
+  field: string;
+  /** ERROR | WARNING | INFO */
+  severity: string;
+  message: string;
+}
+
+export interface OrderEntryExtraction {
+  source_type: string;
+  confidence: number;
+  header: OrderEntryHeader;
+  customer_name?: string | null;
+  customer_bp?: string | null;
+  line_items: OrderEntryLineItem[];
+  validation_flags: OrderEntryValidationFlag[];
 }
 
 /* ── SAP Data section (ADR-042 Phase 2) — mirrors api/schemas.py ── */

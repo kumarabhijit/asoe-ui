@@ -57,6 +57,7 @@ import { EmailOrderEntrySection } from "./EmailOrderEntrySection";
 import { EmailSourceSection } from "./EmailSourceSection";
 import { EntitiesSection } from "./EntitiesSection";
 import { SapDataSection } from "./SapDataSection";
+import { OrderEntrySection } from "./OrderEntrySection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -719,6 +720,14 @@ export default function ExceptionDetailPanel({
           {analysis?.sap_data_analysis && (
             <CollapsibleSection title="SAP Data">
               <SapDataSection data={analysis.sap_data_analysis} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 3 — Customer Inbox Order Entry tab (extracted order
+              form). Data-presence gated; preview-only until the extraction
+              gateway lands. */}
+          {analysis?.order_entry_extraction && (
+            <CollapsibleSection title="Order Entry">
+              <OrderEntrySection data={analysis.order_entry_extraction} />
             </CollapsibleSection>
           )}
 
