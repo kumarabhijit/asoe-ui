@@ -906,6 +906,7 @@ export interface components {
             delivery_delay_analysis?: components["schemas"]["DeliveryDelayAnalysisData"] | null;
             /** Diagnosis */
             diagnosis: string;
+            draft_reply?: components["schemas"]["DraftReply"] | null;
             duplicate_detection?: components["schemas"]["DuplicateDetectionData"] | null;
             edi_850_audit?: components["schemas"]["Edi850Document"] | null;
             edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
@@ -914,6 +915,7 @@ export interface components {
             entities_analysis?: components["schemas"]["EntitiesAnalysisData"] | null;
             entity_profile?: components["schemas"]["EntityProfile"] | null;
             impact_metrics?: components["schemas"]["ImpactMetrics"] | null;
+            knowledge_graph?: components["schemas"]["KnowledgeGraphPayload"] | null;
             /** Lines */
             lines?: components["schemas"]["LineAnalysis"][];
             moq_analysis?: components["schemas"]["MOQAnalysisData"] | null;
@@ -1510,6 +1512,47 @@ export interface components {
             reply?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * DraftReply
+         * @description AI Draft Reply evidence (ADR-042 Phase 4 contract; surfaced on the
+         *     analysis in Phase 7). The current generated reply for the case, projected by
+         *     the composer from `resolution_data["reply_draft"]` (the ReplyDraftRecipe
+         *     output a DRAFT_REPLY disposition persisted). `status` ∈ DRAFTED | REJECTED;
+         *     a REJECTED draft carries a `reason` and no body. Read-only evidence — sending
+         *     is a separate Shadow-gated disposition (SEND_REPLY).
+         */
+        DraftReply: {
+            /** Body */
+            body?: string | null;
+            /** Drafted At */
+            drafted_at?: string | null;
+            /** Drafted By */
+            drafted_by?: string | null;
+            /** Edits Applied */
+            edits_applied?: components["schemas"]["DraftReplyEdit"][];
+            /** Reason */
+            reason?: string | null;
+            /** Recipient */
+            recipient?: string | null;
+            /** Status */
+            status: string;
+            /** Subject */
+            subject?: string | null;
+            /** Template Name */
+            template_name?: string | null;
+        };
+        /**
+         * DraftReplyEdit
+         * @description One operator edit applied to a generated reply (before/after audit).
+         */
+        DraftReplyEdit: {
+            /** After */
+            after?: string | null;
+            /** Before */
+            before?: string | null;
+            /** Field */
+            field: string;
         };
         /**
          * DuplicateDetectionData
@@ -2320,6 +2363,57 @@ export interface components {
             po_num?: string | null;
             /** Qty */
             qty: number;
+        };
+        /**
+         * KnowledgeGraphEdge
+         * @description A directed relationship between two `KnowledgeGraphNode` ids (ADR-042
+         *     Phase 7). `relation` is the decoded edge label (e.g. ``places`` /
+         *     ``contains`` / ``validated_by``).
+         */
+        KnowledgeGraphEdge: {
+            /** Relation */
+            relation: string;
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+        };
+        /**
+         * KnowledgeGraphNode
+         * @description One node in the Change/Knowledge Graph (ADR-042 Phase 7). `kind` buckets
+         *     the node for the viewer's legend (e.g. ``order`` / ``customer`` /
+         *     ``material`` / ``sap_doc`` / ``entity``); `detail` is an optional one-line
+         *     annotation.
+         */
+        KnowledgeGraphNode: {
+            /** Detail */
+            detail?: string | null;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+        };
+        /**
+         * KnowledgeGraphPayload
+         * @description Knowledge Graph tab (ADR-042 Phase 7) — a net-new DERIVED projection over
+         *     the case's already-resolved entities (the order, its customer, materials,
+         *     SAP doc, and extracted entities). Built deterministically by
+         *     `gateways/knowledge_graph.build_knowledge_graph` (pure) — there is no
+         *     standalone KG data source today, so this is a projection of existing
+         *     enrichment context, not invented data (ADR-042 §5b — deferrable behind
+         *     demand). Projected by the composer from
+         *     `enrichment_context["knowledge_graph"]`; preview-only until that producer is
+         *     wired. `root_id` is the focal node (the order/case).
+         */
+        KnowledgeGraphPayload: {
+            /** Edges */
+            edges?: components["schemas"]["KnowledgeGraphEdge"][];
+            /** Nodes */
+            nodes?: components["schemas"]["KnowledgeGraphNode"][];
+            /** Root Id */
+            root_id?: string | null;
         };
         /**
          * LifecycleState

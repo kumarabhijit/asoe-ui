@@ -410,6 +410,14 @@ export interface OrderAnalysis {
    *  Preview-only until the change_analysis producer lands.
    *  Mirrors `api/schemas.py::ChangeAnalysis`. */
   change_analysis?: ChangeAnalysis;
+  /** ADR-042 Phase 7 — Customer Inbox Knowledge Graph tab. A derived node/edge
+   *  projection over the case entities. Preview-only / deferrable until the
+   *  knowledge_graph producer lands. Mirrors `api/schemas.py::KnowledgeGraphPayload`. */
+  knowledge_graph?: KnowledgeGraphPayload;
+  /** ADR-042 Phase 7 — AI Draft Reply evidence, projected from
+   *  resolution_data.reply_draft. Absent until a DRAFT_REPLY disposition runs.
+   *  Mirrors `api/schemas.py::DraftReply`. */
+  draft_reply?: DraftReply;
 }
 
 /* ── Order Entry section (ADR-042 Phase 3) — mirrors api/schemas.py ── */
@@ -571,6 +579,49 @@ export interface ChangeAnalysis {
   evaluation: ConstraintEvaluation;
   scenarios: ScenarioOption[];
   decision: ChangeDecision;
+}
+
+/* ── Knowledge Graph section (ADR-042 Phase 7) — mirrors api/schemas.py ── */
+
+export interface KnowledgeGraphNode {
+  id: string;
+  label: string;
+  /** order | customer | material | sap_doc | entity */
+  kind: string;
+  detail?: string | null;
+}
+
+export interface KnowledgeGraphEdge {
+  source: string;
+  target: string;
+  relation: string;
+}
+
+export interface KnowledgeGraphPayload {
+  nodes: KnowledgeGraphNode[];
+  edges: KnowledgeGraphEdge[];
+  root_id?: string | null;
+}
+
+/* ── Draft Reply section (ADR-042 Phase 7 / Phase 4) — mirrors api/schemas.py ── */
+
+export interface DraftReplyEdit {
+  field: string;
+  before?: string | null;
+  after?: string | null;
+}
+
+export interface DraftReply {
+  /** DRAFTED | REJECTED */
+  status: string;
+  reason?: string | null;
+  template_name?: string | null;
+  recipient?: string | null;
+  subject?: string | null;
+  body?: string | null;
+  edits_applied: DraftReplyEdit[];
+  drafted_by?: string | null;
+  drafted_at?: string | null;
 }
 
 /* ── SAP Data section (ADR-042 Phase 2) — mirrors api/schemas.py ── */

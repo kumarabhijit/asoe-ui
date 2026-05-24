@@ -60,6 +60,8 @@ import { SapDataSection } from "./SapDataSection";
 import { OrderEntrySection } from "./OrderEntrySection";
 import { Edi850Section } from "./Edi850Section";
 import { ChangeAnalysisSection } from "./ChangeAnalysisSection";
+import { KnowledgeGraphSection } from "./KnowledgeGraphSection";
+import { DraftReplySection } from "./DraftReplySection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -746,6 +748,22 @@ export default function ExceptionDetailPanel({
           {analysis?.change_analysis && (
             <CollapsibleSection title="Change Analysis">
               <ChangeAnalysisSection data={analysis.change_analysis} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 7 — Knowledge Graph tab (derived entity projection).
+              Data-presence gated; preview-only / deferrable until the
+              knowledge_graph producer lands. */}
+          {analysis?.knowledge_graph && (
+            <CollapsibleSection title="Knowledge Graph">
+              <KnowledgeGraphSection data={analysis.knowledge_graph} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 7 — AI Draft Reply evidence (projected from
+              resolution_data.reply_draft). Data-presence gated; absent until a
+              DRAFT_REPLY disposition runs. */}
+          {analysis?.draft_reply && (
+            <CollapsibleSection title="AI Draft Reply">
+              <DraftReplySection data={analysis.draft_reply} />
             </CollapsibleSection>
           )}
 
