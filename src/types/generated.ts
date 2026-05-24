@@ -916,6 +916,7 @@ export interface components {
             lines?: components["schemas"]["LineAnalysis"][];
             moq_analysis?: components["schemas"]["MOQAnalysisData"] | null;
             order_comparison?: components["schemas"]["OrderComparisonData"] | null;
+            order_entry_extraction?: components["schemas"]["OrderEntryExtraction"] | null;
             overmax_analysis?: components["schemas"]["OverMaxAnalysisData"] | null;
             pallet_analysis?: components["schemas"]["PalletAnalysisData"] | null;
             price_analysis?: components["schemas"]["PriceAnalysisData"] | null;
@@ -2171,6 +2172,83 @@ export interface components {
             matching_fields?: string[];
             /** Orders */
             orders?: components["schemas"]["ComparisonOrder"][];
+        };
+        /**
+         * OrderEntryExtraction
+         * @description Order Entry tab (ADR-042 Phase 3) — the structured order the AI intake
+         *     agent extracted from the email/attachments, for operator review before ERP
+         *     submit. Projected by the composer from the extraction-gateway read;
+         *     preview-only until that gateway lands. The agent's recommendation /
+         *     autonomy live separately on `email_order_entry_analysis`.
+         */
+        OrderEntryExtraction: {
+            /** Confidence */
+            confidence: number;
+            /** Customer Bp */
+            customer_bp?: string | null;
+            /** Customer Name */
+            customer_name?: string | null;
+            header: components["schemas"]["OrderEntryHeader"];
+            /** Line Items */
+            line_items?: components["schemas"]["OrderEntryLineItem"][];
+            /** Source Type */
+            source_type: string;
+            /** Validation Flags */
+            validation_flags?: components["schemas"]["OrderEntryValidationFlag"][];
+        };
+        /**
+         * OrderEntryHeader
+         * @description Extracted order-header fields (ADR-042 Phase 3 — Order Entry tab).
+         */
+        OrderEntryHeader: {
+            /** Customer Po */
+            customer_po?: string | null;
+            /** Dist Channel */
+            dist_channel?: string | null;
+            /** Order Type */
+            order_type?: string | null;
+            /** Requested Date */
+            requested_date?: string | null;
+            /** Sales Org */
+            sales_org?: string | null;
+            /** Ship Window From */
+            ship_window_from?: string | null;
+            /** Ship Window To */
+            ship_window_to?: string | null;
+        };
+        /**
+         * OrderEntryLineItem
+         * @description One extracted order line. `mdm_matched` = matched against material
+         *     master; None when the master lookup hasn't run.
+         */
+        OrderEntryLineItem: {
+            /** Description */
+            description?: string | null;
+            /** Line Num */
+            line_num: string;
+            /** Material */
+            material: string;
+            /** Mdm Matched */
+            mdm_matched?: boolean | null;
+            /** Quantity */
+            quantity: number;
+            /** Unit Price */
+            unit_price?: number | null;
+            /** Uom */
+            uom?: string | null;
+        };
+        /**
+         * OrderEntryValidationFlag
+         * @description A validation finding on the extracted order. `severity` ∈
+         *     ERROR | WARNING | INFO.
+         */
+        OrderEntryValidationFlag: {
+            /** Field */
+            field: string;
+            /** Message */
+            message: string;
+            /** Severity */
+            severity: string;
         };
         /**
          * OrderSnapshot
