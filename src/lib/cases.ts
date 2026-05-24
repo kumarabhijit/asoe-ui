@@ -251,6 +251,11 @@ const ACTION_LABELS: Readonly<Record<string, ActionLabel>> = {
     caption: "Rejects the order and notifies the buyer.",
     secondary: "Cancel",
   },
+  SUBMIT_TO_ERP: {
+    primary: "Submit to ERP",
+    caption: "Posts the reviewed order to the ERP. Orders over $10k require a second approver.",
+    secondary: "Cancel",
+  },
 };
 
 /**

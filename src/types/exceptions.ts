@@ -88,7 +88,9 @@ export type ResolutionAction =
   | "LOW_CONFIDENCE_FLAG"
   | "AUTO_CORRECT"
   | "REQUEST_CLARIFICATION"
-  | "REJECT";
+  | "REJECT"
+  // ADR-042 §2.2.6 — explicit, financially-binding order-entry ERP submit.
+  | "SUBMIT_TO_ERP";
 
 /* ── Pipeline node names (11-node LangGraph state machine) ─────────────
  *

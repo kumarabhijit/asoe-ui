@@ -1387,6 +1387,10 @@ export interface components {
         DispositionRequest: {
             /** Action */
             action: string;
+            /** Corrections */
+            corrections?: {
+                [key: string]: unknown;
+            } | null;
             /** Notes */
             notes: string;
             /** Reason Tag */
