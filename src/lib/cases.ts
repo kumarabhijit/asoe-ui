@@ -261,6 +261,11 @@ const ACTION_LABELS: Readonly<Record<string, ActionLabel>> = {
     caption: "Composes a reply to the buyer for you to review before sending.",
     secondary: "Cancel",
   },
+  SEND_REPLY: {
+    primary: "Send reply",
+    caption: "Sends the approved reply to the buyer.",
+    secondary: "Cancel",
+  },
 };
 
 /**

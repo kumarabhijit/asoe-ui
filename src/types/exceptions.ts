@@ -92,7 +92,9 @@ export type ResolutionAction =
   // ADR-042 §2.2.6 — explicit, financially-binding order-entry ERP submit.
   | "SUBMIT_TO_ERP"
   // ADR-042 Phase 4 — compose a buyer reply draft (send is a separate action).
-  | "DRAFT_REPLY";
+  | "DRAFT_REPLY"
+  // ADR-042 Phase 4 — send the operator-approved buyer reply.
+  | "SEND_REPLY";
 
 /* ── Pipeline node names (11-node LangGraph state machine) ─────────────
  *

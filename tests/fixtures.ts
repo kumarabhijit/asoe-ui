@@ -189,7 +189,7 @@ export const MOCK_HEALTH: HealthResponse = {
     "ESCALATE", "REQUEST_BUYER_CONFIRMATION",
     "ONE_CLICK_APPROVE", "STANDARD_REVIEW", "LOW_CONFIDENCE_FLAG",
     "AUTO_CORRECT", "REQUEST_CLARIFICATION", "REJECT",
-    "SUBMIT_TO_ERP", "DRAFT_REPLY",
+    "SUBMIT_TO_ERP", "DRAFT_REPLY", "SEND_REPLY",
   ],
   // Sourced from asoe2/constraints/specs.py via the snapshot at
   // tests/contract/snapshots/curated_reason_tags.json. Keeps fixtures

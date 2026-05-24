@@ -1174,7 +1174,7 @@ const MOCK_HEALTH: HealthResponse = {
   // Mirrors asoe2/constraints/specs.py AllowedResolutionAction. Backend is
   // authoritative at runtime (/api/v1/health); this mock list exists only for
   // local development.
-  allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION", "ONE_CLICK_APPROVE", "STANDARD_REVIEW", "LOW_CONFIDENCE_FLAG", "AUTO_CORRECT", "REQUEST_CLARIFICATION", "REJECT", "SUBMIT_TO_ERP", "DRAFT_REPLY"],
+  allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION", "ONE_CLICK_APPROVE", "STANDARD_REVIEW", "LOW_CONFIDENCE_FLAG", "AUTO_CORRECT", "REQUEST_CLARIFICATION", "REJECT", "SUBMIT_TO_ERP", "DRAFT_REPLY", "SEND_REPLY"],
   // Sourced from asoe2/constraints/specs.py via the snapshot at
   // tests/contract/snapshots/curated_reason_tags.json (regen with
   // `npm run sync:reason-tags`). The 2026-05-10 panel curated every
