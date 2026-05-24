@@ -59,7 +59,9 @@ export function caseFromMockException(exc: ExceptionSummary): OrderCase {
   // ORDER_RECEIVED) both map to NEW_ORDER under the recipe registry,
   // so we surface that explicitly.
   const email_classification: EmailClassification | null = isEmail
-    ? "NEW_ORDER"
+    ? exc.event_type?.includes("CHANGE")
+      ? "ORDER_CHANGE"
+      : "NEW_ORDER"
     : null;
   const status: CaseStatus = (() => {
     switch (exc.lifecycle_state) {

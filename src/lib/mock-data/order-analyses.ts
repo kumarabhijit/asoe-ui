@@ -14,6 +14,7 @@
 // preview mode.
 
 import type { OrderAnalysis } from "@/types/exceptions";
+import { INBOX_SECTION_BUNDLES } from "./inbox-sections";
 
 export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
   /* ── CONTRACTUAL_CORRECTION: Pricing / Promo exception ───────────── */
@@ -1832,4 +1833,47 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       ],
     },
   },
+
+  /* ── ADR-042 Customer-Inbox order-change requests (sections merged below) ── */
+  "exc-040": {
+    diagnosis: "Buyer requests a quantity reduction on line 001 (600 → 420 CS). Mid-fulfilment change; supply + logistics clear, GOLD-tier approval required.",
+    confidence: 86,
+    risk: "LOW",
+    resolution: "Approve the reduction and re-confirm the order.",
+    recommendation: "Approve as requested",
+    lines: [],
+  },
+  "exc-041": {
+    diagnosis: "Buyer requests an expedite (delivery 2026-05-24 → 2026-05-20). SLA window tight and carrier capacity constrained.",
+    confidence: 74,
+    risk: "MEDIUM",
+    resolution: "Expedite via upgraded carrier service to hold the window.",
+    recommendation: "Expedite shipping",
+    lines: [],
+  },
+  "exc-042": {
+    diagnosis: "Buyer requests a full cancellation on an order already late in fulfilment (stage 4/5, picked). High-risk; revenue impact above the four-eyes threshold.",
+    confidence: 45,
+    risk: "HIGH",
+    resolution: "Reject the cancellation and escalate to a supply planner.",
+    recommendation: "Reject / escalate to planner",
+    lines: [],
+  },
+  "exc-043": {
+    diagnosis: "Buyer requests a SKU substitution (BEV-LEMON-6PK → BEV-LEMON-12PK). ATP partially covers the substitute.",
+    confidence: 78,
+    risk: "MEDIUM",
+    resolution: "Partial-fulfil the available 12-pack and backorder the balance.",
+    recommendation: "Partial fulfilment",
+    lines: [],
+  },
 };
+
+// ADR-042 — merge the rich Customer-Inbox evidence section bundles onto their
+// cases (keeps the heavy section payloads in inbox-sections.ts and out of this
+// already-large fixtures file). Spread, so a case's existing fields are kept.
+for (const [id, sections] of Object.entries(INBOX_SECTION_BUNDLES)) {
+  if (MOCK_ORDER_ANALYSES[id]) {
+    Object.assign(MOCK_ORDER_ANALYSES[id], sections);
+  }
+}
