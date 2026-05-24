@@ -1395,6 +1395,10 @@ export interface components {
             notes: string;
             /** Reason Tag */
             reason_tag: string;
+            /** Reply */
+            reply?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * DuplicateDetectionData

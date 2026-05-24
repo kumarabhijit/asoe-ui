@@ -60,6 +60,7 @@ const UI_RESOLUTION_ACTIONS: readonly ResolutionAction[] = [
   "REQUEST_CLARIFICATION",
   "REJECT",
   "SUBMIT_TO_ERP",
+  "DRAFT_REPLY",
 ] as const;
 
 describe("Enum parity (asoe-ui ↔ asoe2 constraints/specs.py)", () => {

@@ -256,6 +256,11 @@ const ACTION_LABELS: Readonly<Record<string, ActionLabel>> = {
     caption: "Posts the reviewed order to the ERP. Orders over $10k require a second approver.",
     secondary: "Cancel",
   },
+  DRAFT_REPLY: {
+    primary: "Draft reply",
+    caption: "Composes a reply to the buyer for you to review before sending.",
+    secondary: "Cancel",
+  },
 };
 
 /**
