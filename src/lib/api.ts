@@ -2108,6 +2108,9 @@ export interface CaseListItem extends OrderCase {
 export const casesApi = {
   async list(params?: {
     source?: string;
+    /** Filter by case_type (EMAIL_ENTRY | BLOCK) — the Customer Inbox lens
+     *  (ADR-042). Orthogonal to `source` (ADR-041 §1). */
+    case_type?: string;
     /** Multi-value via comma-separated string. */
     status?: string;
     /** Multi-value via comma-separated string. */
@@ -2140,6 +2143,7 @@ export const casesApi = {
       }>("/api/v1/cases", {
         query: {
           source: params?.source,
+          case_type: params?.case_type,
           status: params?.status,
           intents: params?.intents,
           since: params?.since,
@@ -2155,6 +2159,9 @@ export const casesApi = {
       child_intents: [],  // mock-mode placeholder; live API computes
     }));
     if (params?.source) items = items.filter((c) => c.source === params.source);
+    if (params?.case_type) {
+      items = items.filter((c) => c.case_type === params.case_type);
+    }
     if (params?.status) {
       const statuses = params.status.split(",").map((s) => s.trim()).filter(Boolean);
       if (statuses.length > 0) {
