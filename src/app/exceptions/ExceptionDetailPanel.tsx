@@ -58,6 +58,7 @@ import { EmailSourceSection } from "./EmailSourceSection";
 import { EntitiesSection } from "./EntitiesSection";
 import { SapDataSection } from "./SapDataSection";
 import { OrderEntrySection } from "./OrderEntrySection";
+import { Edi850Section } from "./Edi850Section";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -728,6 +729,14 @@ export default function ExceptionDetailPanel({
           {analysis?.order_entry_extraction && (
             <CollapsibleSection title="Order Entry">
               <OrderEntrySection data={analysis.order_entry_extraction} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 5 — Customer Inbox EDI 850 Audit tab (deterministic
+              X12 850 reconstruction). Data-presence gated; preview-only until
+              the edi_850 builder producer lands. */}
+          {analysis?.edi_850_audit && (
+            <CollapsibleSection title="EDI 850 Audit">
+              <Edi850Section data={analysis.edi_850_audit} />
             </CollapsibleSection>
           )}
 

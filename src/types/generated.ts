@@ -906,6 +906,7 @@ export interface components {
             /** Diagnosis */
             diagnosis: string;
             duplicate_detection?: components["schemas"]["DuplicateDetectionData"] | null;
+            edi_850_audit?: components["schemas"]["Edi850Document"] | null;
             edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
             email_order_entry_analysis?: components["schemas"]["EmailOrderEntryAnalysisData"] | null;
             email_source?: components["schemas"]["EmailSourceData"] | null;
@@ -1494,6 +1495,166 @@ export interface components {
             tenant_id: string;
             /** Updated At */
             updated_at: string;
+        };
+        /**
+         * Edi850Document
+         * @description EDI 850 Audit tab (ADR-042 Phase 5). The ANSI X12 5010 purchase-order
+         *     transaction set the system reconstructs from the reviewed order, built
+         *     deterministically by the `edi_850` builder (`gateways/edi850.py`) — a pure,
+         *     fully unit-testable port of the prototype's client-side `buildEDI850`. It is
+         *     the audit evidence an operator inspects before the order is transmitted to
+         *     the seller's ERP. Projected by the composer from the builder's
+         *     `enrichment_context["edi_850"]` read; preview-only until that producer is
+         *     wired. The three prototype sub-views map onto this contract: Decoded
+         *     (`envelope` / `header` / `parties` / `line_items` / `totals`), Raw X12
+         *     (`raw_x12`), and Segment Map (`segments`).
+         */
+        Edi850Document: {
+            envelope: components["schemas"]["Edi850Envelope"];
+            header: components["schemas"]["Edi850Header"];
+            /** Line Items */
+            line_items?: components["schemas"]["Edi850LineItem"][];
+            /** Parties */
+            parties?: components["schemas"]["Edi850Party"][];
+            /** Raw X12 */
+            raw_x12: string;
+            /** Segments */
+            segments?: components["schemas"]["Edi850Segment"][];
+            /**
+             * Standard
+             * @default ANSI X12 5010
+             */
+            standard: string;
+            totals: components["schemas"]["Edi850Totals"];
+            /**
+             * Transaction Set
+             * @default 850
+             */
+            transaction_set: string;
+        };
+        /**
+         * Edi850Envelope
+         * @description ISA/GS/ST interchange + functional-group identifiers (Decoded view's
+         *     Interchange Envelope card).
+         */
+        Edi850Envelope: {
+            /** Group Control Number */
+            group_control_number: string;
+            /** Interchange Control Number */
+            interchange_control_number: string;
+            /** Receiver Id */
+            receiver_id: string;
+            /** Sender Id */
+            sender_id: string;
+            /** Transaction Set Control Number */
+            transaction_set_control_number: string;
+            /** Usage Indicator */
+            usage_indicator: string;
+            /** X12 Version */
+            x12_version: string;
+        };
+        /**
+         * Edi850Header
+         * @description BEG/CUR/DTM purchase-order header (Decoded view's PO Header card).
+         *     `purpose_code` is BEG01 (e.g. ``00`` = original); `po_type` is BEG02
+         *     (e.g. ``SA`` = stand-alone).
+         */
+        Edi850Header: {
+            /** Currency */
+            currency?: string | null;
+            /** Po Date */
+            po_date?: string | null;
+            /** Po Number */
+            po_number: string;
+            /** Po Type */
+            po_type: string;
+            /** Purpose Code */
+            purpose_code: string;
+            /** Requested Delivery Date */
+            requested_delivery_date?: string | null;
+        };
+        /**
+         * Edi850LineItem
+         * @description A PO1 baseline-item line (Decoded view's Line Items table).
+         *     `product_qualifier` is the PO1 product/service-ID qualifier (e.g. ``VP``
+         *     vendor part / ``IN`` buyer item); `extended_amount` = quantity ×
+         *     unit_price (deterministic).
+         */
+        Edi850LineItem: {
+            /** Description */
+            description?: string | null;
+            /** Extended Amount */
+            extended_amount?: number | null;
+            /** Line Num */
+            line_num: string;
+            /** Product Id */
+            product_id?: string | null;
+            /** Product Qualifier */
+            product_qualifier?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Unit Price */
+            unit_price?: number | null;
+            /** Uom */
+            uom: string;
+        };
+        /**
+         * Edi850Party
+         * @description An N1/N3/N4 party loop (Decoded view's Party Information card).
+         *     `entity_code` is the N101 qualifier (``BY`` buyer / ``SE`` seller /
+         *     ``ST`` ship-to); `role` is its decoded label.
+         */
+        Edi850Party: {
+            /** Address */
+            address?: string | null;
+            /** City State Zip */
+            city_state_zip?: string | null;
+            /** Entity Code */
+            entity_code: string;
+            /** Id Qualifier */
+            id_qualifier?: string | null;
+            /** Id Value */
+            id_value?: string | null;
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
+        };
+        /**
+         * Edi850Segment
+         * @description One ANSI X12 segment of the built 850. `seg_id` is the segment tag
+         *     (ISA/BEG/PO1/…); `elements` are its ordered data elements (excluding the
+         *     tag); `raw` is the assembled X12 line (element-separated, segment-
+         *     terminated); `meaning` is the human-readable decode (Segment Map view);
+         *     `group` buckets the segment for the viewer's colour legend ∈
+         *     envelope | header | dates | party | line | trailer.
+         */
+        Edi850Segment: {
+            /** Elements */
+            elements?: string[];
+            /** Group */
+            group: string;
+            /** Meaning */
+            meaning: string;
+            /** Raw */
+            raw: string;
+            /** Seg Id */
+            seg_id: string;
+        };
+        /**
+         * Edi850Totals
+         * @description CTT transaction totals. `total_line_items` = CTT01 (PO1 count);
+         *     `total_quantity` = CTT02 (hash total of quantities); `total_amount` =
+         *     Σ extended_amount (deterministic, may be None when no line carries a
+         *     price).
+         */
+        Edi850Totals: {
+            /** Total Amount */
+            total_amount?: number | null;
+            /** Total Line Items */
+            total_line_items: number;
+            /** Total Quantity */
+            total_quantity: number;
         };
         /**
          * EdiMismatchAnalysisData

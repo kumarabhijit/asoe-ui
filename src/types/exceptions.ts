@@ -400,6 +400,11 @@ export interface OrderAnalysis {
    *  Preview-only until the extraction-gateway composer adapter lands.
    *  Mirrors `api/schemas.py::OrderEntryExtraction`. */
   order_entry_extraction?: OrderEntryExtraction;
+  /** ADR-042 Phase 5 — Customer Inbox EDI 850 Audit tab. The deterministic
+   *  ANSI X12 5010 purchase-order reconstruction of the reviewed order.
+   *  Preview-only until the edi_850 builder producer lands.
+   *  Mirrors `api/schemas.py::Edi850Document`. */
+  edi_850_audit?: Edi850Document;
 }
 
 /* ── Order Entry section (ADR-042 Phase 3) — mirrors api/schemas.py ── */
@@ -439,6 +444,76 @@ export interface OrderEntryExtraction {
   customer_bp?: string | null;
   line_items: OrderEntryLineItem[];
   validation_flags: OrderEntryValidationFlag[];
+}
+
+/* ── EDI 850 Audit section (ADR-042 Phase 5) — mirrors api/schemas.py ── */
+
+export interface Edi850Segment {
+  seg_id: string;
+  elements: string[];
+  raw: string;
+  meaning: string;
+  /** envelope | header | dates | party | line | trailer */
+  group: string;
+}
+
+export interface Edi850Envelope {
+  sender_id: string;
+  receiver_id: string;
+  interchange_control_number: string;
+  group_control_number: string;
+  transaction_set_control_number: string;
+  usage_indicator: string;
+  x12_version: string;
+}
+
+export interface Edi850Header {
+  purpose_code: string;
+  po_type: string;
+  po_number: string;
+  po_date?: string | null;
+  currency?: string | null;
+  requested_delivery_date?: string | null;
+}
+
+export interface Edi850Party {
+  /** BY (buyer) | SE (seller) | ST (ship-to) */
+  entity_code: string;
+  role: string;
+  name: string;
+  id_qualifier?: string | null;
+  id_value?: string | null;
+  address?: string | null;
+  city_state_zip?: string | null;
+}
+
+export interface Edi850LineItem {
+  line_num: string;
+  quantity: number;
+  uom: string;
+  unit_price?: number | null;
+  product_qualifier?: string | null;
+  product_id?: string | null;
+  description?: string | null;
+  extended_amount?: number | null;
+}
+
+export interface Edi850Totals {
+  total_line_items: number;
+  total_quantity: number;
+  total_amount?: number | null;
+}
+
+export interface Edi850Document {
+  standard: string;
+  transaction_set: string;
+  envelope: Edi850Envelope;
+  header: Edi850Header;
+  parties: Edi850Party[];
+  line_items: Edi850LineItem[];
+  totals: Edi850Totals;
+  segments: Edi850Segment[];
+  raw_x12: string;
 }
 
 /* ── SAP Data section (ADR-042 Phase 2) — mirrors api/schemas.py ── */
