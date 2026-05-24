@@ -900,6 +900,7 @@ export interface components {
          */
         AnalysisResponse: {
             backorder_analysis?: components["schemas"]["BackOrderAnalysisData"] | null;
+            change_analysis?: components["schemas"]["ChangeAnalysis"] | null;
             /** Confidence */
             confidence: number;
             delivery_delay_analysis?: components["schemas"]["DeliveryDelayAnalysisData"] | null;
@@ -1179,6 +1180,59 @@ export interface components {
             /** Challenge Reason */
             challenge_reason: string;
         };
+        /**
+         * ChangeAnalysis
+         * @description Change Analysis tab (ADR-042 Phase 6) — the deterministic evaluation of a
+         *     requested order change: an N-constraint evaluation, M resolution scenarios,
+         *     and a decision. Built by the recipe-homed evaluator
+         *     (`recipes/ChangeAnalysisRecipe.evaluate_change`, pure + deterministic;
+         *     thresholds from `contracts/policy.py`, NOT `constraints/`). Projected by the
+         *     composer from `enrichment_context["change_analysis"]`; preview-only until
+         *     that producer is wired (Guardrail #6 — no partial truth).
+         */
+        ChangeAnalysis: {
+            decision: components["schemas"]["ChangeDecision"];
+            evaluation: components["schemas"]["ConstraintEvaluation"];
+            /** Scenarios */
+            scenarios?: components["schemas"]["ScenarioOption"][];
+        };
+        /**
+         * ChangeDecision
+         * @description The Change Analysis decision panel (ADR-042 Phase 6). `requires_cosign`
+         *     is set deterministically when `revenue_impact_usd` meets the ADR-040
+         *     four-eyes threshold (`contracts/policy.HIGH_VALUE_OVERRIDE_THRESHOLD_USD`) —
+         *     the recipe surfaces the gate; actioning the change is a separate
+         *     Shadow-gated disposition. `confidence` ∈ [0, 1].
+         */
+        ChangeDecision: {
+            /** Confidence */
+            confidence: number;
+            /** Rationale */
+            rationale?: string | null;
+            /** Recommended Action */
+            recommended_action: string;
+            /**
+             * Requires Cosign
+             * @default false
+             */
+            requires_cosign: boolean;
+            /** Revenue Impact Usd */
+            revenue_impact_usd?: number | null;
+            /** Sap Actions */
+            sap_actions?: string[];
+        };
+        /**
+         * ChangeItem
+         * @description One field of the requested order change (the from/to grid).
+         */
+        ChangeItem: {
+            /** Field */
+            field: string;
+            /** From Value */
+            from_value?: string | null;
+            /** To Value */
+            to_value?: string | null;
+        };
         /** ComparisonLineItem */
         ComparisonLineItem: {
             /**
@@ -1302,6 +1356,62 @@ export interface components {
             weights: {
                 [key: string]: number;
             };
+        };
+        /**
+         * ConstraintCheck
+         * @description One deterministic constraint evaluation in the Change Analysis (ADR-042
+         *     Phase 6). `status` ∈ PASS | CONDITIONAL | WARNING. `agent` is a cosmetic
+         *     label (the evaluating discipline) — NOT audit-bearing (ADR-042 §6: agent
+         *     timings/labels are decorative). `system_ref` names the system of record the
+         *     check reasons over (e.g. ``SAP MM/ATP``).
+         */
+        ConstraintCheck: {
+            /** Agent */
+            agent?: string | null;
+            /** Detail */
+            detail: string;
+            /** Metric */
+            metric?: string | null;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** System Ref */
+            system_ref?: string | null;
+        };
+        /**
+         * ConstraintEvaluation
+         * @description The variable-cardinality constraint evaluation for a requested order
+         *     change (ADR-042 Phase 6). `checks` is an N-length list — only the
+         *     constraints whose backing signal is present are evaluated (no fixed 10).
+         *     `lifecycle_stages` is the ordered stage vocabulary (the UI renders the bar
+         *     from the payload — no hardcoded stage list client-side); `lifecycle_index`
+         *     is the current stage's position within it.
+         */
+        ConstraintEvaluation: {
+            /** Change Items */
+            change_items?: components["schemas"]["ChangeItem"][];
+            /** Checks */
+            checks?: components["schemas"]["ConstraintCheck"][];
+            /**
+             * Conditional Count
+             * @default 0
+             */
+            conditional_count: number;
+            /** Lifecycle Index */
+            lifecycle_index?: number | null;
+            /** Lifecycle Stages */
+            lifecycle_stages?: string[];
+            /**
+             * Pass Count
+             * @default 0
+             */
+            pass_count: number;
+            /**
+             * Warning Count
+             * @default 0
+             */
+            warning_count: number;
         };
         /**
          * CosignRequest
@@ -3067,6 +3177,28 @@ export interface components {
             system: string;
             /** Validation Status */
             validation_status: string;
+        };
+        /**
+         * ScenarioOption
+         * @description One resolution scenario the evaluator surfaces for a change (ADR-042
+         *     Phase 6). Variable cardinality — M scenarios, not the prototype's fixed 7.
+         *     `recommended` marks the evaluator's preferred option; `financial_delta_usd`
+         *     is the deterministic revenue delta vs the as-requested change.
+         */
+        ScenarioOption: {
+            /** Description */
+            description: string;
+            /** Financial Delta Usd */
+            financial_delta_usd?: number | null;
+            /** Impact */
+            impact?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
         };
         /** SeedFinancialImpactRequest */
         SeedFinancialImpactRequest: {

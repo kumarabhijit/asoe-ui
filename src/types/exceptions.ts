@@ -405,6 +405,11 @@ export interface OrderAnalysis {
    *  Preview-only until the edi_850 builder producer lands.
    *  Mirrors `api/schemas.py::Edi850Document`. */
   edi_850_audit?: Edi850Document;
+  /** ADR-042 Phase 6 — Customer Inbox Change Analysis tab. The deterministic
+   *  constraint evaluation + scenarios + decision for a requested order change.
+   *  Preview-only until the change_analysis producer lands.
+   *  Mirrors `api/schemas.py::ChangeAnalysis`. */
+  change_analysis?: ChangeAnalysis;
 }
 
 /* ── Order Entry section (ADR-042 Phase 3) — mirrors api/schemas.py ── */
@@ -514,6 +519,58 @@ export interface Edi850Document {
   totals: Edi850Totals;
   segments: Edi850Segment[];
   raw_x12: string;
+}
+
+/* ── Change Analysis section (ADR-042 Phase 6) — mirrors api/schemas.py ── */
+
+export interface ConstraintCheck {
+  name: string;
+  /** PASS | CONDITIONAL | WARNING */
+  status: string;
+  detail: string;
+  metric?: string | null;
+  /** Cosmetic label (evaluating discipline) — not audit-bearing. */
+  agent?: string | null;
+  system_ref?: string | null;
+}
+
+export interface ChangeItem {
+  field: string;
+  from_value?: string | null;
+  to_value?: string | null;
+}
+
+export interface ConstraintEvaluation {
+  lifecycle_stages: string[];
+  lifecycle_index?: number | null;
+  change_items: ChangeItem[];
+  checks: ConstraintCheck[];
+  pass_count: number;
+  conditional_count: number;
+  warning_count: number;
+}
+
+export interface ScenarioOption {
+  name: string;
+  description: string;
+  recommended: boolean;
+  impact?: string | null;
+  financial_delta_usd?: number | null;
+}
+
+export interface ChangeDecision {
+  recommended_action: string;
+  confidence: number;
+  rationale?: string | null;
+  revenue_impact_usd?: number | null;
+  requires_cosign: boolean;
+  sap_actions: string[];
+}
+
+export interface ChangeAnalysis {
+  evaluation: ConstraintEvaluation;
+  scenarios: ScenarioOption[];
+  decision: ChangeDecision;
 }
 
 /* ── SAP Data section (ADR-042 Phase 2) — mirrors api/schemas.py ── */

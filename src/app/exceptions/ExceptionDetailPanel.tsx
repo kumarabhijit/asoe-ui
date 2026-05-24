@@ -59,6 +59,7 @@ import { EntitiesSection } from "./EntitiesSection";
 import { SapDataSection } from "./SapDataSection";
 import { OrderEntrySection } from "./OrderEntrySection";
 import { Edi850Section } from "./Edi850Section";
+import { ChangeAnalysisSection } from "./ChangeAnalysisSection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -737,6 +738,14 @@ export default function ExceptionDetailPanel({
           {analysis?.edi_850_audit && (
             <CollapsibleSection title="EDI 850 Audit">
               <Edi850Section data={analysis.edi_850_audit} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 6 — Customer Inbox Change Analysis tab (deterministic
+              constraint evaluation + scenarios + decision). Data-presence gated;
+              preview-only until the change_analysis producer lands. */}
+          {analysis?.change_analysis && (
+            <CollapsibleSection title="Change Analysis">
+              <ChangeAnalysisSection data={analysis.change_analysis} />
             </CollapsibleSection>
           )}
 
