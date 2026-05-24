@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { casesApi, type CaseListItem } from "@/lib/api";
-import type { CaseSource } from "@/types/cases";
+import type { CaseSource, CaseType } from "@/types/cases";
 import type { WSEvent } from "@/types/websocket";
 
 interface UseCasesReturn {
@@ -46,6 +46,9 @@ export interface UseCasesOptions {
    *  default (200). Backend caps at 500. The hook walks every page
    *  until `has_more` is false, accumulating into `cases`. */
   limit?: number;
+  /** Filter by case_type (EMAIL_ENTRY | BLOCK) — the Customer Inbox
+   *  lens (ADR-042). Orthogonal to `source` (ADR-041 §1). */
+  caseType?: CaseType;
 }
 
 export function useCases(
@@ -60,6 +63,7 @@ export function useCases(
   const [refetchCounter, setRefetchCounter] = useState(0);
 
   const limit = options?.limit;
+  const caseType = options?.caseType;
 
   const refetch = useCallback(() => {
     setRefetchCounter((n) => n + 1);
@@ -78,8 +82,13 @@ export function useCases(
     // per the ADR-038 §D7 amendment; we walk every page so a
     // tenant with >limit cases doesn't silently see only the first
     // slice.
-    const pageParams: { source?: CaseSource; limit?: number } = {};
+    const pageParams: {
+      source?: CaseSource;
+      case_type?: CaseType;
+      limit?: number;
+    } = {};
     if (source) pageParams.source = source;
+    if (caseType) pageParams.case_type = caseType;
     if (limit !== undefined) pageParams.limit = limit;
 
     const run = async () => {
@@ -122,7 +131,7 @@ export function useCases(
     return () => {
       cancelled = true;
     };
-  }, [source, limit, refetchCounter]);
+  }, [source, caseType, limit, refetchCounter]);
 
   return {
     cases,

@@ -61,6 +61,14 @@ describe("useCases — initial fetch", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(casesApi.list).toHaveBeenCalledWith(undefined);
   });
+
+  it("forwards the case_type filter (EMAIL_ENTRY lens) to the API", async () => {
+    const { result } = renderHook(() =>
+      useCases(undefined, { caseType: "EMAIL_ENTRY" }),
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(casesApi.list).toHaveBeenCalledWith({ case_type: "EMAIL_ENTRY" });
+  });
 });
 
 describe("useCases — refetch", () => {
