@@ -11,7 +11,20 @@
  */
 "use client";
 
-import { useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+
+/**
+ * DoR #11 — Layer-2-open signal. A panel wraps its evidence sections in this
+ * provider; every CollapsibleSection then reports the first time it is expanded,
+ * with no per-section wiring. Null (the default) means "nobody is listening".
+ */
+export const Layer2OpenContext = createContext<(() => void) | null>(null);
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -100,20 +113,37 @@ export function CollapsibleSection({
   badge,
   badgeVariant,
   children,
+  onFirstOpen,
 }: {
   title: string;
   defaultOpen?: boolean;
   badge?: string;
   badgeVariant?: string;
   children: ReactNode;
+  /** Fired the first time the operator expands this section (DoR #11 —
+   *  Layer-2-open signal). Optional + idempotent; never fires on collapse. */
+  onFirstOpen?: () => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const firedRef = useRef(false);
+  const reportLayer2Open = useContext(Layer2OpenContext);
+  const toggle = () => {
+    setOpen((v) => {
+      const next = !v;
+      if (next && !firedRef.current) {
+        firedRef.current = true;
+        onFirstOpen?.();
+        reportLayer2Open?.();
+      }
+      return next;
+    });
+  };
   return (
     <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
       <CollapsibleHeader
         title={title}
         open={open}
-        onToggle={() => setOpen((v) => !v)}
+        onToggle={toggle}
         badge={badge}
         badgeVariant={badgeVariant}
       />

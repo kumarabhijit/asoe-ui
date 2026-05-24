@@ -1261,6 +1261,26 @@ export const healthApi = {
 /* ── Exceptions API (/api/v1/exceptions/*) ─────────────────────────── */
 
 export const exceptionsApi = {
+  /**
+   * DoR #11 — automation-bias telemetry. Reports one operator decision's
+   * dwell + whether Layer-2 evidence was opened. Best-effort: never throws into
+   * the UI, and is a no-op in mock mode. Called once per disposition.
+   */
+  async reportReviewerActivity(input: {
+    dwell_ms: number;
+    layer2_opened: boolean;
+  }): Promise<void> {
+    if (!USE_REAL_API) return;
+    try {
+      await http<{ ok: boolean }>("/api/v1/metrics/reviewer-activity", {
+        method: "POST",
+        body: input,
+      });
+    } catch {
+      // best-effort telemetry — never surface to the operator
+    }
+  },
+
   async list(params?: {
     status?: string;
     intent?: string;

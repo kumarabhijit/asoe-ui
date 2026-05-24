@@ -19,7 +19,7 @@
  */
 "use client";
 
-import { useState, useEffect, useCallback, type MutableRefObject } from "react";
+import { useState, useEffect, useRef, useCallback, type MutableRefObject } from "react";
 import { signIn } from "next-auth/react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import {
@@ -39,7 +39,7 @@ import type {
   OrderAnalysis,
 } from "@/types/exceptions";
 import type { TraceResponse } from "@/types/api";
-import { COSIGN_LIFECYCLE_STATE, CollapsibleSection, HITL_LIFECYCLE_STATES } from "./shared";
+import { COSIGN_LIFECYCLE_STATE, CollapsibleSection, HITL_LIFECYCLE_STATES, Layer2OpenContext } from "./shared";
 import { HeaderRibbon } from "./HeaderRibbon";
 import { ContextStrip } from "./ContextStrip";
 import { AgentAnalysisSection } from "./AgentAnalysisSection";
@@ -117,6 +117,26 @@ export default function ExceptionDetailPanel({
     kind: "unauthorized" | "not_found" | "other";
     message: string;
   } | null>(null);
+
+  // DoR #11 — automation-bias telemetry. Measure time-on-case and whether the
+  // operator expanded any Layer-2 evidence before acting; reported once per
+  // decision. Both reset when the operator switches to a different case.
+  const detailOpenedAtRef = useRef<number>(Date.now());
+  const layer2OpenedRef = useRef<boolean>(false);
+  useEffect(() => {
+    detailOpenedAtRef.current = Date.now();
+    layer2OpenedRef.current = false;
+  }, [exceptionId]);
+  const markLayer2Opened = useCallback(() => {
+    layer2OpenedRef.current = true;
+  }, []);
+  const reportingOnActionComplete = useCallback(() => {
+    void exceptionsApi.reportReviewerActivity({
+      dwell_ms: Date.now() - detailOpenedAtRef.current,
+      layer2_opened: layer2OpenedRef.current,
+    });
+    onActionComplete?.();
+  }, [onActionComplete]);
 
   /* ── Data Fetching ───────────────────────────────────────────────── */
 
@@ -200,7 +220,7 @@ export default function ExceptionDetailPanel({
     exceptionId,
     detail,
     setDetail,
-    onActionComplete,
+    onActionComplete: reportingOnActionComplete,
     refreshDetail,
   });
 
@@ -418,6 +438,7 @@ export default function ExceptionDetailPanel({
   /* ── Render ──────────────────────────────────────────────────────── */
 
   return (
+    <Layer2OpenContext.Provider value={markLayer2Opened}>
     <div className="h-full flex flex-col font-sans min-w-0">
 
       {/* ━━ 1. Dynamic Header Ribbon ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
@@ -847,5 +868,6 @@ export default function ExceptionDetailPanel({
         );
       })()}
     </div>
+    </Layer2OpenContext.Provider>
   );
 }
