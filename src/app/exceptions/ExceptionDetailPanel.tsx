@@ -19,7 +19,7 @@
  */
 "use client";
 
-import { useState, useEffect, useCallback, type MutableRefObject } from "react";
+import { useState, useEffect, useRef, useCallback, type MutableRefObject } from "react";
 import { signIn } from "next-auth/react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import {
@@ -39,7 +39,7 @@ import type {
   OrderAnalysis,
 } from "@/types/exceptions";
 import type { TraceResponse } from "@/types/api";
-import { COSIGN_LIFECYCLE_STATE, CollapsibleSection, HITL_LIFECYCLE_STATES } from "./shared";
+import { COSIGN_LIFECYCLE_STATE, CollapsibleSection, HITL_LIFECYCLE_STATES, Layer2OpenContext } from "./shared";
 import { HeaderRibbon } from "./HeaderRibbon";
 import { ContextStrip } from "./ContextStrip";
 import { AgentAnalysisSection } from "./AgentAnalysisSection";
@@ -55,6 +55,13 @@ import { PriceHoldSection } from "./PriceHoldSection";
 import { EdiMismatchSection } from "./EdiMismatchSection";
 import { EmailOrderEntrySection } from "./EmailOrderEntrySection";
 import { EmailSourceSection } from "./EmailSourceSection";
+import { EntitiesSection } from "./EntitiesSection";
+import { SapDataSection } from "./SapDataSection";
+import { OrderEntrySection } from "./OrderEntrySection";
+import { Edi850Section } from "./Edi850Section";
+import { ChangeAnalysisSection } from "./ChangeAnalysisSection";
+import { KnowledgeGraphSection } from "./KnowledgeGraphSection";
+import { DraftReplySection } from "./DraftReplySection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 
@@ -110,6 +117,26 @@ export default function ExceptionDetailPanel({
     kind: "unauthorized" | "not_found" | "other";
     message: string;
   } | null>(null);
+
+  // DoR #11 — automation-bias telemetry. Measure time-on-case and whether the
+  // operator expanded any Layer-2 evidence before acting; reported once per
+  // decision. Both reset when the operator switches to a different case.
+  const detailOpenedAtRef = useRef<number>(Date.now());
+  const layer2OpenedRef = useRef<boolean>(false);
+  useEffect(() => {
+    detailOpenedAtRef.current = Date.now();
+    layer2OpenedRef.current = false;
+  }, [exceptionId]);
+  const markLayer2Opened = useCallback(() => {
+    layer2OpenedRef.current = true;
+  }, []);
+  const reportingOnActionComplete = useCallback(() => {
+    void exceptionsApi.reportReviewerActivity({
+      dwell_ms: Date.now() - detailOpenedAtRef.current,
+      layer2_opened: layer2OpenedRef.current,
+    });
+    onActionComplete?.();
+  }, [onActionComplete]);
 
   /* ── Data Fetching ───────────────────────────────────────────────── */
 
@@ -193,7 +220,7 @@ export default function ExceptionDetailPanel({
     exceptionId,
     detail,
     setDetail,
-    onActionComplete,
+    onActionComplete: reportingOnActionComplete,
     refreshDetail,
   });
 
@@ -411,6 +438,7 @@ export default function ExceptionDetailPanel({
   /* ── Render ──────────────────────────────────────────────────────── */
 
   return (
+    <Layer2OpenContext.Provider value={markLayer2Opened}>
     <div className="h-full flex flex-col font-sans min-w-0">
 
       {/* ━━ 1. Dynamic Header Ribbon ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
@@ -705,6 +733,60 @@ export default function ExceptionDetailPanel({
               <EmailOrderEntrySection data={analysis.email_order_entry_analysis} />
             </CollapsibleSection>
           )}
+          {/* ADR-042 Phase 2 — Customer Inbox Entities tab. Data-presence
+              gated; preview-only until the composer adapter lands. */}
+          {analysis?.entities_analysis && (
+            <CollapsibleSection title="Entities">
+              <EntitiesSection data={analysis.entities_analysis} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 2 — Customer Inbox SAP Data tab. Data-presence
+              gated; preview-only until the SAP-gateway adapter lands. */}
+          {analysis?.sap_data_analysis && (
+            <CollapsibleSection title="SAP Data">
+              <SapDataSection data={analysis.sap_data_analysis} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 3 — Customer Inbox Order Entry tab (extracted order
+              form). Data-presence gated; preview-only until the extraction
+              gateway lands. */}
+          {analysis?.order_entry_extraction && (
+            <CollapsibleSection title="Order Entry">
+              <OrderEntrySection data={analysis.order_entry_extraction} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 5 — Customer Inbox EDI 850 Audit tab (deterministic
+              X12 850 reconstruction). Data-presence gated; preview-only until
+              the edi_850 builder producer lands. */}
+          {analysis?.edi_850_audit && (
+            <CollapsibleSection title="EDI 850 Audit">
+              <Edi850Section data={analysis.edi_850_audit} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 6 — Customer Inbox Change Analysis tab (deterministic
+              constraint evaluation + scenarios + decision). Data-presence gated;
+              preview-only until the change_analysis producer lands. */}
+          {analysis?.change_analysis && (
+            <CollapsibleSection title="Change Analysis">
+              <ChangeAnalysisSection data={analysis.change_analysis} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 7 — Knowledge Graph tab (derived entity projection).
+              Data-presence gated; preview-only / deferrable until the
+              knowledge_graph producer lands. */}
+          {analysis?.knowledge_graph && (
+            <CollapsibleSection title="Knowledge Graph">
+              <KnowledgeGraphSection data={analysis.knowledge_graph} />
+            </CollapsibleSection>
+          )}
+          {/* ADR-042 Phase 7 — AI Draft Reply evidence (projected from
+              resolution_data.reply_draft). Data-presence gated; absent until a
+              DRAFT_REPLY disposition runs. */}
+          {analysis?.draft_reply && (
+            <CollapsibleSection title="AI Draft Reply">
+              <DraftReplySection data={analysis.draft_reply} />
+            </CollapsibleSection>
+          )}
 
           {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           <EvidenceGrid
@@ -786,5 +868,6 @@ export default function ExceptionDetailPanel({
         );
       })()}
     </div>
+    </Layer2OpenContext.Provider>
   );
 }

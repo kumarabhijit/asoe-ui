@@ -900,21 +900,27 @@ export interface components {
          */
         AnalysisResponse: {
             backorder_analysis?: components["schemas"]["BackOrderAnalysisData"] | null;
+            change_analysis?: components["schemas"]["ChangeAnalysis"] | null;
             /** Confidence */
             confidence: number;
             delivery_delay_analysis?: components["schemas"]["DeliveryDelayAnalysisData"] | null;
             /** Diagnosis */
             diagnosis: string;
+            draft_reply?: components["schemas"]["DraftReply"] | null;
             duplicate_detection?: components["schemas"]["DuplicateDetectionData"] | null;
+            edi_850_audit?: components["schemas"]["Edi850Document"] | null;
             edi_mismatch_analysis?: components["schemas"]["EdiMismatchAnalysisData"] | null;
             email_order_entry_analysis?: components["schemas"]["EmailOrderEntryAnalysisData"] | null;
             email_source?: components["schemas"]["EmailSourceData"] | null;
+            entities_analysis?: components["schemas"]["EntitiesAnalysisData"] | null;
             entity_profile?: components["schemas"]["EntityProfile"] | null;
             impact_metrics?: components["schemas"]["ImpactMetrics"] | null;
+            knowledge_graph?: components["schemas"]["KnowledgeGraphPayload"] | null;
             /** Lines */
             lines?: components["schemas"]["LineAnalysis"][];
             moq_analysis?: components["schemas"]["MOQAnalysisData"] | null;
             order_comparison?: components["schemas"]["OrderComparisonData"] | null;
+            order_entry_extraction?: components["schemas"]["OrderEntryExtraction"] | null;
             overmax_analysis?: components["schemas"]["OverMaxAnalysisData"] | null;
             pallet_analysis?: components["schemas"]["PalletAnalysisData"] | null;
             price_analysis?: components["schemas"]["PriceAnalysisData"] | null;
@@ -927,6 +933,7 @@ export interface components {
             risk: string;
             /** Root Cause */
             root_cause?: string | null;
+            sap_data_analysis?: components["schemas"]["SapDataAnalysisData"] | null;
         };
         /**
          * AsyncResolveResponse
@@ -989,6 +996,23 @@ export interface components {
              */
             token_type: string;
             user?: components["schemas"]["UserProfile"] | null;
+        };
+        /**
+         * AutonomyLevelInfo
+         * @description One autonomy tier for the UI to render/sort (ADR-042 §5/§8).
+         *
+         *     `rank` is the degree of automation (higher == more autonomous) under the
+         *     active `autonomy_vocab_version`; the UI orders the ladder by `rank` rather
+         *     than hardcoding a map (asoe-ui Guardrail #1). Display vocabulary only —
+         *     not the engine's gating semantics.
+         */
+        AutonomyLevelInfo: {
+            /** Label */
+            label: string;
+            /** Level */
+            level: string;
+            /** Rank */
+            rank: number;
         };
         /**
          * BackOrderAnalysisData
@@ -1158,6 +1182,59 @@ export interface components {
             /** Challenge Reason */
             challenge_reason: string;
         };
+        /**
+         * ChangeAnalysis
+         * @description Change Analysis tab (ADR-042 Phase 6) — the deterministic evaluation of a
+         *     requested order change: an N-constraint evaluation, M resolution scenarios,
+         *     and a decision. Built by the recipe-homed evaluator
+         *     (`recipes/ChangeAnalysisRecipe.evaluate_change`, pure + deterministic;
+         *     thresholds from `contracts/policy.py`, NOT `constraints/`). Projected by the
+         *     composer from `enrichment_context["change_analysis"]`; preview-only until
+         *     that producer is wired (Guardrail #6 — no partial truth).
+         */
+        ChangeAnalysis: {
+            decision: components["schemas"]["ChangeDecision"];
+            evaluation: components["schemas"]["ConstraintEvaluation"];
+            /** Scenarios */
+            scenarios?: components["schemas"]["ScenarioOption"][];
+        };
+        /**
+         * ChangeDecision
+         * @description The Change Analysis decision panel (ADR-042 Phase 6). `requires_cosign`
+         *     is set deterministically when `revenue_impact_usd` meets the ADR-040
+         *     four-eyes threshold (`contracts/policy.HIGH_VALUE_OVERRIDE_THRESHOLD_USD`) —
+         *     the recipe surfaces the gate; actioning the change is a separate
+         *     Shadow-gated disposition. `confidence` ∈ [0, 1].
+         */
+        ChangeDecision: {
+            /** Confidence */
+            confidence: number;
+            /** Rationale */
+            rationale?: string | null;
+            /** Recommended Action */
+            recommended_action: string;
+            /**
+             * Requires Cosign
+             * @default false
+             */
+            requires_cosign: boolean;
+            /** Revenue Impact Usd */
+            revenue_impact_usd?: number | null;
+            /** Sap Actions */
+            sap_actions?: string[];
+        };
+        /**
+         * ChangeItem
+         * @description One field of the requested order change (the from/to grid).
+         */
+        ChangeItem: {
+            /** Field */
+            field: string;
+            /** From Value */
+            from_value?: string | null;
+            /** To Value */
+            to_value?: string | null;
+        };
         /** ComparisonLineItem */
         ComparisonLineItem: {
             /**
@@ -1283,6 +1360,62 @@ export interface components {
             };
         };
         /**
+         * ConstraintCheck
+         * @description One deterministic constraint evaluation in the Change Analysis (ADR-042
+         *     Phase 6). `status` ∈ PASS | CONDITIONAL | WARNING. `agent` is a cosmetic
+         *     label (the evaluating discipline) — NOT audit-bearing (ADR-042 §6: agent
+         *     timings/labels are decorative). `system_ref` names the system of record the
+         *     check reasons over (e.g. ``SAP MM/ATP``).
+         */
+        ConstraintCheck: {
+            /** Agent */
+            agent?: string | null;
+            /** Detail */
+            detail: string;
+            /** Metric */
+            metric?: string | null;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** System Ref */
+            system_ref?: string | null;
+        };
+        /**
+         * ConstraintEvaluation
+         * @description The variable-cardinality constraint evaluation for a requested order
+         *     change (ADR-042 Phase 6). `checks` is an N-length list — only the
+         *     constraints whose backing signal is present are evaluated (no fixed 10).
+         *     `lifecycle_stages` is the ordered stage vocabulary (the UI renders the bar
+         *     from the payload — no hardcoded stage list client-side); `lifecycle_index`
+         *     is the current stage's position within it.
+         */
+        ConstraintEvaluation: {
+            /** Change Items */
+            change_items?: components["schemas"]["ChangeItem"][];
+            /** Checks */
+            checks?: components["schemas"]["ConstraintCheck"][];
+            /**
+             * Conditional Count
+             * @default 0
+             */
+            conditional_count: number;
+            /** Lifecycle Index */
+            lifecycle_index?: number | null;
+            /** Lifecycle Stages */
+            lifecycle_stages?: string[];
+            /**
+             * Pass Count
+             * @default 0
+             */
+            pass_count: number;
+            /**
+             * Warning Count
+             * @default 0
+             */
+            warning_count: number;
+        };
+        /**
          * CosignRequest
          * @description POST /api/v1/exceptions/{id}/override/cosign — second-reviewer decision
          *     on a pending high-value override (Phase 2 four-eyes control).
@@ -1367,10 +1500,59 @@ export interface components {
         DispositionRequest: {
             /** Action */
             action: string;
+            /** Corrections */
+            corrections?: {
+                [key: string]: unknown;
+            } | null;
             /** Notes */
             notes: string;
             /** Reason Tag */
             reason_tag: string;
+            /** Reply */
+            reply?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * DraftReply
+         * @description AI Draft Reply evidence (ADR-042 Phase 4 contract; surfaced on the
+         *     analysis in Phase 7). The current generated reply for the case, projected by
+         *     the composer from `resolution_data["reply_draft"]` (the ReplyDraftRecipe
+         *     output a DRAFT_REPLY disposition persisted). `status` ∈ DRAFTED | REJECTED;
+         *     a REJECTED draft carries a `reason` and no body. Read-only evidence — sending
+         *     is a separate Shadow-gated disposition (SEND_REPLY).
+         */
+        DraftReply: {
+            /** Body */
+            body?: string | null;
+            /** Drafted At */
+            drafted_at?: string | null;
+            /** Drafted By */
+            drafted_by?: string | null;
+            /** Edits Applied */
+            edits_applied?: components["schemas"]["DraftReplyEdit"][];
+            /** Reason */
+            reason?: string | null;
+            /** Recipient */
+            recipient?: string | null;
+            /** Status */
+            status: string;
+            /** Subject */
+            subject?: string | null;
+            /** Template Name */
+            template_name?: string | null;
+        };
+        /**
+         * DraftReplyEdit
+         * @description One operator edit applied to a generated reply (before/after audit).
+         */
+        DraftReplyEdit: {
+            /** After */
+            after?: string | null;
+            /** Before */
+            before?: string | null;
+            /** Field */
+            field: string;
         };
         /**
          * DuplicateDetectionData
@@ -1466,6 +1648,166 @@ export interface components {
             tenant_id: string;
             /** Updated At */
             updated_at: string;
+        };
+        /**
+         * Edi850Document
+         * @description EDI 850 Audit tab (ADR-042 Phase 5). The ANSI X12 5010 purchase-order
+         *     transaction set the system reconstructs from the reviewed order, built
+         *     deterministically by the `edi_850` builder (`gateways/edi850.py`) — a pure,
+         *     fully unit-testable port of the prototype's client-side `buildEDI850`. It is
+         *     the audit evidence an operator inspects before the order is transmitted to
+         *     the seller's ERP. Projected by the composer from the builder's
+         *     `enrichment_context["edi_850"]` read; preview-only until that producer is
+         *     wired. The three prototype sub-views map onto this contract: Decoded
+         *     (`envelope` / `header` / `parties` / `line_items` / `totals`), Raw X12
+         *     (`raw_x12`), and Segment Map (`segments`).
+         */
+        Edi850Document: {
+            envelope: components["schemas"]["Edi850Envelope"];
+            header: components["schemas"]["Edi850Header"];
+            /** Line Items */
+            line_items?: components["schemas"]["Edi850LineItem"][];
+            /** Parties */
+            parties?: components["schemas"]["Edi850Party"][];
+            /** Raw X12 */
+            raw_x12: string;
+            /** Segments */
+            segments?: components["schemas"]["Edi850Segment"][];
+            /**
+             * Standard
+             * @default ANSI X12 5010
+             */
+            standard: string;
+            totals: components["schemas"]["Edi850Totals"];
+            /**
+             * Transaction Set
+             * @default 850
+             */
+            transaction_set: string;
+        };
+        /**
+         * Edi850Envelope
+         * @description ISA/GS/ST interchange + functional-group identifiers (Decoded view's
+         *     Interchange Envelope card).
+         */
+        Edi850Envelope: {
+            /** Group Control Number */
+            group_control_number: string;
+            /** Interchange Control Number */
+            interchange_control_number: string;
+            /** Receiver Id */
+            receiver_id: string;
+            /** Sender Id */
+            sender_id: string;
+            /** Transaction Set Control Number */
+            transaction_set_control_number: string;
+            /** Usage Indicator */
+            usage_indicator: string;
+            /** X12 Version */
+            x12_version: string;
+        };
+        /**
+         * Edi850Header
+         * @description BEG/CUR/DTM purchase-order header (Decoded view's PO Header card).
+         *     `purpose_code` is BEG01 (e.g. ``00`` = original); `po_type` is BEG02
+         *     (e.g. ``SA`` = stand-alone).
+         */
+        Edi850Header: {
+            /** Currency */
+            currency?: string | null;
+            /** Po Date */
+            po_date?: string | null;
+            /** Po Number */
+            po_number: string;
+            /** Po Type */
+            po_type: string;
+            /** Purpose Code */
+            purpose_code: string;
+            /** Requested Delivery Date */
+            requested_delivery_date?: string | null;
+        };
+        /**
+         * Edi850LineItem
+         * @description A PO1 baseline-item line (Decoded view's Line Items table).
+         *     `product_qualifier` is the PO1 product/service-ID qualifier (e.g. ``VP``
+         *     vendor part / ``IN`` buyer item); `extended_amount` = quantity ×
+         *     unit_price (deterministic).
+         */
+        Edi850LineItem: {
+            /** Description */
+            description?: string | null;
+            /** Extended Amount */
+            extended_amount?: number | null;
+            /** Line Num */
+            line_num: string;
+            /** Product Id */
+            product_id?: string | null;
+            /** Product Qualifier */
+            product_qualifier?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Unit Price */
+            unit_price?: number | null;
+            /** Uom */
+            uom: string;
+        };
+        /**
+         * Edi850Party
+         * @description An N1/N3/N4 party loop (Decoded view's Party Information card).
+         *     `entity_code` is the N101 qualifier (``BY`` buyer / ``SE`` seller /
+         *     ``ST`` ship-to); `role` is its decoded label.
+         */
+        Edi850Party: {
+            /** Address */
+            address?: string | null;
+            /** City State Zip */
+            city_state_zip?: string | null;
+            /** Entity Code */
+            entity_code: string;
+            /** Id Qualifier */
+            id_qualifier?: string | null;
+            /** Id Value */
+            id_value?: string | null;
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
+        };
+        /**
+         * Edi850Segment
+         * @description One ANSI X12 segment of the built 850. `seg_id` is the segment tag
+         *     (ISA/BEG/PO1/…); `elements` are its ordered data elements (excluding the
+         *     tag); `raw` is the assembled X12 line (element-separated, segment-
+         *     terminated); `meaning` is the human-readable decode (Segment Map view);
+         *     `group` buckets the segment for the viewer's colour legend ∈
+         *     envelope | header | dates | party | line | trailer.
+         */
+        Edi850Segment: {
+            /** Elements */
+            elements?: string[];
+            /** Group */
+            group: string;
+            /** Meaning */
+            meaning: string;
+            /** Raw */
+            raw: string;
+            /** Seg Id */
+            seg_id: string;
+        };
+        /**
+         * Edi850Totals
+         * @description CTT transaction totals. `total_line_items` = CTT01 (PO1 count);
+         *     `total_quantity` = CTT02 (hash total of quantities); `total_amount` =
+         *     Σ extended_amount (deterministic, may be None when no line carries a
+         *     price).
+         */
+        Edi850Totals: {
+            /** Total Amount */
+            total_amount?: number | null;
+            /** Total Line Items */
+            total_line_items: number;
+            /** Total Quantity */
+            total_quantity: number;
         };
         /**
          * EdiMismatchAnalysisData
@@ -1644,6 +1986,17 @@ export interface components {
             source_email_id?: string | null;
             /** Subject */
             subject: string;
+        };
+        /**
+         * EntitiesAnalysisData
+         * @description Entities tab (ADR-042 Phase 2). Contextual evidence — the extracted
+         *     entities the operator reviews; the binding control fields remain
+         *     `recommended_action` / `autonomy_level`. Projected by the composer from
+         *     the intake gateway's extraction; preview-only until that adapter lands.
+         */
+        EntitiesAnalysisData: {
+            /** Extracted */
+            extracted?: components["schemas"]["ExtractedEntity"][];
         };
         /**
          * EntityProfile
@@ -1846,6 +2199,26 @@ export interface components {
             timestamp: string;
         };
         /**
+         * ExtractedEntity
+         * @description A single structured value the AI intake agent pulled from the email
+         *     / attachments (ADR-042 Phase 2 — Entities section). `kind` is the
+         *     free-form category (order_id | material | date | po | invoice | qty | …);
+         *     `source_span` is the verbatim text it was extracted from (audit trail of
+         *     where a value came from).
+         */
+        ExtractedEntity: {
+            /** Confidence */
+            confidence?: number | null;
+            /** Key */
+            key: string;
+            /** Kind */
+            kind: string;
+            /** Source Span */
+            source_span?: string | null;
+            /** Value */
+            value: string;
+        };
+        /**
          * GatewayCallSpan
          * @description Per-gateway sub-span emitted by `resolve_dependencies` (Phase B).
          *
@@ -1881,6 +2254,8 @@ export interface components {
          * @description GET /api/v1/health
          */
         HealthResponse: {
+            /** Allowed Autonomy Levels */
+            allowed_autonomy_levels?: components["schemas"]["AutonomyLevelInfo"][];
             /** Allowed Case Sources */
             allowed_case_sources?: string[];
             /** Allowed Case Statuses */
@@ -1897,6 +2272,11 @@ export interface components {
             allowed_recipes: string[];
             /** Allowed Resolution Actions */
             allowed_resolution_actions: string[];
+            /**
+             * Autonomy Vocab Version
+             * @default
+             */
+            autonomy_vocab_version: string;
             /** Explain Mode */
             explain_mode: boolean;
             /** Kill Switch */
@@ -1983,6 +2363,57 @@ export interface components {
             po_num?: string | null;
             /** Qty */
             qty: number;
+        };
+        /**
+         * KnowledgeGraphEdge
+         * @description A directed relationship between two `KnowledgeGraphNode` ids (ADR-042
+         *     Phase 7). `relation` is the decoded edge label (e.g. ``places`` /
+         *     ``contains`` / ``validated_by``).
+         */
+        KnowledgeGraphEdge: {
+            /** Relation */
+            relation: string;
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+        };
+        /**
+         * KnowledgeGraphNode
+         * @description One node in the Change/Knowledge Graph (ADR-042 Phase 7). `kind` buckets
+         *     the node for the viewer's legend (e.g. ``order`` / ``customer`` /
+         *     ``material`` / ``sap_doc`` / ``entity``); `detail` is an optional one-line
+         *     annotation.
+         */
+        KnowledgeGraphNode: {
+            /** Detail */
+            detail?: string | null;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+        };
+        /**
+         * KnowledgeGraphPayload
+         * @description Knowledge Graph tab (ADR-042 Phase 7) — a net-new DERIVED projection over
+         *     the case's already-resolved entities (the order, its customer, materials,
+         *     SAP doc, and extracted entities). Built deterministically by
+         *     `gateways/knowledge_graph.build_knowledge_graph` (pure) — there is no
+         *     standalone KG data source today, so this is a projection of existing
+         *     enrichment context, not invented data (ADR-042 §5b — deferrable behind
+         *     demand). Projected by the composer from
+         *     `enrichment_context["knowledge_graph"]`; preview-only until that producer is
+         *     wired. `root_id` is the focal node (the order/case).
+         */
+        KnowledgeGraphPayload: {
+            /** Edges */
+            edges?: components["schemas"]["KnowledgeGraphEdge"][];
+            /** Nodes */
+            nodes?: components["schemas"]["KnowledgeGraphNode"][];
+            /** Root Id */
+            root_id?: string | null;
         };
         /**
          * LifecycleState
@@ -2138,6 +2569,83 @@ export interface components {
             matching_fields?: string[];
             /** Orders */
             orders?: components["schemas"]["ComparisonOrder"][];
+        };
+        /**
+         * OrderEntryExtraction
+         * @description Order Entry tab (ADR-042 Phase 3) — the structured order the AI intake
+         *     agent extracted from the email/attachments, for operator review before ERP
+         *     submit. Projected by the composer from the extraction-gateway read;
+         *     preview-only until that gateway lands. The agent's recommendation /
+         *     autonomy live separately on `email_order_entry_analysis`.
+         */
+        OrderEntryExtraction: {
+            /** Confidence */
+            confidence: number;
+            /** Customer Bp */
+            customer_bp?: string | null;
+            /** Customer Name */
+            customer_name?: string | null;
+            header: components["schemas"]["OrderEntryHeader"];
+            /** Line Items */
+            line_items?: components["schemas"]["OrderEntryLineItem"][];
+            /** Source Type */
+            source_type: string;
+            /** Validation Flags */
+            validation_flags?: components["schemas"]["OrderEntryValidationFlag"][];
+        };
+        /**
+         * OrderEntryHeader
+         * @description Extracted order-header fields (ADR-042 Phase 3 — Order Entry tab).
+         */
+        OrderEntryHeader: {
+            /** Customer Po */
+            customer_po?: string | null;
+            /** Dist Channel */
+            dist_channel?: string | null;
+            /** Order Type */
+            order_type?: string | null;
+            /** Requested Date */
+            requested_date?: string | null;
+            /** Sales Org */
+            sales_org?: string | null;
+            /** Ship Window From */
+            ship_window_from?: string | null;
+            /** Ship Window To */
+            ship_window_to?: string | null;
+        };
+        /**
+         * OrderEntryLineItem
+         * @description One extracted order line. `mdm_matched` = matched against material
+         *     master; None when the master lookup hasn't run.
+         */
+        OrderEntryLineItem: {
+            /** Description */
+            description?: string | null;
+            /** Line Num */
+            line_num: string;
+            /** Material */
+            material: string;
+            /** Mdm Matched */
+            mdm_matched?: boolean | null;
+            /** Quantity */
+            quantity: number;
+            /** Unit Price */
+            unit_price?: number | null;
+            /** Uom */
+            uom?: string | null;
+        };
+        /**
+         * OrderEntryValidationFlag
+         * @description A validation finding on the extracted order. `severity` ∈
+         *     ERROR | WARNING | INFO.
+         */
+        OrderEntryValidationFlag: {
+            /** Field */
+            field: string;
+            /** Message */
+            message: string;
+            /** Severity */
+            severity: string;
         };
         /**
          * OrderSnapshot
@@ -2743,6 +3251,48 @@ export interface components {
             table?: string | null;
             /** Transaction */
             transaction: string;
+        };
+        /**
+         * SapDataAnalysisData
+         * @description SAP Data tab (ADR-042 Phase 2). Live SAP system-of-record context the
+         *     operator authorises against — which system, its validation state, and the
+         *     order's financial value. Projected by the composer from the SAP gateway
+         *     read; preview-only until that adapter lands. `system` / `validation_status`
+         *     / `order_value_usd` are audit-bearing (the decision applies to a specific
+         *     SAP order in a specific state at a specific value); `sap_doc_number` is a
+         *     contextual reference.
+         */
+        SapDataAnalysisData: {
+            /** Order Value Usd */
+            order_value_usd?: number | null;
+            /** Sap Doc Number */
+            sap_doc_number?: string | null;
+            /** System */
+            system: string;
+            /** Validation Status */
+            validation_status: string;
+        };
+        /**
+         * ScenarioOption
+         * @description One resolution scenario the evaluator surfaces for a change (ADR-042
+         *     Phase 6). Variable cardinality — M scenarios, not the prototype's fixed 7.
+         *     `recommended` marks the evaluator's preferred option; `financial_delta_usd`
+         *     is the deterministic revenue delta vs the as-requested change.
+         */
+        ScenarioOption: {
+            /** Description */
+            description: string;
+            /** Financial Delta Usd */
+            financial_delta_usd?: number | null;
+            /** Impact */
+            impact?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
         };
         /** SeedFinancialImpactRequest */
         SeedFinancialImpactRequest: {
@@ -3409,6 +3959,8 @@ export interface operations {
             query?: {
                 /** @description Filter by case source (manual_order | automated_order) */
                 source?: string | null;
+                /** @description Filter by case_type (EMAIL_ENTRY | BLOCK). Orthogonal to source (ADR-041 §1); drives the Customer Inbox EMAIL_ENTRY lens (ADR-042). */
+                case_type?: string | null;
                 /** @description Filter by case status. Multi-value via comma-separated list (e.g. status=OPEN_AWAITING_HUMAN,OPEN_AWAITING_BUYER). Any-match: a case in any of the listed statuses passes. */
                 status?: string | null;
                 /** @description Filter by child-record intent (Phase 28.5.x §D2). Multi-value via comma-separated list (e.g. intents=DUPLICATE_PO,CONTRACTUAL_CORRECTION). Any-match: a case with at least one child carrying one of the listed intents passes. */

@@ -1170,11 +1170,11 @@ const MOCK_HEALTH: HealthResponse = {
     "ESCALATED", "PENDING_ADMIN_REVIEW", "PENDING_COSIGN", "RESOLVED",
     "FAILED", "BLOCKED", "REJECTED", "CLOSED",
   ],
-  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py", "DeliveryDelayResolutionRecipe.py", "PriceHoldReleaseRecipe.py", "EdiMismatchRecipe.py", "EmailOrderEntryRecipe.py", "ManualOrderIntakeRecipe.py"],
+  allowed_recipes: ["PriceAdjustmentRecipe.py", "CreditHoldReleaseRecipe.py", "DuplicatePORecipe.py", "BackOrderResolutionRecipe.py", "OverMaxTrimRecipe.py", "MOQRoundUpRecipe.py", "PalletAlignmentRecipe.py", "DeliveryDelayResolutionRecipe.py", "PriceHoldReleaseRecipe.py", "EdiMismatchRecipe.py", "EmailOrderEntryRecipe.py", "ManualOrderIntakeRecipe.py", "SubmitToErpRecipe.py", "ReplyDraftRecipe.py"],
   // Mirrors asoe2/constraints/specs.py AllowedResolutionAction. Backend is
   // authoritative at runtime (/api/v1/health); this mock list exists only for
   // local development.
-  allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION", "ONE_CLICK_APPROVE", "STANDARD_REVIEW", "LOW_CONFIDENCE_FLAG", "AUTO_CORRECT", "REQUEST_CLARIFICATION", "REJECT"],
+  allowed_resolution_actions: ["BLOCK_AND_NOTIFY", "MERGE", "SUPERSEDE", "ALLOW_BOTH", "ESCALATE", "REQUEST_BUYER_CONFIRMATION", "ONE_CLICK_APPROVE", "STANDARD_REVIEW", "LOW_CONFIDENCE_FLAG", "AUTO_CORRECT", "REQUEST_CLARIFICATION", "REJECT", "SUBMIT_TO_ERP", "DRAFT_REPLY", "SEND_REPLY"],
   // Sourced from asoe2/constraints/specs.py via the snapshot at
   // tests/contract/snapshots/curated_reason_tags.json (regen with
   // `npm run sync:reason-tags`). The 2026-05-10 panel curated every
@@ -1261,6 +1261,26 @@ export const healthApi = {
 /* ── Exceptions API (/api/v1/exceptions/*) ─────────────────────────── */
 
 export const exceptionsApi = {
+  /**
+   * DoR #11 — automation-bias telemetry. Reports one operator decision's
+   * dwell + whether Layer-2 evidence was opened. Best-effort: never throws into
+   * the UI, and is a no-op in mock mode. Called once per disposition.
+   */
+  async reportReviewerActivity(input: {
+    dwell_ms: number;
+    layer2_opened: boolean;
+  }): Promise<void> {
+    if (!USE_REAL_API) return;
+    try {
+      await http<{ ok: boolean }>("/api/v1/metrics/reviewer-activity", {
+        method: "POST",
+        body: input,
+      });
+    } catch {
+      // best-effort telemetry — never surface to the operator
+    }
+  },
+
   async list(params?: {
     status?: string;
     intent?: string;
@@ -2108,6 +2128,9 @@ export interface CaseListItem extends OrderCase {
 export const casesApi = {
   async list(params?: {
     source?: string;
+    /** Filter by case_type (EMAIL_ENTRY | BLOCK) — the Customer Inbox lens
+     *  (ADR-042). Orthogonal to `source` (ADR-041 §1). */
+    case_type?: string;
     /** Multi-value via comma-separated string. */
     status?: string;
     /** Multi-value via comma-separated string. */
@@ -2140,6 +2163,7 @@ export const casesApi = {
       }>("/api/v1/cases", {
         query: {
           source: params?.source,
+          case_type: params?.case_type,
           status: params?.status,
           intents: params?.intents,
           since: params?.since,
@@ -2155,6 +2179,9 @@ export const casesApi = {
       child_intents: [],  // mock-mode placeholder; live API computes
     }));
     if (params?.source) items = items.filter((c) => c.source === params.source);
+    if (params?.case_type) {
+      items = items.filter((c) => c.case_type === params.case_type);
+    }
     if (params?.status) {
       const statuses = params.status.split(",").map((s) => s.trim()).filter(Boolean);
       if (statuses.length > 0) {

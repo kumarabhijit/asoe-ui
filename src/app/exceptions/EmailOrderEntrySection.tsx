@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/Badge";
 import { ConstraintsPipeline } from "@/components/ui/ConstraintsPipeline";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { autonomyLevelLabel } from "@/lib/cases";
+import { useHealth } from "@/hooks/useHealth";
 import type {
   EmailOrderEntryAnalysisData,
   EmailOrderEntryClassification,
@@ -54,6 +55,8 @@ const FLOOR_LABELS: Record<keyof EmailOrderEntryAnalysisData["floor_status"], st
 };
 
 export function EmailOrderEntrySection({ data }: EmailOrderEntrySectionProps) {
+  // Autonomy labels come from health (Guardrail #1), not a hardcoded map.
+  const { health } = useHealth();
   const classification = CLASSIFICATION_BADGE[data.classification] ?? {
     variant: "neutral" as const,
     label: String(data.classification),
@@ -214,7 +217,7 @@ export function EmailOrderEntrySection({ data }: EmailOrderEntrySectionProps) {
       <div className="flex items-center gap-8 px-12 py-8 bg-surface-secondary rounded-sm text-caption">
         <Clock size={12} className="text-text-tertiary" />
         <span className="text-text-tertiary font-semibold">Autonomy:</span>
-        <span className="text-text-secondary">{autonomyLevelLabel(data.autonomy_level)}</span>
+        <span className="text-text-secondary">{autonomyLevelLabel(data.autonomy_level, health)}</span>
       </div>
     </section>
   );

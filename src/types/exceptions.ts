@@ -88,7 +88,13 @@ export type ResolutionAction =
   | "LOW_CONFIDENCE_FLAG"
   | "AUTO_CORRECT"
   | "REQUEST_CLARIFICATION"
-  | "REJECT";
+  | "REJECT"
+  // ADR-042 §2.2.6 — explicit, financially-binding order-entry ERP submit.
+  | "SUBMIT_TO_ERP"
+  // ADR-042 Phase 4 — compose a buyer reply draft (send is a separate action).
+  | "DRAFT_REPLY"
+  // ADR-042 Phase 4 — send the operator-approved buyer reply.
+  | "SEND_REPLY";
 
 /* ── Pipeline node names (11-node LangGraph state machine) ─────────────
  *
@@ -382,6 +388,266 @@ export interface OrderAnalysis {
    *  CSA sees both the source email and the agent's recommendation
    *  on a single detail surface. */
   email_source?: EmailSourceData;
+  /** ADR-042 Phase 2 — Customer Inbox Entities tab. Extracted entities the
+   *  AI intake agent pulled from the email/attachments. Preview-only until
+   *  the composer adapter lands. Mirrors `api/schemas.py::EntitiesAnalysisData`. */
+  entities_analysis?: EntitiesAnalysisData;
+  /** ADR-042 Phase 2 — Customer Inbox SAP Data tab. Live SAP system-of-record
+   *  context. Preview-only until the SAP-gateway composer adapter lands.
+   *  Mirrors `api/schemas.py::SapDataAnalysisData`. */
+  sap_data_analysis?: SapDataAnalysisData;
+  /** ADR-042 Phase 3 — Customer Inbox Order Entry tab (extracted order form).
+   *  Preview-only until the extraction-gateway composer adapter lands.
+   *  Mirrors `api/schemas.py::OrderEntryExtraction`. */
+  order_entry_extraction?: OrderEntryExtraction;
+  /** ADR-042 Phase 5 — Customer Inbox EDI 850 Audit tab. The deterministic
+   *  ANSI X12 5010 purchase-order reconstruction of the reviewed order.
+   *  Preview-only until the edi_850 builder producer lands.
+   *  Mirrors `api/schemas.py::Edi850Document`. */
+  edi_850_audit?: Edi850Document;
+  /** ADR-042 Phase 6 — Customer Inbox Change Analysis tab. The deterministic
+   *  constraint evaluation + scenarios + decision for a requested order change.
+   *  Preview-only until the change_analysis producer lands.
+   *  Mirrors `api/schemas.py::ChangeAnalysis`. */
+  change_analysis?: ChangeAnalysis;
+  /** ADR-042 Phase 7 — Customer Inbox Knowledge Graph tab. A derived node/edge
+   *  projection over the case entities. Preview-only / deferrable until the
+   *  knowledge_graph producer lands. Mirrors `api/schemas.py::KnowledgeGraphPayload`. */
+  knowledge_graph?: KnowledgeGraphPayload;
+  /** ADR-042 Phase 7 — AI Draft Reply evidence, projected from
+   *  resolution_data.reply_draft. Absent until a DRAFT_REPLY disposition runs.
+   *  Mirrors `api/schemas.py::DraftReply`. */
+  draft_reply?: DraftReply;
+}
+
+/* ── Order Entry section (ADR-042 Phase 3) — mirrors api/schemas.py ── */
+
+export interface OrderEntryHeader {
+  customer_po?: string | null;
+  order_type?: string | null;
+  sales_org?: string | null;
+  dist_channel?: string | null;
+  ship_window_from?: string | null;
+  ship_window_to?: string | null;
+  requested_date?: string | null;
+}
+
+export interface OrderEntryLineItem {
+  line_num: string;
+  material: string;
+  description?: string | null;
+  quantity: number;
+  uom?: string | null;
+  unit_price?: number | null;
+  mdm_matched?: boolean | null;
+}
+
+export interface OrderEntryValidationFlag {
+  field: string;
+  /** ERROR | WARNING | INFO */
+  severity: string;
+  message: string;
+}
+
+export interface OrderEntryExtraction {
+  source_type: string;
+  confidence: number;
+  header: OrderEntryHeader;
+  customer_name?: string | null;
+  customer_bp?: string | null;
+  line_items: OrderEntryLineItem[];
+  validation_flags: OrderEntryValidationFlag[];
+}
+
+/* ── EDI 850 Audit section (ADR-042 Phase 5) — mirrors api/schemas.py ── */
+
+export interface Edi850Segment {
+  seg_id: string;
+  elements: string[];
+  raw: string;
+  meaning: string;
+  /** envelope | header | dates | party | line | trailer */
+  group: string;
+}
+
+export interface Edi850Envelope {
+  sender_id: string;
+  receiver_id: string;
+  interchange_control_number: string;
+  group_control_number: string;
+  transaction_set_control_number: string;
+  usage_indicator: string;
+  x12_version: string;
+}
+
+export interface Edi850Header {
+  purpose_code: string;
+  po_type: string;
+  po_number: string;
+  po_date?: string | null;
+  currency?: string | null;
+  requested_delivery_date?: string | null;
+}
+
+export interface Edi850Party {
+  /** BY (buyer) | SE (seller) | ST (ship-to) */
+  entity_code: string;
+  role: string;
+  name: string;
+  id_qualifier?: string | null;
+  id_value?: string | null;
+  address?: string | null;
+  city_state_zip?: string | null;
+}
+
+export interface Edi850LineItem {
+  line_num: string;
+  quantity: number;
+  uom: string;
+  unit_price?: number | null;
+  product_qualifier?: string | null;
+  product_id?: string | null;
+  description?: string | null;
+  extended_amount?: number | null;
+}
+
+export interface Edi850Totals {
+  total_line_items: number;
+  total_quantity: number;
+  total_amount?: number | null;
+}
+
+export interface Edi850Document {
+  standard: string;
+  transaction_set: string;
+  envelope: Edi850Envelope;
+  header: Edi850Header;
+  parties: Edi850Party[];
+  line_items: Edi850LineItem[];
+  totals: Edi850Totals;
+  segments: Edi850Segment[];
+  raw_x12: string;
+}
+
+/* ── Change Analysis section (ADR-042 Phase 6) — mirrors api/schemas.py ── */
+
+export interface ConstraintCheck {
+  name: string;
+  /** PASS | CONDITIONAL | WARNING */
+  status: string;
+  detail: string;
+  metric?: string | null;
+  /** Cosmetic label (evaluating discipline) — not audit-bearing. */
+  agent?: string | null;
+  system_ref?: string | null;
+}
+
+export interface ChangeItem {
+  field: string;
+  from_value?: string | null;
+  to_value?: string | null;
+}
+
+export interface ConstraintEvaluation {
+  lifecycle_stages: string[];
+  lifecycle_index?: number | null;
+  change_items: ChangeItem[];
+  checks: ConstraintCheck[];
+  pass_count: number;
+  conditional_count: number;
+  warning_count: number;
+}
+
+export interface ScenarioOption {
+  name: string;
+  description: string;
+  recommended: boolean;
+  impact?: string | null;
+  financial_delta_usd?: number | null;
+}
+
+export interface ChangeDecision {
+  recommended_action: string;
+  confidence: number;
+  rationale?: string | null;
+  revenue_impact_usd?: number | null;
+  requires_cosign: boolean;
+  sap_actions: string[];
+}
+
+export interface ChangeAnalysis {
+  evaluation: ConstraintEvaluation;
+  scenarios: ScenarioOption[];
+  decision: ChangeDecision;
+}
+
+/* ── Knowledge Graph section (ADR-042 Phase 7) — mirrors api/schemas.py ── */
+
+export interface KnowledgeGraphNode {
+  id: string;
+  label: string;
+  /** order | customer | material | sap_doc | entity */
+  kind: string;
+  detail?: string | null;
+}
+
+export interface KnowledgeGraphEdge {
+  source: string;
+  target: string;
+  relation: string;
+}
+
+export interface KnowledgeGraphPayload {
+  nodes: KnowledgeGraphNode[];
+  edges: KnowledgeGraphEdge[];
+  root_id?: string | null;
+}
+
+/* ── Draft Reply section (ADR-042 Phase 7 / Phase 4) — mirrors api/schemas.py ── */
+
+export interface DraftReplyEdit {
+  field: string;
+  before?: string | null;
+  after?: string | null;
+}
+
+export interface DraftReply {
+  /** DRAFTED | REJECTED */
+  status: string;
+  reason?: string | null;
+  template_name?: string | null;
+  recipient?: string | null;
+  subject?: string | null;
+  body?: string | null;
+  edits_applied: DraftReplyEdit[];
+  drafted_by?: string | null;
+  drafted_at?: string | null;
+}
+
+/* ── SAP Data section (ADR-042 Phase 2) — mirrors api/schemas.py ── */
+
+export interface SapDataAnalysisData {
+  system: string;
+  validation_status: string;
+  order_value_usd?: number | null;
+  sap_doc_number?: string | null;
+}
+
+/* ── Entities section (ADR-042 Phase 2) — mirrors api/schemas.py ── */
+
+/** A single structured value extracted from the email / attachments.
+ *  `kind` is the category (order_id | material | date | po | invoice | qty | …);
+ *  `source_span` is the verbatim text it came from (provenance). */
+export interface ExtractedEntity {
+  key: string;
+  value: string;
+  kind: string;
+  confidence?: number | null;
+  source_span?: string | null;
+}
+
+export interface EntitiesAnalysisData {
+  extracted: ExtractedEntity[];
 }
 
 /* ── Price Hold Release enrichment types (UI-only, not backend contract) ── */
@@ -512,7 +778,10 @@ export interface EmailOrderEntryAnalysisData {
   classification: EmailOrderEntryClassification;
   /** Recipe-recommended action — must be a member of ResolutionAction. */
   recommended_action: ResolutionAction;
-  autonomy_level: "L1" | "L2" | "L3";
+  // L4 (full autonomy) is valid for email-order-entry only — parity with
+  // generated.ts::EmailOrderEntryAnalysisData (ADR-042 Phase-0). EDI-mismatch
+  // stays L1–L3. Locked by tests/architectural/autonomy_union_parity.test.ts.
+  autonomy_level: "L1" | "L2" | "L3" | "L4";
   /** Typed validation-failure codes from the validation suite. */
   validation_failures: string[];
   /** Names of the floor checks that breached, if any. */
@@ -1034,4 +1303,29 @@ export interface HealthResponse {
    * in `src/lib/api.ts` is retired and this is the only source.
    */
   allowed_case_sources?: string[];
+  /**
+   * ADR-042 §5/§8 — the version the `allowed_autonomy_levels` rows resolve
+   * under (asoe2/contracts/autonomy.py::CURRENT_AUTONOMY_VOCAB_VERSION).
+   * Records stamp their own version; this is the current display set.
+   */
+  autonomy_vocab_version?: string;
+  /**
+   * ADR-042 §5/§8 — the autonomy ladder the UI renders. The UI sorts by
+   * `rank` (degree of automation, higher == more autonomous) and reads
+   * `label` from here rather than a hardcoded map (Guardrail #1). Defaults
+   * to `[]` until the backend ships the field — UI falls back to the
+   * transition map in `src/lib/cases.ts` in that window.
+   */
+  allowed_autonomy_levels?: AutonomyLevelInfo[];
+}
+
+/**
+ * ADR-042 §5/§8 — one autonomy tier (mirrors
+ * `asoe2/api/schemas.py::AutonomyLevelInfo`). Display vocabulary only — not
+ * the engine's gating semantics.
+ */
+export interface AutonomyLevelInfo {
+  level: string;
+  label: string;
+  rank: number;
 }

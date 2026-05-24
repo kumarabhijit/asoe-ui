@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils";
 import type {
   CaseSource,
   CaseStatus,
+  CaseType,
   OrderCase,
   SlaBand,
   SlaSnapshot,
@@ -138,8 +139,13 @@ function formatDeltaShort(ms: number): string {
 
 interface CasesFilters {
   source: CaseSource | null;
+  case_type: CaseType | null;
   status: CaseStatus | null;
 }
+
+// The Customer Inbox lens (ADR-042) is the EMAIL_ENTRY slice of /cases.
+// Typed once here so the chip carries no bare enum literal in JSX.
+const INBOX_LENS_CASE_TYPE: CaseType = "EMAIL_ENTRY";
 
 
 /* ── Page ───────────────────────────────────────────────────────── */
@@ -208,6 +214,7 @@ function CasesWorkspace() {
 
   const [filters, setFilters] = useState<CasesFilters>({
     source: null,
+    case_type: null,
     status: null,
   });
 
@@ -231,7 +238,9 @@ function CasesWorkspace() {
     cases: rawCases,
     loading: listLoading,
     refetch,
-  } = useCases(filters.source ?? undefined);
+  } = useCases(filters.source ?? undefined, {
+    caseType: filters.case_type ?? undefined,
+  });
 
   // useCases doesn't take a status filter; apply it client-side so
   // the chip toolbar stays responsive without an extra round-trip.
@@ -487,8 +496,10 @@ function CasesWorkspace() {
         >
           <FilterChip
             label="All"
-            active={filters.source === null}
-            onClick={() => setFilters((f) => ({ ...f, source: null }))}
+            active={filters.source === null && filters.case_type === null}
+            onClick={() =>
+              setFilters((f) => ({ ...f, source: null, case_type: null }))
+            }
           />
           {ALLOWED_CASE_SOURCES.map((src) => (
             <FilterChip
@@ -503,6 +514,20 @@ function CasesWorkspace() {
               }
             />
           ))}
+          {/* Customer Inbox lens (ADR-042) — the EMAIL_ENTRY slice. */}
+          <FilterChip
+            label="Customer Inbox"
+            active={filters.case_type === INBOX_LENS_CASE_TYPE}
+            onClick={() =>
+              setFilters((f) => ({
+                ...f,
+                case_type:
+                  f.case_type === INBOX_LENS_CASE_TYPE
+                    ? null
+                    : INBOX_LENS_CASE_TYPE,
+              }))
+            }
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto min-h-0">
