@@ -106,6 +106,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/_sandbox/cases/{case_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Seed Case Attachment
+         * @description Dev/demo producer for the attachment store (stand-in for the future
+         *     email-intelligence-agent / ADR-036 ingestion).
+         *
+         *     Persists an attachment's bytes under (tenant, case_id) so the production
+         *     read path — GET /cases/{case_id}/attachments/{attachment_id} — can be
+         *     exercised end-to-end. Sandbox-only; real ingestion lands with ADR-036.
+         */
+        post: operations["seed_case_attachment_api_v1__sandbox_cases__case_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/_sandbox/seed/financial-impact": {
         parameters: {
             query?: never;
@@ -232,6 +257,23 @@ export interface paths {
         };
         /** Get Case */
         get: operations["get_case_api_v1_cases__case_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cases/{case_id}/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Attachment */
+        get: operations["download_attachment_api_v1_cases__case_id__attachments__attachment_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1852,13 +1894,19 @@ export interface components {
          * @description One row in `EmailSourceData.attachment_manifest`.
          *
          *     `name` and `mime_type` are sufficient for the operator to
-         *     triage what arrived; `bytes` lets the UI render a size hint
-         *     and lets the audit trail check tampering against the inbound
-         *     payload. `body_hash` for the email body lives on
-         *     `EmailSourceData`; per-attachment hashes are out of scope until
-         *     a real attachment-store gateway lands (Phase F / ADR-036).
+         *     triage what arrived; `bytes` lets the UI render a size hint.
+         *     `sha256` is the per-attachment tamper-evidence hash (the
+         *     analog of `EmailSourceData.body_hash` for the body) — computed
+         *     over the raw bytes by the attachment store
+         *     (`gateways/attachment_store.py`). `attachment_id` references the
+         *     stored blob so the UI can build a download link
+         *     (GET /cases/{id}/attachments/{attachment_id}). Both are optional:
+         *     they are None until the attachment is persisted to the store
+         *     (preview-only before a producer populates them).
          */
         EmailAttachmentManifestEntry: {
+            /** Attachment Id */
+            attachment_id?: string | null;
             /**
              * Bytes
              * @default 0
@@ -1868,6 +1916,8 @@ export interface components {
             mime_type: string;
             /** Name */
             name: string;
+            /** Sha256 */
+            sha256?: string | null;
         };
         /**
          * EmailOrderEntryAnalysisData
@@ -3294,6 +3344,26 @@ export interface components {
              */
             recommended: boolean;
         };
+        /**
+         * SeedCaseAttachmentRequest
+         * @description Sandbox attachment ingest. ``content_b64`` is optional — when omitted a
+         *     deterministic sample blob is stored so the download path can be exercised
+         *     without supplying bytes.
+         */
+        SeedCaseAttachmentRequest: {
+            /** Content B64 */
+            content_b64?: string | null;
+            /**
+             * Mime Type
+             * @default application/pdf
+             */
+            mime_type: string;
+            /**
+             * Name
+             * @default sample.pdf
+             */
+            name: string;
+        };
         /** SeedFinancialImpactRequest */
         SeedFinancialImpactRequest: {
             /** Exception Id */
@@ -3812,6 +3882,45 @@ export interface operations {
             };
         };
     };
+    seed_case_attachment_api_v1__sandbox_cases__case_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeedCaseAttachmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     seed_financial_impact_api_v1__sandbox_seed_financial_impact_post: {
         parameters: {
             query?: never;
@@ -4023,6 +4132,40 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_attachment_api_v1_cases__case_id__attachments__attachment_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                case_id: string;
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
