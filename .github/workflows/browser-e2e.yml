@@ -19,6 +19,12 @@ on:
       - '.github/workflows/browser-e2e.yml'
   workflow_dispatch:
 
+# Cancel an in-flight run when a newer commit lands on the same PR/ref —
+# Playwright is the heaviest job, so superseded runs are pure waste.
+concurrency:
+  group: browser-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   browser-e2e:
     runs-on: ubuntu-latest
@@ -91,9 +97,29 @@ jobs:
           # exactly the way the asoe2 test suite does.
           pip install -e ".[dev]"
 
-      - name: Install Playwright browsers
+      - name: Resolve Playwright version (cache key)
+        id: pw
+        working-directory: asoe-ui
+        run: |
+          PW_VERSION=$(node -e 'console.log(require("@playwright/test/package.json").version)')
+          echo "version=$PW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.pw.outputs.version }}
+
+      - name: Install Playwright browsers (cache miss → download + OS deps)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         working-directory: asoe-ui
         run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright OS deps (cache hit → no download)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        working-directory: asoe-ui
+        run: npx playwright install-deps chromium
 
       - name: Run browser e2e tests
         working-directory: asoe-ui
