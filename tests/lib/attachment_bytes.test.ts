@@ -38,6 +38,16 @@ describe("mockAttachmentBlob", () => {
     expect(Array.from(sig)).toEqual([0x89, 0x50, 0x4e, 0x47]); // \x89PNG
   });
 
+  it("embeds evidence text into the PDF so the preview can locate it", async () => {
+    const blob = mockAttachmentBlob({
+      caseId: "c", attachmentId: "a", mimeType: "application/pdf", fileName: "po.pdf",
+      evidenceText: ["PO# EML-PO-2026-0042", "ship to Atlanta DC"],
+    });
+    const text = await blob.text();
+    expect(text).toContain("PO# EML-PO-2026-0042");
+    expect(text).toContain("ship to Atlanta DC");
+  });
+
   it("emits CSV text for a .csv", async () => {
     const blob = mockAttachmentBlob({
       caseId: "c", attachmentId: "a", mimeType: "text/csv", fileName: "ship_to.csv",

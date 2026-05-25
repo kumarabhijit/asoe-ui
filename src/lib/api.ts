@@ -1277,7 +1277,7 @@ export const attachmentsApi = {
   async getBlob(
     caseId: string,
     attachmentId: string,
-    opts: { authToken?: string; mimeType?: string; fileName?: string } = {},
+    opts: { authToken?: string; mimeType?: string; fileName?: string; evidenceText?: string[] } = {},
   ): Promise<Blob> {
     if (!USE_REAL_API) {
       return mockAttachmentBlob({
@@ -1285,6 +1285,7 @@ export const attachmentsApi = {
         attachmentId,
         mimeType: opts.mimeType,
         fileName: opts.fileName,
+        evidenceText: opts.evidenceText,
       });
     }
     const token = opts.authToken ?? getTestAccessToken() ?? (await getAuthToken());

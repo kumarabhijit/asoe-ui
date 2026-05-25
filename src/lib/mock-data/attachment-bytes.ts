@@ -5,17 +5,25 @@
  */
 
 /** Build a minimal, single-page, openable PDF as an ASCII string (so it is a
- *  valid Blob string part). xref offsets are byte offsets; the document is
- *  ASCII-only so char positions == byte positions. */
-function makeMinimalPdf(title: string): string {
+ *  valid Blob string part). Each line is rendered as its own text run so a PDF
+ *  text-layer extractor (PDF.js) reads each back contiguously — which lets the
+ *  preview verifier LOCATE embedded evidence text. xref offsets are byte
+ *  offsets; computed via TextEncoder so a stray multibyte char stays correct. */
+function makeMinimalPdf(lines: string[]): string {
   const enc = new TextEncoder();
-  const safe = title.replace(/[\\()]/g, "\\$&");
-  const stream = `BT /F1 18 Tf 64 720 Td (${safe}) Tj ET`;
+  const safe = (lines.length ? lines : ["Mock attachment"]).map((l) =>
+    l.replace(/[\\()]/g, "\\$&"),
+  );
+  let content = "BT /F1 12 Tf 64 720 Td";
+  safe.forEach((l, i) => {
+    content += i === 0 ? ` (${l}) Tj` : ` 0 -18 Td (${l}) Tj`;
+  });
+  content += " ET";
   const objects = [
     "<</Type /Catalog /Pages 2 0 R>>",
     "<</Type /Pages /Kids [3 0 R] /Count 1>>",
     "<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <</Font <</F1 5 0 R>>>> /Contents 4 0 R>>",
-    `<</Length ${enc.encode(stream).length}>>\nstream\n${stream}\nendstream`,
+    `<</Length ${enc.encode(content).length}>>\nstream\n${content}\nendstream`,
     "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>",
   ];
   let body = "%PDF-1.4\n";
@@ -50,9 +58,14 @@ export function mockAttachmentBlob(opts: {
   caseId: string;
   mimeType?: string;
   fileName?: string;
+  /** Verbatim evidence-anchor texts to embed in the synthesized document so the
+   *  preview's safety bar LOCATES them in mock mode (matches what the operator
+   *  sees against the real backend). */
+  evidenceText?: string[];
 }): Blob {
   const name = opts.fileName ?? opts.attachmentId;
   const mime = opts.mimeType ?? "";
+  const evidence = opts.evidenceText ?? [];
   const isPdf = mime === "application/pdf" || /\.pdf$/i.test(name);
   const isImage =
     (mime.startsWith("image/") && mime !== "image/svg+xml") ||
@@ -60,25 +73,23 @@ export function mockAttachmentBlob(opts: {
   const isCsv = mime === "text/csv" || /\.csv$/i.test(name);
 
   if (isPdf) {
-    return new Blob([makeMinimalPdf(`Mock attachment - ${name}`)], { type: "application/pdf" });
+    return new Blob([makeMinimalPdf([`Mock attachment - ${name}`, ...evidence])], {
+      type: "application/pdf",
+    });
   }
   if (isImage) {
+    // Images have no text layer; evidence can't be embedded.
     return pngBlob();
   }
   if (isCsv) {
-    return new Blob(
-      [
-        `field,value\nattachment_id,${opts.attachmentId}\ncase_id,${opts.caseId}\n` +
-          "note,mock CSV (set NEXT_PUBLIC_USE_REAL_API=1 for real bytes)\n",
-      ],
-      { type: "text/csv" },
-    );
+    const rows = [
+      "field,value",
+      `attachment_id,${opts.attachmentId}`,
+      `case_id,${opts.caseId}`,
+      ...evidence.map((t) => `evidence,"${t.replace(/"/g, '""')}"`),
+    ];
+    return new Blob([rows.join("\n") + "\n"], { type: "text/csv" });
   }
-  return new Blob(
-    [
-      `Mock attachment ${name} (case ${opts.caseId}).\n` +
-        "Set NEXT_PUBLIC_USE_REAL_API=1 to fetch real attachment bytes.",
-    ],
-    { type: mime || "text/plain" },
-  );
+  const lines = [`Mock attachment ${name} (case ${opts.caseId}).`, ...evidence];
+  return new Blob([lines.join("\n") + "\n"], { type: mime || "text/plain" });
 }
