@@ -16,8 +16,7 @@ import { describe, it, expect } from "vitest";
 const TS_TYPES = path.resolve(__dirname, "../..", "src/types/exceptions.ts");
 
 describe("EvidenceAnchor type surface (ADR-043)", () => {
-  // RED until CP-C. Remove `.fails` when the interface lands.
-  it.fails("exceptions.ts declares EvidenceAnchor with the audit-tuple + discriminator", () => {
+  it("exceptions.ts declares EvidenceAnchor with the audit-tuple + discriminator", () => {
     const ts = readFileSync(TS_TYPES, "utf-8");
     const block = ts.match(/export interface EvidenceAnchor\s*\{([\s\S]*?)\n\}/);
     expect(block, "EvidenceAnchor interface not found in exceptions.ts").not.toBeNull();

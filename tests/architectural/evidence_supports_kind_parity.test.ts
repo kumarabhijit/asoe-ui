@@ -26,8 +26,7 @@ describe("EvidenceSupportsKind closed-vocabulary parity (asoe2 <-> asoe-ui)", ()
     return;
   }
 
-  // RED until CP-C. Remove `.fails` when the vocabulary lands on both sides.
-  it.fails("supports_kind members are identical across repos", () => {
+  it("supports_kind members are identical across repos", () => {
     const py = readFileSync(SIBLING_SCHEMAS, "utf-8");
     const pyMatch = py.match(/EvidenceSupportsKind\s*=\s*Literal\[([\s\S]*?)\]/);
     expect(pyMatch, "asoe2 EvidenceSupportsKind Literal not found").not.toBeNull();
