@@ -15,11 +15,107 @@ import type {
   ChangeAnalysis,
   DraftReply,
   Edi850Document,
+  EmailSourceData,
   EntitiesAnalysisData,
+  EvidenceAnchor,
+  EvidenceSupportsKind,
   KnowledgeGraphPayload,
   OrderEntryExtraction,
   SapDataAnalysisData,
 } from "@/types/exceptions";
+
+// ── Email source-of-truth (ADR-034 Phase G) + evidence anchors (ADR-043) ─────
+//
+// `emailSourceFor` builds an EmailSourceData with a stored attachment manifest
+// (each entry carries sha256 + attachment_id so the preview/download affordance
+// renders) and DERIVES evidence anchors from the extracted entities, bound to
+// the first attachment — mirroring the backend `build_evidence_anchors`. This is
+// what makes the AttachmentPreview safety bar show located evidence in mock mode.
+
+function _normalizeAnchorText(s: string): string {
+  return s.split(/\s+/).filter(Boolean).join(" ").toLowerCase();
+}
+
+function _fakeSha(seed: string): string {
+  let out = "";
+  let h = 7;
+  for (let i = 0; i < 64; i++) {
+    h = (h * 31 + seed.charCodeAt(i % seed.length) + i * 17) & 0xff;
+    out += (h % 16).toString(16);
+  }
+  return out;
+}
+
+const _ANCHOR_LABELS: Record<string, string> = {
+  customer_po: "PO number", po: "PO number", order_ref: "Order number",
+  order_id: "Order number", customer: "Customer", ship_to: "Ship-to",
+  requested_date: "Requested date", material: "Material", qty: "Quantity",
+  invoice_ref: "Invoice", issue: "Reported issue", sender: "Sender", topic: "Topic",
+};
+
+function _anchorLabel(key: string): string {
+  if (_ANCHOR_LABELS[key]) return _ANCHOR_LABELS[key];
+  const base = key.replace(/_/g, " ").trim();
+  return base ? base.charAt(0).toUpperCase() + base.slice(1) : "Evidence";
+}
+
+interface MockAttachmentSpec {
+  name: string;
+  mime_type: string;
+  bytes: number;
+}
+
+function emailSourceFor(opts: {
+  from: string;
+  receivedAt: string;
+  subject: string;
+  bodyExcerpt: string;
+  sourceEmailId?: string;
+  attachments?: MockAttachmentSpec[];
+  /** Derive evidence anchors from these entities, bound to the first attachment. */
+  anchorsFrom?: EntitiesAnalysisData;
+}): EmailSourceData {
+  const manifest = (opts.attachments ?? []).map((a, i) => ({
+    name: a.name,
+    mime_type: a.mime_type,
+    bytes: a.bytes,
+    sha256: _fakeSha(`${a.name}:${i}`),
+    attachment_id: `att-${a.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+  }));
+
+  let evidence_anchors: EvidenceAnchor[] = [];
+  const primary = manifest[0];
+  if (primary && opts.anchorsFrom) {
+    const seen: Record<string, number> = {};
+    evidence_anchors = opts.anchorsFrom.extracted.map((e) => {
+      const text = e.source_span && e.source_span.trim() ? e.source_span : e.value;
+      const norm = _normalizeAnchorText(text);
+      const occurrence_index = seen[norm] ?? 0;
+      seen[norm] = occurrence_index + 1;
+      return {
+        attachment_id: primary.attachment_id,
+        anchor_source: "text_derived" as const,
+        text,
+        match_key: { normalized_text: norm, occurrence_index },
+        supports_kind: "extracted_field" as EvidenceSupportsKind,
+        supports_ref: `order_entry.${e.key}`,
+        label: _anchorLabel(e.key),
+        source_sha256: primary.sha256,
+      };
+    });
+  }
+
+  return {
+    from_address: opts.from,
+    received_at: opts.receivedAt,
+    subject: opts.subject,
+    body_hash: _fakeSha(`${opts.subject}:${opts.from}`),
+    attachment_manifest: manifest,
+    body_excerpt: opts.bodyExcerpt,
+    source_email_id: opts.sourceEmailId ?? null,
+    evidence_anchors,
+  };
+}
 
 // ── EDI 850 ────────────────────────────────────────────────────────────────
 
@@ -237,6 +333,7 @@ type InboxSections = Pick<
   | "draft_reply"
   | "entities_analysis"
   | "sap_data_analysis"
+  | "email_source"
 >;
 
 const SE_ENTITIES: EntitiesAnalysisData = {
@@ -401,6 +498,109 @@ const HAPPY_KG = knowledgeGraphFor({
   sapDoc: "5100012799",
 });
 
+const HAPPY_ENTITIES: EntitiesAnalysisData = {
+  extracted: [
+    { key: "customer_po", value: "EDI-PO-2026-7781", kind: "po", confidence: 0.99, source_span: "BEG*00*SA*EDI-PO-2026-7781" },
+    { key: "customer", value: "Kroger Co", kind: "customer", confidence: 0.99, source_span: "N1*BY*Kroger Co" },
+    { key: "material", value: "BEV-COLA-12PK", kind: "material", confidence: 0.98, source_span: "PO1*001*480*CS" },
+  ],
+};
+
+// ── Per-case email source-of-truth (every inbox case gets one) ───────────────
+
+const SE_EMAIL = emailSourceFor({
+  from: "buyer@southeast-distrib.example",
+  receivedAt: "2026-04-30T10:12:00Z",
+  subject: "PO 8842 — May allocation, ship to Atlanta DC",
+  bodyExcerpt:
+    "Hi team,\n\nPlease process the attached PO 8842 for our May allocation. " +
+    "Ship to the Atlanta DC — full address in the CSV. Confirm by EOD Friday.\n\nThanks,\nMarcus Reed",
+  sourceEmailId: "4",
+  attachments: [
+    { name: "PO_8842.pdf", mime_type: "application/pdf", bytes: 184_320 },
+    { name: "ship_to_addresses.csv", mime_type: "text/csv", bytes: 4_096 },
+  ],
+  anchorsFrom: SE_ENTITIES,
+});
+
+const CHG040_EMAIL = emailSourceFor({
+  from: "buyer@southeast-distrib.example",
+  receivedAt: "2026-05-18T09:02:00Z",
+  subject: "Change request — reduce line 001 on PO 8842 to 420 CS",
+  bodyExcerpt:
+    "Hi,\n\nPlease reduce line 001 on the attached PO 8842 from 600 to 420 CS. " +
+    "Everything else stays the same.\n\nThanks,\nMarcus",
+  attachments: [{ name: "PO_8842.pdf", mime_type: "application/pdf", bytes: 184_320 }],
+  anchorsFrom: SE_ENTITIES,
+});
+
+const CHG041_EMAIL = emailSourceFor({
+  from: "buyer@southeast-distrib.example",
+  receivedAt: "2026-05-18T11:20:00Z",
+  subject: "Can we pull the delivery in to May 20?",
+  bodyExcerpt:
+    "Hello,\n\nIs it possible to expedite our last order to arrive by May 20 " +
+    "instead of May 24? Let me know the freight impact.\n\nThanks",
+});
+
+const CHG042_EMAIL = emailSourceFor({
+  from: "orders@walmart.example",
+  receivedAt: "2026-05-19T08:15:00Z",
+  subject: "Cancel order EML-CHG-2026-0053",
+  bodyExcerpt:
+    "Please cancel the referenced order in full. The signed cancellation request " +
+    "is attached.\n\nWalmart Replenishment",
+  attachments: [{ name: "cancellation_request.pdf", mime_type: "application/pdf", bytes: 92_160 }],
+  anchorsFrom: SE_ENTITIES,
+});
+
+const CHG043_EMAIL = emailSourceFor({
+  from: "buyer@kroger.example",
+  receivedAt: "2026-05-19T13:40:00Z",
+  subject: "Substitute lemon 6pk to 12pk on our open order",
+  bodyExcerpt:
+    "Hi,\n\nPlease swap line 002 from BEV-LEMON-6PK to BEV-LEMON-12PK if you can " +
+    "cover it.\n\nThanks",
+});
+
+const INQ044_EMAIL = emailSourceFor({
+  from: "ap@southeast-distrib.example",
+  receivedAt: "2026-05-20T14:00:00Z",
+  subject: "Status of order SO-5100012344?",
+  bodyExcerpt:
+    "Hello,\n\nCan you confirm the delivery + invoice status for order " +
+    "SO-5100012344 / invoice INV-2026-8841?\n\nThanks, A/P",
+});
+
+const CMP045_EMAIL = emailSourceFor({
+  from: "buyer@walmart.example",
+  receivedAt: "2026-05-21T09:25:00Z",
+  subject: "Short shipment on SO-5100012501",
+  bodyExcerpt:
+    "We received 380 of 480 cases of BEV-COLA-12PK. The delivery note is attached. " +
+    "Please advise on the missing 100 CS.",
+  attachments: [{ name: "delivery_note_8100044122.pdf", mime_type: "application/pdf", bytes: 73_728 }],
+  anchorsFrom: COMPLAINT_ENTITIES,
+});
+
+const HAPPY046_EMAIL = emailSourceFor({
+  from: "edi@kroger.example",
+  receivedAt: "2026-05-22T07:10:00Z",
+  subject: "EDI 850 transmission — PO EDI-PO-2026-7781",
+  bodyExcerpt: "Automated EDI 850 transmission. The X12 payload is attached.",
+  attachments: [{ name: "EDI_850_7781.txt", mime_type: "text/plain", bytes: 2_048 }],
+  anchorsFrom: HAPPY_ENTITIES,
+});
+
+const GEN047_EMAIL = emailSourceFor({
+  from: "partnerships@beverage-expo.example",
+  receivedAt: "2026-05-22T15:00:00Z",
+  subject: "Booth at Beverage Expo 2026",
+  bodyExcerpt:
+    "Hi,\n\nWe'd love to invite Acme Beverages to exhibit at Beverage Expo 2026. " +
+    "Could we set up a quick call?\n\nPartnerships team",
+});
+
 /** Section bundles keyed by exception id. Spread into MOCK_ORDER_ANALYSES. */
 export const INBOX_SECTION_BUNDLES: Record<string, Partial<InboxSections>> = {
   // New email order — extraction + EDI 850 + entities + SAP + draft + graph.
@@ -411,6 +611,7 @@ export const INBOX_SECTION_BUNDLES: Record<string, Partial<InboxSections>> = {
     sap_data_analysis: SE_SAP,
     draft_reply: SE_DRAFT,
     knowledge_graph: SE_KG,
+    email_source: SE_EMAIL,
   },
   // Order-change requests — Change Analysis + graph (+ EDI of the original PO).
   "exc-040": {
@@ -419,33 +620,41 @@ export const INBOX_SECTION_BUNDLES: Record<string, Partial<InboxSections>> = {
     entities_analysis: SE_ENTITIES,
     sap_data_analysis: SE_SAP,
     edi_850_audit: SE_EDI,
+    email_source: CHG040_EMAIL,
   },
   "exc-041": {
     change_analysis: changeAnalysisFor("expedite"),
     knowledge_graph: SE_KG,
+    entities_analysis: SE_ENTITIES,
     sap_data_analysis: SE_SAP,
+    email_source: CHG041_EMAIL,
   },
   "exc-042": {
     change_analysis: changeAnalysisFor("cancellation"),
     knowledge_graph: SE_KG,
+    entities_analysis: SE_ENTITIES,
     sap_data_analysis: { ...SE_SAP, order_value_usd: 48200.0 },
+    email_source: CHG042_EMAIL,
   },
   "exc-043": {
     change_analysis: changeAnalysisFor("sku_substitution"),
     knowledge_graph: SE_KG,
     entities_analysis: SE_ENTITIES,
+    email_source: CHG043_EMAIL,
   },
   // Inquiry — buyer asks about an order/invoice status (no order/EDI section).
   "exc-044": {
     entities_analysis: INQUIRY_ENTITIES,
     sap_data_analysis: INQUIRY_SAP,
     draft_reply: INQUIRY_DRAFT,
+    email_source: INQ044_EMAIL,
   },
   // Complaint — short shipment; acknowledgement draft + the affected order graph.
   "exc-045": {
     entities_analysis: COMPLAINT_ENTITIES,
     sap_data_analysis: COMPLAINT_SAP,
     draft_reply: COMPLAINT_DRAFT,
+    email_source: CMP045_EMAIL,
     knowledge_graph: knowledgeGraphFor({
       orderId: "SO-5100012501", customerName: "Walmart", customerBp: "300001",
       materials: [{ id: "bev-cola-12pk", label: "BEV-COLA-12PK", detail: "380/480 CS" }],
@@ -460,6 +669,7 @@ export const INBOX_SECTION_BUNDLES: Record<string, Partial<InboxSections>> = {
         { key: "topic", value: "Trade-show booth invitation", kind: "topic", confidence: 0.82, source_span: "Subject: Booth at Beverage Expo 2026" },
       ],
     },
+    email_source: GEN047_EMAIL,
     draft_reply: {
       status: "DRAFTED",
       reason: null,
@@ -477,14 +687,9 @@ export const INBOX_SECTION_BUNDLES: Record<string, Partial<InboxSections>> = {
   "exc-046": {
     order_entry_extraction: HAPPY_ORDER_ENTRY,
     edi_850_audit: HAPPY_EDI,
-    entities_analysis: {
-      extracted: [
-        { key: "customer_po", value: "EDI-PO-2026-7781", kind: "po", confidence: 0.99, source_span: "BEG*00*SA*EDI-PO-2026-7781" },
-        { key: "customer", value: "Kroger Co", kind: "customer", confidence: 0.99, source_span: "N1*BY*Kroger Co" },
-        { key: "material", value: "BEV-COLA-12PK", kind: "material", confidence: 0.98, source_span: "PO1*001*480*CS" },
-      ],
-    },
+    entities_analysis: HAPPY_ENTITIES,
     sap_data_analysis: { system: "S4H_PRD", validation_status: "SO created · ATP OK · credit clear · auto-confirmed", order_value_usd: 4147.2, sap_doc_number: "5100012799" },
     knowledge_graph: HAPPY_KG,
+    email_source: HAPPY046_EMAIL,
   },
 };

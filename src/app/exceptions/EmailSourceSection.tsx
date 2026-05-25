@@ -27,6 +27,7 @@ import { useState } from "react";
 import { Mail, Paperclip, Hash, Clock, Eye } from "lucide-react";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { AttachmentPreview } from "@/components/ui/AttachmentPreview";
+import { AttachmentDownloadButton } from "@/components/ui/AttachmentDownloadButton";
 import type { EmailSourceData } from "@/types/exceptions";
 
 interface EmailSourceSectionProps {
@@ -170,18 +171,21 @@ export function EmailSourceSection({ data, caseId }: EmailSourceSectionProps) {
                           {formatBytes(entry.bytes)}
                         </span>
                         {canPreview && (
-                          <button
-                            type="button"
-                            aria-expanded={isOpen}
-                            aria-label={`${isOpen ? "Hide" : "Preview"} ${entry.name}`}
-                            onClick={() =>
-                              setOpenPreview(isOpen ? null : entry.attachment_id ?? null)
-                            }
-                            className="inline-flex items-center gap-4 px-8 py-4 rounded-sm border border-border-subtle text-caption text-text-secondary hover:bg-surface-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
-                          >
-                            <Eye size={12} aria-hidden />
-                            {isOpen ? "Hide" : "Preview"}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              aria-expanded={isOpen}
+                              aria-label={`${isOpen ? "Hide" : "Preview"} ${entry.name}`}
+                              onClick={() =>
+                                setOpenPreview(isOpen ? null : entry.attachment_id ?? null)
+                              }
+                              className="inline-flex items-center gap-4 px-8 py-4 rounded-sm border border-border-subtle text-caption text-text-secondary hover:bg-surface-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                            >
+                              <Eye size={12} aria-hidden />
+                              {isOpen ? "Hide" : "Preview"}
+                            </button>
+                            <AttachmentDownloadButton caseId={caseId as string} attachment={entry} />
+                          </>
                         )}
                       </div>
                       {canPreview && isOpen && (

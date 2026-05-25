@@ -1333,34 +1333,10 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       },
       notification_template: "email_order_clarification_request",
     },
-    // ADR-034 Phase G — email source-of-truth substrate (PO-driven IA
-    // correction). Renders ABOVE the EmailOrderEntrySection on the
-    // detail page so the CSA sees both the source email AND the
-    // agent's recommendation on a single surface.
-    email_source: {
-      from_address: "buyer@southeast-distrib.example",
-      received_at: "2026-04-30T10:12:00Z",
-      subject: "PO 8842 — May allocation, ship to Atlanta DC",
-      body_hash:
-        "a7f5e3d1b9c0648f2a1e7c9b4d5e6f3c2a1b0d9e8f7c6b5a4938271605040301",
-      attachment_manifest: [
-        {
-          name: "PO_8842.pdf",
-          mime_type: "application/pdf",
-          bytes: 184_320,
-        },
-        {
-          name: "ship_to_addresses.csv",
-          mime_type: "text/csv",
-          bytes: 4_096,
-        },
-      ],
-      body_excerpt:
-        "Hi team,\n\nPlease process the attached PO 8842 for our May " +
-        "allocation. Ship to the Atlanta DC — full address in the " +
-        "CSV. Confirm by EOD Friday.\n\nThanks,\nMarcus Reed",
-      source_email_id: "4",
-    },
+    // ADR-034 Phase G email_source + ADR-043 attachment evidence anchors are
+    // merged in from INBOX_SECTION_BUNDLES (inbox-sections.ts) so the manifest
+    // entries carry attachment_id/sha256 (preview + download) and evidence
+    // anchors derived from the extracted entities.
   },
 
   /* ── Multi-issue case fixtures ────────────────────────────────────

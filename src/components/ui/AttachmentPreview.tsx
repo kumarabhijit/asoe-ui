@@ -26,7 +26,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
-  Download,
   FileWarning,
   HelpCircle,
   Loader2,
@@ -34,6 +33,7 @@ import {
 } from "lucide-react";
 
 import { attachmentsApi } from "@/lib/api";
+import { AttachmentDownloadButton } from "@/components/ui/AttachmentDownloadButton";
 import { detectPreviewFormat, type PreviewFormat } from "@/lib/previewFormat";
 import { resolveAnchorStatus, type AnchorStatus } from "@/lib/evidenceAnchor";
 import type { EmailAttachmentManifestEntry, EvidenceAnchor } from "@/types/exceptions";
@@ -159,19 +159,6 @@ export function AttachmentPreview({ caseId, attachment, anchors }: AttachmentPre
     };
   }, [caseId, attachmentId]);
 
-  async function handleDownload() {
-    if (!attachmentId) return;
-    const blob = await attachmentsApi.getBlob(caseId, attachmentId);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = attachment.name || "attachment";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
-
   return (
     <section
       aria-label={`Attachment preview: ${attachment.name}`}
@@ -266,14 +253,7 @@ export function AttachmentPreview({ caseId, attachment, anchors }: AttachmentPre
 
       {/* Download — always available, even when preview is denied/failed. */}
       <div className="mt-8 flex">
-        <button
-          type="button"
-          onClick={handleDownload}
-          className="inline-flex items-center gap-6 px-12 py-6 rounded-sm border border-border-subtle bg-surface-primary text-body text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
-        >
-          <Download size={14} aria-hidden />
-          Download
-        </button>
+        <AttachmentDownloadButton caseId={caseId} attachment={attachment} />
       </div>
     </section>
   );
