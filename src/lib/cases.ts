@@ -155,10 +155,13 @@ export function autonomyLevelsByRank(health: HealthAutonomy): AutonomyLevelInfo[
 }
 
 /**
- * Plain-language label for an autonomy level. Prefers the backend-served
- * label from `health.allowed_autonomy_levels` (Guardrail #1); falls back to
- * the transition map when no health payload is supplied, and finally to the
- * bare code so the UI never crashes on an unknown level.
+ * Plain-language label for an autonomy level. Leads with the human-readable
+ * description (sourced from `health.allowed_autonomy_levels`, Guardrail #1;
+ * transition-map fallback when no health payload), keeping the raw L-code as a
+ * de-emphasised parenthetical — operators read the meaning, not the code
+ * (issue #133 PO #15), but the tier stays visible because it is audit-bearing
+ * (SOX narratives cite L-tiers). Unknown levels fall back to the bare code so
+ * the UI never crashes.
  */
 export function autonomyLevelLabel(
   level: string | null | undefined,
@@ -168,9 +171,8 @@ export function autonomyLevelLabel(
   const fromHealth = health?.allowed_autonomy_levels?.find(
     (l) => l.level === level,
   )?.label;
-  if (fromHealth) return `${level} — ${fromHealth}`;
-  const desc = AUTONOMY_LEVEL_DESCRIPTIONS[level];
-  return desc ? `${level} — ${desc}` : level;
+  const label = fromHealth ?? AUTONOMY_LEVEL_DESCRIPTIONS[level];
+  return label ? `${label} (${level})` : level;
 }
 
 /**
