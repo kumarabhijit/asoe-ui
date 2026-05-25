@@ -710,6 +710,12 @@ export interface EmailAttachmentManifestEntry {
   name: string;
   mime_type: string;
   bytes: number;
+  /** Per-attachment tamper-evidence hash (analog of body_hash); null until
+   *  the attachment is persisted to the store. */
+  sha256?: string | null;
+  /** Stored-blob reference for the download link
+   *  (GET /cases/{id}/attachments/{attachment_id}); null until persisted. */
+  attachment_id?: string | null;
 }
 
 /**
