@@ -718,6 +718,42 @@ export interface EmailAttachmentManifestEntry {
   attachment_id?: string | null;
 }
 
+/* ── Evidence highlighting (ADR-043) ────────────────────────────────── */
+
+/** Closed vocabulary of what an anchor supports. Parity-locked with asoe2
+ *  `api/schemas.py::EvidenceSupportsKind`
+ *  (tests/architectural/evidence_supports_kind_parity.test.ts) — the UI maps it
+ *  with a `default` fallback, so adding a kind is a backend-only change. */
+export type EvidenceSupportsKind = "extracted_field" | "constraint" | "decision";
+
+/** Deterministic locate key (ADR-043 §2.4) — the viewer does a pure literal
+ *  locate with this, never a client-side search (Guardrail #6). */
+export interface MatchKey {
+  normalized_text: string;
+  occurrence_index: number;
+}
+
+/**
+ * Backend-authoritative highlight anchor (ADR-043 §2.2). The viewer LOCATES and
+ * renders these, inventing nothing. The audit-authoritative identity is
+ * (attachment_id, source_sha256, text, supports_ref) — decoupled from on-screen
+ * position. Phase-1 (`text_derived`) anchors carry no geometry; `page`/`bbox`/
+ * `confidence` are Phase-2 spatial fields (ADR-045), verified at runtime.
+ */
+export interface EvidenceAnchor {
+  attachment_id: string;
+  anchor_source: "text_derived" | "spatial_extracted";
+  text: string;
+  match_key: MatchKey;
+  supports_kind: EvidenceSupportsKind;
+  supports_ref: string;
+  label: string;
+  source_sha256: string;
+  page?: number | null;
+  bbox?: number[] | null;
+  confidence?: number | null;
+}
+
 /**
  * Inbound email source-of-truth substrate — present when the
  * EmailOrderEntryRecipe ran and the `email_intake/fetch_message`
@@ -747,6 +783,10 @@ export interface EmailSourceData {
    *  back-link to /inbox?msg=<id>. Contextual: absent when the
    *  upstream `email-intelligence-agent` integration hasn't shipped. */
   source_email_id?: string | null;
+  /** Backend-authoritative highlight anchors (ADR-043) the attachment-preview
+   *  viewer locates and renders. Empty when no attachment is stored or no
+   *  locatable evidence exists. */
+  evidence_anchors?: EvidenceAnchor[];
 }
 
 /* ── Email Order Entry enrichment types (ADR-034) ───────────────────── */

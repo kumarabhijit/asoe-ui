@@ -2028,6 +2028,8 @@ export interface components {
             body_excerpt?: string | null;
             /** Body Hash */
             body_hash: string;
+            /** Evidence Anchors */
+            evidence_anchors?: components["schemas"]["EvidenceAnchor"][];
             /** From Address */
             from_address: string;
             /** Received At */
@@ -2089,6 +2091,46 @@ export interface components {
             reason: string;
             /** To Role */
             to_role?: ("admin" | "manager") | null;
+        };
+        /**
+         * EvidenceAnchor
+         * @description A backend-authoritative highlight anchor (ADR-043 §2.2).
+         *
+         *     The composer projects one per extracted evidence field; the viewer *locates*
+         *     and renders it, inventing nothing. The audit-authoritative identity is
+         *     `audit_tuple()` — `(attachment_id, source_sha256, text, supports_ref)` —
+         *     explicitly decoupled from on-screen position (ADR-043 §2.3): a best-effort
+         *     box is never the audit unit. Phase-1 (`text_derived`) anchors carry no
+         *     geometry; that invariant is enforced by the validator below.
+         */
+        EvidenceAnchor: {
+            /**
+             * Anchor Source
+             * @enum {string}
+             */
+            anchor_source: "text_derived" | "spatial_extracted";
+            /** Attachment Id */
+            attachment_id: string;
+            /** Bbox */
+            bbox?: number[] | null;
+            /** Confidence */
+            confidence?: number | null;
+            /** Label */
+            label: string;
+            match_key: components["schemas"]["MatchKey"];
+            /** Page */
+            page?: number | null;
+            /** Source Sha256 */
+            source_sha256: string;
+            /**
+             * Supports Kind
+             * @enum {string}
+             */
+            supports_kind: "extracted_field" | "constraint" | "decision";
+            /** Supports Ref */
+            supports_ref: string;
+            /** Text */
+            text: string;
         };
         /**
          * ExceptionDetailResponse
@@ -2599,6 +2641,22 @@ export interface components {
              * @default
              */
             uom: string;
+        };
+        /**
+         * MatchKey
+         * @description Deterministic locate key (ADR-043 §2.4). The backend computes this so the
+         *     viewer does a pure *literal* locate in the rendered text layer — never a
+         *     client-side search (Guardrail #6). `occurrence_index` disambiguates repeated
+         *     tokens (the AMBIGUOUS hazard).
+         */
+        MatchKey: {
+            /** Normalized Text */
+            normalized_text: string;
+            /**
+             * Occurrence Index
+             * @default 0
+             */
+            occurrence_index: number;
         };
         /**
          * OrderComparisonData
