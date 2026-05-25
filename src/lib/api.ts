@@ -49,6 +49,7 @@ import {
 } from "./mock-data/exceptions";
 import { deriveMockCases } from "./mock-data/cases";
 import { MOCK_LINE_ITEMS } from "./mock-data/line-items";
+import { mockAttachmentBlob } from "./mock-data/attachment-bytes";
 import type { OrderCase } from "@/types/cases";
 
 // Mirrors asoe2/constraints/specs.py::is_valid_reason_tag_for_write.
@@ -1268,23 +1269,24 @@ export const attachmentsApi = {
    * Auth is the same bearer-token path as `http`; the byte stream is returned
    * as a Blob (not JSON), so it bypasses the JSON error-envelope wrapper.
    *
-   * Mock mode synthesises a small text document so the dev preview renders;
-   * `NEXT_PUBLIC_USE_REAL_API=1` fetches the real bytes from the RBAC-gated
-   * download endpoint.
+   * Mock mode synthesises TYPE-CORRECT bytes (a real PDF for a .pdf, etc.) so a
+   * downloaded mock file opens; `NEXT_PUBLIC_USE_REAL_API=1` fetches the real
+   * bytes from the RBAC-gated download endpoint. Pass `mimeType`/`fileName` so
+   * mock mode can pick the right shape (ignored on the real path).
    */
   async getBlob(
     caseId: string,
     attachmentId: string,
-    opts: { authToken?: string } = {},
+    opts: { authToken?: string; mimeType?: string; fileName?: string; evidenceText?: string[] } = {},
   ): Promise<Blob> {
     if (!USE_REAL_API) {
-      return new Blob(
-        [
-          `Mock preview for attachment ${attachmentId} (case ${caseId}).\n` +
-            "Set NEXT_PUBLIC_USE_REAL_API=1 to fetch real attachment bytes.",
-        ],
-        { type: "text/plain" },
-      );
+      return mockAttachmentBlob({
+        caseId,
+        attachmentId,
+        mimeType: opts.mimeType,
+        fileName: opts.fileName,
+        evidenceText: opts.evidenceText,
+      });
     }
     const token = opts.authToken ?? getTestAccessToken() ?? (await getAuthToken());
     const headers: Record<string, string> = {};

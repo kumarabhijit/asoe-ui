@@ -125,7 +125,13 @@ export function AttachmentPreview({ caseId, attachment, anchors }: AttachmentPre
 
     (async () => {
       try {
-        const blob = await attachmentsApi.getBlob(caseId, attachmentId);
+        const blob = await attachmentsApi.getBlob(caseId, attachmentId, {
+          mimeType: attachment.mime_type,
+          fileName: attachment.name,
+          // Mock mode embeds these so the safety bar locates them; the real API
+          // ignores the hint and streams genuine bytes.
+          evidenceText: anchors.map((a) => a.text),
+        });
         const bytes = new Uint8Array(await blob.arrayBuffer());
         if (cancelled) return;
         const fmt = detectPreviewFormat(bytes);
