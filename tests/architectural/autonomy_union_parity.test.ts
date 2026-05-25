@@ -7,9 +7,11 @@
  * `EmailOrderEntryAnalysisData.autonomy_level` drift (hand-written L1–L3 vs
  * generated L1–L4) was invisible. This locks per-type parity.
  *
- * Per-type by design (NOT a blanket widen): EDI-mismatch is L1–L3; only
- * email-order-entry carries the L4 (full-autonomy) tier. Widening EDI to L4
- * would mask a real backend distinction and must fail here too.
+ * Parity is exact, never an arbitrary widen — the hand-written union must
+ * equal the generated one literal-for-literal. Under autonomy vocab v2
+ * (ADR-042 §5) both EDI-mismatch and email-order-entry span L1–L4: EDI's
+ * SHIP_TO_MISMATCH escalates to human (v2 L4). The parity assertions below are
+ * the guard against a hand-written type drifting from the backend contract.
  */
 
 import { readFileSync } from "node:fs";
@@ -50,8 +52,10 @@ describe("autonomy_level union parity (exceptions.ts ↔ generated.ts)", () => {
     );
   });
 
-  it("order-entry carries L4 but EDI-mismatch does not (no blanket widen)", () => {
+  it("both EDI-mismatch and order-entry carry L4 under vocab v2", () => {
+    // v2 (ADR-042 §5): EDI SHIP_TO_MISMATCH escalates to human (L4); order
+    // entry's REJECT/ESCALATE/LOW_CONFIDENCE_FLAG also land at L4.
     expect(autonomyUnion(EXCEPTIONS, "EmailOrderEntryAnalysisData")).toContain("L4");
-    expect(autonomyUnion(EXCEPTIONS, "EdiMismatchAnalysisData")).not.toContain("L4");
+    expect(autonomyUnion(EXCEPTIONS, "EdiMismatchAnalysisData")).toContain("L4");
   });
 });

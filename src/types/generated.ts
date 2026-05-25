@@ -1003,8 +1003,8 @@ export interface components {
          *
          *     `rank` is the degree of automation (higher == more autonomous) under the
          *     active `autonomy_vocab_version`; the UI orders the ladder by `rank` rather
-         *     than hardcoding a map (asoe-ui Guardrail #1). Display vocabulary only —
-         *     not the engine's gating semantics.
+         *     than hardcoding a map (asoe-ui Guardrail #1). This is the same vocabulary
+         *     the engine's gating ladders resolve under (ADR-042 §5 migration complete).
          */
         AutonomyLevelInfo: {
             /** Label */
@@ -1830,7 +1830,7 @@ export interface components {
              * Autonomy Level
              * @enum {string}
              */
-            autonomy_level: "L1" | "L2" | "L3";
+            autonomy_level: "L1" | "L2" | "L3" | "L4";
             /**
              * Classification
              * @enum {string}

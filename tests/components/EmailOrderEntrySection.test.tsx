@@ -62,10 +62,9 @@ describe("EmailOrderEntrySection", () => {
           }}
         />,
       );
-      // Issue #133 (PO #15): "One-click approve" now appears in both
-      // the classification badge AND the autonomy footer caption
-      // ("L3 — One-click approve — operator confirms"). The assertion
-      // is satisfied as long as the phrase renders at least once.
+      // Issue #133 (PO #15): "One-click approve" renders as the
+      // classification badge label. The assertion is satisfied as long as
+      // the phrase renders at least once.
       expect(screen.getAllByText(/One-click approve/i).length).toBeGreaterThan(0);
     });
 

@@ -131,12 +131,13 @@ export function sourceChannelLabel(channel: string | null | undefined): string {
 // vocabulary — labels AND ordering — now comes from
 // `health.allowed_autonomy_levels` (rank-sorted), so the UI never hardcodes
 // the ladder (Guardrail #1). This map survives only for the window before a
-// caller has a health payload.
+// caller has a health payload. Values mirror the backend v2 vocabulary
+// (asoe2 contracts/autonomy.py): L1 = most autonomous … L4 = human.
 const AUTONOMY_LEVEL_DESCRIPTIONS: Readonly<Record<string, string>> = {
-  L1: "Block automatically — operator decides",
-  L2: "Recommend — operator approves",
-  L3: "One-click approve — operator confirms",
-  L4: "Fully automated — audit only",
+  L1: "Auto — no human review",
+  L2: "Execute & notify",
+  L3: "Prepare & await approval",
+  L4: "Escalate to human",
 };
 
 type HealthAutonomy = Pick<HealthResponse, "allowed_autonomy_levels"> | null | undefined;

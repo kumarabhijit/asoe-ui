@@ -696,7 +696,8 @@ export interface EdiMismatchAnalysisData {
   classification: EdiMismatchClassification;
   /** Recipe-recommended action (e.g., BLOCK_AND_NOTIFY, REQUEST_BUYER_CONFIRMATION). */
   recommended_action: string;
-  autonomy_level: "L1" | "L2" | "L3";
+  // Autonomy vocab v2 (ADR-042 §5): SHIP_TO_MISMATCH resolves to L4 (escalate).
+  autonomy_level: "L1" | "L2" | "L3" | "L4";
   expected_value: unknown;
   received_value: unknown;
   notification_template: string | null;
