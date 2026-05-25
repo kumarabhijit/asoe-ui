@@ -34,7 +34,10 @@ export function AttachmentDownloadButton({
     if (!attachment.attachment_id || busy) return;
     setBusy(true);
     try {
-      const blob = await attachmentsApi.getBlob(caseId, attachment.attachment_id);
+      const blob = await attachmentsApi.getBlob(caseId, attachment.attachment_id, {
+        mimeType: attachment.mime_type,
+        fileName: attachment.name,
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

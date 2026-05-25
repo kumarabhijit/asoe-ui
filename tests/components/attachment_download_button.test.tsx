@@ -29,7 +29,13 @@ describe("AttachmentDownloadButton", () => {
     getBlob.mockResolvedValue(new Blob(["x"], { type: "text/plain" }));
     render(<AttachmentDownloadButton caseId="case-1" attachment={att()} />);
     fireEvent.click(screen.getByRole("button", { name: /download PO_8842\.pdf/i }));
-    await waitFor(() => expect(getBlob).toHaveBeenCalledWith("case-1", "att-1"));
+    await waitFor(() =>
+      expect(getBlob).toHaveBeenCalledWith(
+        "case-1",
+        "att-1",
+        expect.objectContaining({ fileName: "PO_8842.pdf", mimeType: "application/pdf" }),
+      ),
+    );
   });
 
   it("is disabled when the attachment has no stored id", () => {
