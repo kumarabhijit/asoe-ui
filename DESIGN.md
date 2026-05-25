@@ -41,8 +41,15 @@ src/
 │   │   ├── EdiMismatchSection.tsx         # Data-presence enrichment: sub_type badge, expected vs received cards, classification, autonomy
 │   │   ├── EmailSourceSection.tsx         # Data-presence enrichment: source email substrate (ADR-034 Phase G.2)
 │   │   ├── EmailOrderEntrySection.tsx     # Data-presence enrichment: classified email order intake
+│   │   ├── EntitiesSection.tsx            # ADR-042 P2 — Customer Inbox extracted entities (entities_analysis)
+│   │   ├── SapDataSection.tsx             # ADR-042 P2 — Customer Inbox SAP system-of-record (sap_data_analysis)
+│   │   ├── OrderEntrySection.tsx          # ADR-042 P3 — extracted order form (order_entry_extraction)
+│   │   ├── Edi850Section.tsx              # ADR-042 P5 — EDI 850 viewer (edi_850_audit): Decoded / Raw X12 / Segment Map
+│   │   ├── ChangeAnalysisSection.tsx      # ADR-042 P6 — order-change constraints/scenarios/decision (change_analysis)
+│   │   ├── KnowledgeGraphSection.tsx      # ADR-042 P7 — derived entity graph (knowledge_graph): radial SVG + relationships list
+│   │   ├── DraftReplySection.tsx          # ADR-042 P7 — AI draft-reply evidence (draft_reply)
 │   │   ├── OverrideChooserDialog.tsx      # Modal: pick action / reason / notes for an Override decision
-│   │   └── shared.tsx            # CollapsibleHeader, fmtPrice helpers
+│   │   └── shared.tsx            # CollapsibleHeader, CollapsibleSection (+ Layer2OpenContext, DoR #11), fmtPrice helpers
 │   ├── dashboard/page.tsx        # Analytics dashboard (Layout B) + recent activity feed
 │   ├── inbox/page.tsx            # Customer Inbox — AI email triage (redirects to /cases?source=manual_order per #133 PO #9)
 │   ├── settings/page.tsx         # Settings page (Phase 9 stub — admin, SSO, agent config)
@@ -406,7 +413,7 @@ Page Content (max-width 1800px) — CSS grid:
 | `PricingConditionType` | Pricing condition type enum (BASE/CONTRACT/TPR/UOM/RESULT/ERROR) | exceptions.ts |
 | `PricingWaterfallStep` | Single step in pricing waterfall visualization | exceptions.ts |
 | `LineItemAnalysis` | Per-line agent analysis with waterfall | exceptions.ts |
-| `OrderAnalysis` | Order-level agent analysis (drives detail panel). `root_cause?`, `recommendation?`, `entity_profile?`, `impact_metrics?` are **optional** as of Phase 8.13 — backend `api/profile_composer.py` returns `None` when the backing data is absent so the UI can structurally omit the surface (Verdict 2026-04-22 partial-truth guard). Plus `duplicate_detection?`, `order_comparison?`, `price_analysis?`, `backorder_analysis?`, `overmax_analysis?`, `moq_analysis?`, `pallet_analysis?`, `delivery_delay_analysis?`, `price_hold_analysis?`, `edi_mismatch_analysis?` enrichment fields. | exceptions.ts |
+| `OrderAnalysis` | Order-level agent analysis (drives detail panel). `root_cause?`, `recommendation?`, `entity_profile?`, `impact_metrics?` are **optional** as of Phase 8.13 — backend `api/profile_composer.py` returns `None` when the backing data is absent so the UI can structurally omit the surface (Verdict 2026-04-22 partial-truth guard). Plus `duplicate_detection?`, `order_comparison?`, `price_analysis?`, `backorder_analysis?`, `overmax_analysis?`, `moq_analysis?`, `pallet_analysis?`, `delivery_delay_analysis?`, `price_hold_analysis?`, `edi_mismatch_analysis?` enrichment fields, and the ADR-042 Customer-Inbox section fields `entities_analysis?`, `sap_data_analysis?`, `order_entry_extraction?`, `edi_850_audit?`, `change_analysis?`, `knowledge_graph?`, `draft_reply?`. | exceptions.ts |
 | `EntityProfile` | Master data context for exception entity (customer name, BP number, tier, VIP, credit standing, location) | exceptions.ts |
 | `ImpactMetrics` | Quantitative "blast radius" (revenue at risk, delta, SLA priority, affected lines) | exceptions.ts |
 | `DuplicateDetectionData` | Duplicate detection summary: original/duplicate order snapshots, detection method, confidence, recommended action, autonomy level | exceptions.ts |
@@ -429,6 +436,13 @@ Page Content (max-width 1800px) — CSS grid:
 | `PalletAnalysisData` | Pallet analysis: total cases, loose cases, extra labor, freight waste, per-line details, AI suggested plan | exceptions.ts |
 | `PalletLine` | Per-line pallet alignment detail (layer/pallet qty, complete layers, loose qty, fill pct, violation type) | exceptions.ts |
 | `PalletSuggestion` | AI pallet alignment suggestion (current/suggested qty, delta, layers, full pallets, reason) | exceptions.ts |
+| `EntitiesAnalysisData` / `ExtractedEntity` | ADR-042 P2 — AI-extracted email/attachment entities (`{key, value, kind, confidence?, source_span?}`) | exceptions.ts |
+| `SapDataAnalysisData` | ADR-042 P2 — SAP system-of-record context (system, validation_status, order_value_usd?, sap_doc_number?) | exceptions.ts |
+| `OrderEntryExtraction` / `OrderEntryHeader` / `OrderEntryLineItem` / `OrderEntryValidationFlag` | ADR-042 P3 — extracted order form (header, customer, line items, validation flags) | exceptions.ts |
+| `Edi850Document` (+ `Edi850Envelope`/`Header`/`Party`/`LineItem`/`Totals`/`Segment`) | ADR-042 P5 — ANSI X12 5010 PO reconstruction; `segments[]` carries raw + decoded meaning + colour group; `raw_x12` is the full document | exceptions.ts |
+| `ChangeAnalysis` (+ `ConstraintEvaluation`/`ConstraintCheck`/`ScenarioOption`/`ChangeDecision`/`ChangeItem`) | ADR-042 P6 — order-change evaluation: N constraints (PASS/CONDITIONAL/WARNING), M scenarios, decision (confidence, requires_cosign, sap_actions) | exceptions.ts |
+| `KnowledgeGraphPayload` (+ `KnowledgeGraphNode`/`KnowledgeGraphEdge`) | ADR-042 P7 — derived entity graph (nodes by kind, directed edges, root_id) | exceptions.ts |
+| `DraftReply` (+ `DraftReplyEdit`) | ADR-042 P7 — AI reply-draft evidence (status, recipient, subject, body, before/after edits) | exceptions.ts |
 
 ---
 
@@ -455,6 +469,7 @@ Maps to Section 6.2 REST endpoints. ADR-041 P5 extracted bulk mock fixtures into
 | `exceptionsApi.reanalyze()` | `POST /api/v1/exceptions/{id}/reanalyze` | 6.2 (live `if (USE_REAL_API)` branch — was silently mock-only pre-2026-05-01; architectural lock test in `tests/architectural/exceptions_api_live_branches.test.ts` walks every `LIVE_METHODS` entry and asserts the gate exists) |
 | `exceptionsApi.trace()` | `GET /api/v1/exceptions/{id}/trace` | 6.2 |
 | `exceptionsApi.stats()` | `GET /api/v1/exceptions/stats` | 6.2 |
+| `exceptionsApi.reportReviewerActivity()` | `POST /api/v1/metrics/reviewer-activity` | DoR #11 — automation-bias telemetry (`{dwell_ms, layer2_opened}`); best-effort, no-op in mock mode. Fed once per decision from `ExceptionDetailPanel` (dwell + `Layer2OpenContext` Layer-2-open flag). |
 | `exceptionsApi.lineItems()` | Line items for an exception (UI mock) | — |
 | `exceptionsApi.orderAnalysis()` | Order-level agent analysis (UI mock) | — |
 | `casesApi.list()` | `GET /api/v1/cases` — case-centric list view (ADR-038 Phase H.6) | — (mock-mode only — backend route pending; see asoe2 tasks.md Phase 27.6) |
@@ -473,6 +488,8 @@ Maps to Section 6.2 REST endpoints. ADR-041 P5 extracted bulk mock fixtures into
 **Mock users:** 6 seed users — jane@acme.com (admin), marcus.webb@acme-corp.com (admin), sarah.chen (manager), sarah.chen.sr (analyst), james.ortiz (analyst, scoped to acct-walmart/acct-kroger), priya.nair (analyst, scoped to acct-target/acct-costco). Each user has `title`, `avatar_initials`, `assigned_accounts`, and RBAC-derived `visible_tabs`.
 
 **Mock exceptions:** 21 exceptions (exc-001 through exc-021) with `account_id` and `account_name` fields, covering all supported intents: CONTRACTUAL_CORRECTION, CREDIT_BLOCK, MASS_PRICING_ERROR, DUPLICATE_PO, BACK_ORDER (exc-010, exc-011), OVER_MAX (exc-012), MIN_ORDER_QTY (exc-013), PALLET_CONFIG (exc-014), DELIVERY_DELAY (exc-016), PRICE_HOLD_RELEASE (exc-017 GREEN auto-release, exc-018 YELLOW escalate), EDI_MISMATCH (exc-019 RED SKU hard-reject, exc-020 YELLOW QTY review), and the PRICE_MISMATCH routing-fork demonstrator (exc-021 — `event_type=EDI_850_LINE_MISMATCH` + `metadata.mismatch_sub_type=PRICE_MISMATCH` lands as `CONTRACTUAL_CORRECTION` and renders `PriceAnalysisSection`, NOT `EdiMismatchSection`). Each includes intent-specific `OrderAnalysis` data with the corresponding enrichment fields populated (e.g., `backorder_analysis` for BACK_ORDER, `pallet_analysis` for PALLET_CONFIG, `price_hold_analysis` for PRICE_HOLD_RELEASE, `edi_mismatch_analysis` for EDI_MISMATCH, `price_analysis` for the PRICE_MISMATCH routing-fork case).
+
+**ADR-042 Customer-Inbox mock cases (EMAIL_ENTRY lens):** the inbox set lives in `src/lib/mock-data/inbox-sections.ts` (typed builders + per-case bundles merged into `MOCK_ORDER_ANALYSES`). Eight email cases exercise every `email_classification` chip and all inbox sections: **NEW_ORDER** — exc-026 (full new-order: order entry + EDI 850 + entities + SAP + draft reply + KG) and exc-046 (high-confidence EDI order, auto-resolved RESOLVED/COMPLETE); **ORDER_CHANGE** — exc-040..043 (qty reduction / expedite / cancellation / SKU substitution → `change_analysis`); **INQUIRY** — exc-044; **COMPLAINT** — exc-045; **OTHER** — exc-047. `caseFromMockException` derives the classification from the `event_type` (CHANGE/INQUIRY/COMPLAINT/GENERAL → the matching chip, else NEW_ORDER).
 
 **Health endpoint recipes:** `allowed_recipes` includes 10 recipes: `PriceAdjustmentRecipe.py`, `CreditHoldReleaseRecipe.py`, `DuplicatePORecipe.py`, `BackOrderResolutionRecipe.py`, `OverMaxTrimRecipe.py`, `MOQRoundUpRecipe.py`, `PalletAlignmentRecipe.py`, `DeliveryDelayResolutionRecipe.py`, `PriceHoldReleaseRecipe.py`, `EdiMismatchRecipe.py`. `allowed_intents` includes 11 intents: the original 4 plus `BACK_ORDER`, `OVER_MAX`, `MIN_ORDER_QTY`, `PALLET_CONFIG`, `DELIVERY_DELAY`, `PRICE_HOLD_RELEASE`, `EDI_MISMATCH`.
 
