@@ -19,6 +19,12 @@ on:
       - '.github/workflows/browser-e2e.yml'
   workflow_dispatch:
 
+# Cancel an in-flight run when a newer commit lands on the same PR/ref —
+# Playwright is the heaviest job, so superseded runs are pure waste.
+concurrency:
+  group: browser-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   browser-e2e:
     runs-on: ubuntu-latest

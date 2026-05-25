@@ -22,6 +22,11 @@ on:
       - '.github/workflows/browser-e2e-mock.yml'
   workflow_dispatch:
 
+# Cancel an in-flight run when a newer commit lands on the same PR/ref.
+concurrency:
+  group: browser-e2e-mock-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   browser-e2e-mock:
     runs-on: ubuntu-latest
