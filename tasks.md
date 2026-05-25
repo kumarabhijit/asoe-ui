@@ -1336,3 +1336,20 @@ order, but every mock case had exactly one record — the
       `scroll: false`; verified it fails on the parent commit.
       (Drift D32.)
 
+
+## 16. ADR-042 — Customer-Inbox Prototype Port (asoe-ui #185, merged 2026-05-24)
+
+Frontend half of the cross-repo port (backend = asoe2 #166). All sections are
+dumb, data-presence-driven projectors mounting on `analysis.*` fields — no
+per-intent dispatch (Guardrail #1) — with deliverable + component + axe locks.
+
+- [x] **Phase 2** — `EntitiesSection` (`entities_analysis`) + `SapDataSection` (`sap_data_analysis`)
+- [x] **Phase 3** — `OrderEntrySection` (`order_entry_extraction`): header, customer (MDM-match), line items, validation flags
+- [x] **Phase 4** — AI Draft Reply WS events (`reply_drafted` / `reply_sent`) through `isCaseInvalidationEvent`
+- [x] **Phase 5** — `Edi850Section` (`edi_850_audit`): Decoded / Raw X12 (+ copy) / Segment Map sub-views
+- [x] **Phase 6** — `ChangeAnalysisSection` (`change_analysis`): decision panel + lifecycle bar + change grid + variable-cardinality constraint/scenario cards
+- [x] **Phase 7** — `KnowledgeGraphSection` (`knowledge_graph`, radial SVG + accessible relationships list) + `DraftReplySection` (`draft_reply`)
+- [x] **Phase 8 / DoR #11** — automation-bias telemetry: `Layer2OpenContext` (first-expand signal) + `exceptionsApi.reportReviewerActivity({dwell_ms, layer2_opened})` once per decision; section-render axe sweep; XSS escaping locks (no `dangerouslySetInnerHTML`)
+- [x] **Types** — `src/types/exceptions.ts` mirrors mirror the asoe2 contracts (Edi850Document, ChangeAnalysis, KnowledgeGraphPayload, DraftReply, OrderEntryExtraction, EntitiesAnalysisData, SapDataAnalysisData); generated.ts round-trips from the regenerated OpenAPI
+- [x] **Mock data** — 8 EMAIL_ENTRY cases (exc-026, exc-040..047) covering all five `email_classification` chips (NEW_ORDER / ORDER_CHANGE / INQUIRY / COMPLAINT / OTHER) + the auto-resolved happy path; `src/lib/mock-data/inbox-sections.ts`
+- [ ] **Constraint Graph** — deferred by ADR §2.1/§5b (reuse trace/topology; covered by `ChangeAnalysisSection`)
