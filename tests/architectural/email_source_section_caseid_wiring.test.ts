@@ -25,8 +25,7 @@ function stripComments(content: string): string {
 }
 
 describe("EmailSourceSection preview wiring (ADR-043)", () => {
-  // RED until CP-D. Remove `.fails` when caseId is threaded as a prop.
-  it.fails("section receives caseId explicitly and never fetches bytes directly", () => {
+  it("section receives caseId explicitly and never fetches bytes directly", () => {
     const src = stripComments(readFileSync(SECTION, "utf-8"));
 
     // Threaded explicitly from ExceptionDetailPanel — pending until CP-D.

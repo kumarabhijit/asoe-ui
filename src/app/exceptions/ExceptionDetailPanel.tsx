@@ -725,7 +725,10 @@ export default function ExceptionDetailPanel({
               Both gated by data-presence; no per-intent dispatch. */}
           {analysis?.email_source && (
             <CollapsibleSection title="Source Email">
-              <EmailSourceSection data={analysis.email_source} />
+              <EmailSourceSection
+                data={analysis.email_source}
+                caseId={detail.parent_case_id ?? undefined}
+              />
             </CollapsibleSection>
           )}
           {analysis?.email_order_entry_analysis && (

@@ -1258,6 +1258,48 @@ export const healthApi = {
   },
 };
 
+/* ── Attachments API (/api/v1/cases/{id}/attachments/{id}) ─────────── */
+
+export const attachmentsApi = {
+  /**
+   * Fetch a stored attachment's raw bytes (ADR-043). The single place the UI
+   * reads attachment bytes — the AttachmentPreview component calls this rather
+   * than touching `fetch` itself (CLAUDE.md engineering rule + Guardrail #6).
+   * Auth is the same bearer-token path as `http`; the byte stream is returned
+   * as a Blob (not JSON), so it bypasses the JSON error-envelope wrapper.
+   *
+   * Mock mode synthesises a small text document so the dev preview renders;
+   * `NEXT_PUBLIC_USE_REAL_API=1` fetches the real bytes from the RBAC-gated
+   * download endpoint.
+   */
+  async getBlob(
+    caseId: string,
+    attachmentId: string,
+    opts: { authToken?: string } = {},
+  ): Promise<Blob> {
+    if (!USE_REAL_API) {
+      return new Blob(
+        [
+          `Mock preview for attachment ${attachmentId} (case ${caseId}).\n` +
+            "Set NEXT_PUBLIC_USE_REAL_API=1 to fetch real attachment bytes.",
+        ],
+        { type: "text/plain" },
+      );
+    }
+    const token = opts.authToken ?? getTestAccessToken() ?? (await getAuthToken());
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const url =
+      `${API_URL}/api/v1/cases/${encodeURIComponent(caseId)}` +
+      `/attachments/${encodeURIComponent(attachmentId)}`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      throw new Error(`ATTACHMENT_FETCH_FAILED: ${res.status}`);
+    }
+    return res.blob();
+  },
+};
+
 /* ── Exceptions API (/api/v1/exceptions/*) ─────────────────────────── */
 
 export const exceptionsApi = {

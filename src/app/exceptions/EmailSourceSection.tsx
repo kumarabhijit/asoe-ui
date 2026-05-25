@@ -23,12 +23,19 @@
  */
 "use client";
 
-import { Mail, Paperclip, Hash, Clock } from "lucide-react";
+import { useState } from "react";
+import { Mail, Paperclip, Hash, Clock, Eye } from "lucide-react";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
+import { AttachmentPreview } from "@/components/ui/AttachmentPreview";
 import type { EmailSourceData } from "@/types/exceptions";
 
 interface EmailSourceSectionProps {
   data: EmailSourceData;
+  /** Threaded explicitly from ExceptionDetailPanel for the attachment preview
+   *  (ADR-043 §2.5). Absent on legacy / Tier-1 records without a parent case →
+   *  preview is disabled (manifest still listed). The section forwards it; it
+   *  never fetches bytes itself (Guardrail #6). */
+  caseId?: string;
 }
 
 /**
@@ -41,7 +48,8 @@ function formatBytes(b: number): string {
   return `${(b / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function EmailSourceSection({ data }: EmailSourceSectionProps) {
+export function EmailSourceSection({ data, caseId }: EmailSourceSectionProps) {
+  const [openPreview, setOpenPreview] = useState<string | null>(null);
   return (
     <section
       aria-label="Source email"
@@ -140,22 +148,54 @@ export function EmailSourceSection({ data }: EmailSourceSectionProps) {
                 </span>
               </div>
               <ul className="m-0 p-0 list-none">
-                {manifest.map((entry, idx) => (
-                  <li
-                    key={`${entry.name}-${idx}`}
-                    className="flex items-center gap-10 px-10 py-8 bg-surface-secondary rounded-sm border-b border-border-subtle last:border-b-0"
-                  >
-                    <span className="font-mono font-semibold text-body text-text-primary truncate">
-                      {entry.name}
-                    </span>
-                    <span className="text-caption text-text-tertiary">
-                      {entry.mime_type}
-                    </span>
-                    <span className="ml-auto text-caption text-text-tertiary font-mono">
-                      {formatBytes(entry.bytes)}
-                    </span>
-                  </li>
-                ))}
+                {manifest.map((entry, idx) => {
+                  const canPreview = Boolean(caseId && entry.attachment_id);
+                  const isOpen = openPreview === entry.attachment_id;
+                  const anchorsFor = (data.evidence_anchors ?? []).filter(
+                    (a) => a.attachment_id === entry.attachment_id,
+                  );
+                  return (
+                    <li
+                      key={`${entry.name}-${idx}`}
+                      className="bg-surface-secondary rounded-sm border-b border-border-subtle last:border-b-0"
+                    >
+                      <div className="flex items-center gap-10 px-10 py-8">
+                        <span className="font-mono font-semibold text-body text-text-primary truncate">
+                          {entry.name}
+                        </span>
+                        <span className="text-caption text-text-tertiary">
+                          {entry.mime_type}
+                        </span>
+                        <span className="ml-auto text-caption text-text-tertiary font-mono">
+                          {formatBytes(entry.bytes)}
+                        </span>
+                        {canPreview && (
+                          <button
+                            type="button"
+                            aria-expanded={isOpen}
+                            aria-label={`${isOpen ? "Hide" : "Preview"} ${entry.name}`}
+                            onClick={() =>
+                              setOpenPreview(isOpen ? null : entry.attachment_id ?? null)
+                            }
+                            className="inline-flex items-center gap-4 px-8 py-4 rounded-sm border border-border-subtle text-caption text-text-secondary hover:bg-surface-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                          >
+                            <Eye size={12} aria-hidden />
+                            {isOpen ? "Hide" : "Preview"}
+                          </button>
+                        )}
+                      </div>
+                      {canPreview && isOpen && (
+                        <div className="px-10 pb-10">
+                          <AttachmentPreview
+                            caseId={caseId as string}
+                            attachment={entry}
+                            anchors={anchorsFor}
+                          />
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           );

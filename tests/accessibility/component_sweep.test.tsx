@@ -22,6 +22,7 @@ import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { EventsTimeline } from "@/components/ui/EventsTimeline";
+import { AttachmentPreview } from "@/components/ui/AttachmentPreview";
 import {
   Dialog,
   DialogContent,
@@ -273,6 +274,40 @@ describe("a11y sweep: EventsTimeline", () => {
   it("populated trace", async () =>
     expectNoViolations(
       <EventsTimeline executedNodes={populated} finalStatus="COMPLETE" />,
+    ));
+});
+
+// ---------------------------------------------------------------------------
+// AttachmentPreview — ADR-043 evidence-highlighting surface. The banner,
+// safety bar, and download control must be axe-clean. Mock-mode getBlob
+// returns a text blob (no network, no PDF.js), so the settled DOM is the
+// text-preview + safety-bar state.
+// ---------------------------------------------------------------------------
+describe("a11y sweep: AttachmentPreview", () => {
+  it("with an evidence anchor", async () =>
+    expectNoViolations(
+      <AttachmentPreview
+        caseId="case-1"
+        attachment={{
+          name: "po.pdf",
+          mime_type: "application/pdf",
+          bytes: 42,
+          sha256: "a".repeat(64),
+          attachment_id: "att-1",
+        }}
+        anchors={[
+          {
+            attachment_id: "att-1",
+            anchor_source: "text_derived",
+            text: "PO-2026-0042",
+            match_key: { normalized_text: "po-2026-0042", occurrence_index: 0 },
+            supports_kind: "extracted_field",
+            supports_ref: "order_entry.po_number",
+            label: "PO number",
+            source_sha256: "a".repeat(64),
+          },
+        ]}
+      />,
     ));
 });
 

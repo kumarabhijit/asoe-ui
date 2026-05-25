@@ -1,0 +1,121 @@
+/**
+ * Operator journeys — attachment preview + in-document evidence highlighting
+ * (ADR-043). Given/When/Then over the live sandbox backend, asserting against
+ * re-fetched state + the honest safety-bar surface.
+ *
+ * STATUS: test.fixme (pending, not yet executed). Two dependencies are required
+ * before these can run green:
+ *   1. Playwright browser binaries + the uvicorn/next webServer (CI provisions
+ *      these; not available in the authoring container).
+ *   2. A sandbox seed endpoint that attaches a stored attachment + projected
+ *      EvidenceAnchors to a seeded EMAIL_ENTRY case
+ *      (`POST /api/v1/_sandbox/seed/email-attachment-anchors`) — a CP-D backend
+ *      follow-up. Until it lands these journeys cannot seed their precondition.
+ *
+ * They are committed now (test-first) so the operator-experience contract is
+ * recorded; remove `.fixme` when the seed endpoint + CI browsers are in place.
+ */
+import { test, expect, type APIRequestContext } from "@playwright/test";
+import { loginAs, backendToken, resetTenant, exceptionUrl, expandSection, USERS } from "./_helpers";
+
+const BACKEND_URL = process.env.E2E_BACKEND_URL ?? "http://localhost:8000";
+
+/** Seed an EMAIL_ENTRY exception whose case carries a stored attachment and the
+ *  given evidence anchors. Pending backend endpoint (see header). */
+async function seedAttachmentWithAnchors(
+  request: APIRequestContext,
+  token: string,
+  opts: { documentText: string; anchors: { text: string; label: string; supports_ref: string }[] },
+): Promise<string> {
+  const res = await request.post(
+    `${BACKEND_URL}/api/v1/_sandbox/seed/email-attachment-anchors`,
+    { headers: { Authorization: `Bearer ${token}` }, data: opts },
+  );
+  if (!res.ok()) throw new Error(`seed anchors: ${res.status()} ${await res.text()}`);
+  const body = (await res.json()) as { exception_id: string };
+  return body.exception_id;
+}
+
+async function openPreview(
+  request: APIRequestContext,
+  token: string,
+  page: import("@playwright/test").Page,
+  exceptionId: string,
+): Promise<void> {
+  await page.goto(await exceptionUrl(request, token, exceptionId));
+  await expandSection(page, /source email/i);
+  await page.getByRole("button", { name: /^preview/i }).first().click();
+  await expect(page.getByTestId("evidence-safety-bar")).toBeVisible({ timeout: 15_000 });
+}
+
+test.describe("ADR-043 — attachment preview & evidence highlighting", () => {
+  test.fixme("operator verifies a located evidence value in the document", async ({ page, request }) => {
+    // GIVEN a MANAGER and an EMAIL_ENTRY case whose PO appears once in the doc
+    const token = await backendToken(request, USERS.MANAGER);
+    await resetTenant(request, token);
+    const exId = await seedAttachmentWithAnchors(request, token, {
+      documentText: "Purchase Order PO-2026-0042 — ship to Atlanta DC",
+      anchors: [{ text: "PO-2026-0042", label: "PO number", supports_ref: "order_entry.po_number" }],
+    });
+    await loginAs(page, USERS.MANAGER);
+
+    // WHEN the operator opens the attachment preview
+    await openPreview(request, token, page, exId);
+
+    // THEN the anchor is shown LOCATED (status by icon + text, WCAG 1.4.1)
+    const row = page.locator('[data-testid="evidence-safety-bar"] li').first();
+    await expect(row).toHaveAttribute("data-status", "located");
+    await expect(row).toContainText("PO number");
+  });
+
+  test.fixme("a value absent from the document is shown UNLOCATED, never silently", async ({ page, request }) => {
+    // GIVEN an anchor whose text does not appear in the rendered document
+    const token = await backendToken(request, USERS.MANAGER);
+    await resetTenant(request, token);
+    const exId = await seedAttachmentWithAnchors(request, token, {
+      documentText: "A scanned page with no machine-readable PO number",
+      anchors: [{ text: "PO-2026-0042", label: "PO number", supports_ref: "order_entry.po_number" }],
+    });
+    await loginAs(page, USERS.MANAGER);
+
+    // WHEN the operator opens the preview
+    await openPreview(request, token, page, exId);
+
+    // THEN absence is shown as loudly as a hit (no silent missing highlight)
+    const row = page.locator('[data-testid="evidence-safety-bar"] li').first();
+    await expect(row).toHaveAttribute("data-status", "unlocated");
+    await expect(row).toContainText(/verify manually/i);
+  });
+
+  test.fixme("a repeated value is shown AMBIGUOUS (position approximate)", async ({ page, request }) => {
+    const token = await backendToken(request, USERS.MANAGER);
+    await resetTenant(request, token);
+    const exId = await seedAttachmentWithAnchors(request, token, {
+      documentText: "PO-2026-0042 header ... line item ref PO-2026-0042",
+      anchors: [{ text: "PO-2026-0042", label: "PO number", supports_ref: "order_entry.po_number" }],
+    });
+    await loginAs(page, USERS.MANAGER);
+
+    await openPreview(request, token, page, exId);
+
+    const row = page.locator('[data-testid="evidence-safety-bar"] li').first();
+    await expect(row).toHaveAttribute("data-status", "ambiguous");
+  });
+
+  test.fixme("the preview shows the non-dismissable 'highlight is not authorization' banner", async ({ page, request }) => {
+    const token = await backendToken(request, USERS.MANAGER);
+    await resetTenant(request, token);
+    const exId = await seedAttachmentWithAnchors(request, token, {
+      documentText: "Purchase Order PO-2026-0042",
+      anchors: [{ text: "PO-2026-0042", label: "PO number", supports_ref: "order_entry.po_number" }],
+    });
+    await loginAs(page, USERS.MANAGER);
+
+    await openPreview(request, token, page, exId);
+
+    // THEN the disclaimer is present and has no dismiss control
+    const banner = page.getByTestId("highlight-disclaimer");
+    await expect(banner).toBeVisible();
+    await expect(banner.getByRole("button")).toHaveCount(0);
+  });
+});
