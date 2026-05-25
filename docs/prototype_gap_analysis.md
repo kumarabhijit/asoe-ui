@@ -341,14 +341,14 @@ The prototype mailbox detail has **9 sub-tabs** (context-dependent):
 | Tab | Description | asoe-ui Status |
 |-----|-------------|----------------|
 | `email` | Email body with metadata header | Built (basic) |
-| `order-entry` | AI Order Extraction form with pallet validation | **Not built** |
+| `order-entry` | AI Order Extraction form with pallet validation | **Built** (ADR-042 Phase 3 — `OrderEntrySection`, data-presence on `order_entry_extraction`) |
 | `ai-analysis` | Agent analysis card with confidence | Built (basic) |
-| `entities` | Extracted entities | Placeholder ("coming soon") |
-| `sap` | SAP data lookup | Placeholder ("coming soon") |
-| `edi-850` | Full EDI 850 viewer (Raw/Decoded/Segment Map) | **Not built** |
-| `change-request` | Order change constraint evaluation (10 checks) | **Not built** |
-| `constraint-graph` | Palantir-style SVG constraint graph | **Not built** |
-| `knowledge-graph` | Entity relationship KG | Placeholder ("coming soon") |
+| `entities` | Extracted entities | **Built** (ADR-042 Phase 2 — `EntitiesSection`, on `entities_analysis`) |
+| `sap` | SAP data lookup | **Built** (ADR-042 Phase 2 — `SapDataSection`, on `sap_data_analysis`) |
+| `edi-850` | Full EDI 850 viewer (Raw/Decoded/Segment Map) | **Built** (ADR-042 Phase 5 — `Edi850Section`, three sub-views) |
+| `change-request` | Order change constraint evaluation (10 checks) | **Built** (ADR-042 Phase 6 — `ChangeAnalysisSection`, variable-cardinality constraints/scenarios/decision) |
+| `constraint-graph` | Palantir-style SVG constraint graph | **Deferred** (ADR-042 §2.1/§5b — reuse `get_pipeline_topology` + `/exceptions/{id}/trace`; the Change Analysis section already renders the constraint data) |
+| `knowledge-graph` | Entity relationship KG | **Built** (ADR-042 Phase 7 — `KnowledgeGraphSection`, radial SVG + accessible relationships list) |
 
 ### 4.4 Order Change Workflow (Major Gap)
 
@@ -380,7 +380,7 @@ evaluated by 7 AI agents:
 - Scenario Simulation (3 options with recommended badge)
 - Decision Panel with confidence %, SAP actions, financial summary, Approve/Edit/Reject buttons
 
-**asoe-ui status**: **Entirely missing**. This is one of the largest implementation gaps.
+**asoe-ui status**: **Built** (ADR-042 Phase 6). `ChangeAnalysisSection` (data-presence on `analysis.change_analysis`) renders the constraint evaluation, scenarios, and a Layer-1 decision panel. Backend-authoritative + deterministic: the recipe-homed `recipes/ChangeAnalysisRecipe.py` (NOT `constraints/`) evaluates the catalogue and the composer projects it. **Variable cardinality** (N constraints / M scenarios — not the prototype's fixed 10/7); the lifecycle bar + from→to change grid + per-constraint cards (PASS/CONDITIONAL/WARNING) + recommended-scenario badge + cosign gate are all present. Agent orchestration *timings* were intentionally dropped (cosmetic, not audit-bearing — ADR-042 §6).
 
 ### 4.5 EDI 850 Viewer (Major Gap)
 
@@ -397,7 +397,7 @@ The prototype includes a full **ANSI X12 5010 EDI 850 Purchase Order** viewer:
 - `MASTER_CUSTOMERS`: 2 customers (Walmart, Kroger) with EDI IDs, vendor numbers
 - `EDI_SEG_META`: Color-coded metadata for 18 segment types
 
-**asoe-ui status**: **Not built**.
+**asoe-ui status**: **Built** (ADR-042 Phase 5). `Edi850Section` (data-presence on `analysis.edi_850_audit`) renders all three sub-views: Decoded (envelope / PO header / parties / line items / CTT totals), Raw X12 (group-coloured segment dump + copy-to-clipboard), and Segment Map (segment → decoded meaning). The document is built **deterministically server-side** by `asoe2/gateways/edi850.py::build_edi_850` (a pure port of the client `buildEDI850`; control numbers derive from `order_id`, never a clock), surfaced as the `Edi850Document` contract — the UI is a dumb projector. (ACK 997/855/856 tracking is not modelled; the rest is covered.)
 
 ### 4.6 AI Order Extraction (Major Gap)
 
@@ -415,7 +415,7 @@ The prototype can extract structured orders from email attachments:
 - **Pallet Validation Widget** per line: uses `palletLineCalc()` for layer/pallet alignment, shows round-down/round-up suggestions
 - **Send to ERP footer**: Format selector (SAP BAPI CREATEFROMDAT2 or EDI 850), Send button
 
-**asoe-ui status**: **Not built**.
+**asoe-ui status**: **Built (read/review path)** (ADR-042 Phase 3). `OrderEntrySection` (data-presence on `analysis.order_entry_extraction`) renders the extracted Order Header, Customer (BP#/name + MDM-match), and per-line items with validation flags. Extraction is a server-side constrained-generation **gateway** (`asoe2/gateways/extraction.py`), reviewed before submit. The **ERP submit** is a Shadow-gated disposition (SUBMIT_TO_ERP) with four-eyes cosign >$10k (from the SAP re-price), not an in-form button; operator corrections ride the disposition into the hash-chained audit trail. Per ADR Guardrail #6 the form is a dumb projector — inline per-field correction/retraining capture (`logOrderCorrection`) and the pallet-validation widget remain prototype-only.
 
 ### 4.7 AI Intake Pipeline Sub-View
 
@@ -435,7 +435,7 @@ A modal to inject test email scenarios for development/demo:
 - Each shows icon, label, customer, SO number, "Order Change" tag
 - Triggers the full AI workflow (classify → constraint check → route → resolve)
 
-**asoe-ui status**: **Not built**.
+**asoe-ui status**: **Backend injector built; UI modal deferred** (ADR-042 Phase 4). The sandbox injector `POST /api/v1/_sandbox/seed/manual-order-intake` pushes a synthetic order through the **real** pipeline (env-gated to sandbox; isolation sentinel in `asoe2/tests/test_sandbox_inbound_isolation.py`). The four prototype change scenarios are exercised instead through mock-mode cases (exc-040..043: qty reduction / expedite / cancellation / SKU substitution). The dev-only modal is deferred as low value since the backend capability already exists.
 
 ---
 
@@ -695,7 +695,7 @@ Interactive entity-relationship diagrams rendered inline via SVG:
 - Hover scale animation
 - Node detail tooltip strip showing SAP table references
 
-**asoe-ui status**: **Not built**. Requires a reusable `KnowledgeGraph` component.
+**asoe-ui status**: **Built (Customer-Inbox KG)** (ADR-042 Phase 7). `KnowledgeGraphSection` (data-presence on `analysis.knowledge_graph`) renders a deterministic radial SVG (root order centred, ring-placed kind-coloured nodes, edges) **plus an accessible relationships list** so the graph isn't conveyed by the diagram alone (WCAG 1.4.1). The graph is a server-side **derived projection** over the case entities (`asoe2/gateways/knowledge_graph.py::build_knowledge_graph` → `KnowledgeGraphPayload`) — the `buildMailboxKGConfig` analog. The exception-type (`buildExcKGConfig`) and quota (`buildQuotaKGConfig`) graphs remain prototype-only; click-to-select interaction is not implemented.
 
 ### 6.6 Constraint Graph (Palantir-Style SVG)
 
@@ -708,7 +708,7 @@ A specialized large-scale SVG visualization for order change constraint evaluati
 - Summary header with pass/conditional/warning count chips
 - Live data enrichment from uploaded SAP data
 
-**asoe-ui status**: **Not built**.
+**asoe-ui status**: **Deferred by design** (ADR-042 §2.1/§5b). The dedicated SVG constraint graph is intentionally **not** built: the ADR directs reuse of `get_pipeline_topology` + `/exceptions/{id}/trace` (ADR-027) rather than a new surface, and judged it largely duplicative of the existing trace + the Phase-6 `ChangeAnalysisSection` (which already renders the same constraint evaluation, scenarios, and pass/conditional/warning chips). Revisit only on real demand.
 
 ### 6.7 Case Popout
 
@@ -955,8 +955,8 @@ interface UsageEvent {
 | `.dash-card` | Dashboard card with header/body | Not present | **Missing** |
 | `.oos-option` | Selectable resolution option card | Not present | **Missing** |
 | `.agent-table` | Styled data table | Not present | **Missing** |
-| `renderInlineKG` | SVG Knowledge Graph | Not present | **Missing** |
-| `renderConstraintGraph` | SVG Constraint Graph | Not present | **Missing** |
+| `renderInlineKG` | SVG Knowledge Graph | `KnowledgeGraphSection.tsx` | **Built** (ADR-042 Phase 7 — Customer-Inbox KG) |
+| `renderConstraintGraph` | SVG Constraint Graph | `ChangeAnalysisSection.tsx` (+ trace/topology) | **Deferred** (ADR-042 §5b — covered by Change Analysis section) |
 | `renderPricingWaterfall` | SAP Pricing Waterfall timeline | `PricingWaterfall.tsx` | **Built** |
 | Chat panel | Floating chat assistant | Not present | **Missing** |
 | Persona switcher | Dropdown persona selector | Not present | **Missing** |
