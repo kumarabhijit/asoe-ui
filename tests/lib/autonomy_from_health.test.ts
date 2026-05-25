@@ -31,12 +31,13 @@ describe("autonomyLevelsByRank", () => {
 });
 
 describe("autonomyLevelLabel", () => {
-  it("sources the label from health when present", () => {
-    expect(autonomyLevelLabel("L1", health)).toBe("L1 — Auto — no human review");
+  it("leads with the health label, keeps the code as a parenthetical (issue #133 PO #15)", () => {
+    expect(autonomyLevelLabel("L1", health)).toBe("Auto — no human review (L1)");
   });
 
   it("falls back to the transition map when health is absent", () => {
-    expect(autonomyLevelLabel("L1")).toContain("L1 — ");
+    // Label leads; the raw L-code is retained (audit-bearing) but de-emphasised.
+    expect(autonomyLevelLabel("L1")).toBe("Auto — no human review (L1)");
   });
 
   it("handles empty and unknown levels", () => {

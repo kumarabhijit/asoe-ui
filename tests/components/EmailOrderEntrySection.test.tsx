@@ -62,10 +62,9 @@ describe("EmailOrderEntrySection", () => {
           }}
         />,
       );
-      // Issue #133 (PO #15): "One-click approve" now appears in both
-      // the classification badge AND the autonomy footer caption
-      // ("L3 — One-click approve — operator confirms"). The assertion
-      // is satisfied as long as the phrase renders at least once.
+      // Issue #133 (PO #15): "One-click approve" renders as the
+      // classification badge label. The assertion is satisfied as long as
+      // the phrase renders at least once.
       expect(screen.getAllByText(/One-click approve/i).length).toBeGreaterThan(0);
     });
 
@@ -282,11 +281,10 @@ describe("EmailOrderEntrySection", () => {
     it("renders the autonomy_level under the autonomy footer", () => {
       render(<EmailOrderEntrySection data={base} />);
       expect(screen.getByText(/Autonomy/i)).toBeInTheDocument();
-      // Issue #133 (PO #15) — bare "L2" was opaque; the autonomy
-      // footer now prefixes the level with a plain-language caption
-      // via `autonomyLevelLabel()`. The level code remains visible
-      // (start of the string) so power users still parse it.
-      expect(screen.getByText(/^L2\b/)).toBeInTheDocument();
+      // Issue #133 (PO #15) — bare "L2" was opaque; the autonomy footer now
+      // LEADS with the plain-language caption via `autonomyLevelLabel()`,
+      // keeping the level code as a de-emphasised parenthetical (audit-bearing).
+      expect(screen.getByText(/Execute & notify \(L2\)/)).toBeInTheDocument();
     });
 
     it("renders notification_template when present", () => {

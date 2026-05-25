@@ -59,6 +59,18 @@ describe("EdiMismatchSection", () => {
     });
   });
 
+  describe("autonomy footer (issue #133 PO #15)", () => {
+    it("leads with the plain-language label, de-emphasising the raw L-code", () => {
+      // No health provider in the test → transition-map fallback (v2 labels).
+      render(<EdiMismatchSection data={{ ...base, autonomy_level: "L3" }} />);
+      expect(
+        screen.getByText(/Prepare & await approval \(L3\)/),
+      ).toBeInTheDocument();
+      // The bare code must never be the whole rendered value any more.
+      expect(screen.queryByText("L3")).not.toBeInTheDocument();
+    });
+  });
+
   describe("classification badge", () => {
     it("HARD_REJECT renders 'Hard reject'", () => {
       render(<EdiMismatchSection data={{ ...base, classification: "HARD_REJECT" }} />);

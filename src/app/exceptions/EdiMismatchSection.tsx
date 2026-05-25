@@ -17,6 +17,8 @@
 import { AlertTriangle, ArrowRight, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
+import { autonomyLevelLabel } from "@/lib/cases";
+import { useHealth } from "@/hooks/useHealth";
 import type { EdiMismatchAnalysisData, EdiMismatchClassification } from "@/types/exceptions";
 
 interface EdiMismatchSectionProps {
@@ -54,6 +56,8 @@ function stringifyUnknown(value: unknown): string {
 }
 
 export function EdiMismatchSection({ data }: EdiMismatchSectionProps) {
+  // Autonomy labels come from health (Guardrail #1), not a hardcoded map.
+  const { health } = useHealth();
   // Forward-compatibility fallback (CLAUDE.md Guardrail #1). If asoe2
   // ships a new EdiMismatchClassification literal (e.g. WARN), the
   // UI keeps rendering the record with a neutral badge rather than
@@ -123,11 +127,12 @@ export function EdiMismatchSection({ data }: EdiMismatchSectionProps) {
         </EvidenceBlock>
       </div>
 
-      {/* Autonomy footer */}
+      {/* Autonomy footer — lead with the plain-language label, not the bare
+          L-code (issue #133 PO #15); the tier stays as a parenthetical. */}
       <div className="flex items-center gap-8 px-12 py-8 bg-surface-secondary rounded-sm text-caption">
         <Clock size={12} className="text-text-tertiary" />
         <span className="text-text-tertiary font-semibold">Autonomy:</span>
-        <span className="text-text-secondary">{data.autonomy_level}</span>
+        <span className="text-text-secondary">{autonomyLevelLabel(data.autonomy_level, health)}</span>
       </div>
     </section>
   );

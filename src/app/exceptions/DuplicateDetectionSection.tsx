@@ -14,6 +14,8 @@ import { Copy, ArrowRight, Shield, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { fmtPrice } from "./shared";
+import { autonomyLevelLabel } from "@/lib/cases";
+import { useHealth } from "@/hooks/useHealth";
 import type { DuplicateDetectionData, OrderSnapshot } from "@/types/exceptions";
 
 interface DuplicateDetectionSectionProps {
@@ -32,6 +34,8 @@ interface DuplicateDetectionSectionProps {
  */
 
 export function DuplicateDetectionSection({ data }: DuplicateDetectionSectionProps) {
+  // Autonomy labels come from health (Guardrail #1), not a hardcoded map.
+  const { health } = useHealth();
   return (
     <section className="bg-surface-primary rounded-md shadow-sm p-16">
       {/* Section header */}
@@ -94,13 +98,14 @@ export function DuplicateDetectionSection({ data }: DuplicateDetectionSectionPro
         )}
       </EvidenceBlock>
 
-      {/* Autonomy level (audit-bearing) */}
+      {/* Autonomy level (audit-bearing) — lead with the plain-language label,
+          not the bare L-code (issue #133 PO #15); tier kept as a parenthetical. */}
       <EvidenceBlock tier="audit-bearing" value={data.autonomy_applied}>
         {(autonomy) => (
           <div className="flex items-center gap-8 px-12 py-8 bg-surface-secondary rounded-sm text-caption">
             <Clock size={12} className="text-text-tertiary" />
             <span className="text-text-tertiary font-semibold">Autonomy:</span>
-            <span className="text-text-secondary">{String(autonomy)}</span>
+            <span className="text-text-secondary">{autonomyLevelLabel(String(autonomy), health)}</span>
           </div>
         )}
       </EvidenceBlock>

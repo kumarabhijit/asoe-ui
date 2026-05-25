@@ -131,12 +131,13 @@ export function sourceChannelLabel(channel: string | null | undefined): string {
 // vocabulary — labels AND ordering — now comes from
 // `health.allowed_autonomy_levels` (rank-sorted), so the UI never hardcodes
 // the ladder (Guardrail #1). This map survives only for the window before a
-// caller has a health payload.
+// caller has a health payload. Values mirror the backend v2 vocabulary
+// (asoe2 contracts/autonomy.py): L1 = most autonomous … L4 = human.
 const AUTONOMY_LEVEL_DESCRIPTIONS: Readonly<Record<string, string>> = {
-  L1: "Block automatically — operator decides",
-  L2: "Recommend — operator approves",
-  L3: "One-click approve — operator confirms",
-  L4: "Fully automated — audit only",
+  L1: "Auto — no human review",
+  L2: "Execute & notify",
+  L3: "Prepare & await approval",
+  L4: "Escalate to human",
 };
 
 type HealthAutonomy = Pick<HealthResponse, "allowed_autonomy_levels"> | null | undefined;
@@ -154,10 +155,13 @@ export function autonomyLevelsByRank(health: HealthAutonomy): AutonomyLevelInfo[
 }
 
 /**
- * Plain-language label for an autonomy level. Prefers the backend-served
- * label from `health.allowed_autonomy_levels` (Guardrail #1); falls back to
- * the transition map when no health payload is supplied, and finally to the
- * bare code so the UI never crashes on an unknown level.
+ * Plain-language label for an autonomy level. Leads with the human-readable
+ * description (sourced from `health.allowed_autonomy_levels`, Guardrail #1;
+ * transition-map fallback when no health payload), keeping the raw L-code as a
+ * de-emphasised parenthetical — operators read the meaning, not the code
+ * (issue #133 PO #15), but the tier stays visible because it is audit-bearing
+ * (SOX narratives cite L-tiers). Unknown levels fall back to the bare code so
+ * the UI never crashes.
  */
 export function autonomyLevelLabel(
   level: string | null | undefined,
@@ -167,9 +171,8 @@ export function autonomyLevelLabel(
   const fromHealth = health?.allowed_autonomy_levels?.find(
     (l) => l.level === level,
   )?.label;
-  if (fromHealth) return `${level} — ${fromHealth}`;
-  const desc = AUTONOMY_LEVEL_DESCRIPTIONS[level];
-  return desc ? `${level} — ${desc}` : level;
+  const label = fromHealth ?? AUTONOMY_LEVEL_DESCRIPTIONS[level];
+  return label ? `${label} (${level})` : level;
 }
 
 /**
