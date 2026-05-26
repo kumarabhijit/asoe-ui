@@ -8,16 +8,10 @@
  * attachment (PO_8842.pdf) and the same entity-derived anchors an operator sees
  * in mock mode — so the journeys exercise the canonical example end-to-end.
  *
- * STATUS: test.fixme (pending, not yet executed). Two dependencies are required
- * before these can run green:
- *   1. Playwright browser binaries + the uvicorn/next webServer (CI provisions
- *      these; not available in the authoring container).
- *   2. A sandbox seed endpoint that attaches a stored attachment + projected
- *      EvidenceAnchors to a seeded EMAIL_ENTRY case
- *      (`POST /api/v1/_sandbox/seed/email-attachment-anchors`) — a CP-D backend
- *      follow-up. Until it lands these journeys cannot seed their precondition.
- *
- * Remove `.fixme` when the seed endpoint + CI browsers are in place.
+ * These run against the live sandbox backend (uvicorn webServer) and the
+ * `POST /api/v1/_sandbox/seed/email-attachment-anchors` seed endpoint, which
+ * attaches a stored attachment + projected EvidenceAnchors to a seeded
+ * EMAIL_ENTRY case. Real PDF.js render + the safety-bar verifier are exercised.
  */
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import { loginAs, backendToken, resetTenant, exceptionUrl, expandSection, USERS } from "./_helpers";
@@ -57,7 +51,18 @@ async function seedAttachmentWithAnchors(
 ): Promise<string> {
   const res = await request.post(
     `${BACKEND_URL}/api/v1/_sandbox/seed/email-attachment-anchors`,
-    { headers: { Authorization: `Bearer ${token}` }, data: opts },
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      // Backend request body is snake_case (extra="forbid") — see
+      // docs/specs/sandbox-attachment-anchor-seed.md. anchors[] is already
+      // snake_case (text/label/supports_ref).
+      data: {
+        document_text: opts.documentText,
+        attachment_name: opts.attachmentName,
+        attachment_mime: opts.attachmentMime,
+        anchors: opts.anchors,
+      },
+    },
   );
   if (!res.ok()) throw new Error(`seed anchors: ${res.status()} ${await res.text()}`);
   const body = (await res.json()) as { exception_id: string };
@@ -85,7 +90,7 @@ function poRow(page: import("@playwright/test").Page) {
 }
 
 test.describe("ADR-043 — attachment preview & evidence highlighting", () => {
-  test.fixme("operator verifies a located evidence value in the document", async ({ page, request }) => {
+  test("operator verifies a located evidence value in the document", async ({ page, request }) => {
     // GIVEN a MANAGER and an EMAIL_ENTRY case whose PO appears once in the doc
     const token = await backendToken(request, USERS.MANAGER);
     await resetTenant(request, token);
@@ -107,7 +112,7 @@ test.describe("ADR-043 — attachment preview & evidence highlighting", () => {
     await expect(row).toContainText(SE_EXAMPLE.poText);
   });
 
-  test.fixme("a value absent from the document is shown UNLOCATED, never silently", async ({ page, request }) => {
+  test("a value absent from the document is shown UNLOCATED, never silently", async ({ page, request }) => {
     // GIVEN the PO anchor whose text does not appear in the rendered (scanned) doc
     const token = await backendToken(request, USERS.MANAGER);
     await resetTenant(request, token);
@@ -128,7 +133,7 @@ test.describe("ADR-043 — attachment preview & evidence highlighting", () => {
     await expect(row).toContainText(/verify manually/i);
   });
 
-  test.fixme("a repeated value is shown AMBIGUOUS (position approximate)", async ({ page, request }) => {
+  test("a repeated value is shown AMBIGUOUS (position approximate)", async ({ page, request }) => {
     const token = await backendToken(request, USERS.MANAGER);
     await resetTenant(request, token);
     const exId = await seedAttachmentWithAnchors(request, token, {
@@ -144,7 +149,7 @@ test.describe("ADR-043 — attachment preview & evidence highlighting", () => {
     await expect(poRow(page)).toHaveAttribute("data-status", "ambiguous");
   });
 
-  test.fixme("the preview shows the non-dismissable 'highlight is not authorization' banner", async ({ page, request }) => {
+  test("the preview shows the non-dismissable 'highlight is not authorization' banner", async ({ page, request }) => {
     const token = await backendToken(request, USERS.MANAGER);
     await resetTenant(request, token);
     const exId = await seedAttachmentWithAnchors(request, token, {

@@ -131,6 +131,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/_sandbox/seed/email-attachment-anchors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Seed Email Attachment Anchors
+         * @description Seed an EMAIL_ENTRY case with a stored attachment whose bytes contain
+         *     ``document_text`` and projected text-derived EvidenceAnchors, so the
+         *     composer (`adapt_email_source` → `build_evidence_anchors`) emits located
+         *     anchors with no new business logic (ADR-043 P1.1).
+         */
+        post: operations["seed_email_attachment_anchors_api_v1__sandbox_seed_email_attachment_anchors_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/_sandbox/seed/financial-impact": {
         parameters: {
             query?: never;
@@ -231,6 +254,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attachments/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Attachment By Token
+         * @description Stream attachment bytes for a valid scoped read token (ADR-044 §2.2).
+         *
+         *     No Authorization header: the signed, expiring token is the capability. It is
+         *     bound to a single (tenant, case, attachment) tuple, so it cannot read across
+         *     tenants/cases, and is rejected once expired.
+         */
+        get: operations["read_attachment_by_token_api_v1_attachments_read_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cases": {
         parameters: {
             query?: never;
@@ -276,6 +323,28 @@ export interface paths {
         get: operations["download_attachment_api_v1_cases__case_id__attachments__attachment_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cases/{case_id}/attachments/{attachment_id}/signed-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Signed Read Url
+         * @description Mint a short-TTL, scoped capability URL for an attachment's bytes
+         *     (ADR-044 §2.2). RBAC + tenant + case-scoped at mint time; the returned URL
+         *     needs no auth header (the signed token is the capability) and expires.
+         */
+        post: operations["create_signed_read_url_api_v1_cases__case_id__attachments__attachment_id__signed_url_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -976,6 +1045,15 @@ export interface components {
             /** Root Cause */
             root_cause?: string | null;
             sap_data_analysis?: components["schemas"]["SapDataAnalysisData"] | null;
+        };
+        /** AnchorSpec */
+        AnchorSpec: {
+            /** Label */
+            label: string;
+            /** Supports Ref */
+            supports_ref: string;
+            /** Text */
+            text: string;
         };
         /**
          * AsyncResolveResponse
@@ -2120,6 +2198,8 @@ export interface components {
             match_key: components["schemas"]["MatchKey"];
             /** Page */
             page?: number | null;
+            /** Rendition Hash */
+            rendition_hash?: string | null;
             /** Source Sha256 */
             source_sha256: string;
             /**
@@ -3422,6 +3502,21 @@ export interface components {
              */
             name: string;
         };
+        /** SeedEmailAttachmentAnchorsRequest */
+        SeedEmailAttachmentAnchorsRequest: {
+            /** Anchors */
+            anchors: components["schemas"]["AnchorSpec"][];
+            /** Attachment Mime */
+            attachment_mime: string;
+            /** Attachment Name */
+            attachment_name: string;
+            /** Document Text */
+            document_text: string;
+            /** From Address */
+            from_address?: string | null;
+            /** Subject */
+            subject?: string | null;
+        };
         /** SeedFinancialImpactRequest */
         SeedFinancialImpactRequest: {
             /** Exception Id */
@@ -3979,6 +4074,43 @@ export interface operations {
             };
         };
     };
+    seed_email_attachment_anchors_api_v1__sandbox_seed_email_attachment_anchors_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeedEmailAttachmentAnchorsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     seed_financial_impact_api_v1__sandbox_seed_financial_impact_post: {
         parameters: {
             query?: never;
@@ -4121,6 +4253,37 @@ export interface operations {
             };
         };
     };
+    read_attachment_by_token_api_v1_attachments_read_get: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_cases_api_v1_cases_get: {
         parameters: {
             query?: {
@@ -4224,6 +4387,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_signed_read_url_api_v1_cases__case_id__attachments__attachment_id__signed_url_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                case_id: string;
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

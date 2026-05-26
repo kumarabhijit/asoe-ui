@@ -123,17 +123,25 @@ export default function ExceptionDetailPanel({
   // decision. Both reset when the operator switches to a different case.
   const detailOpenedAtRef = useRef<number>(Date.now());
   const layer2OpenedRef = useRef<boolean>(false);
+  // ADR-043 §2.7 — whether an in-document evidence highlight was shown for this
+  // decision (decision-quality cohort).
+  const highlightShownRef = useRef<boolean>(false);
   useEffect(() => {
     detailOpenedAtRef.current = Date.now();
     layer2OpenedRef.current = false;
+    highlightShownRef.current = false;
   }, [exceptionId]);
   const markLayer2Opened = useCallback(() => {
     layer2OpenedRef.current = true;
+  }, []);
+  const markHighlightShown = useCallback(() => {
+    highlightShownRef.current = true;
   }, []);
   const reportingOnActionComplete = useCallback(() => {
     void exceptionsApi.reportReviewerActivity({
       dwell_ms: Date.now() - detailOpenedAtRef.current,
       layer2_opened: layer2OpenedRef.current,
+      highlight_shown: highlightShownRef.current,
     });
     onActionComplete?.();
   }, [onActionComplete]);
@@ -728,6 +736,7 @@ export default function ExceptionDetailPanel({
               <EmailSourceSection
                 data={analysis.email_source}
                 caseId={detail.parent_case_id ?? undefined}
+                onHighlightShown={markHighlightShown}
               />
             </CollapsibleSection>
           )}

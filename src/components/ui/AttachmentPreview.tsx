@@ -36,7 +36,11 @@ import { attachmentsApi } from "@/lib/api";
 import { AttachmentDownloadButton } from "@/components/ui/AttachmentDownloadButton";
 import { detectPreviewFormat, type PreviewFormat } from "@/lib/previewFormat";
 import { resolveAnchorStatus, type AnchorStatus } from "@/lib/evidenceAnchor";
+import { spatialOverlays } from "@/lib/spatialOverlay";
 import type { EmailAttachmentManifestEntry, EvidenceAnchor } from "@/types/exceptions";
+
+// PDF.js Phase-1 renders page 1 only; spatial overlays are drawn for that page.
+const PREVIEW_PAGE = 1;
 
 interface AttachmentPreviewProps {
   /** Threaded explicitly from ExceptionDetailPanel (provenance must be visible
@@ -44,6 +48,10 @@ interface AttachmentPreviewProps {
   caseId: string;
   attachment: EmailAttachmentManifestEntry;
   anchors: EvidenceAnchor[];
+  /** Decision-quality telemetry (ADR-043 §2.7) — fired once when the operator
+   *  is shown an evidence-highlight safety bar, so scrutiny can be compared
+   *  with vs without highlighting. Best-effort; never blocks render. */
+  onHighlightShown?: () => void;
 }
 
 type LoadState = "loading" | "ready" | "error";
@@ -97,7 +105,7 @@ async function renderPdfAndExtractText(
   }
 }
 
-export function AttachmentPreview({ caseId, attachment, anchors }: AttachmentPreviewProps) {
+export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShown }: AttachmentPreviewProps) {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [format, setFormat] = useState<PreviewFormat | null | undefined>(undefined);
   const [docText, setDocText] = useState<string | null>(null);
@@ -164,6 +172,16 @@ export function AttachmentPreview({ caseId, attachment, anchors }: AttachmentPre
       if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
   }, [caseId, attachmentId]);
+
+  // Decision-quality cohort (ADR-043 §2.7): record that a highlight safety bar
+  // was actually presented to the operator for this case.
+  const highlightReportedRef = useRef(false);
+  useEffect(() => {
+    if (anchors.length > 0 && loadState === "ready" && !highlightReportedRef.current) {
+      highlightReportedRef.current = true;
+      onHighlightShown?.();
+    }
+  }, [anchors.length, loadState, onHighlightShown]);
 
   return (
     <section
@@ -233,7 +251,29 @@ export function AttachmentPreview({ caseId, attachment, anchors }: AttachmentPre
         )}
 
         {loadState === "ready" && format === "pdf" && (
-          <canvas ref={canvasRef} aria-label={`PDF preview of ${attachment.name}`} className="max-w-full" />
+          <div className="relative inline-block max-w-full" data-testid="pdf-canvas-layer">
+            <canvas ref={canvasRef} aria-label={`PDF preview of ${attachment.name}`} className="max-w-full" />
+            {/* Spatial bbox overlays (ADR-045) — best-effort, drawn only for
+                VERIFIED spatial anchors on this page. The safety bar above stays
+                the authoritative surface; a degraded/text anchor has no box. */}
+            {spatialOverlays(anchors, PREVIEW_PAGE).map((o) => (
+              <div
+                key={o.supportsRef}
+                data-testid="spatial-overlay"
+                data-supports-ref={o.supportsRef}
+                aria-hidden
+                className="absolute pointer-events-none rounded-sm"
+                style={{
+                  left: `${o.leftPct}%`,
+                  top: `${o.topPct}%`,
+                  width: `${o.widthPct}%`,
+                  height: `${o.heightPct}%`,
+                  border: "2px solid var(--color-brand)",
+                  background: "var(--color-brand-subtle, rgba(90,75,214,0.12))",
+                }}
+              />
+            ))}
+          </div>
         )}
 
         {loadState === "ready" && format === "image" && objectUrl && (

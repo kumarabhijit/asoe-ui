@@ -91,6 +91,35 @@ describe("AttachmentPreview", () => {
     });
   });
 
+  it("draws a spatial bbox overlay on the PDF canvas for a verified spatial anchor", async () => {
+    // A %PDF blob selects the pdf renderer; PDF.js fails gracefully in jsdom
+    // (no worker) but the canvas layer + overlays still render from the
+    // backend-authoritative anchor geometry (ADR-045 P2.10).
+    getBlob.mockResolvedValue(new Blob(["%PDF-1.4\nmock"], { type: "application/pdf" }));
+    const spatial: EvidenceAnchor = {
+      ...poAnchor(),
+      anchor_source: "spatial_extracted",
+      page: 1,
+      bbox: [0.1, 0.2, 0.5, 0.3],
+      confidence: 0.97,
+      rendition_hash: "rh-1",
+    };
+    render(<AttachmentPreview caseId="case-1" attachment={attachment()} anchors={[spatial]} />);
+    const overlay = await screen.findByTestId("spatial-overlay");
+    expect(overlay).toHaveAttribute("data-supports-ref", "order_entry.po_number");
+    expect(overlay.style.left).toBe("10%");
+    expect(overlay.style.width).toBe("40%");
+    // The safety bar stays the authoritative surface alongside the overlay.
+    expect(screen.getByTestId("evidence-safety-bar")).toBeInTheDocument();
+  });
+
+  it("draws no overlay for a text-derived anchor (safety bar only)", async () => {
+    getBlob.mockResolvedValue(new Blob(["%PDF-1.4\nmock"], { type: "application/pdf" }));
+    render(<AttachmentPreview caseId="case-1" attachment={attachment()} anchors={[poAnchor()]} />);
+    await screen.findByTestId("pdf-canvas-layer");
+    expect(screen.queryByTestId("spatial-overlay")).toBeNull();
+  });
+
   it("default-denies SVG (does not render the markup) and offers download", async () => {
     getBlob.mockResolvedValue(
       new Blob(["<svg xmlns='x'><script>window.__pwned=1</script></svg>"], { type: "image/svg+xml" }),
