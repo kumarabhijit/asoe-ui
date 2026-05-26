@@ -129,4 +129,38 @@ export const MOCK_LINE_ITEMS: Record<string, LineItem[]> = {
     { line_id: "L1", sku: "SKU-KR-1100", description: "Kombucha Variety 6pk", uom: "CS", quantity: 50, erp_price: 28.00, po_price: 28.00, root_cause: "CARRIER_DELAY" },
     { line_id: "L2", sku: "SKU-KR-1110", description: "Ginger Kombucha 6pk", uom: "CS", quantity: 20, erp_price: 28.00, po_price: 28.00, root_cause: "CARRIER_DELAY" },
   ],
+
+  // ── ADR-042 Customer Inbox — change-request / inquiry / complaint / happy
+  // path lines so the "Evidence Detail" pane (EvidenceGrid.tsx) is populated
+  // for every MANUAL_ORDER_INTAKE case, not just the canonical EML-PO-2026-0042.
+  // Each row mirrors the order context already in INBOX_SECTION_BUNDLES so the
+  // line table and the order-entry / KG tabs reconcile.
+  "exc-040": [
+    { line_id: "L1", sku: "BEV-COLA-12PK", description: "Cola 12-pack case (reduce 600 → 420)", uom: "CS", quantity: 600, erp_price: 8.64, po_price: 8.64, root_cause: "CHANGE_QTY_REDUCTION" },
+    { line_id: "L2", sku: "BEV-LEMON-6PK", description: "Lemon 6-pack case", uom: "CS", quantity: 240, erp_price: 7.20, po_price: 7.20 },
+  ],
+  "exc-041": [
+    { line_id: "L1", sku: "BEV-COLA-12PK", description: "Cola 12-pack case (expedite 05/24 → 05/20)", uom: "CS", quantity: 600, erp_price: 8.64, po_price: 8.64, root_cause: "CHANGE_EXPEDITE" },
+    { line_id: "L2", sku: "BEV-LEMON-6PK", description: "Lemon 6-pack case", uom: "CS", quantity: 240, erp_price: 7.20, po_price: 7.20 },
+  ],
+  "exc-042": [
+    { line_id: "L1", sku: "BEV-COLA-12PK", description: "Cola 12-pack case (cancellation requested — picked)", uom: "CS", quantity: 4_800, erp_price: 8.64, po_price: 8.64, root_cause: "CHANGE_CANCELLATION" },
+    { line_id: "L2", sku: "BEV-SPRT-20OZ", description: "Sports Drink 20oz 12pk (cancellation requested — picked)", uom: "CS", quantity: 750, erp_price: 9.20, po_price: 9.20, root_cause: "CHANGE_CANCELLATION" },
+  ],
+  "exc-043": [
+    { line_id: "L1", sku: "BEV-COLA-12PK", description: "Cola 12-pack case", uom: "CS", quantity: 600, erp_price: 8.64, po_price: 8.64 },
+    { line_id: "L2", sku: "BEV-LEMON-6PK", description: "Lemon 6-pack (request: swap to 12-pack)", uom: "CS", quantity: 240, erp_price: 7.20, po_price: 7.20, root_cause: "CHANGE_SKU_SUBSTITUTION" },
+  ],
+  "exc-044": [
+    { line_id: "L1", sku: "BEV-COLA-12PK", description: "Cola 12-pack case (referenced order SO-5100012344, delivered)", uom: "CS", quantity: 480, erp_price: 8.64, po_price: 8.64, root_cause: "INQUIRY_REFERENCED_ORDER" },
+  ],
+  "exc-045": [
+    { line_id: "L1", sku: "BEV-COLA-12PK", description: "Cola 12-pack case (short shipment: received 380 of 480)", uom: "CS", quantity: 480, erp_price: 8.64, po_price: 8.64, root_cause: "COMPLAINT_SHORT_SHIPMENT" },
+  ],
+  "exc-046": [
+    { line_id: "L1", sku: "BEV-COLA-12PK", description: "Cola 12-pack case (EDI 850 — auto-confirmed)", uom: "CS", quantity: 480, erp_price: 8.64, po_price: 8.64 },
+  ],
+  // exc-047 (uncategorised email — not an order-desk matter): no line items
+  // by design; the Evidence Detail pane is structurally empty here because
+  // there is no order to evidence. The bundle's draft_reply makes that clear.
 };
