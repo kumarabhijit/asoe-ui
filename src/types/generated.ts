@@ -2198,6 +2198,8 @@ export interface components {
             match_key: components["schemas"]["MatchKey"];
             /** Page */
             page?: number | null;
+            /** Rendition Hash */
+            rendition_hash?: string | null;
             /** Source Sha256 */
             source_sha256: string;
             /**

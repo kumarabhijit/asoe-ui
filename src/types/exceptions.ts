@@ -752,6 +752,9 @@ export interface EvidenceAnchor {
   page?: number | null;
   bbox?: number[] | null;
   confidence?: number | null;
+  /** Frozen-rendition basis the geometry was computed against (ADR-044 §2.5);
+   *  spatial anchors only. Position provenance, never the audit unit. */
+  rendition_hash?: string | null;
 }
 
 /**
