@@ -278,6 +278,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attachments/{attachment_id}/erasure-certificate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Attachment Erasure Certificate
+         * @description Return the tombstone + audit-chain proof for an erased attachment.
+         *
+         *     The PII-free tombstone is fetched from the tenant's audit log (the
+         *     `ATTACHMENT_ERASED` event the erase routed there in PARITY-0.5).
+         *     Tenant-scoped: a tenant can never read another tenant's certificate.
+         *     404 when no erasure has been logged for the attachment id.
+         */
+        get: operations["attachment_erasure_certificate_api_v1_attachments__attachment_id__erasure_certificate_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cases": {
         parameters: {
             query?: never;
@@ -4271,6 +4296,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attachment_erasure_certificate_api_v1_attachments__attachment_id__erasure_certificate_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

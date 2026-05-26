@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Providers } from "./providers";
+import { PreprodIdentityBanner } from "@/components/ui/PreprodIdentityBanner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,7 +17,10 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body>
         <a href="#main-content" className="skip-to-main">Skip to main content</a>
-        <Providers>{children}</Providers>
+        <Providers>
+          <PreprodIdentityBanner />
+          {children}
+        </Providers>
       </body>
     </html>
   );

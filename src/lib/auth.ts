@@ -1,6 +1,27 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { authApi } from "./api";
+import { buildAzureADProvider } from "@/auth/azure-ad";
+
+/**
+ * ASOE_AUTH_MODE env contract — Decision Q1 + Q8.
+ *
+ *   "seed"  → CredentialsProvider against the asoe2 /auth/login seed users.
+ *             HS256, no Entra. Default for dev + Vercel mock previews.
+ *   "entra" → Azure AD OAuth code flow against the preprod App
+ *             Registration. Backend (PARITY-3b) JWKS-validates the
+ *             resulting token; UI continues to read `user.roles` unchanged.
+ *
+ * IMPORTANT: both providers are ALWAYS mounted in `authOptions.providers`.
+ * NextAuth freezes the provider list at process startup, so trying to
+ * flip the mount based on a runtime env read causes a silent route /
+ * callback mismatch. The env decides which provider is meaningfully
+ * usable at sign-in time; the mount itself is unconditional.
+ */
+const AUTH_MODE = (process.env.ASOE_AUTH_MODE ?? "seed").toLowerCase();
+
+export const ASOE_AUTH_MODE: "seed" | "entra" =
+  AUTH_MODE === "entra" ? "entra" : "seed";
 
 export const authOptions: NextAuthOptions = {
   pages: {
@@ -12,6 +33,7 @@ export const authOptions: NextAuthOptions = {
   },
   providers: [
     CredentialsProvider({
+      id: "credentials",
       name: "credentials",
       credentials: {
         email: { label: "Email", type: "email" },
@@ -47,9 +69,10 @@ export const authOptions: NextAuthOptions = {
         }
       },
     }),
+    buildAzureADProvider(),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
         const u = user as unknown as Record<string, unknown>;
         token.roles = u.roles;
@@ -60,6 +83,20 @@ export const authOptions: NextAuthOptions = {
         token.avatar_initials = u.avatar_initials;
         token.assigned_accounts = u.assigned_accounts;
         token.visible_tabs = u.visible_tabs;
+      }
+      // When Azure AD is the provider, NextAuth surfaces the IdP-issued
+      // access_token / id_token on `account` once at sign-in. Stash the
+      // id_token as the upstream access token so the api client keeps
+      // the same `Authorization: Bearer ...` contract — backend
+      // PARITY-3b will JWKS-validate it.
+      if (account?.provider === "azure-ad") {
+        const a = account as unknown as Record<string, unknown>;
+        if (typeof a.id_token === "string") {
+          token.accessToken = a.id_token;
+        }
+        token.authMode = "entra";
+      } else if (user) {
+        token.authMode = "seed";
       }
       return token;
     },
@@ -80,8 +117,9 @@ export const authOptions: NextAuthOptions = {
       // Authorization: Bearer header on outgoing fetch() calls. Without
       // this the api client sees no token, every authenticated call
       // goes unauthenticated, and asoe2 returns empty list / 404 detail.
-      (session as unknown as Record<string, unknown>).accessToken =
-        token.accessToken;
+      const s = session as unknown as Record<string, unknown>;
+      s.accessToken = token.accessToken;
+      s.authMode = token.authMode ?? "seed";
       return session;
     },
   },
