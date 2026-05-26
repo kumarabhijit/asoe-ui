@@ -254,6 +254,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attachments/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Attachment By Token
+         * @description Stream attachment bytes for a valid scoped read token (ADR-044 §2.2).
+         *
+         *     No Authorization header: the signed, expiring token is the capability. It is
+         *     bound to a single (tenant, case, attachment) tuple, so it cannot read across
+         *     tenants/cases, and is rejected once expired.
+         */
+        get: operations["read_attachment_by_token_api_v1_attachments_read_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cases": {
         parameters: {
             query?: never;
@@ -299,6 +323,28 @@ export interface paths {
         get: operations["download_attachment_api_v1_cases__case_id__attachments__attachment_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cases/{case_id}/attachments/{attachment_id}/signed-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Signed Read Url
+         * @description Mint a short-TTL, scoped capability URL for an attachment's bytes
+         *     (ADR-044 §2.2). RBAC + tenant + case-scoped at mint time; the returned URL
+         *     needs no auth header (the signed token is the capability) and expires.
+         */
+        post: operations["create_signed_read_url_api_v1_cases__case_id__attachments__attachment_id__signed_url_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4205,6 +4251,37 @@ export interface operations {
             };
         };
     };
+    read_attachment_by_token_api_v1_attachments_read_get: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_cases_api_v1_cases_get: {
         parameters: {
             query?: {
@@ -4308,6 +4385,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_signed_read_url_api_v1_cases__case_id__attachments__attachment_id__signed_url_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                case_id: string;
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
