@@ -131,6 +131,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/_sandbox/seed/email-attachment-anchors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Seed Email Attachment Anchors
+         * @description Seed an EMAIL_ENTRY case with a stored attachment whose bytes contain
+         *     ``document_text`` and projected text-derived EvidenceAnchors, so the
+         *     composer (`adapt_email_source` → `build_evidence_anchors`) emits located
+         *     anchors with no new business logic (ADR-043 P1.1).
+         */
+        post: operations["seed_email_attachment_anchors_api_v1__sandbox_seed_email_attachment_anchors_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/_sandbox/seed/financial-impact": {
         parameters: {
             query?: never;
@@ -976,6 +999,15 @@ export interface components {
             /** Root Cause */
             root_cause?: string | null;
             sap_data_analysis?: components["schemas"]["SapDataAnalysisData"] | null;
+        };
+        /** AnchorSpec */
+        AnchorSpec: {
+            /** Label */
+            label: string;
+            /** Supports Ref */
+            supports_ref: string;
+            /** Text */
+            text: string;
         };
         /**
          * AsyncResolveResponse
@@ -3422,6 +3454,21 @@ export interface components {
              */
             name: string;
         };
+        /** SeedEmailAttachmentAnchorsRequest */
+        SeedEmailAttachmentAnchorsRequest: {
+            /** Anchors */
+            anchors: components["schemas"]["AnchorSpec"][];
+            /** Attachment Mime */
+            attachment_mime: string;
+            /** Attachment Name */
+            attachment_name: string;
+            /** Document Text */
+            document_text: string;
+            /** From Address */
+            from_address?: string | null;
+            /** Subject */
+            subject?: string | null;
+        };
         /** SeedFinancialImpactRequest */
         SeedFinancialImpactRequest: {
             /** Exception Id */
@@ -3954,6 +4001,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SeedCaseAttachmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    seed_email_attachment_anchors_api_v1__sandbox_seed_email_attachment_anchors_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeedEmailAttachmentAnchorsRequest"];
             };
         };
         responses: {

@@ -44,6 +44,10 @@ interface AttachmentPreviewProps {
   caseId: string;
   attachment: EmailAttachmentManifestEntry;
   anchors: EvidenceAnchor[];
+  /** Decision-quality telemetry (ADR-043 §2.7) — fired once when the operator
+   *  is shown an evidence-highlight safety bar, so scrutiny can be compared
+   *  with vs without highlighting. Best-effort; never blocks render. */
+  onHighlightShown?: () => void;
 }
 
 type LoadState = "loading" | "ready" | "error";
@@ -97,7 +101,7 @@ async function renderPdfAndExtractText(
   }
 }
 
-export function AttachmentPreview({ caseId, attachment, anchors }: AttachmentPreviewProps) {
+export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShown }: AttachmentPreviewProps) {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [format, setFormat] = useState<PreviewFormat | null | undefined>(undefined);
   const [docText, setDocText] = useState<string | null>(null);
@@ -164,6 +168,16 @@ export function AttachmentPreview({ caseId, attachment, anchors }: AttachmentPre
       if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
   }, [caseId, attachmentId]);
+
+  // Decision-quality cohort (ADR-043 §2.7): record that a highlight safety bar
+  // was actually presented to the operator for this case.
+  const highlightReportedRef = useRef(false);
+  useEffect(() => {
+    if (anchors.length > 0 && loadState === "ready" && !highlightReportedRef.current) {
+      highlightReportedRef.current = true;
+      onHighlightShown?.();
+    }
+  }, [anchors.length, loadState, onHighlightShown]);
 
   return (
     <section

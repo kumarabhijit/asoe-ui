@@ -57,7 +57,18 @@ async function seedAttachmentWithAnchors(
 ): Promise<string> {
   const res = await request.post(
     `${BACKEND_URL}/api/v1/_sandbox/seed/email-attachment-anchors`,
-    { headers: { Authorization: `Bearer ${token}` }, data: opts },
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      // Backend request body is snake_case (extra="forbid") — see
+      // docs/specs/sandbox-attachment-anchor-seed.md. anchors[] is already
+      // snake_case (text/label/supports_ref).
+      data: {
+        document_text: opts.documentText,
+        attachment_name: opts.attachmentName,
+        attachment_mime: opts.attachmentMime,
+        anchors: opts.anchors,
+      },
+    },
   );
   if (!res.ok()) throw new Error(`seed anchors: ${res.status()} ${await res.text()}`);
   const body = (await res.json()) as { exception_id: string };

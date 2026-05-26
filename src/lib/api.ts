@@ -1313,6 +1313,9 @@ export const exceptionsApi = {
   async reportReviewerActivity(input: {
     dwell_ms: number;
     layer2_opened: boolean;
+    // ADR-043 §2.7 — whether an in-document evidence highlight was shown for
+    // this decision, so scrutiny can be compared with vs without highlighting.
+    highlight_shown?: boolean;
   }): Promise<void> {
     if (!USE_REAL_API) return;
     try {

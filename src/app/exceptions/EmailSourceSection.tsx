@@ -37,6 +37,9 @@ interface EmailSourceSectionProps {
    *  preview is disabled (manifest still listed). The section forwards it; it
    *  never fetches bytes itself (Guardrail #6). */
   caseId?: string;
+  /** Decision-quality telemetry (ADR-043 §2.7) — forwarded to the preview so a
+   *  shown highlight is recorded against the operator's decision. */
+  onHighlightShown?: () => void;
 }
 
 /**
@@ -49,7 +52,7 @@ function formatBytes(b: number): string {
   return `${(b / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function EmailSourceSection({ data, caseId }: EmailSourceSectionProps) {
+export function EmailSourceSection({ data, caseId, onHighlightShown }: EmailSourceSectionProps) {
   const [openPreview, setOpenPreview] = useState<string | null>(null);
   return (
     <section
@@ -194,6 +197,7 @@ export function EmailSourceSection({ data, caseId }: EmailSourceSectionProps) {
                             caseId={caseId as string}
                             attachment={entry}
                             anchors={anchorsFor}
+                            onHighlightShown={onHighlightShown}
                           />
                         </div>
                       )}
