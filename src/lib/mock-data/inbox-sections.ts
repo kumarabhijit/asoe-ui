@@ -506,6 +506,69 @@ const HAPPY_ENTITIES: EntitiesAnalysisData = {
   ],
 };
 
+// ── Change-request draft templates (exc-041 / 042 / 043) ────────────────────
+// Each is the agent's proposed reply for the corresponding inbound change; the
+// operator can edit before sending. Same DraftReply shape as SE_DRAFT, just a
+// different template_name per change-type so the canonical-example parity holds.
+
+const CHG041_DRAFT: DraftReply = {
+  status: "DRAFTED",
+  reason: null,
+  template_name: "expedite_acknowledgement",
+  recipient: "buyer@southeast-distrib.example",
+  subject: "Re: expedite request — PO EML-CHG-2026-0052",
+  body:
+    "Hello,\n\nWe can pull the delivery in to May 20 via our upgraded carrier " +
+    "service. Freight uplift is approximately $185 for this load — please " +
+    "confirm and we'll re-confirm the SO.\n\nAcme Beverages Order Desk",
+  edits_applied: [],
+  drafted_by: "analyst-2",
+  drafted_at: "2026-05-18T11:25:00Z",
+};
+
+const CHG042_DRAFT: DraftReply = {
+  status: "DRAFTED",
+  reason: "Order already past stage 4/5 (picked) — cancellation high-risk.",
+  template_name: "cancellation_hold_for_review",
+  recipient: "orders@walmart.example",
+  subject: "Re: cancel order EML-CHG-2026-0053 — held for planner review",
+  body:
+    "Hello,\n\nWe've received your cancellation request. The order is already " +
+    "picked (stage 4/5), so we've routed it to a supply planner for a " +
+    "feasibility review. We'll come back to you within 4 business hours.\n\n" +
+    "Acme Beverages Order Desk",
+  edits_applied: [],
+  drafted_by: "analyst-2",
+  drafted_at: "2026-05-19T08:20:00Z",
+};
+
+const CHG043_DRAFT: DraftReply = {
+  status: "DRAFTED",
+  reason: null,
+  template_name: "substitution_partial_fulfilment",
+  recipient: "buyer@kroger.example",
+  subject: "Re: substitute lemon 6pk → 12pk on PO EML-CHG-2026-0054",
+  body:
+    "Hello,\n\nWe can substitute BEV-LEMON-12PK for BEV-LEMON-6PK on line 002, " +
+    "but ATP only covers part of the requested quantity. We'll ship the " +
+    "available 12-pack and back-order the balance unless you'd prefer to " +
+    "leave line 002 unchanged.\n\nAcme Beverages Order Desk",
+  edits_applied: [],
+  drafted_by: "analyst-2",
+  drafted_at: "2026-05-19T13:45:00Z",
+};
+
+// Inquiry knowledge graph — the referenced order's customer + material context
+// so the inquiry detail page shows the same order graph the operator would see
+// on the underlying SO.
+const INQUIRY_KG = knowledgeGraphFor({
+  orderId: "SO-5100012344",
+  customerName: "Southeast Beverage Distributors",
+  customerBp: "300042",
+  materials: [{ id: "bev-cola-12pk", label: "BEV-COLA-12PK", detail: "delivered 2026-05-18" }],
+  sapDoc: "5100012344",
+});
+
 // ── Per-case email source-of-truth (every inbox case gets one) ───────────────
 
 const SE_EMAIL = emailSourceFor({
@@ -627,6 +690,7 @@ export const INBOX_SECTION_BUNDLES: Record<string, Partial<InboxSections>> = {
     knowledge_graph: SE_KG,
     entities_analysis: SE_ENTITIES,
     sap_data_analysis: SE_SAP,
+    draft_reply: CHG041_DRAFT,
     email_source: CHG041_EMAIL,
   },
   "exc-042": {
@@ -634,19 +698,24 @@ export const INBOX_SECTION_BUNDLES: Record<string, Partial<InboxSections>> = {
     knowledge_graph: SE_KG,
     entities_analysis: SE_ENTITIES,
     sap_data_analysis: { ...SE_SAP, order_value_usd: 48200.0 },
+    draft_reply: CHG042_DRAFT,
     email_source: CHG042_EMAIL,
   },
   "exc-043": {
     change_analysis: changeAnalysisFor("sku_substitution"),
     knowledge_graph: SE_KG,
     entities_analysis: SE_ENTITIES,
+    sap_data_analysis: SE_SAP,
+    draft_reply: CHG043_DRAFT,
     email_source: CHG043_EMAIL,
   },
-  // Inquiry — buyer asks about an order/invoice status (no order/EDI section).
+  // Inquiry — buyer asks about an order/invoice status. KG carries the
+  // referenced order's customer + material context.
   "exc-044": {
     entities_analysis: INQUIRY_ENTITIES,
     sap_data_analysis: INQUIRY_SAP,
     draft_reply: INQUIRY_DRAFT,
+    knowledge_graph: INQUIRY_KG,
     email_source: INQ044_EMAIL,
   },
   // Complaint — short shipment; acknowledgement draft + the affected order graph.
