@@ -14,6 +14,12 @@ import { describe, it, expect } from "vitest";
 
 import { MOCK_EXCEPTIONS } from "@/lib/mock-data/exceptions";
 import { INBOX_SECTION_BUNDLES } from "@/lib/mock-data/inbox-sections";
+import { MOCK_LINE_ITEMS } from "@/lib/mock-data/line-items";
+
+// Inbox cases that legitimately carry no line items (an uncategorised email
+// isn't an order). Anything else must be in MOCK_LINE_ITEMS so the
+// "Evidence Detail" pane (EvidenceGrid.tsx) renders for it.
+const NON_ORDER_INBOX_CASES = new Set<string>(["exc-047"]);
 
 describe("INBOX_SECTION_BUNDLES coverage", () => {
   const inboxCases = MOCK_EXCEPTIONS.filter(
@@ -31,6 +37,22 @@ describe("INBOX_SECTION_BUNDLES coverage", () => {
   it("every bundle carries an email_source (the per-case source-of-truth substrate)", () => {
     const missing = inboxCases
       .filter((e) => !INBOX_SECTION_BUNDLES[e.id]?.email_source)
+      .map((e) => `${e.id} (${e.order_id})`);
+    expect(missing).toEqual([]);
+  });
+
+  it("every order-bearing inbox case has MOCK_LINE_ITEMS so the Evidence Detail pane populates", () => {
+    // The "Evidence Detail" pane (EvidenceGrid.tsx) reads from
+    // `/exceptions/{id}/line-items` (MOCK_LINE_ITEMS in mock mode). Without an
+    // entry it shows "—" and the operator can't see the line table the bundle
+    // already implies. Mirrors the real-API behaviour where
+    // _project_line_items populates resolution_data.line_items from the event.
+    const missing = inboxCases
+      .filter((e) => !NON_ORDER_INBOX_CASES.has(e.id))
+      .filter((e) => {
+        const lines = MOCK_LINE_ITEMS[e.id];
+        return !Array.isArray(lines) || lines.length === 0;
+      })
       .map((e) => `${e.id} (${e.order_id})`);
     expect(missing).toEqual([]);
   });
