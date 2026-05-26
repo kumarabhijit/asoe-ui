@@ -97,6 +97,12 @@ export const authOptions: NextAuthOptions = {
         token.authMode = "entra";
       } else if (user) {
         token.authMode = "seed";
+      } else if (!token.authMode) {
+        // Token-refresh callback: `account` is unset on every renew,
+        // and `user` is unset after the initial sign-in. Default to
+        // "seed" so an old session predating PARITY-3a doesn't carry
+        // an undefined authMode forward indefinitely.
+        token.authMode = "seed";
       }
       return token;
     },
