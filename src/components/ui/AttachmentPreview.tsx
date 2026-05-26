@@ -36,7 +36,11 @@ import { attachmentsApi } from "@/lib/api";
 import { AttachmentDownloadButton } from "@/components/ui/AttachmentDownloadButton";
 import { detectPreviewFormat, type PreviewFormat } from "@/lib/previewFormat";
 import { resolveAnchorStatus, type AnchorStatus } from "@/lib/evidenceAnchor";
+import { spatialOverlays } from "@/lib/spatialOverlay";
 import type { EmailAttachmentManifestEntry, EvidenceAnchor } from "@/types/exceptions";
+
+// PDF.js Phase-1 renders page 1 only; spatial overlays are drawn for that page.
+const PREVIEW_PAGE = 1;
 
 interface AttachmentPreviewProps {
   /** Threaded explicitly from ExceptionDetailPanel (provenance must be visible
@@ -247,7 +251,29 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
         )}
 
         {loadState === "ready" && format === "pdf" && (
-          <canvas ref={canvasRef} aria-label={`PDF preview of ${attachment.name}`} className="max-w-full" />
+          <div className="relative inline-block max-w-full" data-testid="pdf-canvas-layer">
+            <canvas ref={canvasRef} aria-label={`PDF preview of ${attachment.name}`} className="max-w-full" />
+            {/* Spatial bbox overlays (ADR-045) — best-effort, drawn only for
+                VERIFIED spatial anchors on this page. The safety bar above stays
+                the authoritative surface; a degraded/text anchor has no box. */}
+            {spatialOverlays(anchors, PREVIEW_PAGE).map((o) => (
+              <div
+                key={o.supportsRef}
+                data-testid="spatial-overlay"
+                data-supports-ref={o.supportsRef}
+                aria-hidden
+                className="absolute pointer-events-none rounded-sm"
+                style={{
+                  left: `${o.leftPct}%`,
+                  top: `${o.topPct}%`,
+                  width: `${o.widthPct}%`,
+                  height: `${o.heightPct}%`,
+                  border: "2px solid var(--color-brand)",
+                  background: "var(--color-brand-subtle, rgba(90,75,214,0.12))",
+                }}
+              />
+            ))}
+          </div>
         )}
 
         {loadState === "ready" && format === "image" && objectUrl && (
