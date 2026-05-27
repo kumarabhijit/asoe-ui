@@ -138,6 +138,9 @@ src/
 | `GapBar` | Tailwind | Horizontal bar: primary vs secondary qty, shortfall/excess mode, gap indicator | BackOrderSection, OverMaxSection, MOQSection |
 | `GravitationalOrbs` | Custom (canvas) | Canvas animated background | Login |
 | `UserSwitcher` | Tailwind | Sandbox-only user switcher dropdown, server round-trip via `signIn("credentials")` | NavBar (all pages) |
+| `PreprodIdentityBanner` | Tailwind | Non-dismissable identity strip shown whenever `ASOE_AUTH_MODE !== "seed"` (PARITY-3a). Renders `Preprod (Entra ID) — Logged in as: <email>` so operators see at a glance which identity their session runs as (preprod sometimes hosts shadowed real-tenant data — a wrong-identity action there is SOX-relevant). Returns null in seed mode. | `src/app/layout.tsx` |
+| `AttachmentDownloadButton` | Tailwind | Encapsulates the byte-fetch for stored email attachments (ADR-043). Section components render this rather than calling `attachmentsApi.getBlob` directly (Guardrail #6 dumb-projector). Compact icon-only variant for dense list rows. | Section components (EmailSourceSection, etc.) |
+| `ErasureCertificateButton` | Tailwind | PARITY-0.5 / PARITY-8 — wraps `GET /api/v1/attachments/{id}/erasure-certificate` (manager+admin only, tenant-scoped on the backend). Packages the PII-free tombstone + hash-chain proof as a JSON Blob with a regulator-correlable filename (`erasure-certificate-{id}-{erasedAt}.json`). Mock mode synthesises a deterministic certificate so the surface is exercisable in dev / Vercel previews. | (available; intended for the future tenant-facing erasure surface — see prototype_gap_analysis if added) |
 
 **Styling approach (Phase 8.9):** All components use Tailwind utility classes via the design token mapping in `tailwind.config.ts`. CVA (`class-variance-authority`) is used for multi-variant components (Button, Badge). `cn()` utility (`src/lib/utils.ts`) merges Tailwind classes with conflict resolution. Only 18 inline `style={{}}` objects remain across the entire codebase — all are data-driven dynamic values (avatar colors, bar widths, chart colors).
 
@@ -443,6 +446,7 @@ Page Content (max-width 1800px) — CSS grid:
 | `ChangeAnalysis` (+ `ConstraintEvaluation`/`ConstraintCheck`/`ScenarioOption`/`ChangeDecision`/`ChangeItem`) | ADR-042 P6 — order-change evaluation: N constraints (PASS/CONDITIONAL/WARNING), M scenarios, decision (confidence, requires_cosign, sap_actions) | exceptions.ts |
 | `KnowledgeGraphPayload` (+ `KnowledgeGraphNode`/`KnowledgeGraphEdge`) | ADR-042 P7 — derived entity graph (nodes by kind, directed edges, root_id) | exceptions.ts |
 | `DraftReply` (+ `DraftReplyEdit`) | ADR-042 P7 — AI reply-draft evidence (status, recipient, subject, body, before/after edits) | exceptions.ts |
+| `AttachmentErasureCertificate` | PARITY-0.5 / PARITY-8 — `GET /api/v1/attachments/{id}/erasure-certificate` response. PII-free tombstone (no `content`, no `name` — registry contract) + hash-chain audit-event proof (`event_hash`, `prev_hash`, `created_at`, `changed_by`) + `chain_verified` boolean. Used by `ErasureCertificateButton`. | api.ts (re-exported) |
 
 ---
 

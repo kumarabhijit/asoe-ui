@@ -111,6 +111,7 @@ asoe-ui/
 | `tasks.md` | Team | Phase-based progress (Phases 0-8.13, 12-15 complete; 9-11 pending) |
 | `docs/test-strategy/README.md` | Engineers | Test pyramid + gap-closure patterns (ADR-041 codification of the test-strategy gates added to CLAUDE.md) |
 | `docs/test-strategy/UX_ACCESSIBILITY.md` | Engineers / A11y reviewers | UX, accessibility (WCAG 2.1 AA), and screen-clutter test patterns — component axe sweeps, focus management, design-token contrast, route-level axe, viewport overflow, reduced motion, keyboard-only journey |
+| `docs/testing/auth-modes.md` | Engineers / QA | PARITY-3a auth-mode matrix — seed vs entra providers, redirect URIs per env, Playwright fixture strategy. Read before writing a Playwright spec that asserts an authenticated state. |
 | `consol_arch.md` | All | Platform architecture — Section 11 is a stub pointer to `ui_architecture.md` |
 
 ---
@@ -129,6 +130,11 @@ asoe-ui/
 | `SSO_CLIENT_ID` | — | OIDC client ID (per IdP) |
 | `SSO_CLIENT_SECRET` | — | OIDC client secret (per IdP) |
 | `SSO_ISSUER_URL` | — | OIDC issuer URL (per IdP) |
+| `ASOE_AUTH_MODE` | `seed` | PARITY-3a — `seed` (CredentialsProvider against asoe2 `/auth/login`; dev/CI/Vercel mock previews) or `entra` (Azure AD OAuth code flow; preprod/GA). Both providers are always mounted; the env selects which is meaningfully usable. See `docs/testing/auth-modes.md` for the matrix. |
+| `NEXT_PUBLIC_ASOE_AUTH_MODE` | — | Client-readable mirror of `ASOE_AUTH_MODE` so `PreprodIdentityBanner` renders correctly in the browser. Must agree with `ASOE_AUTH_MODE`. |
+| `ASOE_CLIENT_ID` | — | Entra App Registration client id (entra mode only). |
+| `ASOE_CLIENT_SECRET` | — | Entra App Registration client secret (entra mode only; Key Vault secretref in preprod). |
+| `ASOE_TENANT_ID` | `common` | Entra tenant id (entra mode only). Preprod uses single-tenant `AzureADMyOrg` per Decision Q1. |
 
 See `.env.local.example` for the full template.
 
