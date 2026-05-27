@@ -1261,6 +1261,41 @@ export const healthApi = {
 
 /* ── Attachments API (/api/v1/cases/{id}/attachments/{id}) ─────────── */
 
+/**
+ * Erasure certificate shape returned by
+ * GET /api/v1/attachments/{id}/erasure-certificate (PARITY-0.5).
+ *
+ * The tombstone is PII-free by registry contract — no `content`, no
+ * `name`. The audit-event block carries the hash-chain proof a
+ * regulator independently verifies (ADR-023). `chain_verified`
+ * reflects the integrity of the audit chain at fetch time.
+ */
+export interface AttachmentErasureCertificate {
+  attachment_id: string;
+  tenant_id: string;
+  tombstone: {
+    attachment_id: string;
+    tenant_id?: string;
+    case_id?: string | null;
+    sha256: string;
+    size_bytes: number;
+    mime_type: string;
+    erased_at: string;
+    erased_by: string;
+    reason?: string | null;
+  };
+  audit_event: {
+    event_id: string;
+    policy_key: string;
+    event_hash: string;
+    prev_hash: string;
+    created_at: string;
+    changed_by: string;
+    change_reason?: string | null;
+  };
+  chain_verified: boolean;
+}
+
 export const attachmentsApi = {
   /**
    * Fetch a stored attachment's raw bytes (ADR-043). The single place the UI
@@ -1299,6 +1334,52 @@ export const attachmentsApi = {
       throw new Error(`ATTACHMENT_FETCH_FAILED: ${res.status}`);
     }
     return res.blob();
+  },
+
+  /**
+   * Fetch the erasure certificate for a previously erased attachment
+   * (PARITY-0.5 / PARITY-8). Manager+admin only on the backend +
+   * tenant-scoped — a tenant can never read another tenant's
+   * certificate. Mock mode synthesises a deterministic certificate
+   * shape so dev previews can render the UI without a real erasure.
+   */
+  async getErasureCertificate(
+    attachmentId: string,
+    opts: { authToken?: string } = {},
+  ): Promise<AttachmentErasureCertificate> {
+    if (!USE_REAL_API) {
+      const now = new Date().toISOString();
+      return {
+        attachment_id: attachmentId,
+        tenant_id: "tenant-mock",
+        tombstone: {
+          attachment_id: attachmentId,
+          tenant_id: "tenant-mock",
+          case_id: null,
+          sha256: "0".repeat(64),
+          size_bytes: 0,
+          mime_type: "application/octet-stream",
+          erased_at: now,
+          erased_by: "mock:operator",
+          reason: "mock-mode certificate",
+        },
+        audit_event: {
+          event_id: `mock-event-${attachmentId}`,
+          policy_key: "ATTACHMENT_ERASED",
+          event_hash: "0".repeat(64),
+          prev_hash: "0".repeat(64),
+          created_at: now,
+          changed_by: "mock:operator",
+          change_reason: "mock-mode certificate",
+        },
+        chain_verified: true,
+      };
+    }
+    const token = opts.authToken ?? getTestAccessToken() ?? (await getAuthToken());
+    return http<AttachmentErasureCertificate>(
+      `/api/v1/attachments/${encodeURIComponent(attachmentId)}/erasure-certificate`,
+      { authToken: token ?? undefined },
+    );
   },
 };
 
