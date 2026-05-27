@@ -40,19 +40,39 @@ const LIVE_METHODS: Array<[string, string]> = [
   ["reanalyze", "/api/v1/exceptions/${id}/reanalyze"],
 ];
 
+// Scope the per-method search to the body of `export const exceptionsApi = {`
+// so a method name that collides with another API surface (e.g. `get` on
+// healthApi / orderCasesApi) doesn't false-match. The exceptionsApi block
+// is delimited by the next `export const \w+Api = {` declaration.
+const EXCEPTIONS_API_HEADER = /export\s+const\s+exceptionsApi\s*=\s*\{/;
+const NEXT_API_HEADER = /export\s+const\s+\w+Api\s*=\s*\{/g;
+
+function exceptionsApiBody(): string {
+  const headerMatch = SRC.match(EXCEPTIONS_API_HEADER);
+  if (!headerMatch || headerMatch.index === undefined) {
+    throw new Error("exceptionsApi declaration not found in src/lib/api.ts");
+  }
+  const start = headerMatch.index + headerMatch[0].length;
+  NEXT_API_HEADER.lastIndex = start;
+  const next = NEXT_API_HEADER.exec(SRC);
+  const end = next ? next.index : SRC.length;
+  return SRC.slice(start, end);
+}
+
 describe("exceptionsApi: every documented mutation has a USE_REAL_API branch", () => {
+  const BODY = exceptionsApiBody();
   for (const [method, pathFragment] of LIVE_METHODS) {
     it(`${method} sends to ${pathFragment} when USE_REAL_API is set`, () => {
       // Find the method body. Methods are object-shorthand so we look
       // for `async ${method}(` and capture until the next async-method
       // boundary OR end of object.
       const methodHeader = new RegExp(`async\\s+${method}\\s*\\(`);
-      const headerMatch = SRC.match(methodHeader);
-      expect(headerMatch, `method ${method} not found in api.ts`).toBeTruthy();
+      const headerMatch = BODY.match(methodHeader);
+      expect(headerMatch, `method ${method} not found in exceptionsApi`).toBeTruthy();
       const start = headerMatch!.index!;
       // Cheap upper bound: search the next ~6kb for both `USE_REAL_API`
       // and the path fragment. Each method body fits well within this.
-      const window = SRC.slice(start, start + 6000);
+      const window = BODY.slice(start, start + 6000);
       expect(
         window,
         `${method} body must contain "if (USE_REAL_API)"`,
