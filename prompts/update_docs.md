@@ -13,6 +13,7 @@ Target documents (update only the ones relevant to what has changed):
 - ui_architecture.md                — authoritative UI architecture (layouts, components, data flows, drift register)
 - docs/AUDITOR_GUIDE.md             — audit controls reference; audience: auditors and operators
 - docs/prototype_gap_analysis.md    — prototype vs implementation gap tracker; update status column when gaps are closed
+- docs/testing/*.md                 — test-strategy + auth-mode references (`auth-modes.md`, `test-strategy/README.md`). Update when an auth mode lands, when a Playwright fixture's contract changes, or when a new gap-closure pattern joins the test strategy.
 - prompts/full_project_sequence.md  — phase sequence; add new phases as needed
 - prompts/phase_*.md                — phase-specific build prompts; add new phases as needed
 - (any other *.md added in future)

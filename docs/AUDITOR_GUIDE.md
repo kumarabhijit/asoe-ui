@@ -47,6 +47,34 @@ Action buttons are gated by user role per Section 9.2. The backend enforces RBAC
 
 **SOX relevance:** Prevents unauthorized financial exception resolution. Ensures separation of duty — agents propose, humans review, backend executes.
 
+### 1.1 Erasure-certificate download (PARITY-0.5 / PARITY-8)
+
+`ErasureCertificateButton` (`src/components/ui/ErasureCertificateButton.tsx`)
+wraps `GET /api/v1/attachments/{id}/erasure-certificate`. The
+backend gates the endpoint on **manager+admin only** (analyst /
+viewer / partner all return 403) and **tenant-scopes** the read —
+the audit log is queried per the caller's tenant, so a tenant can
+never read another tenant's certificate. Both invariants are
+enforced server-side; the UI component does not re-implement them.
+
+The certificate response carries a PII-free tombstone (`attachment_id`,
+`sha256`, `case_id`, `size_bytes`, `mime_type`, `erased_at`,
+`erased_by`, `reason`) plus the hash-chained audit-event proof
+(`event_id`, `policy_key`, `event_hash`, `prev_hash`, `created_at`,
+`changed_by`, `change_reason`) and a `chain_verified` boolean
+recomputed at fetch time. The component packages this as a JSON Blob
+and triggers a download with a regulator-correlable filename
+(`erasure-certificate-{attachmentId}-{erasedAt}.json`).
+
+The mock-mode path in `attachmentsApi.getErasureCertificate`
+synthesises the same shape (deliberately no `content`, no `name`)
+so the surface is exercisable in dev / Vercel previews without a
+real erasure.
+
+**SOX relevance:** Right-to-erasure proof. A regulator can verify
+the chain-proof from the certificate independently of ASOE — the
+audit chain is the tamper-evident record, not a wet signature.
+
 ---
 
 ## 2. Session Security
