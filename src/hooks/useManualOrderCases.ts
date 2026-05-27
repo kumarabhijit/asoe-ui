@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { casesApi, type CaseListItem } from "@/lib/api";
-import type { CaseSource, CaseType } from "@/types/cases";
+import type { Origin } from "@/types/cases";
 import type { WSEvent } from "@/types/websocket";
 
 interface UseCasesReturn {
@@ -46,13 +46,13 @@ export interface UseCasesOptions {
    *  default (200). Backend caps at 500. The hook walks every page
    *  until `has_more` is false, accumulating into `cases`. */
   limit?: number;
-  /** Filter by case_type (EMAIL_ENTRY | BLOCK) — the Customer Inbox
-   *  lens (ADR-042). Orthogonal to `source` (ADR-041 §1). */
-  caseType?: CaseType;
+  /** Filter by Intent Super-Group (requirements §6). E.g.
+   *  `supergroupCode: "SG_BLOCK_PRICING"`. Orthogonal to `origin`. */
+  supergroupCode?: string;
 }
 
 export function useCases(
-  source?: CaseSource,
+  origin?: Origin,
   options?: UseCasesOptions,
 ): UseCasesReturn {
   const [cases, setCases] = useState<CaseListItem[]>([]);
@@ -63,7 +63,7 @@ export function useCases(
   const [refetchCounter, setRefetchCounter] = useState(0);
 
   const limit = options?.limit;
-  const caseType = options?.caseType;
+  const supergroupCode = options?.supergroupCode;
 
   const refetch = useCallback(() => {
     setRefetchCounter((n) => n + 1);
@@ -83,12 +83,12 @@ export function useCases(
     // tenant with >limit cases doesn't silently see only the first
     // slice.
     const pageParams: {
-      source?: CaseSource;
-      case_type?: CaseType;
+      origin?: Origin;
+      supergroup_code?: string;
       limit?: number;
     } = {};
-    if (source) pageParams.source = source;
-    if (caseType) pageParams.case_type = caseType;
+    if (origin) pageParams.origin = origin;
+    if (supergroupCode) pageParams.supergroup_code = supergroupCode;
     if (limit !== undefined) pageParams.limit = limit;
 
     const run = async () => {
@@ -131,7 +131,7 @@ export function useCases(
     return () => {
       cancelled = true;
     };
-  }, [source, caseType, limit, refetchCounter]);
+  }, [origin, supergroupCode, limit, refetchCounter]);
 
   return {
     cases,
@@ -145,12 +145,14 @@ export function useCases(
 
 /**
  * useManualOrderCases — convenience wrapper. Kept as the previous
- * named export so callers in /inbox don't need to update.
+ * named export so callers in /inbox don't need to update. Post Case
+ * & Intent Super-Group pivot the "manual order" lens IS the
+ * `origin === "CUSTOMER"` slice.
  */
 export function useManualOrderCases(
   options?: UseCasesOptions,
 ): UseCasesReturn {
-  return useCases("manual_order", options);
+  return useCases("CUSTOMER", options);
 }
 
 /**

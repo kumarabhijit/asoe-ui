@@ -11,7 +11,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { slaSnapshot } from "@/app/cases/page";
-import { ALLOWED_CASE_SOURCES } from "@/lib/api";
+import { ALLOWED_CASE_ORIGINS } from "@/lib/api";
 import type { OrderCase } from "@/types/cases";
 
 
@@ -20,10 +20,9 @@ function mockCase(over: Partial<OrderCase> = {}): OrderCase {
     case_id: "case-1",
     tenant_id: "acme-corp",
     customer_id: null,
-    source: "manual_order",
+    origin: "CUSTOMER",
     source_channel: "email",
-    case_type: "EMAIL_ENTRY",
-    email_classification: "NEW_ORDER",
+    supergroup_code: "SG_NEW_ORDER",
     customer_po_number: "PO-1",
     sales_order_id: null,
     edi_transaction_id: null,
@@ -32,6 +31,7 @@ function mockCase(over: Partial<OrderCase> = {}): OrderCase {
     closed_at: null,
     status: "OPEN_AGENT_PROCESSING",
     sla_deadline: null,
+    will_miss_rdd: false,
     tier: 2,
     working_memory_summary: null,
     last_compaction_at: null,
@@ -88,17 +88,17 @@ describe("slaSnapshot — band thresholds", () => {
 });
 
 
-describe("ALLOWED_CASE_SOURCES — case vocabulary surface", () => {
-  it("contains both manual_order and automated_order", () => {
-    expect(ALLOWED_CASE_SOURCES).toContain("manual_order");
-    expect(ALLOWED_CASE_SOURCES).toContain("automated_order");
+describe("ALLOWED_CASE_ORIGINS — case vocabulary surface", () => {
+  it("contains both CUSTOMER and API", () => {
+    expect(ALLOWED_CASE_ORIGINS).toContain("CUSTOMER");
+    expect(ALLOWED_CASE_ORIGINS).toContain("API");
   });
 
   it("is read-only at the type level (frozen tuple)", () => {
     // The constant is `as const` so it's a readonly tuple. This test
     // is a smoke-check that the runtime value is also a tuple, not
     // an object accidentally substituted later.
-    expect(Array.isArray(ALLOWED_CASE_SOURCES)).toBe(true);
-    expect(ALLOWED_CASE_SOURCES.length).toBeGreaterThanOrEqual(2);
+    expect(Array.isArray(ALLOWED_CASE_ORIGINS)).toBe(true);
+    expect(ALLOWED_CASE_ORIGINS.length).toBeGreaterThanOrEqual(2);
   });
 });

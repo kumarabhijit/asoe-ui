@@ -5,14 +5,14 @@
 // lifecycle — the most common operator-actionable shape, and the
 // one the action matrix covers densely.
 import type { BehaviourScenario, ScenarioActions } from "./_types";
-import type { CaseSource } from "@/types/cases";
+import type { Origin } from "@/types/cases";
 
 interface TemplateInput {
   /** "<INTENT>__<operator_situation>" — used as scenario.id. */
   id: string;
   intent: string;
   curatedVocab: readonly string[];
-  caseSource?: CaseSource;
+  caseOrigin?: Origin;
   caseChannel?: string;
   customerPo?: string;
   recipeName?: string;
@@ -53,15 +53,16 @@ export function buildOpenActionableScenario(
     case: {
       case_id: caseId,
       tenant_id: "acme-corp",
-      source: input.caseSource ?? "automated_order",
+      origin: input.caseOrigin ?? "API",
       source_channel: input.caseChannel ?? "edi_x12_850",
-      case_type: (input.caseSource === "manual_order" ? "EMAIL_ENTRY" : "BLOCK"),
-      email_classification: (input.caseSource === "manual_order" ? "NEW_ORDER" : null),
+      supergroup_code:
+        input.caseOrigin === "CUSTOMER" ? "SG_NEW_ORDER" : "SG_BLOCK_UNMAPPED",
       customer_po_number: input.customerPo ?? orderId,
       opened_at: opened,
       updated_at: opened,
       status: "OPEN_AWAITING_HUMAN",
       sla_deadline: "2026-05-10T20:00:00Z",
+      will_miss_rdd: false,
       tier: 2,
       child_intents: [intent],
     },

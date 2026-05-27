@@ -22,13 +22,13 @@ function makeItem(i: number): CaseListItem {
   return {
     case_id: `case-${i.toString().padStart(3, "0")}`,
     tenant_id: "acme-corp",
-    source: "manual_order",
+    origin: "CUSTOMER",
     source_channel: "email",
-    case_type: "EMAIL_ENTRY",
-    email_classification: "NEW_ORDER",
+    supergroup_code: "SG_NEW_ORDER",
     opened_at: "2026-05-10T09:00:00Z",
     updated_at: "2026-05-10T09:00:00Z",
     status: "OPEN_AGENT_PROCESSING",
+    will_miss_rdd: false,
     tier: 2,
     child_intents: [],
   };
@@ -59,10 +59,10 @@ describe("useCases — cursor-loop pagination", () => {
       has_more: false,
     });
     const { result } = renderHook(() =>
-      useCases("manual_order", { limit: 5 }),
+      useCases("CUSTOMER", { limit: 5 }),
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(listMock).toHaveBeenNthCalledWith(1, { source: "manual_order", limit: 5 });
+    expect(listMock).toHaveBeenNthCalledWith(1, { origin: "CUSTOMER", limit: 5 });
   });
 
   it("walks every page until has_more=false (rows accumulated, total respected)", async () => {
@@ -79,7 +79,7 @@ describe("useCases — cursor-loop pagination", () => {
       });
 
     const { result } = renderHook(() =>
-      useCases("manual_order", { limit: 5 }),
+      useCases("CUSTOMER", { limit: 5 }),
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.cases).toHaveLength(12);
@@ -88,10 +88,10 @@ describe("useCases — cursor-loop pagination", () => {
     expect(listMock).toHaveBeenCalledTimes(3);
     // Subsequent calls carry the previous page's cursor.
     expect(listMock).toHaveBeenNthCalledWith(2, {
-      source: "manual_order", limit: 5, cursor: "case-004",
+      origin: "CUSTOMER", limit: 5, cursor: "case-004",
     });
     expect(listMock).toHaveBeenNthCalledWith(3, {
-      source: "manual_order", limit: 5, cursor: "case-009",
+      origin: "CUSTOMER", limit: 5, cursor: "case-009",
     });
   });
 
@@ -105,7 +105,7 @@ describe("useCases — cursor-loop pagination", () => {
       has_more: true,      // never flips
     });
     const { result } = renderHook(() =>
-      useCases("manual_order", { limit: 5 }),
+      useCases("CUSTOMER", { limit: 5 }),
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     // First fetch returns 5 rows; second sees cursor === previous
@@ -119,7 +119,7 @@ describe("useCases — cursor-loop pagination", () => {
       items: MOCK_ITEMS, total: 12, cursor: null, has_more: false,
     });
     const { result } = renderHook(() =>
-      useCases("manual_order", { limit: 200 }),
+      useCases("CUSTOMER", { limit: 200 }),
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => result.current.refetch());
@@ -131,9 +131,9 @@ describe("useCases — cursor-loop pagination", () => {
     listMock.mockResolvedValue({
       items: MOCK_ITEMS, total: 12, cursor: null, has_more: false,
     });
-    const { result } = renderHook(() => useCases("manual_order"));
+    const { result } = renderHook(() => useCases("CUSTOMER"));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(listMock).toHaveBeenNthCalledWith(1, { source: "manual_order" });
+    expect(listMock).toHaveBeenNthCalledWith(1, { origin: "CUSTOMER" });
   });
 
   it("source-less call omits both source and limit", async () => {

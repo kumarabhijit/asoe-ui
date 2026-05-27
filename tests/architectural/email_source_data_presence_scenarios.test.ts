@@ -29,11 +29,11 @@ import { SCENARIOS } from "../scenarios";
 describe.each(SCENARIOS)("email_source data presence — $id", (s) => {
   const hasEmail = s.email_source !== undefined;
 
-  it("manual_order cases without email_source are not permitted", () => {
-    if (s.case.source !== "manual_order") return;
+  it("CUSTOMER-origin cases without email_source are not permitted", () => {
+    if (s.case.origin !== "CUSTOMER") return;
     expect(
       hasEmail,
-      `scenario ${s.id} is manual_order but has no email_source — ADR-034 Phase G requires the source surface`,
+      `scenario ${s.id} is origin=CUSTOMER but has no email_source — ADR-034 Phase G requires the source surface`,
     ).toBe(true);
   });
 

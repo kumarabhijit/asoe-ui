@@ -32,7 +32,7 @@ const caseFilters: CaseSavedViewFilters = {
   surface: "cases",
   filterStatuses: ["OPEN_AWAITING_HUMAN"],
   filterIntents: ["CONTRACTUAL_CORRECTION"],
-  filterSource: "manual_order",
+  filterOrigin: "CUSTOMER",
   filterSince: "7d",
   searchQuery: "po:KRO",
   sortMode: "sla",
@@ -147,7 +147,7 @@ describe("useSavedViews — save / remove", () => {
     expect(view.surface).toBe("cases");
     if (view.surface === "cases") {
       expect(view.filterStatuses).toEqual(["OPEN_AWAITING_HUMAN"]);
-      expect(view.filterSource).toBe("manual_order");
+      expect(view.filterOrigin).toBe("CUSTOMER");
       expect(view.filterSince).toBe("7d");
       expect(view.sortMode).toBe("sla");
     }

@@ -48,7 +48,7 @@ import {
   isCaseInvalidationEvent,
 } from "@/hooks/useManualOrderCases";
 import { useSlaTicker } from "@/hooks/useSlaTicker";
-import type { CaseSource } from "@/types/cases";
+import type { Origin } from "@/types/cases";
 import type { WSEvent } from "@/types/websocket";
 import {
   STATUS_LABEL,
@@ -59,9 +59,9 @@ import {
 import { NAV_TABS } from "@/config/nav-tabs";
 import { slaSnapshot } from "@/app/cases/page";
 
-const SOURCE_ICON: Record<CaseSource | "default", React.ReactNode> = {
-  manual_order: <Mail size={12} aria-hidden />,
-  automated_order: <PackageCheck size={12} aria-hidden />,
+const ORIGIN_ICON: Record<Origin | "default", React.ReactNode> = {
+  CUSTOMER: <Mail size={12} aria-hidden />,
+  API: <PackageCheck size={12} aria-hidden />,
   default: <Clock size={12} aria-hidden />,
 };
 
@@ -275,8 +275,8 @@ function HomePageInner() {
                     aria-label={`Open case ${orderRef}`}
                   >
                     <Badge variant="neutral" size="sm">
-                      {SOURCE_ICON[case_.source as CaseSource]
-                        ?? SOURCE_ICON.default}
+                      {ORIGIN_ICON[case_.origin as Origin]
+                        ?? ORIGIN_ICON.default}
                       <span className="ml-4">
                         {sourceChannelLabel(case_.source_channel)}
                       </span>

@@ -23,12 +23,12 @@ vi.mock("@/lib/api", () => {
     {
       case_id: "case-A",
       tenant_id: "t",
-      source: "manual_order",
+      origin: "CUSTOMER",
       source_channel: "email",
-      case_type: "EMAIL_ENTRY",
-      email_classification: "NEW_ORDER",
+      supergroup_code: "SG_NEW_ORDER",
       opened_at: "2026-05-10T08:00:00Z",
       status: "OPEN_AGENT_PROCESSING",
+      will_miss_rdd: false,
       tier: 2,
     },
   ];
@@ -47,27 +47,29 @@ describe("useCases — initial fetch", () => {
   });
 
   it("hydrates cases and flips loading after mount", async () => {
-    const { result } = renderHook(() => useCases("manual_order"));
+    const { result } = renderHook(() => useCases("CUSTOMER"));
     expect(result.current.loading).toBe(true);
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.cases.map((c) => c.case_id)).toEqual(["case-A"]);
     expect(result.current.total).toBe(1);
     expect(result.current.error).toBeNull();
-    expect(casesApi.list).toHaveBeenCalledWith({ source: "manual_order" });
+    expect(casesApi.list).toHaveBeenCalledWith({ origin: "CUSTOMER" });
   });
 
-  it("omits the source filter when no source is passed", async () => {
+  it("omits the origin filter when no origin is passed", async () => {
     const { result } = renderHook(() => useCases());
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(casesApi.list).toHaveBeenCalledWith(undefined);
   });
 
-  it("forwards the case_type filter (EMAIL_ENTRY lens) to the API", async () => {
+  it("forwards the supergroup_code filter to the API", async () => {
     const { result } = renderHook(() =>
-      useCases(undefined, { caseType: "EMAIL_ENTRY" }),
+      useCases(undefined, { supergroupCode: "SG_BLOCK_PRICING" }),
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(casesApi.list).toHaveBeenCalledWith({ case_type: "EMAIL_ENTRY" });
+    expect(casesApi.list).toHaveBeenCalledWith({
+      supergroup_code: "SG_BLOCK_PRICING",
+    });
   });
 });
 
@@ -77,7 +79,7 @@ describe("useCases — refetch", () => {
   });
 
   it("refetch() triggers a silent re-fetch (loading stays false)", async () => {
-    const { result } = renderHook(() => useCases("manual_order"));
+    const { result } = renderHook(() => useCases("CUSTOMER"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(casesApi.list).toHaveBeenCalledTimes(1);
 

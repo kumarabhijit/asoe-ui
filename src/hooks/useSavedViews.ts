@@ -23,7 +23,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type { CaseSource } from "@/types/cases";
+import type { Origin } from "@/types/cases";
 
 const STORAGE_KEY = "asoe-ui:saved-views:v2";
 const LEGACY_STORAGE_KEY = "asoe-ui:saved-views:v1";
@@ -45,8 +45,9 @@ export interface CaseSavedViewFilters {
   filterStatuses: string[];
   /** Multi-value child intents. */
   filterIntents: string[];
-  /** Single-value source filter. */
-  filterSource: CaseSource | null;
+  /** Single-value origin filter (CUSTOMER | API). Replaces the
+   *  pre-pivot `filterSource` field. */
+  filterOrigin: Origin | null;
   /** Recency preset matching the backend's `since=` param. */
   filterSince: "today" | "24h" | "7d" | "30d" | null;
   searchQuery: string;
@@ -171,9 +172,9 @@ function isValidSavedView(v: unknown): v is SavedView {
       (r.filterStatuses as unknown[]).every((s) => typeof s === "string") &&
       Array.isArray(r.filterIntents) &&
       (r.filterIntents as unknown[]).every((s) => typeof s === "string") &&
-      (r.filterSource === null
-        || r.filterSource === "manual_order"
-        || r.filterSource === "automated_order") &&
+      (r.filterOrigin === null
+        || r.filterOrigin === "CUSTOMER"
+        || r.filterOrigin === "API") &&
       (r.filterSince === null
         || r.filterSince === "today"
         || r.filterSince === "24h"

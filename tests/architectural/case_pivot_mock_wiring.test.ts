@@ -86,22 +86,39 @@ describe("case-pivot mock wiring", () => {
     }
   });
 
-  it("every mock case carries an ADR-041 case_type", async () => {
+  it("every mock case carries an origin and a supergroup_code", async () => {
+    // Post Case & Intent Super-Group pivot the EMAIL/API axis is
+    // gone; the mock layer must mirror the backend's orthogonal
+    // `origin` (CUSTOMER | API) + `supergroup_code` shape. The
+    // asserted-field-set is the lock — adding a backend field on
+    // OrderCase that the mock layer silently doesn't surface
+    // should fail here.
     const { items: cases } = await casesApi.list();
     for (const c of cases) {
-      expect(c.case_type, `case ${c.case_id} missing case_type`).toBeTruthy();
-      expect(["EMAIL_ENTRY", "BLOCK"]).toContain(c.case_type);
-      if (c.case_type === "EMAIL_ENTRY") {
-        expect(
-          c.email_classification,
-          `EMAIL_ENTRY case ${c.case_id} missing email_classification`,
-        ).toBeTruthy();
-      } else {
-        expect(
-          c.email_classification ?? null,
-          `BLOCK case ${c.case_id} must have email_classification=null`,
-        ).toBeNull();
-      }
+      expect(c.origin, `case ${c.case_id} missing origin`).toBeTruthy();
+      expect(["CUSTOMER", "API"]).toContain(c.origin);
+      expect(
+        c.supergroup_code,
+        `case ${c.case_id} missing supergroup_code`,
+      ).toBeTruthy();
+      expect(c.supergroup_code).toMatch(/^SG_/);
+      // Phase 2 §8.4 — every case carries the projected RDD-miss
+      // flag (defaults to false on rows the projector hasn't
+      // stamped). Field-set lock; the value itself is not asserted.
+      expect(typeof c.will_miss_rdd).toBe("boolean");
+      // The retired legacy axes MUST NOT leak back into mock rows.
+      expect(
+        (c as unknown as Record<string, unknown>).source,
+        `case ${c.case_id} carries retired field 'source'`,
+      ).toBeUndefined();
+      expect(
+        (c as unknown as Record<string, unknown>).case_type,
+        `case ${c.case_id} carries retired field 'case_type'`,
+      ).toBeUndefined();
+      expect(
+        (c as unknown as Record<string, unknown>).email_classification,
+        `case ${c.case_id} carries retired field 'email_classification'`,
+      ).toBeUndefined();
     }
   });
 

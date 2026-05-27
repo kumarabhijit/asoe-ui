@@ -11,8 +11,8 @@
 // responsive-collapse + pin-selection work lands.
 //
 // Architecturally:
-//   * No per-intent dispatch (Guardrail #1). Source vocabulary from
-//     ALLOWED_CASE_SOURCES (api.ts boundary).
+//   * No per-intent dispatch (Guardrail #1). Origin vocabulary from
+//     ALLOWED_CASE_ORIGINS (api.ts boundary).
 //   * No threshold logic in page code — `slaSnapshot` is exported as
 //     a pure derivation (visual policy ratified by Frontend Platform).
 //   * `/cases/[id]` survives as a focused single-case view for deep
@@ -34,7 +34,7 @@ import {
 import { useSignOut } from "@/hooks/useSignOut";
 import { Badge } from "@/components/ui/Badge";
 import { NavBar } from "@/components/ui/NavBar";
-import { ALLOWED_CASE_SOURCES, casesApi } from "@/lib/api";
+import { ALLOWED_CASE_ORIGINS, casesApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useKeyboardListNav } from "@/hooks/useKeyboardListNav";
@@ -48,9 +48,8 @@ import {
 import { STATUS_LABEL } from "@/lib/cases";
 import { cn } from "@/lib/utils";
 import type {
-  CaseSource,
   CaseStatus,
-  CaseType,
+  Origin,
   OrderCase,
   SlaBand,
   SlaSnapshot,
@@ -63,15 +62,18 @@ import { NAV_TABS } from "@/config/nav-tabs";
 
 /* ── Visual mappings (vendor-neutral; per-source / per-status badge style) ── */
 
-const SOURCE_LABEL: Record<CaseSource | "default", string> = {
-  manual_order: "Manual",
-  automated_order: "Automated",
-  default: "Unknown source",
+// Origin chrome — KEEP the "Customer Inbox" label per requirements
+// §4 Q7. The internal field flipped from CaseSource to Origin but
+// the partner-facing chrome stays.
+const ORIGIN_LABEL: Record<Origin | "default", string> = {
+  CUSTOMER: "Customer Inbox",
+  API: "API",
+  default: "Unknown origin",
 };
 
-const SOURCE_ICON: Record<CaseSource | "default", React.ReactNode> = {
-  manual_order: <Mail size={12} aria-hidden />,
-  automated_order: <PackageCheck size={12} aria-hidden />,
+const ORIGIN_ICON: Record<Origin | "default", React.ReactNode> = {
+  CUSTOMER: <Mail size={12} aria-hidden />,
+  API: <PackageCheck size={12} aria-hidden />,
   default: <Clock size={12} aria-hidden />,
 };
 
@@ -138,14 +140,14 @@ function formatDeltaShort(ms: number): string {
 /* ── Filters ────────────────────────────────────────────────────── */
 
 interface CasesFilters {
-  source: CaseSource | null;
-  case_type: CaseType | null;
+  origin: Origin | null;
   status: CaseStatus | null;
 }
 
-// The Customer Inbox lens (ADR-042) is the EMAIL_ENTRY slice of /cases.
-// Typed once here so the chip carries no bare enum literal in JSX.
-const INBOX_LENS_CASE_TYPE: CaseType = "EMAIL_ENTRY";
+// The Customer Inbox lens (requirements §3/§4 Q7) is the CUSTOMER
+// origin slice of /cases. Typed once here so the chip carries no
+// bare enum literal in JSX (Guardrail #1).
+const INBOX_LENS_ORIGIN: Origin = "CUSTOMER";
 
 
 /* ── Page ───────────────────────────────────────────────────────── */
@@ -213,8 +215,7 @@ function CasesWorkspace() {
   const selectedRecordId = search?.get("record") ?? undefined;
 
   const [filters, setFilters] = useState<CasesFilters>({
-    source: null,
-    case_type: null,
+    origin: null,
     status: null,
   });
 
@@ -238,9 +239,7 @@ function CasesWorkspace() {
     cases: rawCases,
     loading: listLoading,
     refetch,
-  } = useCases(filters.source ?? undefined, {
-    caseType: filters.case_type ?? undefined,
-  });
+  } = useCases(filters.origin ?? undefined);
 
   // useCases doesn't take a status filter; apply it client-side so
   // the chip toolbar stays responsive without an extra round-trip.
@@ -486,9 +485,11 @@ function CasesWorkspace() {
           </p>
         </div>
 
-        {/* Filter chips. ALLOWED_CASE_SOURCES comes from the api.ts
-            boundary; page code never names the source literals
-            inline (Guardrail #1). */}
+        {/* Filter chips. ALLOWED_CASE_ORIGINS comes from the api.ts
+            boundary; page code never names the origin literals
+            inline (Guardrail #1). The "Customer Inbox" label on the
+            CUSTOMER chip is the visible partner-facing chrome
+            (requirements §4 Q7). */}
         <div
           role="toolbar"
           aria-label="Case filters"
@@ -496,38 +497,26 @@ function CasesWorkspace() {
         >
           <FilterChip
             label="All"
-            active={filters.source === null && filters.case_type === null}
-            onClick={() =>
-              setFilters((f) => ({ ...f, source: null, case_type: null }))
-            }
+            active={filters.origin === null}
+            onClick={() => setFilters((f) => ({ ...f, origin: null }))}
           />
-          {ALLOWED_CASE_SOURCES.map((src) => (
+          {ALLOWED_CASE_ORIGINS.map((o) => (
             <FilterChip
-              key={src}
-              label={SOURCE_LABEL[src as CaseSource] ?? SOURCE_LABEL.default}
-              active={filters.source === src}
+              key={o}
+              label={ORIGIN_LABEL[o as Origin] ?? ORIGIN_LABEL.default}
+              active={
+                o === INBOX_LENS_ORIGIN
+                  ? filters.origin === INBOX_LENS_ORIGIN
+                  : filters.origin === o
+              }
               onClick={() =>
                 setFilters((f) => ({
                   ...f,
-                  source: f.source === src ? null : (src as CaseSource),
+                  origin: f.origin === o ? null : (o as Origin),
                 }))
               }
             />
           ))}
-          {/* Customer Inbox lens (ADR-042) — the EMAIL_ENTRY slice. */}
-          <FilterChip
-            label="Customer Inbox"
-            active={filters.case_type === INBOX_LENS_CASE_TYPE}
-            onClick={() =>
-              setFilters((f) => ({
-                ...f,
-                case_type:
-                  f.case_type === INBOX_LENS_CASE_TYPE
-                    ? null
-                    : INBOX_LENS_CASE_TYPE,
-              }))
-            }
-          />
         </div>
 
         <div className="flex-1 overflow-y-auto min-h-0">
@@ -588,11 +577,11 @@ function CasesWorkspace() {
                     >
                       <div className="flex items-center gap-8">
                         <Badge variant="neutral" size="sm">
-                          {SOURCE_ICON[case_.source as CaseSource] ??
-                            SOURCE_ICON.default}
+                          {ORIGIN_ICON[case_.origin as Origin] ??
+                            ORIGIN_ICON.default}
                           <span className="ml-4">
-                            {SOURCE_LABEL[case_.source as CaseSource] ??
-                              SOURCE_LABEL.default}
+                            {ORIGIN_LABEL[case_.origin as Origin] ??
+                              ORIGIN_LABEL.default}
                           </span>
                         </Badge>
                         <Badge
