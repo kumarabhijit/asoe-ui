@@ -33,12 +33,26 @@ import { encode } from "next-auth/jwt";
 
 /**
  * Defaults match the docs/testing/auth-modes.md matrix. The
- * NEXTAUTH_SECRET must agree with the dev server's so the cookie
- * decodes server-side; playwright.config.ts sets it for the
- * webServer.
+ * NEXTAUTH_SECRET MUST agree with the dev server's so the cookie
+ * decodes server-side.
+ *
+ * playwright.config.ts sets NEXTAUTH_SECRET on the dev server via
+ * `webServer.env` — but `webServer.env` does NOT propagate to the
+ * Playwright test-runner process. So `process.env.NEXTAUTH_SECRET`
+ * read here would fall through to the literal default and the cookie
+ * would silently fail to decode (server sees a different secret → no
+ * session → tests pass by accident with an empty session).
+ *
+ * To prevent the mismatch we hard-pin the same secret on both sides.
+ * If you change this string, change `playwright.config.ts`'s
+ * `webServer.env.NEXTAUTH_SECRET` together; the architectural lock
+ * in tests/architectural/entra_fixture_shape.test.ts asserts they
+ * stay in sync.
  */
+export const PLAYWRIGHT_NEXTAUTH_SECRET = "test-secret-browser-e2e-only";
+
 const NEXTAUTH_SECRET =
-  process.env.NEXTAUTH_SECRET ?? "playwright-entra-secret";
+  process.env.NEXTAUTH_SECRET ?? PLAYWRIGHT_NEXTAUTH_SECRET;
 
 const COOKIE_NAME = "next-auth.session-token";
 

@@ -64,4 +64,28 @@ describe("entra fixture: shape parity with src/lib/auth.ts", () => {
     expect(FIXTURE).toMatch(/server-side/i);
     expect(FIXTURE).toMatch(/page\.route/i);
   });
+
+  it("fixture NEXTAUTH_SECRET matches playwright.config.ts webServer env", () => {
+    // CRITICAL: playwright.config.ts sets the secret on the dev
+    // server's `webServer.env`, which does NOT propagate to the
+    // Playwright test-runner process. Reading `process.env.NEXTAUTH_SECRET`
+    // in the fixture would fall through to the literal default;
+    // the cookie would silently fail to decode and every entra
+    // spec would pass against an empty session.
+    //
+    // We pin both sides to the same constant. This lock fails if
+    // the two strings ever drift.
+    const config = readFileSync(
+      path.resolve(__dirname, "../../playwright.config.ts"), "utf-8",
+    );
+    const fixtureMatch = FIXTURE.match(
+      /PLAYWRIGHT_NEXTAUTH_SECRET\s*=\s*"([^"]+)"/,
+    );
+    expect(fixtureMatch, "fixture must export PLAYWRIGHT_NEXTAUTH_SECRET").toBeTruthy();
+    const fixtureSecret = fixtureMatch![1];
+    const configMatch = config.match(/NEXTAUTH_SECRET:\s*"([^"]+)"/);
+    expect(configMatch, "playwright.config.ts must set NEXTAUTH_SECRET").toBeTruthy();
+    const configSecret = configMatch![1];
+    expect(fixtureSecret).toBe(configSecret);
+  });
 });
