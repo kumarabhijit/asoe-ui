@@ -27,8 +27,10 @@ import { useEffect, useState } from "react";
 import { Mail, PackageCheck, Clock, ShieldAlert, ChevronRight, ChevronDown } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
+import { ClassificationHistoryPanel } from "@/components/cases/ClassificationHistoryPanel";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { PolicyHitBadge } from "@/components/ui/PolicyHitBadge";
+import { useClassificationHistory } from "@/hooks/useClassificationHistory";
 import type { Origin, OrderCase, SlaBand } from "@/types/cases";
 import type { ExceptionDetailResponse } from "@/types/api";
 import { STATUS_LABEL, lastActivityLabel, sourceChannelLabel } from "@/lib/cases";
@@ -138,6 +140,12 @@ export function CaseDetailPanel({
   const now = useSlaTicker();
   const sla = slaSnapshot(orderCase, now);
   const hasPolicyHits = (policyHits ?? []).length > 0;
+  // Requirements §8.6 — classification-history audit strip.
+  const {
+    entries: classificationHistory,
+    loading: classificationHistoryLoading,
+    error: classificationHistoryError,
+  } = useClassificationHistory(orderCase.case_id);
   const records = attachedRecords ?? [];
   const hasAttachedRecords = records.length > 0;
   // When a record is selected, the per-record HITL ribbon is the
@@ -348,6 +356,13 @@ export function CaseDetailPanel({
           </ul>
         </section>
       )}
+
+      {/* ── Classification history (requirements §8.6) ────────── */}
+      <ClassificationHistoryPanel
+        entries={classificationHistory}
+        loading={classificationHistoryLoading}
+        error={classificationHistoryError}
+      />
 
       {/* ── Attached records picker ──────────────────────────────
           Stacked at the top of the detail pane so the operator picks

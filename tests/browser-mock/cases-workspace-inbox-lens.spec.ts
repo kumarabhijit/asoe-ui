@@ -2,11 +2,12 @@
  * Customer Inbox lens — operator journey (MOCK MODE, Pattern B).
  *
  * Pairs with the source lock tests/architectural/customer_inbox_lens.test.ts.
- * The EMAIL_ENTRY lens (ADR-042) is a filter chip on /cases wired to the
- * case_type filter. This journey proves the chip filters the live queue in a
- * real browser and is reversible — the per-case correctness (every returned
- * case IS EMAIL_ENTRY) is locked deterministically in
- * tests/lib/cases_api_case_type.test.ts.
+ * The Customer Inbox lens (requirements §3 / §4 Q7) is a filter chip on
+ * /cases wired to `origin=CUSTOMER` post Case & Intent Super-Group pivot.
+ * This journey proves the chip filters the live queue in a real browser and
+ * is reversible — the per-case correctness (every returned case carries
+ * origin=CUSTOMER) is locked deterministically in
+ * tests/lib/cases_api_supergroup.test.ts.
  *
  * Mock mode: self-contained (next dev, no backend). Run via
  * `npm run test:browser:mock`.
@@ -35,7 +36,7 @@ test.describe("Customer Inbox lens (mock mode)", () => {
     const allCount = await page.getByRole("option").count();
     expect(allCount).toBeGreaterThan(0);
 
-    // Activate the lens — the queue refetches with case_type=EMAIL_ENTRY.
+    // Activate the lens — the queue refetches with origin=CUSTOMER.
     await inboxChip.click();
     await expect(inboxChip).toHaveAttribute("aria-pressed", "true");
     await expect
