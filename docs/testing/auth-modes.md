@@ -89,12 +89,24 @@ valid identity hit the wall" is more useful intact.
 * **seed mode** (current): `tests/browser/_helpers.ts::createSession`
   mints a seed JWT via the asoe2 `create_test_token` helper and sets
   the NextAuth session cookie directly. No real OAuth flow.
-* **entra mode** (PARITY-3a follow-up): a fixture stubs the Entra
-  authorize / token / userinfo endpoints with a fake JWKS so the
-  OAuth code flow completes deterministically against a recorded
-  Azure response. Both code paths converge on the same `useSession`
-  shape — tests can assert `session.authMode` to verify the right
-  branch ran.
+* **entra mode**: `tests/browser/_entra-fixture.ts` exports
+  `createEntraSession(context, opts)` + `loginAsEntra(page, opts)`.
+  Implementation note: the fixture **mints the NextAuth session
+  cookie directly** rather than driving the OAuth redirect chain
+  through Microsoft. NextAuth's token + userinfo fetches run
+  server-side inside Next.js; `page.route` only intercepts browser
+  traffic, so a full code-flow stub would require running an
+  additional Microsoft HTTP server and rewriting `ASOE_TENANT_ID`
+  at process start — an order of magnitude more setup for tests
+  that are exercising **UI state given an entra session**, not the
+  OAuth flow itself (NextAuth's own tests cover that). Both
+  auth-mode paths converge on the same `useSession()` shape, so
+  the spec asserting `session.authMode === "entra"` verifies the
+  azure-ad jwt callback ran.
+
+  Reference spec: `tests/browser/entra-mode.spec.ts` — exercises
+  the session shape, the `PreprodIdentityBanner`, and the
+  no-role-for-tenant `/403` middleware branch.
 
 When adding a new browser test that exercises an authenticated route,
 default to seed mode unless you're specifically validating an Entra
