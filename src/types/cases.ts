@@ -1,10 +1,13 @@
 /**
  * Case-centric types — mirrors asoe2/contracts/models.py per ADR-038 §6.1.
  *
- * Phase H.6 introduces OrderCase as the parent surface the CSR works
- * against. Existing ExceptionRecord stays as the per-event child;
- * ExceptionSummary / ExceptionDetail in src/types/exceptions.ts are
- * unchanged. This file extends the type surface; nothing renames.
+ * Post Case & Intent Super-Group pivot: the legacy EMAIL/API axis
+ * (source + case_type + email_classification) has been replaced by
+ * the orthogonal pair `origin` (who initiated the case) +
+ * `supergroup_code` (which Intent Super-Group the case classifies
+ * under, sourced from `src/generated/taxonomy.ts`). See asoe2's
+ * `docs/specs/case-intent-supergroup-requirements.md` for the
+ * sign-off doc.
  *
  * Per CLAUDE.md Guardrail #3 — types match asoe2's Pydantic
  * field-for-field. When asoe2 adds a field to OrderCase, this file
@@ -12,37 +15,20 @@
  */
 
 /**
- * ADR-038 §3.1 — case source (immutable at open).
+ * Requirements §3 glossary — who initiated the case.
  *
- * Manual = email/phone/fax (CSR reads prose to extract).
- * Automated = EDI X12 / portal / API feed / FTP / VMI (no prose).
- */
-export type CaseSource = "manual_order" | "automated_order";
-
-/**
- * ADR-041 §1 — Why ASOE materialised this case. Orthogonal to
- * `CaseSource` (which describes how the order originated). Mirrors
- * `asoe2/contracts/models.py::CaseType` field-for-field.
+ * - `CUSTOMER` drives the Customer Inbox lens (emails, portal forms,
+ *   phone/fax intakes — anywhere the operator reads buyer prose to
+ *   extract intent).
+ * - `API` is the SAP-pushed block path (EDI X12 / portal / VMI /
+ *   anything where the order arrived as a structured payload that
+ *   carried its own block reason).
  *
- * - `EMAIL_ENTRY` — customer email arrived; case carries an
- *   `email_classification` (1:1 with the intake).
- * - `BLOCK` — SAP order carried a block reason; each child
- *   ExceptionRecord carries the raw `sap_block_code` (1:N).
+ * Replaces the legacy `CaseSource` ("manual_order"/"automated_order")
+ * + `CaseType` ("EMAIL_ENTRY"/"BLOCK") + `EmailClassification` axes
+ * the Case & Intent Super-Group pivot retired.
  */
-export type CaseType = "EMAIL_ENTRY" | "BLOCK";
-
-/**
- * ADR-041 §2 — Per-intake classification for an EMAIL_ENTRY case.
- * Mirrors `asoe2/contracts/models.py::EmailClassification`. Set once
- * at case open by the email-classification graph node; never mutates.
- * `null` for any case where `case_type !== "EMAIL_ENTRY"`.
- */
-export type EmailClassification =
-  | "NEW_ORDER"
-  | "ORDER_CHANGE"
-  | "INQUIRY"
-  | "COMPLAINT"
-  | "OTHER";
+export type Origin = "CUSTOMER" | "API";
 
 /** ADR-038 §6.1 — 7-state case lifecycle. Distinct from per-exception
  *  LifecycleState. */
@@ -55,8 +41,10 @@ export type CaseStatus =
   | "FAILED"
   | "BLOCKED";
 
-/** ADR-038 §7.1 — graduated materialisation tier. */
-export type CaseTier = 1 | 2 | 3;
+/** ADR-038 §7.1 — graduated materialisation tier. Phase 2 §8.4 SLA
+ *  bucketing introduced tier 4 (no-SLA / inert) alongside the original
+ *  1/2/3 ladder. */
+export type CaseTier = 1 | 2 | 3 | 4;
 
 /**
  * The OrderCase entity. Mirrors `asoe2/contracts/models.py::OrderCase`
@@ -69,15 +57,23 @@ export interface OrderCase {
   tenant_id: string;
   customer_id?: string | null;
 
-  source: CaseSource;
+  /** Requirements §3 — who initiated this case. */
+  origin: Origin;
+  /** Orthogonal transport channel (email | edi_x12_850 | api | …). */
   source_channel: string;
 
-  /** ADR-041 §1 — why ASOE materialised this case. Always present
-   *  on records that exist as cases (backend defaults from `source`
-   *  if not provided at lookup_or_create). */
-  case_type: CaseType;
-  /** ADR-041 §2 — present iff `case_type === "EMAIL_ENTRY"`. */
-  email_classification?: EmailClassification | null;
+  /** Requirements §6 — the Intent Super-Group this case classifies
+   *  under (e.g. `SG_BLOCK_PRICING`). Populated by the classifier;
+   *  unmapped intakes land on `SG_NEEDS_TRIAGE` or `SG_BLOCK_UNMAPPED`
+   *  (Phase 2 §6 sentinel codes). String at the wire level — the
+   *  generated `SupergroupCode` union in `src/generated/taxonomy.ts`
+   *  is the canonical type for places that branch on the value. */
+  supergroup_code?: string;
+
+  /** Phase 5 — reclassification anchor: when a case is split or
+   *  rerouted, the new case points back at the case it superseded.
+   *  `null` on freshly-opened cases. */
+  predecessor_case_id?: string | null;
 
   customer_po_number?: string | null;
   sales_order_id?: string | null;
@@ -95,6 +91,18 @@ export interface OrderCase {
   updated_at?: string | null;
   status: CaseStatus;
   sla_deadline?: string | null;
+
+  /** Phase 2 §8.4 — projected SLA deadline derived from the case's
+   *  supergroup + tier. Distinct from `sla_deadline` (which carries
+   *  the negotiated/honoured deadline once committed). `null` for
+   *  tier-4 inert cases. */
+  sla_due_at?: string | null;
+
+  /** Phase 2 §8.4 — true when the agent's projection is that the
+   *  case will not meet its Requested Delivery Date. Drives the
+   *  `breached` / `at_risk` visual bands; defaults to false on
+   *  rows the projector has not stamped yet. */
+  will_miss_rdd: boolean;
 
   tier: CaseTier;
 

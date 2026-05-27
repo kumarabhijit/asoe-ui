@@ -179,12 +179,56 @@ export interface GatewayResponse {
 /* ── Exception record (persistence model) ──────────────────────────── */
 
 /** ExceptionSummary — list view (GET /api/v1/exceptions) */
+/**
+ * The per-event child record attached to an OrderCase
+ * (`asoe2/contracts/models.py::ChildCase`). UI calls it
+ * `ExceptionSummary` for historical reasons; the field set mirrors
+ * the backend `ChildCase` Pydantic model field-for-field.
+ *
+ * Post Case & Intent Super-Group pivot (Phase 2 §6) records carry
+ * their own supergroup_code + intent_code (the leaf intent inside
+ * the supergroup). For partner roles the backend redacts
+ * `divergence_reason` to null and coarsens upstream classifier
+ * attribution; the UI just renders what it receives.
+ */
 export interface ExceptionSummary {
   id: string;
   tenant_id: string;
   order_id: string;
   event_type: string;
   intent?: string;
+  /** Phase 2 §6 — the leaf intent inside the parent supergroup
+   *  (e.g. `INT_PRICE_MISMATCH`). The canonical typed union lives
+   *  in `src/generated/taxonomy.ts::IntentCode`; this stays string
+   *  at the wire to tolerate unknown codes (Guardrail #2). The
+   *  legacy `intent` field above remains populated as a runtime
+   *  fallback during the transition window. */
+  intent_code?: string;
+  /** Phase 2 §6 — the Intent Super-Group the record classifies
+   *  under (e.g. `SG_BLOCK_PRICING`). Typed `SupergroupCode` in
+   *  `src/generated/taxonomy.ts`. */
+  supergroup_code?: string;
+  /** Phase 2 §6 — set when the child's classification diverges
+   *  from the parent case's supergroup. Redacted to `null` on
+   *  partner-role responses. */
+  divergence_reason?: string | null;
+  /** Phase 2 §8.5 — the SAP block field this child record carries.
+   *  `LIFSK`/`LIFSP` = delivery-block header/item, `FAKSK`/`FAKSP`
+   *  = billing-block header/item, `ABGRU` = order-reject code,
+   *  `CMGST` = credit-management status, `Z_CUSTOM` = tenant
+   *  custom field. `null` for non-SAP records. */
+  sap_block_field?:
+    | "LIFSK"
+    | "LIFSP"
+    | "FAKSK"
+    | "FAKSP"
+    | "ABGRU"
+    | "CMGST"
+    | "Z_CUSTOM"
+    | null;
+  /** Phase 2 §8.5 — whether the SAP block applies to the order
+   *  header or a specific line item. `null` when not applicable. */
+  scope?: "HEADER" | "ITEM" | null;
   lifecycle_state: LifecycleState;
   shadow_verdict?: ShadowVerdict;
   selected_recipe?: string;
@@ -199,10 +243,10 @@ export interface ExceptionSummary {
    *  to a case. None on Tier-1 stateless records and pre-Phase-H.3
    *  legacy rows. UI uses this for the "View case" deeplink. */
   parent_case_id?: string | null;
-  /** ADR-041 §2 — raw SAP block reason code on records whose parent
-   *  case is `case_type === "BLOCK"`. Distinct from `intent` (the
-   *  classified business intent recipes dispatch on). `null` on
-   *  EMAIL_ENTRY-parented records and pre-ADR-041 legacy rows. */
+  /** Phase 2 §8.5 — raw SAP block reason code (`LIFSK=Z1`, `ABGRU=42`,
+   *  …) for records whose parent case has origin=API. Distinct from
+   *  `intent` (the classified business intent recipes dispatch on).
+   *  `null` on customer-origin records and pre-ADR-041 legacy rows. */
   sap_block_code?: string | null;
 }
 
@@ -1348,11 +1392,12 @@ export interface HealthResponse {
    */
   allowed_case_statuses?: string[];
   /**
-   * Phase 28.5.x §D1 — the two `CaseSource` values
-   * (manual_order | automated_order). Once present, `ALLOWED_CASE_SOURCES`
-   * in `src/lib/api.ts` is retired and this is the only source.
+   * Requirements §3 — the two `Origin` values (CUSTOMER | API)
+   * surfaced via `/api/v1/health` so the UI never branches on
+   * hardcoded literals (Guardrail #1). Replaces the pre-pivot
+   * `allowed_case_sources` field.
    */
-  allowed_case_sources?: string[];
+  allowed_case_origins?: string[];
   /**
    * ADR-042 §5/§8 — the version the `allowed_autonomy_levels` rows resolve
    * under (asoe2/contracts/autonomy.py::CURRENT_AUTONOMY_VOCAB_VERSION).
@@ -1378,4 +1423,50 @@ export interface AutonomyLevelInfo {
   level: string;
   label: string;
   rank: number;
+}
+
+/* ── Classification history (requirements §8.6) ──────────────────── */
+
+/**
+ * Which actor stamped the classification row. The `HUMAN | MODEL |
+ * RULE` enum is closed at the backend (V020 trigger), so it's safe
+ * to constrain at the type level.
+ */
+export type ClassifierType = "HUMAN" | "MODEL" | "RULE";
+
+/**
+ * One row of the case's classification audit trail. Mirrors
+ * `asoe2/contracts/models.py::ClassificationEvent` and the
+ * `case_classification_history` table (V020).
+ *
+ * Partner-role responses are redacted server-side: `reason_text` and
+ * `model_version` come back as `null`, and `classified_by` is
+ * coarsened to one of `"internal:human"` / `"internal:model"` /
+ * `"internal:rule"` (the row's identity is hidden but the actor
+ * class is preserved). The UI renders the coarse tokens cleanly —
+ * see `ClassificationHistoryPanel`.
+ */
+export interface ClassificationHistoryEntry {
+  id: string;
+  case_id: string;
+  child_case_id?: string | null;
+  supergroup_code: string;
+  intent_code?: string | null;
+  classified_at: string;
+  classified_by: string;
+  classifier_type: ClassifierType;
+  model_version?: string | null;
+  reason_text?: string | null;
+  source_event_id?: string | null;
+  taxonomy_version: string;
+}
+
+/**
+ * GET /api/v1/cases/{case_id}/classification-history — append-order
+ * audit response. `total` is the row count; callers paginate
+ * client-side today (single-digit depth in the audit window).
+ */
+export interface ClassificationHistoryResponse {
+  items: ClassificationHistoryEntry[];
+  total: number;
 }
