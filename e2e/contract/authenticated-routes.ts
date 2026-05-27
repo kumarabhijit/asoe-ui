@@ -40,6 +40,11 @@ export interface AuthenticatedRoute {
 export const PUBLIC_ROUTES: readonly string[] = [
   "/login",
   "/auth/callback",
+  // PARITY-3a — no-role-for-tenant landing page. Public because the
+  // middleware redirects authenticated-but-unprivileged identities
+  // here without forcing a sign-out; the route itself does not gate
+  // on roles.
+  "/403",
 ] as const;
 
 // Routes whose source page.tsx exists but which do not host a
