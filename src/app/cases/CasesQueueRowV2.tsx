@@ -33,6 +33,7 @@ import type { CaseListItem, CaseSummaryDollarImpact } from "@/lib/api";
 import type { Origin, SlaBand, SlaSnapshot } from "@/types/cases";
 import { formatCurrency, formatCurrencyForA11y } from "@/lib/format";
 import type { RowDensity } from "@/hooks/useRowDensity";
+import { reportRowClick } from "@/lib/telemetry";
 
 const ORIGIN_LABEL: Record<Origin | "default", string> = {
   CUSTOMER: "Customer Inbox",
@@ -64,6 +65,10 @@ export interface CasesQueueRowV2Props {
   isPinned: boolean;
   density: RowDensity;
   onSelect: (caseId: string) => void;
+  /** Position in the visible queue (0-indexed) at render time.
+   *  Surfaced into the row-click telemetry so the backend can
+   *  correlate "top-row click rate" with SLA-sort effectiveness. */
+  rowIndex?: number;
 }
 
 export function CasesQueueRowV2({
@@ -73,9 +78,21 @@ export function CasesQueueRowV2({
   isPinned,
   density,
   onSelect,
+  rowIndex,
 }: CasesQueueRowV2Props) {
   const compact = density === "compact";
   const ariaLabel = buildAriaLabel(case_, sla);
+
+  // ADR-041 P3e Phase 3 sign-off gate #5 — row-click telemetry.
+  // Best-effort, no-op in mock mode, never blocks selection.
+  function handleClick() {
+    reportRowClick({
+      case_id: case_.case_id,
+      row_index: rowIndex,
+      audit_verdict_color: case_.audit_verdict_color ?? null,
+    });
+    onSelect(case_.case_id);
+  }
 
   return (
     <div className="relative">
@@ -99,7 +116,7 @@ export function CasesQueueRowV2({
         data-keyboard-nav-id={case_.case_id}
         data-pinned={isPinned || undefined}
         data-density={density}
-        onClick={() => onSelect(case_.case_id)}
+        onClick={handleClick}
         className={cn(
           "w-full text-left flex flex-col",
           "py-12 pr-16",
