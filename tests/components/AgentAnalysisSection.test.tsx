@@ -21,6 +21,9 @@ const ANALYSIS: OrderAnalysis = {
   root_cause: "Sample root cause.",
   recommendation: "Sample recommendation.",
   confidence: 80,
+  risk: "MEDIUM",
+  resolution: "Sample resolution prose.",
+  lines: [],
 };
 
 // IntersectionObserver doesn't exist in jsdom; install a spy.
