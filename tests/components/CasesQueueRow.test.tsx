@@ -27,7 +27,7 @@ const CASE: CaseListItem = {
   customer_po_number: "PO-2026-0062",
   opened_at: "2026-05-10T08:00:00Z",
   updated_at: "2026-05-10T09:00:00Z",
-  status: "PENDING_REVIEW",
+  status: "OPEN_AWAITING_HUMAN",
   will_miss_rdd: false,
   tier: 2,
   child_intents: [],

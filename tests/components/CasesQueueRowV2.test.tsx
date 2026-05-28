@@ -33,7 +33,7 @@ const FULL_CASE: CaseListItem = {
   customer_po_number: "PO-2026-0062",
   opened_at: "2026-05-10T08:00:00Z",
   updated_at: "2026-05-10T09:00:00Z",
-  status: "ESCALATED",
+  status: "OPEN_AWAITING_HUMAN",
   will_miss_rdd: false,
   tier: 2,
   child_intents: ["EMAIL_COMPLAINT"],
@@ -71,7 +71,7 @@ describe("CasesQueueRowV2 — full data", () => {
     );
     const row = screen.getByRole("option");
     expect(within(row).getByText("Customer Inbox")).toBeInTheDocument();
-    expect(within(row).getByText(/ESCALATED|Escalated/i)).toBeInTheDocument();
+    expect(within(row).getByText(/Awaiting review/i)).toBeInTheDocument();
     expect(within(row).getByText("EML-CMP-2026-0062")).toBeInTheDocument();
     expect(within(row).getByText("acme-corp")).toBeInTheDocument();
     expect(within(row).getByText("BEV-COLA-12PK")).toBeInTheDocument();
