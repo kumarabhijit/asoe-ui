@@ -31,6 +31,14 @@ function makeItem(i: number): CaseListItem {
     will_miss_rdd: false,
     tier: 2,
     child_intents: [],
+    // ADR-041 P3e §3.1 — CaseSummary projection (mock-null).
+    customer_name: null,
+    top_line_sku_code: null,
+    top_line_sku_title: null,
+    problem_one_liner: null,
+    intent: null,
+    dollar_impact: null,
+    audit_verdict_color: null,
   };
 }
 
