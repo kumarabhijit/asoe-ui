@@ -62,6 +62,26 @@ describe("cases workspace audit rail (ADR-041 P3e §2.3)", () => {
     );
   });
 
+  it("rail stacks ComplianceHitsRail + RecordPreviewRail (PO #1)", () => {
+    // 2026-05-28 UX panel synthesis (PO finding #1): the rail's
+    // 320px third column was sparse. Compliance Hits stays at
+    // the top; RecordPreviewRail (AI-drafted reply on Phase 1)
+    // stacks below. No tabs — Compliance SME vetoed swapping
+    // hits off-screen.
+    expect(PAGE).toMatch(
+      /import\s*\{\s*RecordPreviewRail\s*\}\s*from\s*["']\.\/RecordPreviewRail["']/,
+    );
+    expect(PAGE).toMatch(/<RecordPreviewRail\s+selectedRecordId=/);
+    // ComplianceHitsRail must mount BEFORE RecordPreviewRail in
+    // source order — SOX evidence-of-review can't drop below the
+    // preview.
+    const hitsIdx = PAGE.indexOf("<ComplianceHitsRail hits={policyHits");
+    const previewIdx = PAGE.indexOf("<RecordPreviewRail");
+    expect(hitsIdx).toBeGreaterThan(-1);
+    expect(previewIdx).toBeGreaterThan(-1);
+    expect(hitsIdx).toBeLessThan(previewIdx);
+  });
+
   it("renders an xl:hidden inline ComplianceHitsRail for lg fallback", () => {
     // At lg the panel's own inline section is suppressed by the
     // prop above; the page must re-render the hits as a sibling
