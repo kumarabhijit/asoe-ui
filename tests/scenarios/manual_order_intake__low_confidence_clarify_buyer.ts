@@ -22,6 +22,14 @@ export const MANUAL_ORDER_INTAKE__low_confidence_clarify_buyer: BehaviourScenari
     will_miss_rdd: false,
     tier: 2,
     child_intents: ["MANUAL_ORDER_INTAKE"],
+    // ADR-041 P3e §3.1 — CaseSummary projection (mock-null).
+    customer_name: null,
+    top_line_sku_code: null,
+    top_line_sku_title: null,
+    problem_one_liner: null,
+    intent: "MANUAL_ORDER_INTAKE",
+    dollar_impact: null,
+    audit_verdict_color: null,
   },
   records: [
     {

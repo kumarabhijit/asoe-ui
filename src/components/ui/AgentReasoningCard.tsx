@@ -30,11 +30,10 @@
  */
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { Zap, Check, AlertTriangle, ShieldX, MessageSquare, XCircle, RotateCcw } from "lucide-react";
+import { type ReactNode } from "react";
+import { Zap, Check, AlertTriangle, ShieldX, XCircle } from "lucide-react";
 import { Badge, verdictVariant } from "./Badge";
-import { Button } from "./Button";
-import { actionLabel as resolveActionLabel } from "@/lib/cases";
+import { ActionButtonMatrix } from "./ActionButtonMatrix";
 import { PolicyHitBadge } from "./PolicyHitBadge";
 import { cn } from "@/lib/utils";
 import { useIntentLabel } from "@/hooks/useErpProfile";
@@ -116,6 +115,16 @@ interface AgentReasoningCardProps {
   /** @deprecated Use `canOverride` instead. Retained for migration safety —
    *  treated as a fallback when `canOverride` is not provided. */
   isAdmin?: boolean;
+  /**
+   * ADR-041 P3e §2.2 — suppress the inline action-button matrix.
+   * Default `false` keeps today's behaviour. When `true`, the card
+   * renders the verdict / confidence / explanation surface only;
+   * the verdict × permission button matrix moves to an external
+   * `<StickyActionRibbon>` mounted at the top of the right-pane
+   * scroll container. Both consumers share `<ActionButtonMatrix>`
+   * so the verdict × permission logic stays in one place.
+   */
+  hideActionMatrix?: boolean;
   className?: string;
 }
 
@@ -197,90 +206,14 @@ export function AgentReasoningCard({
   canApprove,
   canOverride,
   canEscalate,
-  canReanalyze: canReanalyzeProp,
+  canReanalyze,
   isAdmin = false,
+  hideActionMatrix = false,
   className,
 }: AgentReasoningCardProps) {
   const isErrored = executionError !== undefined;
   const config = VERDICT_CONFIG[verdict];
   const intentLabel = useIntentLabel(intent);
-  const [pendingAction, setPendingAction] = useState<"approve" | "reject" | "reanalyze" | null>(null);
-  const [comment, setComment] = useState("");
-
-  // Migration safety — if the parent still passes `isAdmin` but not the new
-  // `canOverride` prop, honour the legacy value so no page regresses until
-  // it's updated. Once every caller has migrated this fallback can go.
-  const effectiveCanOverride = canOverride ?? isAdmin;
-  // Default the approve/escalate gates to `true` when unspecified so existing
-  // callers that pass only the `onX` handler keep working while the page
-  // layer is still being rewired.
-  const effectiveCanApprove = canApprove ?? true;
-  const effectiveCanEscalate = canEscalate ?? true;
-
-  // Re-analyze is eligible when the agent's prior outcome warrants review:
-  // YELLOW/RED compliance verdict, or an execution crash. Not shown for GREEN
-  // (auto-resolved) — matches the backend eligibility gate and closes the
-  // outcome-shopping vector flagged in the expert debate.
-  const reanalyzeAllowedByPermission = canReanalyzeProp ?? effectiveCanOverride;
-  const canReanalyze =
-    onReanalyze !== undefined
-    && reanalyzeAllowedByPermission
-    && (verdict === "YELLOW" || verdict === "RED" || isErrored)
-    && reanalyzeAttempts < reanalyzeMax;
-
-  // Any button disables everything else — prevents double-click races while
-  // a mutation is in flight. `actionLoading` preserved for legacy callers.
-  const anyActionInFlight = actionInFlight !== null || actionLoading;
-
-  // PO #11 (issue #133): "Approve / Reject" is too generic when the
-  // recommended action is something like REQUEST_CLARIFICATION (the
-  // actual action is "send the drafted email to the buyer"). The
-  // shared `actionLabel` map renders primary/secondary verbs that
-  // match what the action will do, with a one-line caption above
-  // the buttons. Falls back to plain Approve/Reject when no action
-  // is wired (e.g. RED verdicts where Override is the path forward).
-  const action = recommendedAction ? resolveActionLabel(recommendedAction) : null;
-  const primaryLabel = action?.primary ?? "Approve";
-  const secondaryLabel = action?.secondary ?? "Reject";
-  const actionCaption = action?.caption;
-  // In-flight label = first verb of the action title with an -ing
-  // suffix (sufficient for "Approve", "Send", "Block", "Merge"...).
-  // The visibleLabel helper appends "…" so the operator sees e.g.
-  // "Approving…" or "Sending…" while the request is pending.
-  const ingForm = (label: string) => {
-    const verb = label.split(/\s+/)[0] || label;
-    if (verb.endsWith("e")) return verb.slice(0, -1) + "ing";
-    return verb + "ing";
-  };
-  const primaryInProgress = ingForm(primaryLabel);
-  const secondaryInProgress = ingForm(secondaryLabel);
-
-  function confirmAction() {
-    if (pendingAction === "approve" && onApprove) onApprove(comment);
-    else if (pendingAction === "reject" && onReject) onReject(comment);
-    else if (pendingAction === "reanalyze" && onReanalyze) onReanalyze(comment);
-    setPendingAction(null);
-    setComment("");
-  }
-
-  function cancelAction() {
-    setPendingAction(null);
-    setComment("");
-  }
-
-  /**
-   * Visible label: short verb. When the action is in flight the trailing
-   * "…" is appended to the verb stem (e.g. `Approving…`). The aria-label
-   * stays the noun-phrase form regardless — screen-reader users continue
-   * to hear the same name while the text changes.
-   */
-  function visibleLabel(
-    base: string,
-    ingForm: string,
-    key: Exclude<ActionInFlight, null>,
-  ): string {
-    return actionInFlight === key ? `${ingForm}…` : base;
-  }
 
   return (
     <div className={cn("bg-surface-primary rounded-md shadow-sm overflow-hidden", className)}>
@@ -377,218 +310,31 @@ export function AgentReasoningCard({
           </div>
         )}
 
-        {/* PO #11 (issue #133): when the recommended_action implies a
-            non-obvious side effect (sending a buyer email, merging
-            POs, posting to ERP), show a one-line caption above the
-            buttons so "Approve" isn't a leap of faith. Hidden when
-            no action map applies (default Approve/Reject). */}
-        {!pendingAction && verdict === "YELLOW" && actionCaption && (
-          <p className="mt-0 mb-8 text-caption text-text-tertiary">
-            {actionCaption}
-          </p>
-        )}
-
-        {/* Action buttons — verdict × permission matrix.
-            Visible labels are short verbs; aria-labels are long noun-phrase
-            forms for screen readers (WCAG 2.5.3 consistent accessible name). */}
-        {!pendingAction && (
-          <div className="flex gap-8 flex-wrap">
-            {isErrored ? (
-              // Approve/Reject are not meaningful against a crashed execution;
-              // route operator to Escalate for triage.
-              onEscalate && effectiveCanEscalate && (
-                <Button
-                  variant="neutral"
-                  size="sm"
-                  disabled={anyActionInFlight}
-                  onClick={onEscalate}
-                  aria-label="Send for triage"
-                >
-                  {visibleLabel("Escalate", "Escalating", "escalate")}
-                </Button>
-              )
-            ) : (
-              <>
-                {verdict === "YELLOW" && (
-                  <>
-                    {onApprove && effectiveCanApprove && (
-                      <Button
-                        variant="brand"
-                        size="sm"
-                        disabled={anyActionInFlight}
-                        onClick={() => setPendingAction("approve")}
-                        aria-label={
-                          action
-                            ? `${primaryLabel} — ${formatActionLabel(recommendedAction!)}`
-                            : recommendedAction
-                              ? `Approve recommendation: ${formatActionLabel(recommendedAction)}`
-                              : "Approve recommendation"
-                        }
-                        title={
-                          actionCaption
-                            ?? (recommendedAction
-                              ? `Approve: ${formatActionLabel(recommendedAction)}`
-                              : undefined)
-                        }
-                      >
-                        {visibleLabel(primaryLabel, primaryInProgress, "approve")}
-                      </Button>
-                    )}
-                    {onReject && effectiveCanApprove && (
-                      <Button
-                        variant="neutral"
-                        size="sm"
-                        disabled={anyActionInFlight}
-                        onClick={() => setPendingAction("reject")}
-                        aria-label={
-                          action
-                            ? secondaryLabel
-                            : "Reject recommendation"
-                        }
-                      >
-                        {visibleLabel(secondaryLabel, secondaryInProgress, "reject")}
-                      </Button>
-                    )}
-                    {onOverride && effectiveCanOverride && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        disabled={anyActionInFlight}
-                        onClick={onOverride}
-                        aria-label="Choose different action"
-                        title="Choose different action"
-                      >
-                        {actionInFlight === "override" ? "Overriding…" : "Override…"}
-                      </Button>
-                    )}
-                    {onEscalate && effectiveCanEscalate && (
-                      <Button
-                        variant="neutral"
-                        size="sm"
-                        disabled={anyActionInFlight}
-                        onClick={onEscalate}
-                        aria-label="Send for triage"
-                      >
-                        {visibleLabel("Escalate", "Escalating", "escalate")}
-                      </Button>
-                    )}
-                  </>
-                )}
-                {verdict === "RED" && (
-                  <>
-                    {onOverride && effectiveCanOverride && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        disabled={anyActionInFlight}
-                        onClick={onOverride}
-                        aria-label="Choose different action"
-                        title="Choose different action"
-                      >
-                        {actionInFlight === "override" ? "Overriding…" : "Override…"}
-                      </Button>
-                    )}
-                    {onEscalate && effectiveCanEscalate && (
-                      <Button
-                        variant="neutral"
-                        size="sm"
-                        disabled={anyActionInFlight}
-                        onClick={onEscalate}
-                        aria-label="Send for triage"
-                      >
-                        {visibleLabel("Escalate", "Escalating", "escalate")}
-                      </Button>
-                    )}
-                  </>
-                )}
-                {verdict === "GREEN" && onOverride && effectiveCanOverride && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={anyActionInFlight}
-                    onClick={onOverride}
-                    aria-label="Choose different action"
-                    title="Choose different action"
-                  >
-                    {actionInFlight === "override" ? "Overriding…" : "Override…"}
-                  </Button>
-                )}
-              </>
-            )}
-            {canReanalyze && (
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={anyActionInFlight}
-                onClick={() => setPendingAction("reanalyze")}
-                aria-label="Re-analyze exception"
-                title={`Re-run this exception through a fresh Compliance Shadow (attempt ${reanalyzeAttempts + 1} of ${reanalyzeMax})`}
-              >
-                <RotateCcw size={13} className="mr-1" />
-                {actionInFlight === "reanalyze" ? "Re-analyzing…" : "Re-analyze"}
-                <span className="ml-1 font-mono opacity-60">
-                  {reanalyzeAttempts}/{reanalyzeMax}
-                </span>
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Comment input — reanalyze requires a non-empty reason (SOX). */}
-        {pendingAction && (
-          <div
-            className="flex flex-col gap-8 p-12 bg-surface-secondary rounded-sm"
-            role={pendingAction === "reanalyze" ? "dialog" : undefined}
-            aria-modal={pendingAction === "reanalyze" ? true : undefined}
-            aria-label={pendingAction === "reanalyze" ? "Reanalyze reason required" : undefined}
-          >
-            <div className="flex items-center gap-6 text-caption font-semibold text-text-secondary">
-              <MessageSquare size={14} />
-              {pendingAction === "approve"
-                ? "Approval Comment"
-                : pendingAction === "reject"
-                ? "Rejection Comment"
-                : "Reanalyze Reason (required)"}
-            </div>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder={
-                pendingAction === "approve"
-                  ? "Add approval notes (optional)..."
-                  : pendingAction === "reject"
-                  ? "Provide rejection reason..."
-                  : "Why should this be re-run? (e.g., new contract uploaded, gateway was down)"
-              }
-              autoFocus
-              rows={3}
-              className="w-full px-12 py-8 border border-border rounded-sm text-caption font-sans text-text-primary bg-surface-primary resize-y outline-none focus:border-brand"
-              onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) confirmAction(); }}
-              required={pendingAction === "reanalyze"}
-            />
-            <div className="flex gap-8 justify-end">
-              <Button variant="ghost" size="sm" onClick={cancelAction}>Cancel</Button>
-              <Button
-                variant={pendingAction === "approve" ? "brand" : "neutral"}
-                size="sm"
-                disabled={
-                  anyActionInFlight
-                  // Reanalyze reason is mandatory — mirrors the backend
-                  // ReanalyzeRequest schema requirement.
-                  || (pendingAction === "reanalyze" && comment.trim().length === 0)
-                }
-                onClick={confirmAction}
-              >
-                {actionLoading
-                  ? "Processing..."
-                  : pendingAction === "approve"
-                  ? "Confirm Approval"
-                  : pendingAction === "reject"
-                  ? "Confirm Rejection"
-                  : "Confirm Re-analyze"}
-              </Button>
-            </div>
-          </div>
+        {/* Action surface — verdict × permission matrix. Single source
+            of truth in `<ActionButtonMatrix>` so this card and
+            `<StickyActionRibbon>` (ADR-041 P3e §2.2) render identical
+            buttons. `hideActionMatrix` suppresses the inline mount when
+            the sticky ribbon takes over. */}
+        {!hideActionMatrix && (
+          <ActionButtonMatrix
+            verdict={verdict}
+            executionError={executionError}
+            recommendedAction={recommendedAction}
+            onApprove={onApprove}
+            onReject={onReject}
+            onEscalate={onEscalate}
+            onOverride={onOverride}
+            onReanalyze={onReanalyze}
+            reanalyzeAttempts={reanalyzeAttempts}
+            reanalyzeMax={reanalyzeMax}
+            actionLoading={actionLoading}
+            actionInFlight={actionInFlight}
+            canApprove={canApprove}
+            canOverride={canOverride}
+            canEscalate={canEscalate}
+            canReanalyze={canReanalyze}
+            isAdmin={isAdmin}
+          />
         )}
       </div>
     </div>

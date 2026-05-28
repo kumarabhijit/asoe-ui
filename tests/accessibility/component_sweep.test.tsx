@@ -20,7 +20,11 @@ import { AgentReasoningCard } from "@/components/ui/AgentReasoningCard";
 import { NavBar } from "@/components/ui/NavBar";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { ActionButtonMatrix } from "@/components/ui/ActionButtonMatrix";
+import { ComplianceHitCountChip } from "@/components/ui/ComplianceHitCountChip";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
+import { StickyActionRibbon } from "@/components/ui/StickyActionRibbon";
+import { VerdictDot } from "@/components/ui/VerdictDot";
 import { EventsTimeline } from "@/components/ui/EventsTimeline";
 import { AttachmentPreview } from "@/components/ui/AttachmentPreview";
 import {
@@ -233,6 +237,93 @@ describe("a11y sweep: EvidenceBlock", () => {
           {() => null}
         </EvidenceBlock>
       </section>,
+    ));
+});
+
+// ---------------------------------------------------------------------------
+// VerdictDot — ADR-041 P3e §2.4. WCAG 1.4.1: letter pairing
+// (not color alone) carries the audit-verdict signal. aria-label
+// gives the spoken form.
+// ---------------------------------------------------------------------------
+describe("a11y sweep: VerdictDot", () => {
+  it("RED at sm size", async () =>
+    expectNoViolations(<VerdictDot color="R" />));
+
+  it("AMBER at sm size", async () =>
+    expectNoViolations(<VerdictDot color="A" />));
+
+  it("GREEN at md size", async () =>
+    expectNoViolations(<VerdictDot color="G" size="md" />));
+});
+
+// ---------------------------------------------------------------------------
+// ComplianceHitCountChip — ADR-041 P3e §2.3. Non-dismissible count
+// indicator for the slim case-header. Null on zero (Guardrail #6),
+// so the sweep covers the rendered (count > 0) branches only.
+// ---------------------------------------------------------------------------
+describe("a11y sweep: ComplianceHitCountChip", () => {
+  it("singular (count=1)", async () =>
+    expectNoViolations(<ComplianceHitCountChip count={1} />));
+
+  it("plural (count=4)", async () =>
+    expectNoViolations(<ComplianceHitCountChip count={4} />));
+});
+
+// ---------------------------------------------------------------------------
+// ActionButtonMatrix — ADR-041 P3e §2.2. Shared verdict × permission
+// surface used by AgentReasoningCard and StickyActionRibbon. Each
+// verdict × permission branch must be axe-clean.
+// ---------------------------------------------------------------------------
+describe("a11y sweep: ActionButtonMatrix", () => {
+  it("YELLOW analyst (Approve + Reject + Escalate)", async () =>
+    expectNoViolations(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        onApprove={() => {}}
+        onReject={() => {}}
+        onEscalate={() => {}}
+        canApprove
+        canEscalate
+      />,
+    ));
+
+  it("RED privileged (Override + Escalate)", async () =>
+    expectNoViolations(
+      <ActionButtonMatrix
+        verdict="RED"
+        onOverride={() => {}}
+        onEscalate={() => {}}
+        canOverride
+        canEscalate
+      />,
+    ));
+
+  it("executionError → Escalate only", async () =>
+    expectNoViolations(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        executionError={{ message: "Recipe timed out" }}
+        onEscalate={() => {}}
+        canEscalate
+      />,
+    ));
+});
+
+// ---------------------------------------------------------------------------
+// StickyActionRibbon — ADR-041 P3e §2.2. Sticky chrome over the
+// shared matrix; the region label + anchor id are the SR contract.
+// ---------------------------------------------------------------------------
+describe("a11y sweep: StickyActionRibbon", () => {
+  it("YELLOW analyst", async () =>
+    expectNoViolations(
+      <StickyActionRibbon
+        verdict="YELLOW"
+        onApprove={() => {}}
+        onReject={() => {}}
+        onEscalate={() => {}}
+        canApprove
+        canEscalate
+      />,
     ));
 });
 

@@ -124,14 +124,28 @@ describe("/cases workspace — case-switch race invariants", () => {
       "the workspace grid must declare two columns at the lg breakpoint",
     ).toMatch(/lg:grid-cols-\[[^\]]+_[^\]]+\]/);
 
-    // (c) …and it must NOT re-introduce a dedicated 3rd column at xl.
-    // The record list stacks on the detail pane; a 3rd column squeezed
-    // the record rows and clipped their labels at laptop widths.
-    expect(
-      src,
-      "the workspace must not declare a 3-column grid (the record list " +
-        "stacks on the detail pane, it is not a dedicated column)",
-    ).not.toMatch(/grid-cols-\[[^\]]+_[^\]]+_[^\]]+\]/);
+    // (c) …and any 3rd column at xl must be the ADR-041 P3e §2.3
+    // audit-rail column (320px), NOT a re-introduced record-list
+    // column. The record list stacks on the detail pane — a
+    // dedicated record-list 3rd column squeezed record rows and
+    // clipped their labels at laptop widths.
+    //
+    // Find every 3-column grid-cols declaration; each must be the
+    // exact audit-rail pattern. Any other 3-column grid is a
+    // regression.
+    const threeCols = src.match(
+      /grid-cols-\[[^\]]+_[^\]]+_[^\]]+\]/g,
+    ) ?? [];
+    const AUDIT_RAIL_GRID = "xl:grid-cols-[360px_minmax(0,1fr)_320px]";
+    for (const decl of threeCols) {
+      expect(
+        src.includes(AUDIT_RAIL_GRID),
+        `3-column grid '${decl}' found but it is not the ` +
+          `audit-rail pattern '${AUDIT_RAIL_GRID}'. Either the record-` +
+          "list column is being re-introduced (regression) or the " +
+          "audit-rail column shape has drifted.",
+      ).toBe(true);
+    }
   });
 
   it("mounts the records picker inline on the detail pane (CaseDetailPanel)", () => {
@@ -234,11 +248,29 @@ describe("/cases workspace — case-switch race invariants", () => {
       src,
       "queue listbox must carry aria-activedescendant",
     ).toMatch(/role=["']listbox["'][\s\S]*?aria-activedescendant=/);
-    expect(
-      src,
-      "the option rows must be tabIndex={-1} so the listbox is the " +
-        "single Tab stop (roving via aria-activedescendant)",
-    ).toMatch(/role=["']option["'][\s\S]*?tabIndex=\{-1\}/);
+    // ADR-041 P3e §2.1 — row anatomy lives in `CasesQueueRow.tsx`
+    // (legacy) and `CasesQueueRowV2.tsx` (flagged), both consumed by
+    // page.tsx. Both must keep the roving-tabindex contract so the
+    // listbox stays a single Tab stop regardless of which row is
+    // mounted.
+    const rowV1 = readFileSync(
+      path.resolve(__dirname, "../../src/app/cases/CasesQueueRow.tsx"),
+      "utf-8",
+    );
+    const rowV2 = readFileSync(
+      path.resolve(__dirname, "../../src/app/cases/CasesQueueRowV2.tsx"),
+      "utf-8",
+    );
+    for (const [name, body] of [
+      ["CasesQueueRow.tsx", rowV1],
+      ["CasesQueueRowV2.tsx", rowV2],
+    ] as const) {
+      expect(
+        body,
+        `${name}: the option row must be tabIndex={-1} so the listbox ` +
+          "is the single Tab stop (roving via aria-activedescendant)",
+      ).toMatch(/role=["']option["'][\s\S]*?tabIndex=\{-1\}/);
+    }
   });
 
   it("supports F6 cross-pane focus switching", () => {

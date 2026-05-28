@@ -21,6 +21,14 @@ export const BACK_ORDER__failed_terminal: BehaviourScenario = {
     will_miss_rdd: false,
     tier: 2,
     child_intents: ["BACK_ORDER"],
+    // ADR-041 P3e §3.1 — CaseSummary projection (mock-null).
+    customer_name: null,
+    top_line_sku_code: null,
+    top_line_sku_title: null,
+    problem_one_liner: null,
+    intent: "BACK_ORDER",
+    dollar_impact: null,
+    audit_verdict_color: null,
   },
   records: [
     {

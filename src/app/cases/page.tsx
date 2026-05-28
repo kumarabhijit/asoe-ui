@@ -34,7 +34,7 @@ import {
 import { useSignOut } from "@/hooks/useSignOut";
 import { Badge } from "@/components/ui/Badge";
 import { NavBar } from "@/components/ui/NavBar";
-import { ALLOWED_CASE_ORIGINS, casesApi } from "@/lib/api";
+import { ALLOWED_CASE_ORIGINS, casesApi, type CaseListItem } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useKeyboardListNav } from "@/hooks/useKeyboardListNav";
@@ -57,7 +57,16 @@ import type {
 import type { ExceptionDetailResponse } from "@/types/api";
 
 import { CaseDetailPanel } from "./CaseDetailPanel";
+import { CasesQueueRow } from "./CasesQueueRow";
+import { CasesQueueRowV2 } from "./CasesQueueRowV2";
+import { ComplianceHitsRail } from "./ComplianceHitsRail";
 import { NAV_TABS } from "@/config/nav-tabs";
+import { useRowDensity, type RowDensity } from "@/hooks/useRowDensity";
+
+// ADR-041 P3e §2.1 — gates the four-line queue row + density
+// toggle. Default OFF until Phase 0 backend ships the
+// `CaseSummary` projection (asoe2 PR #184).
+const CASES_ROW_V2 = process.env.NEXT_PUBLIC_CASES_ROW_V2 === "1";
 
 
 /* ── Visual mappings (vendor-neutral; per-source / per-status badge style) ── */
@@ -251,7 +260,7 @@ function CasesWorkspace() {
   // list rather than yanking the operator's row out from under them.
   // The visual treatment (`isPinned`) distinguishes the pin from a
   // regular filter match.
-  const cases = useMemo<{ case_: OrderCase; isPinned: boolean }[]>(() => {
+  const cases = useMemo<{ case_: CaseListItem; isPinned: boolean }[]>(() => {
     const filtered = filters.status
       ? rawCases.filter((c) => c.status === filters.status)
       : rawCases;
@@ -426,6 +435,12 @@ function CasesWorkspace() {
     enabled: sorted.length > 0,
   });
 
+  // ── Density preference (ADR-041 P3e §2.4) ────────────────────
+  // Only consulted when CASES_ROW_V2 is on; the legacy row has a
+  // single density. Hook always mounts so the SSR hydration order
+  // matches whether or not the flag is set.
+  const [density, setDensity] = useRowDensity();
+
   // ── Cross-pane focus (F6 / Shift+F6) ────────────────────────
   // Tab walks the controls inside the focused pane; F6 jumps to the
   // next pane. The workspace is two panes — queue ↔ detail — with the
@@ -452,6 +467,11 @@ function CasesWorkspace() {
         //     and clipped their labels at common laptop widths.
         "grid-cols-1",
         "lg:grid-cols-[360px_minmax(0,1fr)]",
+        // ADR-041 P3e §2.3 — at xl (≥1280px) the audit rail mounts
+        // as a third column when CASES_ROW_V2 is on. The xl override
+        // only takes effect when the flag is set; default keeps the
+        // two-column layout.
+        CASES_ROW_V2 && "xl:grid-cols-[360px_minmax(0,1fr)_320px]",
         // Viewport-locked master-detail (the "Outlook" pane pattern the
         // layout tokens describe). Below `lg` the panes stack and use
         // normal document flow so nothing is clipped on tablet/phone.
@@ -483,6 +503,13 @@ function CasesWorkspace() {
             <kbd className="font-sans">↑</kbd>/<kbd className="font-sans">↓</kbd>{" "}
             move · <kbd className="font-sans">F6</kbd> switch panes
           </p>
+          {/* Density toggle — ADR-041 P3e §2.4. Only meaningful when
+              the four-line V2 row is mounted; the legacy row has one
+              density. The hook always runs (SSR-safe) so the toggle
+              just hides without re-ordering hooks. */}
+          {CASES_ROW_V2 && (
+            <DensityToggle density={density} onChange={setDensity} />
+          )}
         </div>
 
         {/* Filter chips. ALLOWED_CASE_ORIGINS comes from the api.ts
@@ -551,76 +578,24 @@ function CasesWorkspace() {
                 const isSelected = case_.case_id === selectedCaseId;
                 return (
                   <li key={case_.case_id} className="border-b border-border-subtle">
-                    <button
-                      id={`case-row-${case_.case_id}`}
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      // Roving-out of the Tab order: the listbox container
-                      // is the one Tab stop; arrow keys move the active
-                      // option (announced via aria-activedescendant).
-                      // Without this every queue row was its own Tab stop
-                      // — a 50-row queue meant 50 Tab presses to cross the
-                      // pane (WCAG 2.4.3 Focus Order).
-                      tabIndex={-1}
-                      data-keyboard-nav-id={case_.case_id}
-                      data-pinned={isPinned || undefined}
-                      onClick={() => handleSelectCase(case_.case_id)}
-                      className={cn(
-                        "w-full text-left py-12 px-16 flex flex-col gap-4",
-                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ring",
-                        "transition-colors duration-fast",
-                        isSelected
-                          ? "bg-surface-row-active"
-                          : "hover:bg-surface-secondary",
-                      )}
-                    >
-                      <div className="flex items-center gap-8">
-                        <Badge variant="neutral" size="sm">
-                          {ORIGIN_ICON[case_.origin as Origin] ??
-                            ORIGIN_ICON.default}
-                          <span className="ml-4">
-                            {ORIGIN_LABEL[case_.origin as Origin] ??
-                              ORIGIN_LABEL.default}
-                          </span>
-                        </Badge>
-                        <Badge
-                          variant={SLA_BAND_VARIANT[sla.band]}
-                          size="sm"
-                          aria-label={`SLA: ${sla.label}`}
-                        >
-                          {sla.band === "breached" && (
-                            <AlertTriangle size={10} aria-hidden className="mr-4" />
-                          )}
-                          <Clock size={10} aria-hidden className="mr-4" />
-                          {sla.label}
-                        </Badge>
-                        {isPinned && (
-                          // Pin-selection guard — the selected case
-                          // doesn't match the active filter but stays
-                          // visible so the operator's cursor isn't
-                          // yanked. The badge tells them "this is
-                          // your row even though it's filtered out".
-                          <Badge
-                            variant="info"
-                            size="sm"
-                            aria-label="Pinned because selected"
-                          >
-                            Pinned
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-8">
-                        <span className="font-mono text-body text-text-primary truncate">
-                          {case_.customer_po_number ??
-                            case_.sales_order_id ??
-                            case_.case_id}
-                        </span>
-                      </div>
-                      <span className="text-caption text-text-tertiary">
-                        {STATUS_LABEL[case_.status] ?? case_.status}
-                      </span>
-                    </button>
+                    {CASES_ROW_V2 ? (
+                      <CasesQueueRowV2
+                        case_={case_}
+                        sla={sla}
+                        isSelected={isSelected}
+                        isPinned={isPinned}
+                        density={density}
+                        onSelect={handleSelectCase}
+                      />
+                    ) : (
+                      <CasesQueueRow
+                        case_={case_}
+                        sla={sla}
+                        isSelected={isSelected}
+                        isPinned={isPinned}
+                        onSelect={handleSelectCase}
+                      />
+                    )}
                   </li>
                 );
               })}
@@ -680,20 +655,56 @@ function CasesWorkspace() {
           && !detailLoading
           && orderCase
           && orderCase.case_id === selectedCaseId && (
-          <CaseDetailPanel
-            orderCase={orderCase}
-            attachedRecords={records}
-            policyHits={policyHits}
-            selectedRecordId={selectedRecordId}
-            onSelectRecord={handleSelectRecord}
-            onRecordActionComplete={handleRecordActionComplete}
-            // CaseDetailPanel renders the attached-records picker
-            // (RecordListPane) stacked at the top of this pane by
-            // default — the workspace no longer has a separate column
-            // for it, so the operator always picks a record here.
-          />
+          <>
+            {/* ADR-041 P3e §2.3 — when V2 is on, suppress the panel's
+                own inline Compliance Hits and re-render it as a
+                sibling that hides at xl. At xl the third column hosts
+                the rail; below xl the inline render keeps Compliance
+                Hits in the main column (Compliance veto on hiding
+                them at smaller breakpoints). */}
+            {CASES_ROW_V2 && (policyHits ?? []).length > 0 && (
+              <div className="xl:hidden">
+                <ComplianceHitsRail
+                  hits={policyHits ?? []}
+                  variant="inline"
+                />
+              </div>
+            )}
+            <CaseDetailPanel
+              orderCase={orderCase}
+              attachedRecords={records}
+              policyHits={policyHits}
+              selectedRecordId={selectedRecordId}
+              onSelectRecord={handleSelectRecord}
+              onRecordActionComplete={handleRecordActionComplete}
+              suppressInlineComplianceHits={CASES_ROW_V2}
+              // CaseDetailPanel renders the attached-records picker
+              // (RecordListPane) stacked at the top of this pane by
+              // default — the workspace no longer has a separate column
+              // for it, so the operator always picks a record here.
+            />
+          </>
         )}
       </section>
+
+      {/* ── Audit rail (xl-only third column) ───────────────────
+          ADR-041 P3e §2.3 — at xl the Compliance Shadow hits live
+          in their own column so they remain persistently visible
+          without competing with the workspace. The aside is gated
+          on the flag (`hidden` when V2 is off) and on xl breakpoint
+          (`hidden xl:flex` when V2 is on). At lg and below the
+          inline render under CaseDetailPanel takes over. */}
+      <aside
+        aria-label="Compliance audit rail"
+        className={cn(
+          "bg-surface-secondary border border-border-subtle rounded-md min-h-0 flex-col",
+          CASES_ROW_V2 ? "hidden xl:flex" : "hidden",
+        )}
+      >
+        {selectedCaseId && orderCase && (
+          <ComplianceHitsRail hits={policyHits ?? []} variant="rail" />
+        )}
+      </aside>
     </main>
   );
 }
@@ -715,6 +726,65 @@ function FilterChip({ label, active, onClick }: FilterChipProps) {
       onClick={onClick}
       className={cn(
         "px-12 py-4 rounded-full border text-caption transition-colors duration-fast",
+        active
+          ? "bg-brand-subtle border-brand text-brand font-semibold"
+          : "bg-surface-primary border-border text-text-secondary hover:bg-surface-secondary",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+
+/* ── Density toggle ─────────────────────────────────────────────── */
+
+interface DensityToggleProps {
+  density: RowDensity;
+  onChange: (value: RowDensity) => void;
+}
+
+function DensityToggle({ density, onChange }: DensityToggleProps) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Row density"
+      className="mt-8 inline-flex items-center gap-2 text-label"
+    >
+      <span className="text-text-quaternary">Density:</span>
+      <DensityOption
+        label="Comfortable"
+        value="comfortable"
+        active={density === "comfortable"}
+        onSelect={onChange}
+      />
+      <DensityOption
+        label="Compact"
+        value="compact"
+        active={density === "compact"}
+        onSelect={onChange}
+      />
+    </div>
+  );
+}
+
+interface DensityOptionProps {
+  label: string;
+  value: RowDensity;
+  active: boolean;
+  onSelect: (value: RowDensity) => void;
+}
+
+function DensityOption({ label, value, active, onSelect }: DensityOptionProps) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={() => onSelect(value)}
+      className={cn(
+        "px-6 py-2 rounded-sm border text-label transition-colors duration-fast",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
         active
           ? "bg-brand-subtle border-brand text-brand font-semibold"
           : "bg-surface-primary border-border text-text-secondary hover:bg-surface-secondary",
