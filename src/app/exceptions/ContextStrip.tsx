@@ -17,9 +17,17 @@ interface ContextStripProps {
   entityProfile?: EntityProfile | null;
   impactMetrics?: ImpactMetrics | null;
   defaultOpen?: boolean;
+  /**
+   * S1 finding #7, #8 — when mounted inside `CaseDetailPanel`, the
+   * case-level chrome already shows Customer name and Location
+   * (breadcrumb + slim header). Embedded mode drops those two rows
+   * from the Customer column so the strip only carries net-new
+   * facts (Tier/VIP, Credit, Location-when-no-customer-context).
+   */
+  embedded?: boolean;
 }
 
-export function ContextStrip({ entityProfile: ep, impactMetrics: im, defaultOpen = false }: ContextStripProps) {
+export function ContextStrip({ entityProfile: ep, impactMetrics: im, defaultOpen = false, embedded = false }: ContextStripProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   if (!ep && !im) return null;
@@ -36,7 +44,14 @@ export function ContextStrip({ entityProfile: ep, impactMetrics: im, defaultOpen
             </div>
             {ep && (
               <div className="flex flex-col gap-4 text-caption">
-                <ContextRow icon={<User size={11} />} label="Customer" value={`${ep.customer_name} (${ep.bp_number})`} />
+                {/* S1 finding #7 — Customer (name + bp_number) is in the
+                    HeaderRibbon breadcrumb when standalone, and in the
+                    case-level chrome when embedded. Suppress in both
+                    embedded paths so the same name does not render in
+                    three places on the right pane. */}
+                {!embedded && (
+                  <ContextRow icon={<User size={11} />} label="Customer" value={`${ep.customer_name} (${ep.bp_number})`} />
+                )}
                 {/* CLAUDE.md Guardrail #6: contextual fields use
                     structural omission (render nothing) when absent.
                     `?? "—"` was the partial-truth anti-pattern flagged
@@ -44,6 +59,11 @@ export function ContextStrip({ entityProfile: ep, impactMetrics: im, defaultOpen
                     returns null when value is undefined. */}
                 <ContextRow icon={<Building2 size={11} />} label="Tier" value={ep.customer_tier} badge={ep.vip_status ? "VIP" : undefined} />
                 <ContextRow icon={<Shield size={11} />} label="Credit" value={ep.credit_standing} />
+                {/* S1 finding #8 — Location lives in the HeaderRibbon
+                    breadcrumb when standalone. Embedded suppresses the
+                    breadcrumb (HeaderRibbon `embedded`), but the
+                    case-level chrome does not currently surface
+                    location, so it stays in embedded mode. */}
                 <ContextRow icon={<MapPin size={11} />} label="Location" value={ep.location} />
               </div>
             )}

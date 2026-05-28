@@ -17,32 +17,47 @@ interface HeaderRibbonProps {
   primarySkuLabel: string;
   totalPo: number;
   delta: number;
+  /**
+   * S1 finding #1, #5 — when this panel is mounted INSIDE
+   * `CaseDetailPanel` (the /cases workspace right pane), the case-level
+   * slim header already carries customer, case id, and compliance
+   * verdict. Showing the breadcrumb + Audit Result here as well puts
+   * two parallel headers above the same action ribbon and surfaces
+   * compliance state four times across the screen.
+   *
+   * `embedded` suppresses the breadcrumb row and the Audit Result
+   * badge. Per-record facts that have no case-level analog (lifecycle
+   * "Current State", event type, totalPo, delta) stay visible.
+   */
+  embedded?: boolean;
 }
 
-export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, totalPo, delta }: HeaderRibbonProps) {
+export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, totalPo, delta, embedded = false }: HeaderRibbonProps) {
   return (
     <div className="px-16 py-10 border-b border-border bg-surface-primary shrink-0">
       {/* Breadcrumb row */}
-      <div className="flex items-center gap-6 text-caption text-text-tertiary mb-6 flex-wrap min-w-0">
-        <span className="font-mono font-bold text-text-primary">
-          {detail.order_id}
-        </span>
-        <ChevronRight size={10} />
-        <span className="font-medium text-text-secondary">
-          {ep?.customer_name ?? detail.tenant_id}
-        </span>
-        {/* Structural omission for the contextual entity-profile
-            location: drop the chevron + slot when absent rather than
-            rendering "—" (CLAUDE.md Guardrail #6). */}
-        {ep?.location && (
-          <>
-            <ChevronRight size={10} />
-            <span>{ep.location}</span>
-          </>
-        )}
-        <ChevronRight size={10} />
-        <span>{primarySkuLabel}</span>
-      </div>
+      {!embedded && (
+        <div className="flex items-center gap-6 text-caption text-text-tertiary mb-6 flex-wrap min-w-0">
+          <span className="font-mono font-bold text-text-primary">
+            {detail.order_id}
+          </span>
+          <ChevronRight size={10} />
+          <span className="font-medium text-text-secondary">
+            {ep?.customer_name ?? detail.tenant_id}
+          </span>
+          {/* Structural omission for the contextual entity-profile
+              location: drop the chevron + slot when absent rather than
+              rendering "—" (CLAUDE.md Guardrail #6). */}
+          {ep?.location && (
+            <>
+              <ChevronRight size={10} />
+              <span>{ep.location}</span>
+            </>
+          )}
+          <ChevronRight size={10} />
+          <span>{primarySkuLabel}</span>
+        </div>
+      )}
 
       {/* Status row \u2014 labels make the two parallel facts unambiguous:
           "Current State" is the lifecycle (where the exception sits in
@@ -59,7 +74,12 @@ export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, total
             {detail.lifecycle_state.replace(/_/g, " ")}
           </Badge>
         </div>
-        {detail.shadow_verdict && (
+        {/* S1 finding #5 — when embedded inside `CaseDetailPanel`, the
+            case-level Compliance surfaces (slim-header chip + rail or
+            inline section) already carry the verdict. Suppress the
+            per-record Audit Result badge so compliance state is not
+            repeated four times across the screen. */}
+        {!embedded && detail.shadow_verdict && (
           <div className="flex items-center gap-4">
             <span className="text-label font-semibold uppercase tracking-wider text-text-quaternary">
               Audit Result:
