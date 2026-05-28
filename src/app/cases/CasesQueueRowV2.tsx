@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { VerdictDot } from "@/components/ui/VerdictDot";
 import { cn } from "@/lib/utils";
-import { STATUS_LABEL } from "@/lib/cases";
+import { STATUS_LABEL, formatCaseId } from "@/lib/cases";
 import type { CaseListItem, CaseSummaryDollarImpact } from "@/lib/api";
 import type { Origin, SlaBand, SlaSnapshot } from "@/types/cases";
 import { formatCurrency, formatCurrencyForA11y } from "@/lib/format";
@@ -157,8 +157,11 @@ export function CasesQueueRowV2({
         {/* Line 2 — case id + customer name. Hidden in compact density. */}
         {!compact && (
           <div className="flex items-center gap-8 min-w-0">
-            <span className="font-mono text-body text-text-primary truncate">
-              {case_.case_id}
+            <span
+              className="font-mono text-body text-text-primary truncate"
+              title={case_.case_id}
+            >
+              {formatCaseId(case_.case_id)}
             </span>
             {case_.customer_name && (
               <span className="text-caption text-text-tertiary truncate min-w-0">
@@ -270,7 +273,7 @@ function buildAriaLabel(case_: CaseListItem, sla: SlaSnapshot): string {
     `SLA ${sla.label}`,
     status,
     verdict,
-    `case ${case_.case_id}`,
+    `case ${formatCaseId(case_.case_id)}`,
     customer,
     subject,
     intent,

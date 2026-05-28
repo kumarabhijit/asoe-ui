@@ -34,7 +34,7 @@ import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { useClassificationHistory } from "@/hooks/useClassificationHistory";
 import type { Origin, OrderCase, SlaBand } from "@/types/cases";
 import type { ExceptionDetailResponse } from "@/types/api";
-import { STATUS_LABEL, lastActivityLabel, sourceChannelLabel } from "@/lib/cases";
+import { STATUS_LABEL, formatCaseId, lastActivityLabel, sourceChannelLabel } from "@/lib/cases";
 import { useSlaTicker } from "@/hooks/useSlaTicker";
 import ExceptionDetailPanel from "../exceptions/ExceptionDetailPanel";
 import { RecordListPane } from "./RecordListPane";
@@ -207,7 +207,10 @@ export function CaseDetailPanel({
           >
             Skip to actions
           </a>
-          <code className="font-mono text-text-primary">{orderCase.case_id}</code>
+          <code
+            className="font-mono text-text-primary"
+            title={orderCase.case_id}
+          >{formatCaseId(orderCase.case_id)}</code>
           <span aria-hidden className="text-text-quaternary">·</span>
           <span>{sourceChannelLabel(orderCase.source_channel)}</span>
           {sla.band !== "none" && (
@@ -304,7 +307,10 @@ export function CaseDetailPanel({
         </div>
 
         <h1 className="text-display font-semibold text-text-primary mb-12">
-          Case <code className="font-mono">{orderCase.case_id}</code>
+          Case <code
+            className="font-mono"
+            title={orderCase.case_id}
+          >{formatCaseId(orderCase.case_id)}</code>
         </h1>
 
         {/* PO #17 (issue #133): timing context (Opened / SLA deadline)
