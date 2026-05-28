@@ -574,7 +574,7 @@ function CasesWorkspace() {
               // ring lives here, on the container.
               className="m-0 p-0 list-none rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ring"
             >
-              {sorted.map(({ case_, sla, isPinned }) => {
+              {sorted.map(({ case_, sla, isPinned }, rowIndex) => {
                 const isSelected = case_.case_id === selectedCaseId;
                 return (
                   <li key={case_.case_id} className="border-b border-border-subtle">
@@ -586,6 +586,7 @@ function CasesWorkspace() {
                         isPinned={isPinned}
                         density={density}
                         onSelect={handleSelectCase}
+                        rowIndex={rowIndex}
                       />
                     ) : (
                       <CasesQueueRow

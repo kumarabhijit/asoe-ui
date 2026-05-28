@@ -259,3 +259,174 @@ export function deriveMockCases(): OrderCase[] {
  * call `deriveMockCases()` directly.
  */
 export const MOCK_CASES: OrderCase[] = deriveMockCases();
+
+
+/* ── CaseSummary mock projection (ADR-041 P3e §3.1) ────────────────
+ *
+ * Production fills these seven fields from the asoe2
+ * `build_case_summary` graph node + `api/case_summary.py` projection.
+ * Mock mode has to invent plausible values per intent so the V2
+ * row + audit rail + count chip surfaces actually demo against
+ * realistic-looking data when `NEXT_PUBLIC_CASES_ROW_V2=1` is set.
+ *
+ * `INTENT_SUMMARY_TEMPLATES` is the canonical source of mock
+ * projection per intent. `deriveMockCaseSummaries()` joins it
+ * against `MOCK_EXCEPTIONS` so every grouped case carries:
+ *
+ *   * customer_name        — from the lead record's `account_name`
+ *   * intent               — from the primary child
+ *   * audit_verdict_color  — severity-wins rollup of child verdicts
+ *   * dollar_impact        — per-intent fixed value (USD cents)
+ *   * top_line_sku_code/title + problem_one_liner — per-intent
+ *     fixed strings (in production the recipe templates fill these;
+ *     here we inline plausible mock data so preview environments
+ *     showcase the row anatomy)
+ *
+ * Intents without a template entry ship null for the per-intent
+ * fields — matches the backend's grandfather-clause behaviour for
+ * recipe-gap intents (PRICE_HOLD, EMAIL_COMPLAINT-intake).
+ */
+
+interface MockSummaryTemplate {
+  sku_code: string | null;
+  sku_title: string | null;
+  one_liner: string | null;
+  /** Dollar amount in cents. Null when the intent has no honest
+   *  single-number impact (EDI_MISMATCH, PALLET, EMAIL_COMPLAINT
+   *  intake — matches the Recipe SME panel's hide-the-column list). */
+  impact_cents: number | null;
+}
+
+const INTENT_SUMMARY_TEMPLATES: Record<string, MockSummaryTemplate> = {
+  CONTRACTUAL_CORRECTION: {
+    sku_code: "BEV-COLA-12PK",
+    sku_title: "Cola 12-pack",
+    one_liner: "Contract price $9.80 vs PO $10.50 — 6.7% variance",
+    impact_cents: 85000,
+  },
+  DUPLICATE_PO: {
+    sku_code: null,
+    sku_title: null,
+    one_liner: "Duplicate of PO-2025-1042 (3d apart, 92% match)",
+    impact_cents: 414720,
+  },
+  CREDIT_BLOCK: {
+    sku_code: null,
+    sku_title: null,
+    one_liner: "Credit limit breached: $48,200 exposure over $40,000 limit",
+    impact_cents: 4820000,
+  },
+  MASS_PRICING_ERROR: {
+    sku_code: "BEV-COLA-12PK",
+    sku_title: "Cola 12-pack",
+    one_liner: "Bulk price drift across 12 lines (avg 8.2% variance)",
+    impact_cents: 1240000,
+  },
+  PRICE_DISCREPANCY: {
+    sku_code: "SNK-CHIPS-FAM",
+    sku_title: "Family-size chips (24ct)",
+    one_liner: "ERP $14.20 vs PO $12.80 — 9.9% delta, $2,840 at risk",
+    impact_cents: 284000,
+  },
+  BACK_ORDER: {
+    sku_code: "BEV-COLA-12PK",
+    sku_title: "Cola 12-pack",
+    one_liner: "Short stock: 380/480 12pk (20.8% gap, ATP 2026-06-04)",
+    impact_cents: 195000,
+  },
+  OVER_MAX: {
+    sku_code: "BEV-COLA-12PK",
+    sku_title: "Cola 12-pack",
+    one_liner: "Over max by 240 cases (8.3% over allocation)",
+    impact_cents: 408000,
+  },
+  MOQ_UPLIFT: {
+    sku_code: "BEV-COLA-12PK",
+    sku_title: "Cola 12-pack",
+    one_liner: "Below MOQ by 36 cases (ordered 64 vs 100 required)",
+    impact_cents: 61200,
+  },
+  EMAIL_COMPLAINT: {
+    sku_code: "BEV-COLA-12PK",
+    sku_title: "Cola 12-pack",
+    one_liner: "Short shipment: received 380 of 480",
+    impact_cents: 414720,
+  },
+  MANUAL_ORDER_INTAKE: {
+    sku_code: null,
+    sku_title: null,
+    one_liner: "New email order — buyer requested $9.80 contract price",
+    impact_cents: 156000,
+  },
+  // Intents intentionally without templates (grandfather-clause
+  // parity with the backend recipe gaps):
+  //   PRICE_HOLD       — missing sku + qty on PriceHoldAnalysisData
+  //   EDI_MISMATCH     — no honest dollar number
+  //   PALLET           — labor/freight, not revenue
+};
+
+function verdictRollup(
+  records: readonly ExceptionSummary[],
+): "R" | "A" | "G" | null {
+  let hasR = false;
+  let hasA = false;
+  let hasG = false;
+  for (const r of records) {
+    const v = r.shadow_verdict;
+    if (v === "RED") hasR = true;
+    else if (v === "YELLOW") hasA = true;
+    else if (v === "GREEN") hasG = true;
+  }
+  if (hasR) return "R";
+  if (hasA) return "A";
+  if (hasG) return "G";
+  return null;
+}
+
+export interface MockCaseSummary {
+  customer_name: string | null;
+  top_line_sku_code: string | null;
+  top_line_sku_title: string | null;
+  problem_one_liner: string | null;
+  intent: string | null;
+  dollar_impact: { amount_cents: number; currency: string } | null;
+  audit_verdict_color: "R" | "A" | "G" | null;
+}
+
+/**
+ * Project every grouped case onto its CaseSummary mock fields.
+ * Returns a Map keyed on case_id so the api.ts list serialiser can
+ * splice the result into each `CaseListItem` row.
+ *
+ * Production fills these via the backend's `compute_case_summary`;
+ * the live API path in `casesApi.list` skips this function entirely.
+ */
+export function deriveMockCaseSummaries(): Map<string, MockCaseSummary> {
+  const byCaseId = new Map<string, ExceptionSummary[]>();
+  for (const exc of MOCK_EXCEPTIONS) {
+    const cid = exc.parent_case_id;
+    if (!cid) continue;
+    const bucket = byCaseId.get(cid);
+    if (bucket) bucket.push(exc);
+    else byCaseId.set(cid, [exc]);
+  }
+  const out = new Map<string, MockCaseSummary>();
+  for (const [caseId, records] of byCaseId.entries()) {
+    const lead = records[0];
+    const intent = lead.intent ?? null;
+    const template = intent ? INTENT_SUMMARY_TEMPLATES[intent] : null;
+    const customerName = lead.account_name ?? null;
+    out.set(caseId, {
+      customer_name: customerName,
+      top_line_sku_code: template?.sku_code ?? null,
+      top_line_sku_title: template?.sku_title ?? null,
+      problem_one_liner: template?.one_liner ?? null,
+      intent,
+      dollar_impact: template?.impact_cents != null
+        ? { amount_cents: template.impact_cents, currency: "USD" }
+        : null,
+      audit_verdict_color: verdictRollup(records),
+    });
+  }
+  return out;
+}

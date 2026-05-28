@@ -27,6 +27,7 @@ import {
   type ExecutionError,
 } from "@/components/ui/AgentReasoningCard";
 import { StickyActionRibbon } from "@/components/ui/StickyActionRibbon";
+import { useCaseTelemetry } from "@/hooks/useCaseTelemetry";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useExceptionActions } from "@/hooks/useExceptionActions";
@@ -241,6 +242,39 @@ export default function ExceptionDetailPanel({
     onActionComplete: reportingOnActionComplete,
     refreshDetail,
   });
+
+  // ADR-041 P3e Phase 3 sign-off gate #5 — telemetry for the V2
+  // surfaces. Hook always mounts (Rules of Hooks); passing
+  // undefined for the case id makes `markFirstAction` a no-op so
+  // legacy (flag-off) mode is byte-for-byte identical at the wire
+  // level. The wrapped handlers below are passed ONLY to
+  // StickyActionRibbon; the legacy AgentReasoningCard mount keeps
+  // the raw handlers.
+  const telemetryCaseId = CASES_ROW_V2
+    ? (detail?.parent_case_id ?? undefined)
+    : undefined;
+  const { markFirstAction } = useCaseTelemetry(telemetryCaseId);
+
+  const handleApproveWithTelemetry = (comment: string) => {
+    markFirstAction("approve");
+    handleApprove(comment);
+  };
+  const handleRejectWithTelemetry = (comment: string) => {
+    markFirstAction("reject");
+    handleReject(comment);
+  };
+  const handleEscalateWithTelemetry = () => {
+    markFirstAction("escalate");
+    handleEscalate();
+  };
+  const handleOverrideWithTelemetry = () => {
+    markFirstAction("override");
+    handleOverride();
+  };
+  const handleReanalyzeWithTelemetry = (reason: string) => {
+    markFirstAction("reanalyze");
+    handleReanalyze(reason);
+  };
 
   /**
    * View-layer accessor — the recipe's recommended action is surfaced
@@ -578,16 +612,18 @@ export default function ExceptionDetailPanel({
               verdict={detail.shadow_verdict as ShadowVerdict}
               executionError={executionError}
               recommendedAction={_recommendedAction() ?? undefined}
-              onApprove={handleApprove}
-              onReject={handleReject}
-              onEscalate={handleEscalate}
-              onOverride={handleOverride}
+              onApprove={handleApproveWithTelemetry}
+              onReject={handleRejectWithTelemetry}
+              onEscalate={handleEscalateWithTelemetry}
+              onOverride={handleOverrideWithTelemetry}
               canApprove={hasPermission("exceptions:approve")}
               canOverride={hasPermission("exceptions:override")}
               canEscalate={hasPermission("exceptions:escalate")}
               canReanalyze={hasPermission("exceptions:override")}
               onReanalyze={
-                hasPermission("exceptions:override") ? handleReanalyze : undefined
+                hasPermission("exceptions:override")
+                  ? handleReanalyzeWithTelemetry
+                  : undefined
               }
               reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
               actionInFlight={actionInFlight}

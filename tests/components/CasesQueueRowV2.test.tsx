@@ -12,10 +12,24 @@
  * carries the spoken form (currency as "X.XX USD", not "$").
  */
 import { render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, vi } from "vitest";
 
 import { CasesQueueRowV2 } from "@/app/cases/CasesQueueRowV2";
 import type { CaseListItem } from "@/lib/api";
 import type { SlaSnapshot } from "@/types/cases";
+
+const reportRowClick = vi.fn();
+vi.mock("@/lib/telemetry", () => ({
+  reportRowClick: (...args: unknown[]) => reportRowClick(...args),
+}));
+
+beforeEach(() => {
+  reportRowClick.mockReset();
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
 
 const SLA: SlaSnapshot = {
   band: "breached",
@@ -216,6 +230,27 @@ describe("CasesQueueRowV2 — selection", () => {
     );
     screen.getByRole("option").click();
     expect(onSelect).toHaveBeenCalledWith("EML-CMP-2026-0062");
+  });
+
+  it("fires the row-click telemetry on click (ADR-041 P3e gate #5)", () => {
+    render(
+      <CasesQueueRowV2
+        case_={FULL_CASE}
+        sla={SLA}
+        isSelected={false}
+        isPinned={false}
+        density="comfortable"
+        onSelect={() => {}}
+        rowIndex={3}
+      />,
+    );
+    screen.getByRole("option").click();
+    expect(reportRowClick).toHaveBeenCalledTimes(1);
+    expect(reportRowClick).toHaveBeenCalledWith({
+      case_id: "EML-CMP-2026-0062",
+      row_index: 3,
+      audit_verdict_color: "R",
+    });
   });
 
   it("aria-selected reflects isSelected", () => {

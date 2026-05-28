@@ -56,7 +56,7 @@ import {
   MOCK_EXCEPTIONS,
   persistMockExceptionMutation,
 } from "./mock-data/exceptions";
-import { deriveMockCases } from "./mock-data/cases";
+import { deriveMockCases, deriveMockCaseSummaries } from "./mock-data/cases";
 import { MOCK_LINE_ITEMS } from "./mock-data/line-items";
 import { mockAttachmentBlob } from "./mock-data/attachment-bytes";
 import type { OrderCase } from "@/types/cases";
@@ -2367,20 +2367,28 @@ export const casesApi = {
       });
     }
     await new Promise((r) => setTimeout(r, MOCK_DELAY));
-    let items: CaseListItem[] = deriveMockCases().map((c) => ({
-      ...c,
-      child_intents: [],  // mock-mode placeholder; live API computes
-      // ADR-041 P3e §3.1 mock defaults. Live backend computes via
-      // `build_case_summary`. Nulls here render as Structurally
-      // Omitted on the queue row (EvidenceBlock contract).
-      customer_name: null,
-      top_line_sku_code: null,
-      top_line_sku_title: null,
-      problem_one_liner: null,
-      intent: null,
-      dollar_impact: null,
-      audit_verdict_color: null,
-    }));
+    // ADR-041 P3e §3.1 — splice the CaseSummary mock projection
+    // onto each row. Live backend computes via `build_case_summary`;
+    // mock mode invents plausible per-intent values (see
+    // `INTENT_SUMMARY_TEMPLATES` in mock-data/cases.ts) so preview
+    // environments showcase the V2 row when NEXT_PUBLIC_CASES_ROW_V2
+    // is set. Intents without a template ship null fields — matches
+    // backend grandfather-clause behaviour for recipe-gap intents.
+    const summaries = deriveMockCaseSummaries();
+    let items: CaseListItem[] = deriveMockCases().map((c) => {
+      const s = summaries.get(c.case_id);
+      return {
+        ...c,
+        child_intents: s?.intent ? [s.intent] : [],
+        customer_name: s?.customer_name ?? null,
+        top_line_sku_code: s?.top_line_sku_code ?? null,
+        top_line_sku_title: s?.top_line_sku_title ?? null,
+        problem_one_liner: s?.problem_one_liner ?? null,
+        intent: s?.intent ?? null,
+        dollar_impact: s?.dollar_impact ?? null,
+        audit_verdict_color: s?.audit_verdict_color ?? null,
+      };
+    });
     if (params?.origin) items = items.filter((c) => c.origin === params.origin);
     if (params?.supergroup_code) {
       items = items.filter(
