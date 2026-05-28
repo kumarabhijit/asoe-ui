@@ -255,7 +255,9 @@ export default function ExceptionDetailPanel({
   const telemetryCaseId = CASES_ROW_V2
     ? (detail?.parent_case_id ?? undefined)
     : undefined;
-  const { markFirstAction } = useCaseTelemetry(telemetryCaseId);
+  const { markFirstAction, trackAnalysisScroll } = useCaseTelemetry(
+    telemetryCaseId,
+  );
 
   const handleApproveWithTelemetry = (comment: string) => {
     markFirstAction("approve");
@@ -640,6 +642,10 @@ export default function ExceptionDetailPanel({
             <AgentAnalysisSection
               analysis={analysis}
               defaultOpen={isHumanInTheLoopState(detail.lifecycle_state)}
+              // ADR-041 P3e Phase 3 gate #5 — wire the scroll
+              // observer so the hook accumulates max-depth for
+              // the analysis-scroll-depth telemetry.
+              onScrollDepth={trackAnalysisScroll}
             />
           )}
 
