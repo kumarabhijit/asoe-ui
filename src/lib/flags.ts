@@ -2,36 +2,33 @@
 //
 // Centralises the `NEXT_PUBLIC_CASES_ROW_V2` rollout policy. Two
 // callers today (`src/app/cases/page.tsx` and
-// `src/app/exceptions/ExceptionDetailPanel.tsx`); a third lands
-// when telemetry's scroll observer wires in (Phase 3+ follow-on).
+// `src/app/exceptions/ExceptionDetailPanel.tsx`).
 //
-// Policy (ADR-041 P3e Phase 3 sign-off — gate timing):
+// Project deployment taxonomy (PO direction 2026-05-28):
 //
-//   * **Production** — flag stays OFF unless
-//     `NEXT_PUBLIC_CASES_ROW_V2=1` is explicitly set at build time.
-//     Compliance audit-format review (gate 2) + CSA dry-run (gate 4)
-//     are not yet complete, so production rollout is operator-
-//     decision, not automatic.
+//   * **Dev**       — local engineer workstation. Iteration env.
+//   * **Preview**   — asoe-ui.vercel.app. Gate reviewers (CSA,
+//                     Compliance, Recipe SME), UX validation,
+//                     stakeholder demo. NOTE Vercel's own
+//                     `VERCEL_ENV` reports "production" for this
+//                     deploy because it's the main-branch alias;
+//                     the project's taxonomy treats it as preview.
+//                     Do NOT key flag behaviour on `VERCEL_ENV`.
+//   * **Pre-prod**  — Azure. Integration testing against the
+//                     real backend + gateways.
+//   * **Prod**      — does not exist yet. When prod lands, revisit
+//                     this helper to add gating per the Phase 3
+//                     sign-off list (Compliance audit-format
+//                     review + CSA dry-run).
 //
-//   * **Vercel preview deploys** — flag ON by default so the V2
-//     surface is reviewable on the preview URL without a manual
-//     env-var flip. `VERCEL_ENV === "preview"` is set by Vercel
-//     on every PR / branch deploy. Operators reviewing the gate
-//     deliverables see realistic V2 surfaces here.
+// Until prod lands, all four current tiers want V2 visible — the
+// surface is being actively reviewed. Default ON.
 //
-//   * **Local dev** — flag OFF unless the env var is set. Matches
-//     production so dev sessions exercise the rollback path by
-//     default.
-//
-// The function is pure + synchronous + safe to call during render —
-// `process.env` reads are baked at build time for `NEXT_PUBLIC_*`
-// vars and Vercel injects `VERCEL_ENV` at the same boundary.
+// `NEXT_PUBLIC_CASES_ROW_V2=0` is the escape hatch: flip the env
+// var in Vercel Project Settings → Environment Variables to roll
+// back without a code change.
 
 export function casesRowV2Enabled(): boolean {
-  if (process.env.NEXT_PUBLIC_CASES_ROW_V2 === "1") return true;
   if (process.env.NEXT_PUBLIC_CASES_ROW_V2 === "0") return false;
-  // Vercel preview deploys default to V2 so gate reviewers see
-  // the new surface without a manual env-var flip.
-  if (process.env.NEXT_PUBLIC_VERCEL_ENV === "preview") return true;
-  return false;
+  return true;
 }
