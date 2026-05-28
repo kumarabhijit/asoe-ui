@@ -389,6 +389,12 @@ export interface MockCaseSummary {
   top_line_sku_title: string | null;
   problem_one_liner: string | null;
   intent: string | null;
+  /** PO 2026-05-28 #4 — distinct child intents on this case. The
+   *  primary `intent` field carries the head record's intent
+   *  (already in this struct); `child_intents` carries the full
+   *  deduplicated set so multi-intent cases are visible on the
+   *  queue row. Empty array when no records carry an intent. */
+  child_intents: string[];
   dollar_impact: { amount_cents: number; currency: string } | null;
   audit_verdict_color: "R" | "A" | "G" | null;
 }
@@ -416,12 +422,28 @@ export function deriveMockCaseSummaries(): Map<string, MockCaseSummary> {
     const intent = lead.intent ?? null;
     const template = intent ? INTENT_SUMMARY_TEMPLATES[intent] : null;
     const customerName = lead.account_name ?? null;
+    // PO 2026-05-28 #4 — collect the full deduplicated set of
+    // child intents (preserving insertion order). Without this
+    // the queue row would only show the lead record's intent and
+    // multi-intent cases like `case-multi-WMT-Q1RESET`
+    // (PRICE_HOLD_RELEASE + BACK_ORDER + DUPLICATE_PO) look
+    // single-intent.
+    const seen = new Set<string>();
+    const childIntents: string[] = [];
+    for (const r of records) {
+      const ri = r.intent;
+      if (ri && !seen.has(ri)) {
+        seen.add(ri);
+        childIntents.push(ri);
+      }
+    }
     out.set(caseId, {
       customer_name: customerName,
       top_line_sku_code: template?.sku_code ?? null,
       top_line_sku_title: template?.sku_title ?? null,
       problem_one_liner: template?.one_liner ?? null,
       intent,
+      child_intents: childIntents,
       dollar_impact: template?.impact_cents != null
         ? { amount_cents: template.impact_cents, currency: "USD" }
         : null,

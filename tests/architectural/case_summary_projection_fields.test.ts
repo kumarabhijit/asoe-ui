@@ -107,4 +107,26 @@ describe("case-summary projection fields (ADR-041 P3e §3.1)", () => {
         "is hardcoded rather than data-driven",
     ).toBeGreaterThan(1);
   });
+
+  it("at least one mock case carries multiple distinct child_intents (PO #4)", async () => {
+    // Multi-intent cases exist in the mock fixture
+    // (`case-multi-WMT-Q1RESET` = 3 intents,
+    // `case-multi-COST-EOQ` = 2, `case-multi-KR-WK15` = 2). Before
+    // PO 2026-05-28 #4 the projection only carried the primary
+    // intent in child_intents, so these cases looked single-intent
+    // on the queue row. Lock: at least one row must surface > 1
+    // distinct intent.
+    const { items } = await casesApi.list();
+    const multiIntentRows = items.filter(
+      (r) => new Set(r.child_intents).size > 1,
+    );
+    expect(
+      multiIntentRows.length,
+      "expected at least one mock case with > 1 distinct child " +
+        "intent — `deriveMockCaseSummaries` must dedup across child " +
+        "records so multi-intent cases (case-multi-WMT-Q1RESET, " +
+        "case-multi-COST-EOQ, case-multi-KR-WK15) are visible on " +
+        "the queue row",
+    ).toBeGreaterThan(0);
+  });
 });

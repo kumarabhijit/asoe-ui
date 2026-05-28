@@ -215,6 +215,110 @@ describe("CasesQueueRowV2 — density", () => {
   });
 });
 
+describe("CasesQueueRowV2 — multi-intent visibility (PO #4)", () => {
+  it("primary intent only when child_intents has a single entry", () => {
+    render(
+      <CasesQueueRowV2
+        case_={FULL_CASE}
+        sla={SLA}
+        isSelected={false}
+        isPinned={false}
+        density="comfortable"
+        onSelect={() => {}}
+      />,
+    );
+    // FULL_CASE.child_intents has one entry (the primary).
+    expect(screen.getByText("EMAIL_COMPLAINT")).toBeInTheDocument();
+    expect(screen.queryByText(/\+\d/)).not.toBeInTheDocument();
+  });
+
+  it("appends +N when child_intents has additional distinct intents", () => {
+    render(
+      <CasesQueueRowV2
+        case_={{
+          ...FULL_CASE,
+          intent: "PRICE_HOLD_RELEASE",
+          child_intents: [
+            "PRICE_HOLD_RELEASE",
+            "BACK_ORDER",
+            "DUPLICATE_PO",
+          ],
+        }}
+        sla={SLA}
+        isSelected={false}
+        isPinned={false}
+        density="comfortable"
+        onSelect={() => {}}
+      />,
+    );
+    // Primary intent + the +N suffix.
+    expect(screen.getByText("PRICE_HOLD_RELEASE +2")).toBeInTheDocument();
+  });
+
+  it("multi-intent badge title lists all distinct intents", () => {
+    render(
+      <CasesQueueRowV2
+        case_={{
+          ...FULL_CASE,
+          intent: "OVER_MAX",
+          child_intents: ["OVER_MAX", "PALLET_CONFIG"],
+        }}
+        sla={SLA}
+        isSelected={false}
+        isPinned={false}
+        density="comfortable"
+        onSelect={() => {}}
+      />,
+    );
+    const badge = screen.getByText("OVER_MAX +1");
+    expect(badge.getAttribute("title")).toMatch(
+      /OVER_MAX, PALLET_CONFIG/,
+    );
+  });
+
+  it("aria-label announces the multi-intent count for SR users", () => {
+    render(
+      <CasesQueueRowV2
+        case_={{
+          ...FULL_CASE,
+          intent: "OVER_MAX",
+          child_intents: ["OVER_MAX", "PALLET_CONFIG"],
+        }}
+        sla={SLA}
+        isSelected={false}
+        isPinned={false}
+        density="comfortable"
+        onSelect={() => {}}
+      />,
+    );
+    const row = screen.getByRole("option");
+    expect(row.getAttribute("aria-label") ?? "").toMatch(
+      /OVER_MAX plus 1 more intent/,
+    );
+  });
+
+  it("singular vs plural in the aria-label", () => {
+    render(
+      <CasesQueueRowV2
+        case_={{
+          ...FULL_CASE,
+          intent: "A",
+          child_intents: ["A", "B", "C"],
+        }}
+        sla={SLA}
+        isSelected={false}
+        isPinned={false}
+        density="comfortable"
+        onSelect={() => {}}
+      />,
+    );
+    const row = screen.getByRole("option");
+    expect(row.getAttribute("aria-label") ?? "").toMatch(
+      /A plus 2 more intents/,
+    );
+  });
+});
+
 describe("CasesQueueRowV2 — selection", () => {
   it("calls onSelect with case_id on click", () => {
     const onSelect = vi.fn();

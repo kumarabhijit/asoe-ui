@@ -180,11 +180,27 @@ export function CasesQueueRowV2({
         {!compact && (
           <div className="grid grid-cols-[1fr_auto] items-center gap-8">
             <EvidenceBlock tier="audit-bearing" value={case_.intent}>
-              {(v) => (
-                <Badge variant="neutral" size="sm">
-                  {String(v)}
-                </Badge>
-              )}
+              {(v) => {
+                // PO 2026-05-28 #4 — surface multi-intent cases.
+                // The primary intent shows in the badge text;
+                // when child_intents carries additional distinct
+                // intents, append " +N" so the operator sees the
+                // case spans more than the primary classification.
+                // Title attr lists the full set for hover.
+                const additional =
+                  case_.child_intents.filter((i) => i !== v).length;
+                const label = additional > 0
+                  ? `${String(v)} +${additional}`
+                  : String(v);
+                const title = additional > 0
+                  ? `Intents on this case: ${case_.child_intents.join(", ")}`
+                  : undefined;
+                return (
+                  <Badge variant="neutral" size="sm" title={title}>
+                    {label}
+                  </Badge>
+                );
+              }}
             </EvidenceBlock>
             <EvidenceBlock tier="audit-bearing" value={case_.dollar_impact}>
               {(v) => {
@@ -260,7 +276,17 @@ function buildAriaLabel(case_: CaseListItem, sla: SlaSnapshot): string {
   ]
     .filter(Boolean)
     .join(" — ");
-  const intent = case_.intent;
+  // Intent: primary + multi-intent count for SR announce. Matches
+  // the visible "+N" badge so screen-reader output mirrors sighted
+  // scan order.
+  const additionalIntents = case_.intent
+    ? case_.child_intents.filter((i) => i !== case_.intent).length
+    : case_.child_intents.length;
+  const intent = case_.intent
+    ? additionalIntents > 0
+      ? `${case_.intent} plus ${additionalIntents} more intent${additionalIntents === 1 ? "" : "s"}`
+      : case_.intent
+    : null;
   const amount = case_.dollar_impact
     ? formatCurrencyForA11y(
         case_.dollar_impact.amount_cents,

@@ -2379,7 +2379,13 @@ export const casesApi = {
       const s = summaries.get(c.case_id);
       return {
         ...c,
-        child_intents: s?.intent ? [s.intent] : [],
+        // PO 2026-05-28 #4 — surface the FULL distinct intent set
+        // so multi-intent cases are visible on the row.
+        // `deriveMockCaseSummaries` already dedupes; fall back to
+        // the primary intent if no summary (just-opened case).
+        child_intents:
+          s?.child_intents
+          ?? (s?.intent ? [s.intent] : []),
         customer_name: s?.customer_name ?? null,
         top_line_sku_code: s?.top_line_sku_code ?? null,
         top_line_sku_title: s?.top_line_sku_title ?? null,
