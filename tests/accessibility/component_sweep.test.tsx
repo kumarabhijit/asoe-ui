@@ -20,6 +20,7 @@ import { AgentReasoningCard } from "@/components/ui/AgentReasoningCard";
 import { NavBar } from "@/components/ui/NavBar";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { ComplianceHitCountChip } from "@/components/ui/ComplianceHitCountChip";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { VerdictDot } from "@/components/ui/VerdictDot";
 import { EventsTimeline } from "@/components/ui/EventsTimeline";
@@ -251,6 +252,19 @@ describe("a11y sweep: VerdictDot", () => {
 
   it("GREEN at md size", async () =>
     expectNoViolations(<VerdictDot color="G" size="md" />));
+});
+
+// ---------------------------------------------------------------------------
+// ComplianceHitCountChip — ADR-041 P3e §2.3. Non-dismissible count
+// indicator for the slim case-header. Null on zero (Guardrail #6),
+// so the sweep covers the rendered (count > 0) branches only.
+// ---------------------------------------------------------------------------
+describe("a11y sweep: ComplianceHitCountChip", () => {
+  it("singular (count=1)", async () =>
+    expectNoViolations(<ComplianceHitCountChip count={1} />));
+
+  it("plural (count=4)", async () =>
+    expectNoViolations(<ComplianceHitCountChip count={4} />));
 });
 
 // ---------------------------------------------------------------------------

@@ -28,6 +28,7 @@ import { Mail, PackageCheck, Clock, ChevronRight, ChevronDown } from "lucide-rea
 
 import { Badge } from "@/components/ui/Badge";
 import { ClassificationHistoryPanel } from "@/components/cases/ClassificationHistoryPanel";
+import { ComplianceHitCountChip } from "@/components/ui/ComplianceHitCountChip";
 import { ComplianceHitsRail } from "./ComplianceHitsRail";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { useClassificationHistory } from "@/hooks/useClassificationHistory";
@@ -220,6 +221,12 @@ export function CaseDetailPanel({
               </>
             )}
           </EvidenceBlock>
+          {/* ADR-041 P3e §2.3 — Compliance reversal condition #3.
+              Non-dismissible count chip stays on the slim header so
+              the operator always sees Compliance presence even when
+              the full hits surface (rail at xl, inline below xl) is
+              scrolled off-screen. Returns null when count is 0. */}
+          <ComplianceHitCountChip count={(policyHits ?? []).length} />
           <span className="ml-auto text-text-tertiary">
             {STATUS_LABEL[orderCase.status] ?? orderCase.status}
           </span>
