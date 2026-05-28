@@ -66,7 +66,9 @@ const BARE_CASE: CaseListItem = {
   top_line_sku_code: null,
   top_line_sku_title: null,
   problem_one_liner: null,
+  supergroup_code: undefined,
   intent: null,
+  child_intents: [],
   dollar_impact: null,
   audit_verdict_color: null,
 };
@@ -90,7 +92,9 @@ describe("CasesQueueRowV2 — full data", () => {
     expect(within(row).getByText("acme-corp")).toBeInTheDocument();
     expect(within(row).getByText("BEV-COLA-12PK")).toBeInTheDocument();
     expect(within(row).getByText(/short shipment/)).toBeInTheDocument();
-    expect(within(row).getByText("EMAIL_COMPLAINT")).toBeInTheDocument();
+    // PO round-2 #2 — primary classification is the supergroup
+    // (operator-facing taxonomy), not the record-level intent.
+    expect(within(row).getByText("New Order")).toBeInTheDocument();
     expect(within(row).getByText("$4,147.20")).toBeInTheDocument();
   });
 
@@ -128,7 +132,9 @@ describe("CasesQueueRowV2 — full data", () => {
     expect(label).toMatch(/audit verdict R/);
     expect(label).toMatch(/case EML-CMP-2026-0062/);
     expect(label).toMatch(/acme-corp/);
-    expect(label).toMatch(/EMAIL_COMPLAINT/);
+    // PO round-2 #2 — SR announces the supergroup
+    // classification, not the record-level intent.
+    expect(label).toMatch(/New Order/);
     // Spoken currency, not the "$" glyph (NVDA/JAWS pronunciation drift).
     expect(label).toMatch(/4,147\.20 USD/);
     expect(label).not.toMatch(/\$4,147/);
@@ -149,6 +155,9 @@ describe("CasesQueueRowV2 — bare data (EvidenceBlock omission)", () => {
     );
     expect(screen.queryByText("acme-corp")).not.toBeInTheDocument();
     expect(screen.queryByText("BEV-COLA-12PK")).not.toBeInTheDocument();
+    // Bare case has no supergroup AND no intent → no
+    // classification badge.
+    expect(screen.queryByText("New Order")).not.toBeInTheDocument();
     expect(screen.queryByText("EMAIL_COMPLAINT")).not.toBeInTheDocument();
     expect(screen.queryByText(/\$/)).not.toBeInTheDocument();
     // The chips on line 1 still render — origin and SLA always present.
@@ -206,8 +215,8 @@ describe("CasesQueueRowV2 — density", () => {
     );
     // Line 2 (case_id) hidden.
     expect(screen.queryByText("EML-CMP-2026-0062")).not.toBeInTheDocument();
-    // Line 4 (intent badge + currency) hidden.
-    expect(screen.queryByText("EMAIL_COMPLAINT")).not.toBeInTheDocument();
+    // Line 4 (classification badge + currency) hidden.
+    expect(screen.queryByText("New Order")).not.toBeInTheDocument();
     expect(screen.queryByText("$4,147.20")).not.toBeInTheDocument();
     // Line 1 chips + line 3 subject still visible.
     expect(screen.getByText("Customer Inbox")).toBeInTheDocument();
@@ -215,8 +224,8 @@ describe("CasesQueueRowV2 — density", () => {
   });
 });
 
-describe("CasesQueueRowV2 — multi-intent visibility (PO #4)", () => {
-  it("primary intent only when child_intents has a single entry", () => {
+describe("CasesQueueRowV2 — multi-intent visibility (PO round-2 #2)", () => {
+  it("no secondary intent-count badge when child_intents has a single entry", () => {
     render(
       <CasesQueueRowV2
         case_={FULL_CASE}
@@ -227,16 +236,18 @@ describe("CasesQueueRowV2 — multi-intent visibility (PO #4)", () => {
         onSelect={() => {}}
       />,
     );
-    // FULL_CASE.child_intents has one entry (the primary).
-    expect(screen.getByText("EMAIL_COMPLAINT")).toBeInTheDocument();
-    expect(screen.queryByText(/\+\d/)).not.toBeInTheDocument();
+    // Primary classification (supergroup) renders; no `+N intents`
+    // secondary badge for a single-intent case.
+    expect(screen.getByText("New Order")).toBeInTheDocument();
+    expect(screen.queryByText(/\+\d+ intents/)).not.toBeInTheDocument();
   });
 
-  it("appends +N when child_intents has additional distinct intents", () => {
+  it("renders +N intents secondary badge when multiple distinct intents", () => {
     render(
       <CasesQueueRowV2
         case_={{
           ...FULL_CASE,
+          supergroup_code: "SG_BLOCK_PRICING",
           intent: "PRICE_HOLD_RELEASE",
           child_intents: [
             "PRICE_HOLD_RELEASE",
@@ -251,15 +262,18 @@ describe("CasesQueueRowV2 — multi-intent visibility (PO #4)", () => {
         onSelect={() => {}}
       />,
     );
-    // Primary intent + the +N suffix.
-    expect(screen.getByText("PRICE_HOLD_RELEASE +2")).toBeInTheDocument();
+    // Primary classification (formatted supergroup).
+    expect(screen.getByText("Block Pricing")).toBeInTheDocument();
+    // Secondary intent-count badge.
+    expect(screen.getByText("+3 intents")).toBeInTheDocument();
   });
 
-  it("multi-intent badge title lists all distinct intents", () => {
+  it("intent-count badge title lists all distinct underlying intents", () => {
     render(
       <CasesQueueRowV2
         case_={{
           ...FULL_CASE,
+          supergroup_code: "SG_BLOCK_AVAILABILITY",
           intent: "OVER_MAX",
           child_intents: ["OVER_MAX", "PALLET_CONFIG"],
         }}
@@ -270,17 +284,18 @@ describe("CasesQueueRowV2 — multi-intent visibility (PO #4)", () => {
         onSelect={() => {}}
       />,
     );
-    const badge = screen.getByText("OVER_MAX +1");
+    const badge = screen.getByText("+2 intents");
     expect(badge.getAttribute("title")).toMatch(
       /OVER_MAX, PALLET_CONFIG/,
     );
   });
 
-  it("aria-label announces the multi-intent count for SR users", () => {
+  it("aria-label announces classification + intent count for SR users", () => {
     render(
       <CasesQueueRowV2
         case_={{
           ...FULL_CASE,
+          supergroup_code: "SG_BLOCK_AVAILABILITY",
           intent: "OVER_MAX",
           child_intents: ["OVER_MAX", "PALLET_CONFIG"],
         }}
@@ -293,17 +308,18 @@ describe("CasesQueueRowV2 — multi-intent visibility (PO #4)", () => {
     );
     const row = screen.getByRole("option");
     expect(row.getAttribute("aria-label") ?? "").toMatch(
-      /OVER_MAX plus 1 more intent/,
+      /Block Availability, 2 underlying intents/,
     );
   });
 
-  it("singular vs plural in the aria-label", () => {
+  it("falls back to intent when supergroup_code is absent", () => {
     render(
       <CasesQueueRowV2
         case_={{
           ...FULL_CASE,
-          intent: "A",
-          child_intents: ["A", "B", "C"],
+          supergroup_code: undefined,
+          intent: "MANUAL_ORDER_INTAKE",
+          child_intents: ["MANUAL_ORDER_INTAKE"],
         }}
         sla={SLA}
         isSelected={false}
@@ -312,10 +328,9 @@ describe("CasesQueueRowV2 — multi-intent visibility (PO #4)", () => {
         onSelect={() => {}}
       />,
     );
-    const row = screen.getByRole("option");
-    expect(row.getAttribute("aria-label") ?? "").toMatch(
-      /A plus 2 more intents/,
-    );
+    // Without a supergroup classification, the row falls back to
+    // the intent so the operator at least sees what the case is.
+    expect(screen.getByText("MANUAL_ORDER_INTAKE")).toBeInTheDocument();
   });
 });
 

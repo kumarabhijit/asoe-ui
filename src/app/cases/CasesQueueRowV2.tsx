@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { VerdictDot } from "@/components/ui/VerdictDot";
 import { cn } from "@/lib/utils";
-import { STATUS_LABEL, formatCaseId } from "@/lib/cases";
+import { STATUS_LABEL, formatCaseId, formatSupergroupCode } from "@/lib/cases";
 import type { CaseListItem, CaseSummaryDollarImpact } from "@/lib/api";
 import type { Origin, SlaBand, SlaSnapshot } from "@/types/cases";
 import { formatCurrency, formatCurrencyForA11y } from "@/lib/format";
@@ -179,29 +179,49 @@ export function CasesQueueRowV2({
         {/* Line 4 — intent + currency. Hidden in compact density. */}
         {!compact && (
           <div className="grid grid-cols-[1fr_auto] items-center gap-8">
-            <EvidenceBlock tier="audit-bearing" value={case_.intent}>
-              {(v) => {
-                // PO 2026-05-28 #4 — surface multi-intent cases.
-                // The primary intent shows in the badge text;
-                // when child_intents carries additional distinct
-                // intents, append " +N" so the operator sees the
-                // case spans more than the primary classification.
-                // Title attr lists the full set for hover.
-                const additional =
-                  case_.child_intents.filter((i) => i !== v).length;
-                const label = additional > 0
-                  ? `${String(v)} +${additional}`
-                  : String(v);
-                const title = additional > 0
-                  ? `Intents on this case: ${case_.child_intents.join(", ")}`
-                  : undefined;
-                return (
-                  <Badge variant="neutral" size="sm" title={title}>
-                    {label}
+            {/* PO 2026-05-28 round-2 #2 — primary classification
+                is the case's supergroup_code (operator-facing
+                taxonomy: "Order Change", "New Order", "Block
+                Pricing", etc.), NOT the record-level intent
+                (recipe routing: MANUAL_ORDER_INTAKE etc.). The
+                expert panel (CSA + Compliance) confirmed:
+                supergroup answers "what kind of work is this?";
+                intents answer "which recipes ran underneath?".
+                Multi-intent cases get a secondary `+N intents`
+                badge so the multi-intent visibility from round-1
+                #4 isn't lost — record-level intents move to the
+                tooltip on the secondary badge.
+
+                Fallback: when supergroup_code is absent (just-
+                opened case, classifier not run), fall back to
+                the primary intent so the row isn't empty. */}
+            <div className="flex items-center gap-4 min-w-0">
+              <EvidenceBlock
+                tier="audit-bearing"
+                value={case_.supergroup_code ?? case_.intent}
+              >
+                {(v) => (
+                  <Badge
+                    variant="neutral"
+                    size="sm"
+                    title={String(v)}
+                  >
+                    {case_.supergroup_code
+                      ? formatSupergroupCode(case_.supergroup_code)
+                      : String(v)}
                   </Badge>
-                );
-              }}
-            </EvidenceBlock>
+                )}
+              </EvidenceBlock>
+              {case_.child_intents.length > 1 && (
+                <Badge
+                  variant="neutral"
+                  size="sm"
+                  title={`Underlying intents: ${case_.child_intents.join(", ")}`}
+                >
+                  {`+${case_.child_intents.length} intents`}
+                </Badge>
+              )}
+            </div>
             <EvidenceBlock tier="audit-bearing" value={case_.dollar_impact}>
               {(v) => {
                 const d = v as CaseSummaryDollarImpact;
@@ -276,16 +296,19 @@ function buildAriaLabel(case_: CaseListItem, sla: SlaSnapshot): string {
   ]
     .filter(Boolean)
     .join(" — ");
-  // Intent: primary + multi-intent count for SR announce. Matches
-  // the visible "+N" badge so screen-reader output mirrors sighted
-  // scan order.
-  const additionalIntents = case_.intent
-    ? case_.child_intents.filter((i) => i !== case_.intent).length
-    : case_.child_intents.length;
-  const intent = case_.intent
-    ? additionalIntents > 0
-      ? `${case_.intent} plus ${additionalIntents} more intent${additionalIntents === 1 ? "" : "s"}`
-      : case_.intent
+  // PO 2026-05-28 round-2 #2 — SR announces the case-level
+  // classification (supergroup), matching the visible primary
+  // badge. Multi-intent cases also announce the underlying
+  // intent count so the SR experience mirrors the sighted scan
+  // order of the secondary badge.
+  const classification = case_.supergroup_code
+    ? formatSupergroupCode(case_.supergroup_code)
+    : case_.intent ?? null;
+  const intentCount = case_.child_intents.length;
+  const intent = classification
+    ? intentCount > 1
+      ? `${classification}, ${intentCount} underlying intents`
+      : classification
     : null;
   const amount = case_.dollar_impact
     ? formatCurrencyForA11y(
