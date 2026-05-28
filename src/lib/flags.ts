@@ -3,35 +3,35 @@
 // Centralises the `NEXT_PUBLIC_CASES_ROW_V2` rollout policy. Two
 // callers today (`src/app/cases/page.tsx` and
 // `src/app/exceptions/ExceptionDetailPanel.tsx`); a third lands
-// when telemetry's scroll observer wires in (Phase 3+ follow-on).
+// when telemetry's scroll observer wires in.
 //
-// Policy (ADR-041 P3e Phase 3 sign-off — gate timing):
+// Policy (ADR-041 P3e Phase 3 — PO direction 2026-05-28):
 //
-//   * **Production** — flag stays OFF unless
-//     `NEXT_PUBLIC_CASES_ROW_V2=1` is explicitly set at build time.
-//     Compliance audit-format review (gate 2) + CSA dry-run (gate 4)
-//     are not yet complete, so production rollout is operator-
-//     decision, not automatic.
+//   * **Default ON everywhere.** The PO confirmed
+//     `asoe-ui.vercel.app` is the validation surface for the
+//     gate-2 (Compliance audit-format) and gate-4 (CSA dry-run)
+//     reviews — both of which need the V2 surface visible to run.
+//     Previous "production stays OFF" policy made
+//     asoe-ui.vercel.app show the legacy row, which blocked the
+//     gate reviewers' workflow. The PO's direction supersedes the
+//     conservative default; production is the gate-validation
+//     environment.
 //
-//   * **Vercel preview deploys** — flag ON by default so the V2
-//     surface is reviewable on the preview URL without a manual
-//     env-var flip. `VERCEL_ENV === "preview"` is set by Vercel
-//     on every PR / branch deploy. Operators reviewing the gate
-//     deliverables see realistic V2 surfaces here.
+//   * **`NEXT_PUBLIC_CASES_ROW_V2=0` is the escape hatch.** If a
+//     gate review finds a blocker, flip the env var in Vercel
+//     Project Settings → Environment Variables to roll back
+//     without a code change.
 //
-//   * **Local dev** — flag OFF unless the env var is set. Matches
-//     production so dev sessions exercise the rollback path by
-//     default.
+//   * **`NEXT_PUBLIC_CASES_ROW_V2=1` is the redundant explicit
+//     opt-in.** Same as the default; retained so the local dev
+//     pattern (set the env var when iterating on V2-only paths)
+//     keeps working.
 //
 // The function is pure + synchronous + safe to call during render —
 // `process.env` reads are baked at build time for `NEXT_PUBLIC_*`
-// vars and Vercel injects `VERCEL_ENV` at the same boundary.
+// vars.
 
 export function casesRowV2Enabled(): boolean {
-  if (process.env.NEXT_PUBLIC_CASES_ROW_V2 === "1") return true;
   if (process.env.NEXT_PUBLIC_CASES_ROW_V2 === "0") return false;
-  // Vercel preview deploys default to V2 so gate reviewers see
-  // the new surface without a manual env-var flip.
-  if (process.env.NEXT_PUBLIC_VERCEL_ENV === "preview") return true;
-  return false;
+  return true;
 }
