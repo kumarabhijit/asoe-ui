@@ -54,7 +54,7 @@ describe("ExceptionDetailPanel section reorder (ADR-041 P3e §2.2)", () => {
     // The mount may include an intermediate wrapper div (chrome
     // around the ribbon when it lives outside the scroll container);
     // assert the gate-then-ribbon proximity within ~400 chars.
-    expect(PANEL).toMatch(/CASES_ROW_V2[\s\S]{0,400}?<StickyActionRibbon/);
+    expect(PANEL).toMatch(/CASES_ROW_V2[\s\S]{0,1200}?<StickyActionRibbon/);
   });
 
   it("AgentReasoningCard receives hideActionMatrix bound to the flag", () => {
@@ -103,44 +103,53 @@ describe("ExceptionDetailPanel section reorder (ADR-041 P3e §2.2)", () => {
     ).toBeLessThan(scrollContainerIdx);
   });
 
-  it("ribbon wrapper applies position: sticky against the right-pane scroll", () => {
-    // The lift-out-of-inner-scroll fix (commit c8d226d) only
-    // addressed scroll surface (B) — the inner ExceptionDetailPanel
-    // overflow-auto. Scroll surface (A) — the outer right-pane
-    // `<section aria-label="Case workspace" lg:overflow-y-auto>` —
-    // was still pulling the ribbon away when the operator scrolled
-    // past the slim header / classification / records picker. The
-    // wrapper must carry `position: sticky` so the ribbon pins to
-    // the right-pane viewport at lg+ and to the document viewport
-    // (offset by --nav-height) below lg.
+  it("ribbon's own className carries position: sticky", () => {
+    // The user reported the sticky wiring missing TWICE
+    // (c8d226d's lift-out-of-inner-scroll only addressed scroll
+    // surface B; 6fbfad3 added sticky on a wrapper to also
+    // address scroll surface A; round-3 the wrapper's chrome was
+    // dropped because it read as a heavy grey box around the
+    // ribbon — sticky classes moved onto the ribbon's section
+    // directly via its `className` prop).
     //
-    // The user reported this twice; protect it with a lock so the
-    // sticky wiring can't regress.
-    const wrapperMatch = PANEL.match(
-      /<div\s+className=\{[\s\S]{0,400}?\}\s*>\s*<StickyActionRibbon/,
+    // Three invariants must hold so the sticky behaviour doesn't
+    // regress:
+    //   * `sticky` class present
+    //   * `top-` offset class present (the NavBar is also sticky
+    //     `top: 0` below lg, so the ribbon needs to anchor below
+    //     it with `top-[var(--nav-height)]`)
+    //   * `z-` class present so the cards scrolling under don't
+    //     overdraw the ribbon
+    //
+    // The classes live on the `<StickyActionRibbon className={...}>`
+    // prop — check the JSX block for them.
+    const ribbonMatch = PANEL.match(
+      /<StickyActionRibbon[\s\S]{0,600}?className=\{cn\(([\s\S]{0,400}?)\)\}/,
     );
     expect(
-      wrapperMatch,
-      "Could not find the wrapper <div> around <StickyActionRibbon>",
+      ribbonMatch,
+      "Could not find <StickyActionRibbon className={cn(...)} ...> " +
+        "block — the sticky wiring lives in the className prop.",
     ).not.toBeNull();
-    const wrapperClassName = wrapperMatch?.[0] ?? "";
+    const ribbonClassName = ribbonMatch?.[1] ?? "";
     expect(
-      wrapperClassName,
-      "Ribbon wrapper must include `sticky` class (CSS " +
-        "`position: sticky`) so it pins to the nearest scrolling " +
-        "ancestor — without it the ribbon scrolls away with the " +
-        "right-pane outer scroll surface.",
+      ribbonClassName,
+      "Ribbon `className` must include `sticky` (CSS " +
+        "`position: sticky`) so it pins to the right-pane " +
+        "scrolling ancestor — without it the ribbon scrolls " +
+        "away with the right-pane outer scroll surface.",
     ).toMatch(/\bsticky\b/);
     expect(
-      wrapperClassName,
-      "Ribbon wrapper must include a `top-` offset class — below " +
-        "lg the NavBar is also sticky `top: 0` so the ribbon needs " +
-        "to anchor below it (e.g. `top-[var(--nav-height)]`).",
+      ribbonClassName,
+      "Ribbon `className` must include a `top-` offset class — " +
+        "below lg the NavBar is also sticky `top: 0` so the " +
+        "ribbon needs to anchor below it " +
+        "(e.g. `top-[var(--nav-height)]`).",
     ).toMatch(/\btop-(?:0|\[)/);
     expect(
-      wrapperClassName,
-      "Ribbon wrapper must include a `z-` class above the scroll " +
-        "content so the cards underneath don't bleed through.",
+      ribbonClassName,
+      "Ribbon `className` must include a `z-` class above the " +
+        "scroll content so the cards underneath don't bleed through.",
     ).toMatch(/\bz-\d+\b/);
   });
 });
