@@ -234,11 +234,29 @@ describe("/cases workspace — case-switch race invariants", () => {
       src,
       "queue listbox must carry aria-activedescendant",
     ).toMatch(/role=["']listbox["'][\s\S]*?aria-activedescendant=/);
-    expect(
-      src,
-      "the option rows must be tabIndex={-1} so the listbox is the " +
-        "single Tab stop (roving via aria-activedescendant)",
-    ).toMatch(/role=["']option["'][\s\S]*?tabIndex=\{-1\}/);
+    // ADR-041 P3e §2.1 — row anatomy lives in `CasesQueueRow.tsx`
+    // (legacy) and `CasesQueueRowV2.tsx` (flagged), both consumed by
+    // page.tsx. Both must keep the roving-tabindex contract so the
+    // listbox stays a single Tab stop regardless of which row is
+    // mounted.
+    const rowV1 = readFileSync(
+      path.resolve(__dirname, "../../src/app/cases/CasesQueueRow.tsx"),
+      "utf-8",
+    );
+    const rowV2 = readFileSync(
+      path.resolve(__dirname, "../../src/app/cases/CasesQueueRowV2.tsx"),
+      "utf-8",
+    );
+    for (const [name, body] of [
+      ["CasesQueueRow.tsx", rowV1],
+      ["CasesQueueRowV2.tsx", rowV2],
+    ] as const) {
+      expect(
+        body,
+        `${name}: the option row must be tabIndex={-1} so the listbox ` +
+          "is the single Tab stop (roving via aria-activedescendant)",
+      ).toMatch(/role=["']option["'][\s\S]*?tabIndex=\{-1\}/);
+    }
   });
 
   it("supports F6 cross-pane focus switching", () => {
