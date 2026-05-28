@@ -65,6 +65,17 @@ export function buildOpenActionableScenario(
       will_miss_rdd: false,
       tier: 2,
       child_intents: [intent],
+      // ADR-041 P3e §3.1 — CaseSummary projection. Scenarios drive
+      // the test-suite path; live backend computes these via
+      // `build_case_summary`. Null is the legal mock state per the
+      // EvidenceBlock Structurally Omitted contract.
+      customer_name: null,
+      top_line_sku_code: null,
+      top_line_sku_title: null,
+      problem_one_liner: null,
+      intent,
+      dollar_impact: null,
+      audit_verdict_color: null,
     },
     records: [
       {

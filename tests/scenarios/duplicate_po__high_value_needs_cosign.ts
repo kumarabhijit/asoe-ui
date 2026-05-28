@@ -23,6 +23,14 @@ export const DUPLICATE_PO__high_value_needs_cosign: BehaviourScenario = {
     will_miss_rdd: false,
     tier: 2,
     child_intents: ["DUPLICATE_PO"],
+    // ADR-041 P3e §3.1 — CaseSummary projection (mock-null).
+    customer_name: null,
+    top_line_sku_code: null,
+    top_line_sku_title: null,
+    problem_one_liner: null,
+    intent: "DUPLICATE_PO",
+    dollar_impact: null,
+    audit_verdict_color: null,
   },
   records: [
     {

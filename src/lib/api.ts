@@ -2258,8 +2258,61 @@ export const policyApi = {
  * `src/types/cases.ts`. Empty array when the case has no children
  * yet (just-opened Manual Order).
  */
+/**
+ * ADR-041 P3e §3.1 — read-projection fields populated by the
+ * backend's `build_case_summary` graph node. All seven are nullable
+ * and rendered through `<EvidenceBlock>` on the queue row
+ * (Guardrail #6 — no `?? "—"` fallbacks). `customer_name` is the
+ * only cosmetic field; the remainder are audit-bearing.
+ *
+ * Backend lives in `asoe2/api/schemas.py::CaseListItem`; the wire
+ * type widens here without touching `src/types/cases.ts`
+ * (Guardrail #3 — `OrderCase` mirrors the persisted shape only).
+ *
+ * `dollar_impact` is stripped at the route boundary for callers
+ * lacking `exceptions:approve` OR `exceptions:override`
+ * (ADR-041 P3e §3.4). UI must not infer permission from null —
+ * the row's line 4 collapses to intent badge alone when the field
+ * is absent.
+ */
+export interface CaseSummaryDollarImpact {
+  amount_cents: number;
+  /** ISO 4217 currency code. */
+  currency: string;
+}
+
 export interface CaseListItem extends OrderCase {
   child_intents: string[];
+
+  /** Cosmetic — customer display name resolved from `customer_id`. */
+  customer_name: string | null;
+
+  /** Audit-bearing — top-line SKU by absolute dollar impact. */
+  top_line_sku_code: string | null;
+
+  /** Audit-bearing — title of the top-line SKU. */
+  top_line_sku_title: string | null;
+
+  /** Audit-bearing — per-intent problem one-liner composed by
+   *  `analysis_composer.py`. Null when the recipe template is
+   *  ungrounded (PRICE_HOLD without sku, EMAIL_COMPLAINT intake
+   *  without quantity — tracked in
+   *  `compliance/audit_bearing_registry.yaml::grandfather_clauses`). */
+  problem_one_liner: string | null;
+
+  /** Audit-bearing — primary child intent. Runtime enum
+   *  (Guardrail #1); no Literal type. */
+  intent: string | null;
+
+  /** Audit-bearing — financial impact in cents + ISO currency.
+   *  Null when (a) the route stripped it by RBAC, or (b) the intent
+   *  has no honest single-number impact (EDI_MISMATCH, PALLET,
+   *  EMAIL_COMPLAINT intake). */
+  dollar_impact: CaseSummaryDollarImpact | null;
+
+  /** Audit-bearing — shadow-rollup verdict color, gated by
+   *  per-intent never-RED / never-GREEN rules in the backend. */
+  audit_verdict_color: "R" | "A" | "G" | null;
 }
 
 export const casesApi = {
@@ -2317,6 +2370,16 @@ export const casesApi = {
     let items: CaseListItem[] = deriveMockCases().map((c) => ({
       ...c,
       child_intents: [],  // mock-mode placeholder; live API computes
+      // ADR-041 P3e §3.1 mock defaults. Live backend computes via
+      // `build_case_summary`. Nulls here render as Structurally
+      // Omitted on the queue row (EvidenceBlock contract).
+      customer_name: null,
+      top_line_sku_code: null,
+      top_line_sku_title: null,
+      problem_one_liner: null,
+      intent: null,
+      dollar_impact: null,
+      audit_verdict_color: null,
     }));
     if (params?.origin) items = items.filter((c) => c.origin === params.origin);
     if (params?.supergroup_code) {

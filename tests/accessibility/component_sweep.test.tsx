@@ -21,6 +21,7 @@ import { NavBar } from "@/components/ui/NavBar";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
+import { VerdictDot } from "@/components/ui/VerdictDot";
 import { EventsTimeline } from "@/components/ui/EventsTimeline";
 import { AttachmentPreview } from "@/components/ui/AttachmentPreview";
 import {
@@ -234,6 +235,22 @@ describe("a11y sweep: EvidenceBlock", () => {
         </EvidenceBlock>
       </section>,
     ));
+});
+
+// ---------------------------------------------------------------------------
+// VerdictDot — ADR-041 P3e §2.4. WCAG 1.4.1: letter pairing
+// (not color alone) carries the audit-verdict signal. aria-label
+// gives the spoken form.
+// ---------------------------------------------------------------------------
+describe("a11y sweep: VerdictDot", () => {
+  it("RED at sm size", async () =>
+    expectNoViolations(<VerdictDot color="R" />));
+
+  it("AMBER at sm size", async () =>
+    expectNoViolations(<VerdictDot color="A" />));
+
+  it("GREEN at md size", async () =>
+    expectNoViolations(<VerdictDot color="G" size="md" />));
 });
 
 // ---------------------------------------------------------------------------
