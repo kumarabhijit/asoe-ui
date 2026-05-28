@@ -29,6 +29,7 @@ import {
 import { StickyActionRibbon } from "@/components/ui/StickyActionRibbon";
 import { useCaseTelemetry } from "@/hooks/useCaseTelemetry";
 import { casesRowV2Enabled } from "@/lib/flags";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useExceptionActions } from "@/hooks/useExceptionActions";
@@ -513,24 +514,50 @@ export default function ExceptionDetailPanel({
       />
 
       {/* ━━ 2b. Sticky action ribbon (ADR-041 P3e §2.2) ━━━━━━━━━━━━━━
-          Mounted as a SIBLING of the inner scroll container below
-          (not inside it) so it stays pinned above the scroll area
-          regardless of how the inner content scrolls.
+          The ribbon must stay visible regardless of which scroll
+          surface the operator drives. Two scroll surfaces in play:
 
-          The previous mount-inside-the-scroll-container approach
-          was broken: ExceptionDetailPanel owns its own
-          `overflow-auto` scroll surface (the line below at #3); a
-          sticky element inside that container would scroll AWAY
-          with its content because the user's scroll happens INSIDE
-          the same container, not against an outer ancestor.
+            A. Right pane (`/cases/page.tsx`'s
+               `<section aria-label="Case workspace" lg:overflow-y-auto>`)
+               scrolls slim header, classification history,
+               records picker, and this entire panel.
+            B. The inner `flex-1 overflow-auto` div below scrolls
+               Analysis / Recommendation / enrichment sections.
 
-          Lifting the ribbon out of the scroll container means it
-          renders above the Analysis / Recommendation / enrichment
-          sections in normal flow. Analysis scrolls underneath;
-          Approve / Reject / Override / Escalate / Re-analyze stay
-          one click away no matter how far the operator scrolls. */}
+          The first iteration only addressed (B) — the ribbon sat
+          inside the inner scroll, so its sticky reference was the
+          same surface that scrolled. Fixed in commit c8d226d by
+          lifting it OUT of (B). But that left (A) unaddressed:
+          when the operator scrolled the right pane, the ribbon
+          scrolled away with the slim header / classification /
+          records picker.
+
+          This commit adds genuine `position: sticky` on the
+          wrapper so the ribbon pins to the top of the nearest
+          scrolling ancestor — which at lg+ is the right-pane
+          workspace section (the (A) scroll), and below lg is the
+          document. The `top` value differs by breakpoint:
+
+            * lg+: `top: 0` — anchors to the top of the right
+              pane's viewport, which already sits below the nav
+              (the workspace section is inside `<main>` which is
+              `h-[calc(100vh-var(--nav-height))]`).
+            * `< lg`: `top: var(--nav-height)` — the document is
+              the scrolling ancestor, and the NavBar is also
+              sticky `top: 0`. Anchoring the ribbon to the
+              nav-height avoids overlap.
+
+          z-10 keeps the ribbon over the cards that scroll under
+          it. Wrapper has its own background so the scroll content
+          doesn't bleed through. */}
       {CASES_ROW_V2 && detail?.shadow_verdict && (
-        <div className="px-16 pt-16 border-b border-border-subtle bg-surface-secondary">
+        <div
+          className={cn(
+            "sticky top-[var(--nav-height)] lg:top-0 z-10",
+            "px-16 pt-16 border-b border-border-subtle",
+            "bg-surface-secondary",
+          )}
+        >
           <StickyActionRibbon
             verdict={detail.shadow_verdict as ShadowVerdict}
             executionError={executionError}

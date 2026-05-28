@@ -85,12 +85,11 @@ describe("ExceptionDetailPanel section reorder (ADR-041 P3e §2.2)", () => {
   it("StickyActionRibbon mounts ABOVE the inner scroll container", () => {
     // The first iteration mounted the ribbon INSIDE the
     // `<div className="flex-1 overflow-auto p-16">` scroll
-    // container. That broke pinning: the ribbon's sticky
-    // reference was the same surface the user's scroll happened
-    // against, so the ribbon scrolled away with its content. The
-    // ribbon now mounts as a SIBLING of (and ABOVE) the inner
-    // scroll container — pinning is achieved by being outside the
-    // scrolling surface, not by `position: sticky`.
+    // container. That broke pinning relative to the inner scroll
+    // (the ribbon's sticky reference was the same surface the
+    // user's scroll happened against, so it scrolled away with
+    // its content). The ribbon now mounts as a SIBLING of (and
+    // ABOVE) the inner scroll container.
     const ribbonIdx = PANEL.indexOf("<StickyActionRibbon");
     const scrollContainerIdx = PANEL.indexOf("flex-1 overflow-auto");
     expect(ribbonIdx).toBeGreaterThan(-1);
@@ -102,5 +101,46 @@ describe("ExceptionDetailPanel section reorder (ADR-041 P3e §2.2)", () => {
         "container in file order — otherwise the ribbon scrolls " +
         "away with its content (see commit history).",
     ).toBeLessThan(scrollContainerIdx);
+  });
+
+  it("ribbon wrapper applies position: sticky against the right-pane scroll", () => {
+    // The lift-out-of-inner-scroll fix (commit c8d226d) only
+    // addressed scroll surface (B) — the inner ExceptionDetailPanel
+    // overflow-auto. Scroll surface (A) — the outer right-pane
+    // `<section aria-label="Case workspace" lg:overflow-y-auto>` —
+    // was still pulling the ribbon away when the operator scrolled
+    // past the slim header / classification / records picker. The
+    // wrapper must carry `position: sticky` so the ribbon pins to
+    // the right-pane viewport at lg+ and to the document viewport
+    // (offset by --nav-height) below lg.
+    //
+    // The user reported this twice; protect it with a lock so the
+    // sticky wiring can't regress.
+    const wrapperMatch = PANEL.match(
+      /<div\s+className=\{[\s\S]{0,400}?\}\s*>\s*<StickyActionRibbon/,
+    );
+    expect(
+      wrapperMatch,
+      "Could not find the wrapper <div> around <StickyActionRibbon>",
+    ).not.toBeNull();
+    const wrapperClassName = wrapperMatch?.[0] ?? "";
+    expect(
+      wrapperClassName,
+      "Ribbon wrapper must include `sticky` class (CSS " +
+        "`position: sticky`) so it pins to the nearest scrolling " +
+        "ancestor — without it the ribbon scrolls away with the " +
+        "right-pane outer scroll surface.",
+    ).toMatch(/\bsticky\b/);
+    expect(
+      wrapperClassName,
+      "Ribbon wrapper must include a `top-` offset class — below " +
+        "lg the NavBar is also sticky `top: 0` so the ribbon needs " +
+        "to anchor below it (e.g. `top-[var(--nav-height)]`).",
+    ).toMatch(/\btop-(?:0|\[)/);
+    expect(
+      wrapperClassName,
+      "Ribbon wrapper must include a `z-` class above the scroll " +
+        "content so the cards underneath don't bleed through.",
+    ).toMatch(/\bz-\d+\b/);
   });
 });
