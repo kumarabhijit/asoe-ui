@@ -240,6 +240,17 @@ function CasesWorkspace() {
   const [policyHits, setPolicyHits] = useState<string[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailMissing, setDetailMissing] = useState(false);
+  // PO finding 2026-05-28 round-2 #1 — dynamically collapse the
+  // xl audit rail when none of its tenants have content. Each
+  // tenant reports its contentful state (ComplianceHitsRail's
+  // hits comes from page-level `policyHits`; RecordPreviewRail's
+  // draft availability fires via the `onContentfulChange`
+  // callback below). Combined `railHasContent` gates both the
+  // 3-column grid override and the aside visibility — when
+  // neither tenant has content the layout reverts to 2 columns.
+  const [previewHasContent, setPreviewHasContent] = useState(false);
+  const hitsHaveContent = (policyHits ?? []).length > 0;
+  const railHasContent = hitsHaveContent || previewHasContent;
 
   /* ── Queue — silent live refresh via useCases + useWebSocket ── */
   // P3b restored the WS-driven silent refresh that landed on the
@@ -472,10 +483,12 @@ function CasesWorkspace() {
         "grid-cols-1",
         "lg:grid-cols-[360px_minmax(0,1fr)]",
         // ADR-041 P3e §2.3 — at xl (≥1280px) the audit rail mounts
-        // as a third column when CASES_ROW_V2 is on. The xl override
-        // only takes effect when the flag is set; default keeps the
-        // two-column layout.
-        CASES_ROW_V2 && "xl:grid-cols-[360px_minmax(0,1fr)_320px]",
+        // as a third column when CASES_ROW_V2 is on AND at least
+        // one rail tenant has content to show (PO round-2 #1).
+        // Without that AND we leave the 2-column layout in place
+        // so the workspace gets the full width — better than a
+        // 320px empty rail.
+        CASES_ROW_V2 && railHasContent && "xl:grid-cols-[360px_minmax(0,1fr)_320px]",
         // Viewport-locked master-detail (the "Outlook" pane pattern the
         // layout tokens describe). Below `lg` the panes stack and use
         // normal document flow so nothing is clipped on tablet/phone.
@@ -699,11 +712,17 @@ function CasesWorkspace() {
           on the flag (`hidden` when V2 is off) and on xl breakpoint
           (`hidden xl:flex` when V2 is on). At lg and below the
           inline render under CaseDetailPanel takes over. */}
+      {/* The aside is gated on `railHasContent` (PO round-2 #1)
+          so the empty 320px column doesn't render when there are
+          neither Compliance Hits nor a preview draft to show.
+          RecordPreviewRail reports its contentful state via
+          `onContentfulChange` so the page can flip the grid +
+          aside together when the draft availability changes. */}
       <aside
         aria-label="Compliance audit rail"
         className={cn(
           "bg-surface-secondary border border-border-subtle rounded-md min-h-0 flex-col overflow-y-auto",
-          CASES_ROW_V2 ? "hidden xl:flex" : "hidden",
+          CASES_ROW_V2 && railHasContent ? "hidden xl:flex" : "hidden",
         )}
       >
         {selectedCaseId && orderCase && (
@@ -717,7 +736,10 @@ function CasesWorkspace() {
                 section. No tabs — Compliance vetoed swap
                 patterns that would hide hits off-screen. */}
             <ComplianceHitsRail hits={policyHits ?? []} variant="rail" />
-            <RecordPreviewRail selectedRecordId={selectedRecordId} />
+            <RecordPreviewRail
+              selectedRecordId={selectedRecordId}
+              onContentfulChange={setPreviewHasContent}
+            />
           </>
         )}
       </aside>

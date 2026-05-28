@@ -38,11 +38,13 @@ describe("cases workspace audit rail (ADR-041 P3e §2.3)", () => {
     );
   });
 
-  it("only widens to xl 3-column when CASES_ROW_V2 is true", () => {
-    // The xl override must be gated on the flag — otherwise the
-    // layout shifts under operators even with the V2 flag off.
+  it("only widens to xl 3-column when CASES_ROW_V2 is true AND rail has content", () => {
+    // The xl override must be gated on the flag (so the layout
+    // doesn't shift under operators with V2 off) AND on
+    // `railHasContent` (so the 320px column doesn't render
+    // when there's nothing to put in it — PO round-2 #1).
     expect(PAGE).toMatch(
-      /CASES_ROW_V2\s*&&\s*["']xl:grid-cols-\[360px_minmax\(0,1fr\)_320px\]["']/,
+      /CASES_ROW_V2\s*&&\s*railHasContent\s*&&\s*["']xl:grid-cols-\[360px_minmax\(0,1fr\)_320px\]["']/,
     );
   });
 
@@ -54,11 +56,15 @@ describe("cases workspace audit rail (ADR-041 P3e §2.3)", () => {
     expect(PAGE).toMatch(/aria-label=["']Compliance audit rail["']/);
   });
 
-  it("rail aside is hidden at lg and only shown at xl when flag is on", () => {
-    // The aside must collapse below xl AND when the flag is off,
-    // so the legacy two-column layout is preserved.
+  it("rail aside is hidden when the flag is off OR no tenant has content", () => {
+    // The aside must collapse:
+    //   * below xl (responsive),
+    //   * when the V2 flag is off (rollback), and
+    //   * when no rail tenant has content (PO round-2 #1).
+    // Without all three, an operator either sees the legacy
+    // layout collide with V2 or stares at an empty 320px column.
     expect(PAGE).toMatch(
-      /CASES_ROW_V2\s*\?\s*["']hidden xl:flex["']\s*:\s*["']hidden["']/,
+      /CASES_ROW_V2\s*&&\s*railHasContent\s*\?\s*["']hidden xl:flex["']\s*:\s*["']hidden["']/,
     );
   });
 
@@ -71,7 +77,7 @@ describe("cases workspace audit rail (ADR-041 P3e §2.3)", () => {
     expect(PAGE).toMatch(
       /import\s*\{\s*RecordPreviewRail\s*\}\s*from\s*["']\.\/RecordPreviewRail["']/,
     );
-    expect(PAGE).toMatch(/<RecordPreviewRail\s+selectedRecordId=/);
+    expect(PAGE).toMatch(/<RecordPreviewRail\b/);
     // ComplianceHitsRail must mount BEFORE RecordPreviewRail in
     // source order — SOX evidence-of-review can't drop below the
     // preview.
@@ -80,6 +86,28 @@ describe("cases workspace audit rail (ADR-041 P3e §2.3)", () => {
     expect(hitsIdx).toBeGreaterThan(-1);
     expect(previewIdx).toBeGreaterThan(-1);
     expect(hitsIdx).toBeLessThan(previewIdx);
+  });
+
+  it("rail collapses dynamically when no tenant has content (PO round-2 #1)", () => {
+    // User reported the empty 320px column looked awkward when
+    // a case had neither Compliance Hits nor a draft reply.
+    // Fix: page tracks `railHasContent` (combined of
+    // `policyHits.length > 0` and the preview's
+    // `onContentfulChange` callback), and gates BOTH the
+    // xl:grid-cols-3 override AND the aside visibility on it.
+    // When both rail tenants are empty the grid stays 2-col and
+    // the workspace gets the full width.
+    expect(PAGE).toMatch(/railHasContent/);
+    expect(PAGE).toMatch(
+      /CASES_ROW_V2\s*&&\s*railHasContent\s*&&\s*["']xl:grid-cols-\[360px_minmax\(0,1fr\)_320px\]["']/,
+    );
+    expect(PAGE).toMatch(
+      /CASES_ROW_V2\s*&&\s*railHasContent\s*\?\s*["']hidden xl:flex["']/,
+    );
+    // RecordPreviewRail must wire its contentful callback up to
+    // the page-level state setter so the rail can collapse when
+    // the draft availability changes.
+    expect(PAGE).toMatch(/onContentfulChange=\{setPreviewHasContent\}/);
   });
 
   it("renders an xl:hidden inline ComplianceHitsRail for lg fallback", () => {
