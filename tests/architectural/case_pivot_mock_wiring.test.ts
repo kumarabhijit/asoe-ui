@@ -122,6 +122,26 @@ describe("case-pivot mock wiring", () => {
     }
   });
 
+  it("CUSTOMER-origin cases surface supergroup variety (not collapsed to SG_NEW_ORDER)", async () => {
+    // Regression guard: the seed exception fixtures reuse
+    // `intent: MANUAL_ORDER_INTAKE` for every email shape (entry /
+    // change / inquiry / complaint / general). If the mock layer
+    // projects supergroup off intent alone, the Customer Inbox lens
+    // collapses to a single SG_NEW_ORDER row in classification
+    // history — the supergroup-pivot UX disappears. This lock keeps
+    // the projection event_type-aware for CUSTOMER cases.
+    const { items: cases } = await casesApi.list({ origin: "CUSTOMER", limit: 500 });
+    expect(cases.length).toBeGreaterThan(2);
+    const supergroups = new Set(cases.map((c) => c.supergroup_code));
+    expect(
+      supergroups.size,
+      `Customer Inbox only surfaced ${supergroups.size} distinct ` +
+        `supergroup(s) (${Array.from(supergroups).join(", ")}); ` +
+        `the seed fixtures cover order-change, inquiry, complaint, and ` +
+        `general email shapes that should each project to their own SG_*.`,
+    ).toBeGreaterThanOrEqual(3);
+  });
+
   it("auto-mount path works for single-record cases (records[0] is fetchable)", async () => {
     // Single-record cases are the CSA's one-task happy path —
     // CaseDetailPanel auto-fires onSelectRecord(records[0].id) and the

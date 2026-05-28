@@ -31,7 +31,25 @@ import { MOCK_EXCEPTIONS } from "./exceptions";
 // classifier resolves this against `INTENTS_BY_SUPERGROUP`; the
 // mock keeps a small switch so the fixture surface mirrors the
 // live shape without pulling in the full taxonomy.
+//
+// CUSTOMER-origin cases project off `event_type` first because the
+// seed exception fixtures reuse `intent: MANUAL_ORDER_INTAKE` for
+// every email shape (entry / change / inquiry / complaint /
+// general) — projecting off intent alone collapses the whole
+// Customer Inbox to SG_NEW_ORDER, which hides the supergroup
+// variety the classification-history strip is meant to show.
 function supergroupFor(exc: ExceptionSummary, origin: Origin): string {
+  if (origin === "CUSTOMER") {
+    const et = exc.event_type ?? "";
+    if (et === "EMAIL_ORDER_CHANGE_REQUEST") return "SG_ORDER_CHANGE";
+    if (et === "EMAIL_INQUIRY") return "SG_ORDER_STATUS_INQUIRY";
+    if (et === "EMAIL_COMPLAINT") return "SG_COMPLAINT_SERVICE";
+    if (et === "EMAIL_GENERAL") return "SG_DOCUMENTATION";
+    if (et === "EMAIL_ORDER_ENTRY_REQUEST") return "SG_NEW_ORDER";
+    // ORDER_RECEIVED falls through to the intent switch — these
+    // are full-text-arrived orders that may carry pricing /
+    // logistics / availability concerns regardless of channel.
+  }
   const intent = exc.intent ?? "";
   switch (intent) {
     case "CREDIT_BLOCK":
