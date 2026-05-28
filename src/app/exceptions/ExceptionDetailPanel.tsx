@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/AgentReasoningCard";
 import { StickyActionRibbon } from "@/components/ui/StickyActionRibbon";
 import { useCaseTelemetry } from "@/hooks/useCaseTelemetry";
+import { casesRowV2Enabled } from "@/lib/flags";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useExceptionActions } from "@/hooks/useExceptionActions";
@@ -78,13 +79,14 @@ function isHumanInTheLoopState(state: string): boolean {
 }
 
 // ADR-041 P3e §2.2 — gates the Analysis-above-Recommendation
-// reorder + the sticky `<StickyActionRibbon>` mount. Default OFF
-// keeps today's behaviour (Recommendation card on top with its own
-// action matrix). When ON, the ribbon takes over the action
-// surface, the card hides its matrix, and `<AgentAnalysisSection>`
-// renders above the card. Today's HITL auto-expand predicate is
-// preserved (CSA + Compliance panel agreement).
-const CASES_ROW_V2 = process.env.NEXT_PUBLIC_CASES_ROW_V2 === "1";
+// reorder + the sticky `<StickyActionRibbon>` mount. Rollout
+// policy in `src/lib/flags.ts` (production stays OFF; Vercel
+// preview deploys default ON). When ON, the ribbon takes over
+// the action surface, the card hides its matrix, and
+// `<AgentAnalysisSection>` renders above the card. Today's HITL
+// auto-expand predicate is preserved (CSA + Compliance panel
+// agreement).
+const CASES_ROW_V2 = casesRowV2Enabled();
 
 interface ExceptionDetailPanelProps {
   exceptionId: string;
@@ -253,7 +255,9 @@ export default function ExceptionDetailPanel({
   const telemetryCaseId = CASES_ROW_V2
     ? (detail?.parent_case_id ?? undefined)
     : undefined;
-  const { markFirstAction } = useCaseTelemetry(telemetryCaseId);
+  const { markFirstAction, trackAnalysisScroll } = useCaseTelemetry(
+    telemetryCaseId,
+  );
 
   const handleApproveWithTelemetry = (comment: string) => {
     markFirstAction("approve");
@@ -638,6 +642,10 @@ export default function ExceptionDetailPanel({
             <AgentAnalysisSection
               analysis={analysis}
               defaultOpen={isHumanInTheLoopState(detail.lifecycle_state)}
+              // ADR-041 P3e Phase 3 gate #5 — wire the scroll
+              // observer so the hook accumulates max-depth for
+              // the analysis-scroll-depth telemetry.
+              onScrollDepth={trackAnalysisScroll}
             />
           )}
 

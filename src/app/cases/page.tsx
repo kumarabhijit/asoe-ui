@@ -62,11 +62,14 @@ import { CasesQueueRowV2 } from "./CasesQueueRowV2";
 import { ComplianceHitsRail } from "./ComplianceHitsRail";
 import { NAV_TABS } from "@/config/nav-tabs";
 import { useRowDensity, type RowDensity } from "@/hooks/useRowDensity";
+import { casesRowV2Enabled } from "@/lib/flags";
 
 // ADR-041 P3e §2.1 — gates the four-line queue row + density
-// toggle. Default OFF until Phase 0 backend ships the
-// `CaseSummary` projection (asoe2 PR #184).
-const CASES_ROW_V2 = process.env.NEXT_PUBLIC_CASES_ROW_V2 === "1";
+// toggle. Rollout policy in `src/lib/flags.ts`: production stays
+// OFF until Phase 3 sign-off completes; Vercel preview deploys
+// flip ON so gate reviewers see the V2 surface. Resolved at
+// module load so the value is stable across renders.
+const CASES_ROW_V2 = casesRowV2Enabled();
 
 
 /* ── Visual mappings (vendor-neutral; per-source / per-status badge style) ── */

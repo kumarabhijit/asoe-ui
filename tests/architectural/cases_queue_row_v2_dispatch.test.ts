@@ -34,8 +34,16 @@ describe("cases queue row V1/V2 dispatch (ADR-041 P3e §2.1)", () => {
     expect(PAGE).toMatch(/import\s*\{\s*CasesQueueRowV2\s*\}\s*from\s*["']\.\/CasesQueueRowV2["']/);
   });
 
-  it("reads the NEXT_PUBLIC_CASES_ROW_V2 flag", () => {
-    expect(PAGE).toMatch(/process\.env\.NEXT_PUBLIC_CASES_ROW_V2/);
+  it("resolves the V2 flag via the shared `casesRowV2Enabled` helper", () => {
+    // Pre-rollout-policy refactor (commit 7a3d256) this checked
+    // for `process.env.NEXT_PUBLIC_CASES_ROW_V2` inline. The
+    // policy now lives in `src/lib/flags.ts::casesRowV2Enabled`
+    // so production stays gated while preview deploys default
+    // ON; this lock just asserts the consumer calls the helper.
+    expect(PAGE).toMatch(/casesRowV2Enabled/);
+    expect(PAGE).toMatch(
+      /import\s*\{[^}]*casesRowV2Enabled[^}]*\}\s*from\s*["']@\/lib\/flags["']/,
+    );
   });
 
   it("mounts both row components conditionally (flag dispatch present)", () => {

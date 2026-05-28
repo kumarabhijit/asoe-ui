@@ -17,6 +17,14 @@ const nextConfig = {
     // terminology rather than the GENERIC fallback.
     NEXT_PUBLIC_ASOE_ERP_VENDOR:
       process.env.NEXT_PUBLIC_ASOE_ERP_VENDOR ?? 'SAP',
+    // ADR-041 P3e Phase 3 — expose Vercel deploy environment to
+    // the client bundle so feature-flag helpers
+    // (`src/lib/flags.ts`) can default the V2 cases row ON in
+    // preview deploys while keeping production gated. Server-only
+    // `VERCEL_ENV` is converted to a build-baked
+    // `NEXT_PUBLIC_VERCEL_ENV` here. Falls through to undefined
+    // on non-Vercel builds (local dev, CI).
+    NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? '',
   },
   // S15a (PR #153) made /cases/[id]?record=<id> the canonical action
   // surface. ADR-041 P4 retires the duplicate `/exceptions` queue
