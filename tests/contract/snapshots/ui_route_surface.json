@@ -17,6 +17,10 @@
       "raw": "/api/v1/cases/${encodeURIComponent(case_id)}"
     },
     {
+      "path": "/api/v1/cases/{case_id}/classification-history",
+      "raw": "/api/v1/cases/${encodeURIComponent(case_id)}/classification-history"
+    },
+    {
       "path": "/api/v1/exceptions",
       "raw": "/api/v1/exceptions"
     },

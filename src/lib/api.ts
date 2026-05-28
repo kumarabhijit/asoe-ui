@@ -30,7 +30,16 @@ import type {
   PolicyOverrideResponse,
   PipelineTopology,
 } from "@/types/api";
-import type { HealthResponse, ExceptionSummary, LifecycleState, LineItem, OrderAnalysis, ReanalysisEntry } from "@/types/exceptions";
+import type {
+  ClassificationHistoryEntry,
+  ClassificationHistoryResponse,
+  HealthResponse,
+  ExceptionSummary,
+  LifecycleState,
+  LineItem,
+  OrderAnalysis,
+  ReanalysisEntry,
+} from "@/types/exceptions";
 import {
   ALLOWED_OVERRIDE_REASON_TAGS,
   ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT,
@@ -404,7 +413,7 @@ let _currentMockUser: AuthUser = MOCK_USER;
 
 /**
  * Per-exception reanalysis history, keyed by exception id. Mirrors the
- * backend ExceptionRecord.reanalysis_history column introduced by V002.
+ * backend ChildCase.reanalysis_history column introduced by V002.
  * Module-level so the counter persists across repeated reanalyze calls
  * within a session — previously the mock returned a fresh length-1 array
  * each time, which is why the UI counter never advanced past 0/3.
@@ -2255,10 +2264,13 @@ export interface CaseListItem extends OrderCase {
 
 export const casesApi = {
   async list(params?: {
-    source?: string;
-    /** Filter by case_type (EMAIL_ENTRY | BLOCK) — the Customer Inbox lens
-     *  (ADR-042). Orthogonal to `source` (ADR-041 §1). */
-    case_type?: string;
+    /** Filter by case origin (CUSTOMER | API). Requirements §3 —
+     *  CUSTOMER drives the Customer Inbox lens; API is the SAP-pushed
+     *  block path. Replaces the retired `source` axis. */
+    origin?: string;
+    /** Filter by Intent Super-Group (requirements §6). E.g.
+     *  `supergroup_code=SG_BLOCK_PRICING`. */
+    supergroup_code?: string;
     /** Multi-value via comma-separated string. */
     status?: string;
     /** Multi-value via comma-separated string. */
@@ -2290,8 +2302,8 @@ export const casesApi = {
         has_more: boolean;
       }>("/api/v1/cases", {
         query: {
-          source: params?.source,
-          case_type: params?.case_type,
+          origin: params?.origin,
+          supergroup_code: params?.supergroup_code,
           status: params?.status,
           intents: params?.intents,
           since: params?.since,
@@ -2306,9 +2318,11 @@ export const casesApi = {
       ...c,
       child_intents: [],  // mock-mode placeholder; live API computes
     }));
-    if (params?.source) items = items.filter((c) => c.source === params.source);
-    if (params?.case_type) {
-      items = items.filter((c) => c.case_type === params.case_type);
+    if (params?.origin) items = items.filter((c) => c.origin === params.origin);
+    if (params?.supergroup_code) {
+      items = items.filter(
+        (c) => c.supergroup_code === params.supergroup_code,
+      );
     }
     if (params?.status) {
       const statuses = params.status.split(",").map((s) => s.trim()).filter(Boolean);
@@ -2405,14 +2419,58 @@ export const casesApi = {
     // without the policy-hits panel until they hit the live API.
     return { items, total: items.length, aggregated_policy_hits: [] };
   },
+
+  /**
+   * GET /api/v1/cases/{case_id}/classification-history — append-order
+   * audit trail of every (re)classification event on the case
+   * (requirements §8.6).
+   *
+   * Partner-role responses are redacted server-side: `reason_text`
+   * and `model_version` come back `null`, and `classified_by` is
+   * coarsened to `internal:human` / `internal:model` /
+   * `internal:rule`. The mock branch returns a small synthetic
+   * trail so the preview surface renders something — production
+   * callers always hit the live endpoint.
+   */
+  async getClassificationHistory(case_id: string): Promise<ClassificationHistoryResponse> {
+    if (USE_REAL_API) {
+      return http<ClassificationHistoryResponse>(
+        `/api/v1/cases/${encodeURIComponent(case_id)}/classification-history`,
+      );
+    }
+    await new Promise((r) => setTimeout(r, MOCK_DELAY));
+    const cases = deriveMockCases();
+    const orderCase = cases.find((c) => c.case_id === case_id);
+    if (!orderCase) return { items: [], total: 0 };
+    const items: ClassificationHistoryEntry[] = [
+      {
+        id: `cls-${case_id}-001`,
+        case_id,
+        child_case_id: null,
+        supergroup_code: orderCase.supergroup_code ?? "SG_NEEDS_TRIAGE",
+        intent_code: null,
+        classified_at: orderCase.opened_at,
+        classified_by: "internal:rule",
+        classifier_type: "RULE",
+        model_version: null,
+        reason_text: null,
+        source_event_id: null,
+        taxonomy_version: "2026-05-27-v1",
+      },
+    ];
+    return { items, total: items.length };
+  },
 };
 
 /**
- * Visible to architectural-lock tests. The case-source vocabulary is
+ * Visible to architectural-lock tests. The case-origin vocabulary is
  * sourced from this constant in the UI; backend `/api/v1/health`
- * gains `allowed_case_sources` in Phase H.7. Until then this is the
- * UI's stable list — but it lives in api.ts (the boundary layer)
- * NOT in page code, preserving Guardrail #1.
+ * also exposes the same set via `allowed_case_origins`. The constant
+ * lives in api.ts (the boundary layer) NOT in page code, preserving
+ * Guardrail #1.
+ *
+ * Replaces the pre-pivot `ALLOWED_CASE_SOURCES` (manual_order |
+ * automated_order) per requirements §3.
  */
-export const ALLOWED_CASE_SOURCES = ["manual_order", "automated_order"] as const;
+export const ALLOWED_CASE_ORIGINS = ["CUSTOMER", "API"] as const;
 

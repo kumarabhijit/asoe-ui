@@ -27,9 +27,11 @@ import { useEffect, useState } from "react";
 import { Mail, PackageCheck, Clock, ShieldAlert, ChevronRight, ChevronDown } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
+import { ClassificationHistoryPanel } from "@/components/cases/ClassificationHistoryPanel";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { PolicyHitBadge } from "@/components/ui/PolicyHitBadge";
-import type { CaseSource, OrderCase, SlaBand } from "@/types/cases";
+import { useClassificationHistory } from "@/hooks/useClassificationHistory";
+import type { Origin, OrderCase, SlaBand } from "@/types/cases";
 import type { ExceptionDetailResponse } from "@/types/api";
 import { STATUS_LABEL, lastActivityLabel, sourceChannelLabel } from "@/lib/cases";
 import { useSlaTicker } from "@/hooks/useSlaTicker";
@@ -47,16 +49,19 @@ const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutr
 };
 
 
-const SOURCE_ICON: Record<CaseSource | "default", React.ReactNode> = {
-  manual_order: <Mail size={14} aria-hidden />,
-  automated_order: <PackageCheck size={14} aria-hidden />,
+// Origin chrome — KEEP the "Customer Inbox" label per requirements
+// §4 Q7 even though the internal field flipped from CaseSource to
+// Origin. Partners read the visible chrome, not the field name.
+const ORIGIN_ICON: Record<Origin | "default", React.ReactNode> = {
+  CUSTOMER: <Mail size={14} aria-hidden />,
+  API: <PackageCheck size={14} aria-hidden />,
   default: <Clock size={14} aria-hidden />,
 };
 
-const SOURCE_LABEL: Record<CaseSource | "default", string> = {
-  manual_order: "Manual Order",
-  automated_order: "Automated Order",
-  default: "Unknown source",
+const ORIGIN_LABEL: Record<Origin | "default", string> = {
+  CUSTOMER: "Customer Inbox",
+  API: "API",
+  default: "Unknown origin",
 };
 
 // STATUS_LABEL is imported from src/lib/cases.ts — the consolidated
@@ -79,7 +84,7 @@ export interface CaseDetailPanelProps {
    */
   policyHits?: string[];
   /**
-   * The child `ExceptionRecord`s attached to this case
+   * The child `ChildCase`s attached to this case
    * (Phase 28.5.x §28.5 follow-up). Sourced from
    * `casesApi.getRecords(case_id).items`. Selecting a row mounts
    * the per-record ribbon + sections inline. Empty array hides the
@@ -135,6 +140,12 @@ export function CaseDetailPanel({
   const now = useSlaTicker();
   const sla = slaSnapshot(orderCase, now);
   const hasPolicyHits = (policyHits ?? []).length > 0;
+  // Requirements §8.6 — classification-history audit strip.
+  const {
+    entries: classificationHistory,
+    loading: classificationHistoryLoading,
+    error: classificationHistoryError,
+  } = useClassificationHistory(orderCase.case_id);
   const records = attachedRecords ?? [];
   const hasAttachedRecords = records.length > 0;
   // When a record is selected, the per-record HITL ribbon is the
@@ -222,9 +233,9 @@ export function CaseDetailPanel({
       >
         <div className="flex flex-wrap items-center gap-8 mb-12">
           <Badge variant="neutral" size="sm">
-            {SOURCE_ICON[orderCase.source as CaseSource] ?? SOURCE_ICON.default}
+            {ORIGIN_ICON[orderCase.origin as Origin] ?? ORIGIN_ICON.default}
             <span className="ml-4">
-              {SOURCE_LABEL[orderCase.source as CaseSource] ?? SOURCE_LABEL.default}
+              {ORIGIN_LABEL[orderCase.origin as Origin] ?? ORIGIN_LABEL.default}
             </span>
           </Badge>
           <Badge variant="neutral" size="sm">
@@ -345,6 +356,13 @@ export function CaseDetailPanel({
           </ul>
         </section>
       )}
+
+      {/* ── Classification history (requirements §8.6) ────────── */}
+      <ClassificationHistoryPanel
+        entries={classificationHistory}
+        loading={classificationHistoryLoading}
+        error={classificationHistoryError}
+      />
 
       {/* ── Attached records picker ──────────────────────────────
           Stacked at the top of the detail pane so the operator picks

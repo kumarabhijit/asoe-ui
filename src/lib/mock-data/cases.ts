@@ -8,18 +8,56 @@
 // exception, mirroring the asoe2 backend's "materialise every
 // record" invariant.
 //
+// Post Case & Intent Super-Group pivot (Phase 2 §6) the case
+// shape uses the orthogonal `origin` + `supergroup_code` axes
+// instead of the retired `source` / `case_type` /
+// `email_classification` triple.
+//
 // `tests/architectural/case_pivot_mock_wiring.test.ts` locks the
 // invariants this file's wiring encodes.
 
 import type { ExceptionSummary } from "@/types/exceptions";
 import type {
   CaseStatus,
-  CaseType,
-  EmailClassification,
+  Origin,
   OrderCase,
 } from "@/types/cases";
+import { SG_BLOCK_UNMAPPED, SG_NEEDS_TRIAGE } from "@/generated/taxonomy";
 
 import { MOCK_EXCEPTIONS } from "./exceptions";
+
+
+// Coarse intent→supergroup projection for the mock layer. The live
+// classifier resolves this against `INTENTS_BY_SUPERGROUP`; the
+// mock keeps a small switch so the fixture surface mirrors the
+// live shape without pulling in the full taxonomy.
+function supergroupFor(exc: ExceptionSummary, origin: Origin): string {
+  const intent = exc.intent ?? "";
+  switch (intent) {
+    case "CREDIT_BLOCK":
+      return "SG_BLOCK_CREDIT";
+    case "PRICE_MISMATCH":
+    case "MASS_PRICING_ERROR":
+    case "PRICE_HOLD_RELEASE":
+    case "CONTRACTUAL_CORRECTION":
+      return "SG_BLOCK_PRICING";
+    case "DUPLICATE_PO":
+    case "EDI_MISMATCH":
+      return "SG_BLOCK_ORDER_INTEGRITY";
+    case "BACK_ORDER":
+    case "MIN_ORDER_QTY":
+    case "OVER_MAX":
+      return "SG_BLOCK_AVAILABILITY";
+    case "BROKEN_PALLET":
+    case "DELIVERY_DELAY":
+    case "PALLET_CONFIG":
+      return "SG_BLOCK_LOGISTICS";
+    case "MANUAL_ORDER_INTAKE":
+      return "SG_NEW_ORDER";
+    default:
+      return origin === "CUSTOMER" ? SG_NEEDS_TRIAGE : SG_BLOCK_UNMAPPED;
+  }
+}
 
 
 /**
@@ -29,11 +67,15 @@ import { MOCK_EXCEPTIONS } from "./exceptions";
  * case for every exception the queue can link to.
  *
  * Field derivations:
- *   * `source` / `source_channel` — inferred from `event_type`. Email-
- *     origin events surface as manual_order/email; EDI events as
- *     automated_order/edi_x12_850; everything else as automated_order
- *     with a generic api channel. This is a UI-side default — the
- *     live backend reads this off the case row directly.
+ *   * `origin` / `source_channel` — inferred from `event_type`. Email-
+ *     origin events land on CUSTOMER + channel=email; EDI events on
+ *     API + channel=edi_x12_850; everything else on API + api channel.
+ *     This is a UI-side default — the live backend reads `origin` off
+ *     the case row directly.
+ *   * `supergroup_code` — projected from the record's intent via the
+ *     `supergroupFor` switch above; unmapped intents land on the
+ *     reserved sentinels (`SG_NEEDS_TRIAGE` for CUSTOMER,
+ *     `SG_BLOCK_UNMAPPED` for API).
  *   * `customer_po_number` / `sales_order_id` — the exception's
  *     `order_id` is the operator-visible PO; we mirror it into both
  *     slots so the slim context strip + case-list rows both render.
@@ -47,28 +89,9 @@ export function caseFromMockException(exc: ExceptionSummary): OrderCase {
   const isEmail =
     exc.event_type?.startsWith("EMAIL_") || exc.event_type === "ORDER_RECEIVED";
   const isEdi = exc.event_type?.startsWith("EDI_");
-  const source = isEmail ? "manual_order" : "automated_order";
+  const origin: Origin = isEmail ? "CUSTOMER" : "API";
   const source_channel = isEdi ? "edi_x12_850" : isEmail ? "email" : "api";
-  // ADR-041 §1 — case_type is orthogonal to source. EMAIL_ENTRY iff
-  // the trigger was an inbound email; BLOCK otherwise.
-  const case_type: CaseType = isEmail ? "EMAIL_ENTRY" : "BLOCK";
-  // ADR-041 §2 — per-intake classification (1:1 with the email). For
-  // mock data the modeller's "default to OTHER, surface real intents
-  // when the email-classification node lands" rule applies. The two
-  // email-shaped fixtures we have today (EMAIL_ORDER_ENTRY_REQUEST,
-  // ORDER_RECEIVED) both map to NEW_ORDER under the recipe registry,
-  // so we surface that explicitly.
-  const email_classification: EmailClassification | null = isEmail
-    ? exc.event_type?.includes("CHANGE")
-      ? "ORDER_CHANGE"
-      : exc.event_type?.includes("INQUIRY")
-        ? "INQUIRY"
-        : exc.event_type?.includes("COMPLAINT")
-          ? "COMPLAINT"
-          : exc.event_type?.includes("GENERAL") || exc.event_type?.includes("OTHER")
-            ? "OTHER"
-            : "NEW_ORDER"
-    : null;
+  const supergroup_code = supergroupFor(exc, origin);
   const status: CaseStatus = (() => {
     switch (exc.lifecycle_state) {
       case "RESOLVED":
@@ -96,18 +119,20 @@ export function caseFromMockException(exc: ExceptionSummary): OrderCase {
     case_id: `case-for-${exc.id}`,
     tenant_id: exc.tenant_id,
     customer_id: exc.account_id ?? null,
-    source,
+    origin,
     source_channel,
-    case_type,
-    email_classification,
+    supergroup_code,
+    predecessor_case_id: null,
     customer_po_number: exc.order_id ?? null,
-    sales_order_id: source === "automated_order" ? exc.order_id ?? null : null,
+    sales_order_id: origin === "API" ? exc.order_id ?? null : null,
     edi_transaction_id: null,
     source_email_id: isEmail ? `msg-${exc.id}` : null,
     opened_at: exc.created_at,
     closed_at: isClosed ? exc.updated_at : null,
     status,
     sla_deadline: sla,
+    sla_due_at: sla,
+    will_miss_rdd: false,
     tier: 2,
     working_memory_summary: null,
     last_compaction_at: null,
@@ -188,8 +213,8 @@ export function deriveMockCases(): OrderCase[] {
     else byCaseId.set(cid, [exc]);
   }
   return Array.from(byCaseId.entries()).map(([caseId, records]) => {
-    // The lead record seeds the case shape (source, source_channel,
-    // case_type, customer_po_number, etc.). Sibling records carry the
+    // The lead record seeds the case shape (origin, source_channel,
+    // supergroup_code, customer_po_number, etc.). Sibling records carry the
     // same PO + tenant by construction; the only field that needs
     // cross-record aggregation is `status` (and the derived
     // `closed_at`). The case_id comes from the grouping key

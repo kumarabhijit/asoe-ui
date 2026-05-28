@@ -376,6 +376,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cases/{case_id}/classification-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Classification History
+         * @description Return the case's full classification audit trail in append order.
+         *
+         *     Requirements §8.6: every classification or reclassification event
+         *     appends exactly one row stamped with the taxonomy version in effect
+         *     at the time. The audit is append-only on both sides (in-memory and
+         *     V020 DB triggers). Reads are open to any role that can see the case.
+         */
+        get: operations["list_classification_history_api_v1_cases__case_id__classification_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cases/{case_id}/override": {
         parameters: {
             query?: never;
@@ -1282,7 +1307,7 @@ export interface components {
          *     (Phase 28.5.x §28.5 follow-up).
          *
          *     `items` is the list of `ExceptionDetail`-shaped child records
-         *     attached to the case (`ExceptionRecord.parent_case_id == case_id`).
+         *     attached to the case (`ChildCase.parent_case_id == case_id`).
          *     The UI's CaseDetailPanel uses this both to render the stack of
          *     per-event sections and to aggregate `aggregated_policy_hits` into
          *     the L1/L2 PolicyHitBadge surface (ADR-039 §4.5).
@@ -1379,6 +1404,65 @@ export interface components {
             from_value?: string | null;
             /** To Value */
             to_value?: string | null;
+        };
+        /**
+         * ClassificationHistoryEntry
+         * @description One row of the case's classification audit trail.
+         *
+         *     Mirrors ``contracts.models.ClassificationEvent`` and the
+         *     ``case_classification_history`` table (V020). Requirements §8.6 —
+         *     surfaces the append-only audit for UI / steward reporting.
+         *
+         *     Field-set parity with ``ClassificationEvent`` is locked by
+         *     ``tests/test_classification_history_shape.py``: an event field
+         *     that this model doesn't mirror would silently drop data on the
+         *     wire, so the field sets must remain identical.
+         */
+        ClassificationHistoryEntry: {
+            /** Case Id */
+            case_id: string;
+            /** Child Case Id */
+            child_case_id?: string | null;
+            /** Classified At */
+            classified_at: string;
+            /** Classified By */
+            classified_by: string;
+            /**
+             * Classifier Type
+             * @enum {string}
+             */
+            classifier_type: "HUMAN" | "MODEL" | "RULE";
+            /** Id */
+            id: string;
+            /** Intent Code */
+            intent_code?: string | null;
+            /** Model Version */
+            model_version?: string | null;
+            /** Reason Text */
+            reason_text?: string | null;
+            /** Source Event Id */
+            source_event_id?: string | null;
+            /** Supergroup Code */
+            supergroup_code: string;
+            /** Taxonomy Version */
+            taxonomy_version: string;
+        };
+        /**
+         * ClassificationHistoryResponse
+         * @description GET /api/v1/cases/{case_id}/classification-history.
+         *
+         *     Returns the case's full audit trail in append order (oldest first).
+         *     ``total`` is the row count; callers paginate client-side today (the
+         *     expected depth is single-digit for the audit window).
+         */
+        ClassificationHistoryResponse: {
+            /** Items */
+            items?: components["schemas"]["ClassificationHistoryEntry"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
         };
         /** ComparisonLineItem */
         ComparisonLineItem: {
@@ -2248,6 +2332,8 @@ export interface components {
             account_name?: string | null;
             /** Created At */
             created_at: string;
+            /** Divergence Reason */
+            divergence_reason?: string | null;
             /** Event Type */
             event_type: string;
             /** Final Status */
@@ -2256,6 +2342,8 @@ export interface components {
             id: string;
             /** Intent */
             intent?: string | null;
+            /** Intent Code */
+            intent_code?: string | null;
             lifecycle_state: components["schemas"]["LifecycleState"];
             /** Order Id */
             order_id: string;
@@ -2275,10 +2363,16 @@ export interface components {
             resolved_action?: string | null;
             /** Resolved By */
             resolved_by?: string | null;
+            /** Sap Block Field */
+            sap_block_field?: string | null;
+            /** Scope */
+            scope?: string | null;
             /** Selected Recipe */
             selected_recipe?: string | null;
             /** Shadow Verdict */
             shadow_verdict?: string | null;
+            /** Supergroup Code */
+            supergroup_code?: string | null;
             /** Tenant Id */
             tenant_id: string;
             /** Trace Id */
@@ -2320,6 +2414,8 @@ export interface components {
             id: string;
             /** Intent */
             intent?: string | null;
+            /** Intent Code */
+            intent_code?: string | null;
             lifecycle_state: components["schemas"]["LifecycleState"];
             /** Order Id */
             order_id: string;
@@ -2329,6 +2425,8 @@ export interface components {
             selected_recipe?: string | null;
             /** Shadow Verdict */
             shadow_verdict?: string | null;
+            /** Supergroup Code */
+            supergroup_code?: string | null;
             /** Tenant Id */
             tenant_id: string;
             /** Updated At */
@@ -2453,8 +2551,8 @@ export interface components {
         HealthResponse: {
             /** Allowed Autonomy Levels */
             allowed_autonomy_levels?: components["schemas"]["AutonomyLevelInfo"][];
-            /** Allowed Case Sources */
-            allowed_case_sources?: string[];
+            /** Allowed Case Origins */
+            allowed_case_origins?: string[];
             /** Allowed Case Statuses */
             allowed_case_statuses?: string[];
             /** Allowed Intents */
@@ -4347,10 +4445,10 @@ export interface operations {
     list_cases_api_v1_cases_get: {
         parameters: {
             query?: {
-                /** @description Filter by case source (manual_order | automated_order) */
-                source?: string | null;
-                /** @description Filter by case_type (EMAIL_ENTRY | BLOCK). Orthogonal to source (ADR-041 §1); drives the Customer Inbox EMAIL_ENTRY lens (ADR-042). */
-                case_type?: string | null;
+                /** @description Filter by case origin (CUSTOMER | API). Requirements §3 glossary — CUSTOMER drives the Customer Inbox lens; API is the SAP-pushed block path. Unknown values rejected at the edge by FastAPI (constrained-input gate, CLAUDE.md §3). */
+                origin?: ("CUSTOMER" | "API") | null;
+                /** @description Filter by Intent Super-Group (requirements §6). E.g. supergroup_code=SG_BLOCK_PRICING. */
+                supergroup_code?: string | null;
                 /** @description Filter by case status. Multi-value via comma-separated list (e.g. status=OPEN_AWAITING_HUMAN,OPEN_AWAITING_BUYER). Any-match: a case in any of the listed statuses passes. */
                 status?: string | null;
                 /** @description Filter by child-record intent (Phase 28.5.x §D2). Multi-value via comma-separated list (e.g. intents=DUPLICATE_PO,CONTRACTUAL_CORRECTION). Any-match: a case with at least one child carrying one of the listed intents passes. */
@@ -4483,6 +4581,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_classification_history_api_v1_cases__case_id__classification_history_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassificationHistoryResponse"];
                 };
             };
             /** @description Validation Error */
