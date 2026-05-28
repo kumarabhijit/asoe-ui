@@ -18,6 +18,7 @@
 import { History, User as UserIcon, Bot, BookCheck } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
+import { formatSupergroupCode } from "@/lib/cases";
 import type {
   ClassificationHistoryEntry,
   ClassifierType,
@@ -122,8 +123,11 @@ export function ClassificationHistoryPanel({
                 {CLASSIFIER_ICON[e.classifier_type]}
                 <span className="ml-4">{e.classifier_type}</span>
               </Badge>
-              <code className="font-mono text-caption text-text-primary">
-                {e.supergroup_code}
+              <code
+                className="font-mono text-caption text-text-primary"
+                title={e.supergroup_code}
+              >
+                {formatSupergroupCode(e.supergroup_code)}
               </code>
               {e.intent_code && (
                 <>

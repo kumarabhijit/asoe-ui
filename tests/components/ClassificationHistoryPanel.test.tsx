@@ -49,7 +49,11 @@ describe("ClassificationHistoryPanel", () => {
     expect(
       screen.getByRole("region", { name: /classification history/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText("SG_BLOCK_PRICING")).toBeInTheDocument();
+    // PO 2026-05-28 — supergroup_code displays via
+    // `formatSupergroupCode` which strips the SG_ prefix and
+    // humanises snake_case. Full code remains on the hover title.
+    expect(screen.getByText("Block Pricing")).toBeInTheDocument();
+    expect(screen.getByTitle("SG_BLOCK_PRICING")).toBeInTheDocument();
     expect(screen.getByText("INT_PRICE_MISMATCH")).toBeInTheDocument();
     expect(
       screen.getByText(/Operator reclassified after PO inspection/),
@@ -86,8 +90,14 @@ describe("ClassificationHistoryPanel", () => {
         ]}
       />,
     );
-    const codes = screen.getAllByText(/^SG_/);
-    expect(codes[0].textContent).toBe("SG_NEEDS_TRIAGE");
-    expect(codes[1].textContent).toBe("SG_BLOCK_PRICING");
+    // PO 2026-05-28 — supergroup codes display via
+    // `formatSupergroupCode`; the SG_ prefix is stripped and
+    // snake_case → Title Case. The full code is preserved on
+    // the hover title so audit hover still surfaces it.
+    const codes = screen.getAllByTitle(/^SG_/);
+    expect(codes[0].getAttribute("title")).toBe("SG_NEEDS_TRIAGE");
+    expect(codes[1].getAttribute("title")).toBe("SG_BLOCK_PRICING");
+    expect(codes[0].textContent).toBe("Needs Triage");
+    expect(codes[1].textContent).toBe("Block Pricing");
   });
 });
