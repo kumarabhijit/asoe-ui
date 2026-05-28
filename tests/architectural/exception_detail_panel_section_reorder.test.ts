@@ -51,7 +51,10 @@ describe("ExceptionDetailPanel section reorder (ADR-041 P3e §2.2)", () => {
   });
 
   it("StickyActionRibbon is gated on the V2 flag (not unconditional)", () => {
-    expect(PANEL).toMatch(/CASES_ROW_V2\s*&&[^<]*<StickyActionRibbon/);
+    // The mount may include an intermediate wrapper div (chrome
+    // around the ribbon when it lives outside the scroll container);
+    // assert the gate-then-ribbon proximity within ~400 chars.
+    expect(PANEL).toMatch(/CASES_ROW_V2[\s\S]{0,400}?<StickyActionRibbon/);
   });
 
   it("AgentReasoningCard receives hideActionMatrix bound to the flag", () => {
@@ -77,5 +80,27 @@ describe("ExceptionDetailPanel section reorder (ADR-041 P3e §2.2)", () => {
     // earlier V2-only mount replaces it; the legacy mount must be
     // guarded by `!CASES_ROW_V2` so the section doesn't render twice.
     expect(PANEL).toMatch(/!CASES_ROW_V2\s*&&\s*analysis\s*&&[^<]*<AgentAnalysisSection/);
+  });
+
+  it("StickyActionRibbon mounts ABOVE the inner scroll container", () => {
+    // The first iteration mounted the ribbon INSIDE the
+    // `<div className="flex-1 overflow-auto p-16">` scroll
+    // container. That broke pinning: the ribbon's sticky
+    // reference was the same surface the user's scroll happened
+    // against, so the ribbon scrolled away with its content. The
+    // ribbon now mounts as a SIBLING of (and ABOVE) the inner
+    // scroll container — pinning is achieved by being outside the
+    // scrolling surface, not by `position: sticky`.
+    const ribbonIdx = PANEL.indexOf("<StickyActionRibbon");
+    const scrollContainerIdx = PANEL.indexOf("flex-1 overflow-auto");
+    expect(ribbonIdx).toBeGreaterThan(-1);
+    expect(scrollContainerIdx).toBeGreaterThan(-1);
+    expect(
+      ribbonIdx,
+      "StickyActionRibbon must mount BEFORE the inner " +
+        "`<div className=\"flex-1 overflow-auto p-16\">` scroll " +
+        "container in file order — otherwise the ribbon scrolls " +
+        "away with its content (see commit history).",
+    ).toBeLessThan(scrollContainerIdx);
   });
 });

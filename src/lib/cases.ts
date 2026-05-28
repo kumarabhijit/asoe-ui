@@ -370,3 +370,64 @@ export function pickQuickActionReasonTag(
   // because it implies the backend dropped both sentinels.
   return pool[0] ?? null;
 }
+
+
+/* ── Display formatters (PO 2026-05-28) ──────────────────────────── */
+
+
+/**
+ * Strip the internal `case-for-` / `case-multi-` prefixes from a
+ * case_id for display. The underlying identifier stays unchanged
+ * — URL routing, WebSocket invalidation, audit-log references all
+ * still use the full id. This is a display-only transform.
+ *
+ * Per PO 2026-05-28: the prefixes are an artefact of the mock-
+ * data layer (`caseFromMockException` defaults to `case-for-${id}`
+ * to satisfy the S15a invariant; multi-record cases use
+ * `case-multi-*` as the grouping key). Neither prefix carries
+ * operator-visible meaning — strip them so the visible label is
+ * the trailing identifier (e.g., `EML-CMP-2026-0062` rather than
+ * `case-for-EML-CMP-2026-0062`).
+ *
+ * Null-safe: returns "" on null / undefined / empty input so
+ * callers can render with an `EvidenceBlock` parent.
+ */
+export function formatCaseId(id: string | null | undefined): string {
+  if (!id) return "";
+  if (id.startsWith("case-for-")) return id.slice("case-for-".length);
+  if (id.startsWith("case-multi-")) return id.slice("case-multi-".length);
+  return id;
+}
+
+
+/**
+ * Strip the `SG_` taxonomy prefix from a supergroup code and
+ * humanise the remaining snake_case into Title Case. Display-only;
+ * the underlying code stays as the closed taxonomy key.
+ *
+ * `SG_NEW_ORDER`        → `New Order`
+ * `SG_BLOCK_PRICING`    → `Block Pricing`
+ * `SG_ORDER_CHANGE`     → `Order Change`
+ *
+ * Per PO 2026-05-28: the `SG_` prefix is internal taxonomy
+ * vocabulary; operators don't need to see the namespacing. The
+ * humanised label still uniquely identifies the supergroup
+ * because the trailing payload is a closed vocabulary
+ * (case_supergroup table; ADR-041 §2.1).
+ *
+ * Null-safe: returns "" on null / undefined / empty input.
+ */
+export function formatSupergroupCode(code: string | null | undefined): string {
+  if (!code) return "";
+  const stripped = code.startsWith("SG_") ? code.slice("SG_".length) : code;
+  // Snake-case → Title Case. Unknown chars (digits, hyphens) pass
+  // through unchanged.
+  return stripped
+    .split("_")
+    .map((part) =>
+      part.length === 0
+        ? ""
+        : part[0].toUpperCase() + part.slice(1).toLowerCase(),
+    )
+    .join(" ");
+}

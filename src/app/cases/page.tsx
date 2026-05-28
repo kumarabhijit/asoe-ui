@@ -60,6 +60,7 @@ import { CaseDetailPanel } from "./CaseDetailPanel";
 import { CasesQueueRow } from "./CasesQueueRow";
 import { CasesQueueRowV2 } from "./CasesQueueRowV2";
 import { ComplianceHitsRail } from "./ComplianceHitsRail";
+import { RecordPreviewRail } from "./RecordPreviewRail";
 import { NAV_TABS } from "@/config/nav-tabs";
 import { useRowDensity, type RowDensity } from "@/hooks/useRowDensity";
 import { casesRowV2Enabled } from "@/lib/flags";
@@ -701,12 +702,23 @@ function CasesWorkspace() {
       <aside
         aria-label="Compliance audit rail"
         className={cn(
-          "bg-surface-secondary border border-border-subtle rounded-md min-h-0 flex-col",
+          "bg-surface-secondary border border-border-subtle rounded-md min-h-0 flex-col overflow-y-auto",
           CASES_ROW_V2 ? "hidden xl:flex" : "hidden",
         )}
       >
         {selectedCaseId && orderCase && (
-          <ComplianceHitsRail hits={policyHits ?? []} variant="rail" />
+          <>
+            {/* Stacked rail tenants (PO 2026-05-28 #1 — UX panel
+                synthesis). Compliance Hits stays at the top so
+                SOX evidence-of-review is always above any preview
+                content. The record preview (currently
+                AI-drafted reply only) renders below when the
+                selected record carries one; absent → no second
+                section. No tabs — Compliance vetoed swap
+                patterns that would hide hits off-screen. */}
+            <ComplianceHitsRail hits={policyHits ?? []} variant="rail" />
+            <RecordPreviewRail selectedRecordId={selectedRecordId} />
+          </>
         )}
       </aside>
     </main>

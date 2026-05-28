@@ -1,0 +1,80 @@
+// RecordPreviewRail — record-scoped preview surfaces for the
+// `/cases` xl audit rail.
+//
+// ADR-041 P3e §2.3 follow-on, PO finding 2026-05-28 #1: the rail's
+// 320px third column was sparse — Compliance Hits often empty;
+// the rest of the rail wasted. The 2026-05-28 UX panel synthesis
+// recommended a stacked-section pattern (no tabs — Compliance SME
+// veto on swapping their hits off-screen) with the AI-drafted
+// reply as the Phase-1 preview tenant.
+//
+// This component fetches the analysis for the currently-selected
+// record and renders `<DraftReplySection>` when `analysis.draft_reply`
+// is present. Returns null otherwise — empty state on the rail is
+// preferable to a placeholder that adds visual noise (matches the
+// Compliance Hits null-on-empty contract above it).
+//
+// Architectural notes:
+//   * Per-record (driven by `selectedRecordId`) — the rail's
+//     compliance-hits sibling is per-case. Together they cover both
+//     scopes within the same xl column.
+//   * Pure projector (Guardrail #6) — fetches the existing
+//     orderAnalysis endpoint and projects `analysis.draft_reply`.
+//     No client-side composition.
+//   * Lazy-load deferred to follow-on — `DraftReplySection` is a
+//     small read-only render, no PDF preview here.
+
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { exceptionsApi } from "@/lib/api";
+import type { OrderAnalysis } from "@/types/exceptions";
+import { DraftReplySection } from "@/app/exceptions/DraftReplySection";
+
+export interface RecordPreviewRailProps {
+  /** Currently selected record id (URL `?record=` param). Null /
+   *  undefined means "no record selected" — the rail renders
+   *  nothing. */
+  selectedRecordId?: string | null;
+}
+
+export function RecordPreviewRail({ selectedRecordId }: RecordPreviewRailProps) {
+  const [analysis, setAnalysis] = useState<OrderAnalysis | null>(null);
+
+  useEffect(() => {
+    if (!selectedRecordId) {
+      setAnalysis(null);
+      return;
+    }
+    let cancelled = false;
+    exceptionsApi
+      .orderAnalysis(selectedRecordId)
+      .then((a) => {
+        if (!cancelled) setAnalysis(a);
+      })
+      .catch(() => {
+        // Best-effort preview — never block the rail; the rest of
+        // the rail (Compliance Hits) is independent.
+        if (!cancelled) setAnalysis(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRecordId]);
+
+  const draft = analysis?.draft_reply;
+  if (!draft) return null;
+
+  return (
+    <section
+      aria-label="Draft reply preview"
+      className="border-t border-border-subtle p-16 bg-surface-secondary"
+    >
+      <div className="text-label uppercase tracking-wider text-text-quaternary font-semibold mb-8">
+        Draft reply
+      </div>
+      <DraftReplySection data={draft} />
+    </section>
+  );
+}
