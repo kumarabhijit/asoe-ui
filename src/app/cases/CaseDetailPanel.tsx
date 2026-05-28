@@ -195,6 +195,18 @@ export function CaseDetailPanel({
           aria-label="Case context"
           className="flex flex-wrap items-center gap-8 px-12 py-8 bg-surface-secondary border border-border-subtle rounded-md text-caption text-text-secondary"
         >
+          {/* ADR-041 P3e §2.2 — skip-link target. The sticky action
+              ribbon's section id is `action-ribbon`; keyboard users
+              can jump straight to the buttons from the slim header
+              without tabbing through the records picker + Analysis.
+              `sr-only focus:not-sr-only` keeps it invisible until
+              keyboard focus reveals it. */}
+          <a
+            href="#action-ribbon"
+            className="sr-only focus:not-sr-only focus:px-8 focus:py-4 focus:bg-brand-subtle focus:text-brand focus:rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+          >
+            Skip to actions
+          </a>
           <code className="font-mono text-text-primary">{orderCase.case_id}</code>
           <span aria-hidden className="text-text-quaternary">·</span>
           <span>{sourceChannelLabel(orderCase.source_channel)}</span>

@@ -26,6 +26,7 @@ import {
   AgentReasoningCard,
   type ExecutionError,
 } from "@/components/ui/AgentReasoningCard";
+import { StickyActionRibbon } from "@/components/ui/StickyActionRibbon";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useExceptionActions } from "@/hooks/useExceptionActions";
@@ -74,6 +75,15 @@ import { DiagnosticsSection } from "./DiagnosticsSection";
 function isHumanInTheLoopState(state: string): boolean {
   return HITL_LIFECYCLE_STATES.has(state);
 }
+
+// ADR-041 P3e §2.2 — gates the Analysis-above-Recommendation
+// reorder + the sticky `<StickyActionRibbon>` mount. Default OFF
+// keeps today's behaviour (Recommendation card on top with its own
+// action matrix). When ON, the ribbon takes over the action
+// surface, the card hides its matrix, and `<AgentAnalysisSection>`
+// renders above the card. Today's HITL auto-expand predicate is
+// preserved (CSA + Compliance panel agreement).
+const CASES_ROW_V2 = process.env.NEXT_PUBLIC_CASES_ROW_V2 === "1";
 
 interface ExceptionDetailPanelProps {
   exceptionId: string;
@@ -555,10 +565,52 @@ export default function ExceptionDetailPanel({
             </div>
           )}
 
+          {/* ADR-041 P3e §2.2 — when V2 is on, mount the sticky
+              `<StickyActionRibbon>` first. It carries the verdict ×
+              permission button matrix from the SAME `<ActionButtonMatrix>`
+              the Recommendation card would use, so the buttons are
+              byte-identical regardless of mount. The ribbon sticks to
+              the top of the right-pane scroll container — Approve
+              stays above the fold no matter how long the Analysis
+              section grows below. */}
+          {CASES_ROW_V2 && detail.shadow_verdict && (
+            <StickyActionRibbon
+              verdict={detail.shadow_verdict as ShadowVerdict}
+              executionError={executionError}
+              recommendedAction={_recommendedAction() ?? undefined}
+              onApprove={handleApprove}
+              onReject={handleReject}
+              onEscalate={handleEscalate}
+              onOverride={handleOverride}
+              canApprove={hasPermission("exceptions:approve")}
+              canOverride={hasPermission("exceptions:override")}
+              canEscalate={hasPermission("exceptions:escalate")}
+              canReanalyze={hasPermission("exceptions:override")}
+              onReanalyze={
+                hasPermission("exceptions:override") ? handleReanalyze : undefined
+              }
+              reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
+              actionInFlight={actionInFlight}
+            />
+          )}
+
+          {/* ADR-041 P3e §2.2 — Agent Analysis ABOVE Recommendation
+              when V2 is on (cognitive sequence: diagnose → recommend
+              → act). HITL auto-expand predicate preserved verbatim;
+              the panel rejected widening it to all queue cases. */}
+          {CASES_ROW_V2 && analysis && (
+            <AgentAnalysisSection
+              analysis={analysis}
+              defaultOpen={isHumanInTheLoopState(detail.lifecycle_state)}
+            />
+          )}
+
           {/* Agent Reasoning Card (Layer 1/2 pattern) — the
               "Recommendation" pane (PO request #4: pane 2 after Entity
               Profile). Always rendered expanded; this is the primary
-              decision surface the operator must always see. */}
+              decision surface the operator must always see.
+              When V2 is on, `hideActionMatrix` suppresses the inline
+              button matrix — the sticky ribbon above carries it. */}
           {detail.shadow_verdict ? (
             <AgentReasoningCard
               verdict={detail.shadow_verdict as ShadowVerdict}
@@ -608,6 +660,7 @@ export default function ExceptionDetailPanel({
               }
               reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
               actionInFlight={actionInFlight}
+              hideActionMatrix={CASES_ROW_V2}
             />
           ) : executionError ? (
             // Lifecycle=FAILED with no shadow_verdict means the pipeline
@@ -654,8 +707,12 @@ export default function ExceptionDetailPanel({
               request #4. Auto-expands when the exception sits in a
               Human-in-the-Loop state so the reviewer sees the full
               narrative the moment they open a row that needs their
-              decision. */}
-          {analysis && (
+              decision.
+
+              ADR-041 P3e §2.2 — when V2 is on, this section is moved
+              ABOVE the Recommendation card (rendered earlier). The
+              guard here keeps the legacy ordering for flag-off. */}
+          {!CASES_ROW_V2 && analysis && (
             <AgentAnalysisSection
               analysis={analysis}
               defaultOpen={isHumanInTheLoopState(detail.lifecycle_state)}
