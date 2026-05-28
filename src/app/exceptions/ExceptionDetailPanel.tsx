@@ -551,34 +551,42 @@ export default function ExceptionDetailPanel({
           it. Wrapper has its own background so the scroll content
           doesn't bleed through. */}
       {CASES_ROW_V2 && detail?.shadow_verdict && (
-        <div
+        // PO 2026-05-28 round-3: the previous wrapper carried
+        // `bg-surface-secondary` + `border-b border-border-subtle`
+        // + `px-16 pt-16` as visual scaffolding. With the ribbon's
+        // own opaque card chrome (`bg-surface-primary border
+        // shadow-sm` from StickyActionRibbon.tsx) under it, the
+        // wrapper's chrome read as a heavy grey box around the
+        // ribbon. Pass the sticky positioning straight through to
+        // the ribbon's section via `className` — the ribbon's own
+        // bg/border/shadow is the only visual chrome the operator
+        // needs. The trailing `mt-12 mb-8` keeps the ribbon from
+        // touching the ContextStrip above and the scroll body
+        // below.
+        <StickyActionRibbon
           className={cn(
             "sticky top-[var(--nav-height)] lg:top-0 z-10",
-            "px-16 pt-16 border-b border-border-subtle",
-            "bg-surface-secondary",
+            "mx-16 mt-12 mb-8",
           )}
-        >
-          <StickyActionRibbon
-            verdict={detail.shadow_verdict as ShadowVerdict}
-            executionError={executionError}
-            recommendedAction={_recommendedAction() ?? undefined}
-            onApprove={handleApproveWithTelemetry}
-            onReject={handleRejectWithTelemetry}
-            onEscalate={handleEscalateWithTelemetry}
-            onOverride={handleOverrideWithTelemetry}
-            canApprove={hasPermission("exceptions:approve")}
-            canOverride={hasPermission("exceptions:override")}
-            canEscalate={hasPermission("exceptions:escalate")}
-            canReanalyze={hasPermission("exceptions:override")}
-            onReanalyze={
-              hasPermission("exceptions:override")
-                ? handleReanalyzeWithTelemetry
-                : undefined
-            }
-            reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
-            actionInFlight={actionInFlight}
-          />
-        </div>
+          verdict={detail.shadow_verdict as ShadowVerdict}
+          executionError={executionError}
+          recommendedAction={_recommendedAction() ?? undefined}
+          onApprove={handleApproveWithTelemetry}
+          onReject={handleRejectWithTelemetry}
+          onEscalate={handleEscalateWithTelemetry}
+          onOverride={handleOverrideWithTelemetry}
+          canApprove={hasPermission("exceptions:approve")}
+          canOverride={hasPermission("exceptions:override")}
+          canEscalate={hasPermission("exceptions:escalate")}
+          canReanalyze={hasPermission("exceptions:override")}
+          onReanalyze={
+            hasPermission("exceptions:override")
+              ? handleReanalyzeWithTelemetry
+              : undefined
+          }
+          reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
+          actionInFlight={actionInFlight}
+        />
       )}
 
       {/* ━━ 3. Scrollable Body ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}

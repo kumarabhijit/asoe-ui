@@ -37,9 +37,21 @@ export interface RecordPreviewRailProps {
    *  undefined means "no record selected" — the rail renders
    *  nothing. */
   selectedRecordId?: string | null;
+  /** PO finding 2026-05-28 round-2 #1 — the parent page collapses
+   *  the entire rail (and switches the grid from 3-column back to
+   *  2-column) when none of the rail tenants have content. This
+   *  callback fires whenever the preview's contentful state
+   *  changes so the parent can track it alongside its own
+   *  policyHits check.
+   *
+   *  Idempotent — callers can re-set the same value repeatedly. */
+  onContentfulChange?: (hasContent: boolean) => void;
 }
 
-export function RecordPreviewRail({ selectedRecordId }: RecordPreviewRailProps) {
+export function RecordPreviewRail({
+  selectedRecordId,
+  onContentfulChange,
+}: RecordPreviewRailProps) {
   const [analysis, setAnalysis] = useState<OrderAnalysis | null>(null);
 
   useEffect(() => {
@@ -64,6 +76,19 @@ export function RecordPreviewRail({ selectedRecordId }: RecordPreviewRailProps) 
   }, [selectedRecordId]);
 
   const draft = analysis?.draft_reply;
+  const hasContent = draft != null;
+
+  // Report contentful state to the parent so it can collapse the
+  // rail when both this and ComplianceHitsRail are empty.
+  // Cleanup on unmount reports false so the parent doesn't keep
+  // the rail open after the preview component is gone.
+  useEffect(() => {
+    onContentfulChange?.(hasContent);
+    return () => {
+      onContentfulChange?.(false);
+    };
+  }, [hasContent, onContentfulChange]);
+
   if (!draft) return null;
 
   return (

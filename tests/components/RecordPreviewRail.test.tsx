@@ -44,6 +44,94 @@ describe("RecordPreviewRail — no selection", () => {
   });
 });
 
+describe("RecordPreviewRail — onContentfulChange callback (PO round-2 #1)", () => {
+  it("reports false on mount with no selection", () => {
+    const onContentfulChange = vi.fn();
+    render(<RecordPreviewRail onContentfulChange={onContentfulChange} />);
+    expect(onContentfulChange).toHaveBeenCalledWith(false);
+  });
+
+  it("reports false when analysis has no draft_reply", async () => {
+    orderAnalysisMock.mockResolvedValue({
+      diagnosis: "x",
+      confidence: 80,
+      risk: "LOW",
+      resolution: "y",
+      lines: [],
+    });
+    const onContentfulChange = vi.fn();
+    render(
+      <RecordPreviewRail
+        selectedRecordId="rec-1"
+        onContentfulChange={onContentfulChange}
+      />,
+    );
+    await act(async () => {});
+    // Initial false (no analysis yet) + post-fetch false (no draft).
+    const lastCall =
+      onContentfulChange.mock.calls[onContentfulChange.mock.calls.length - 1];
+    expect(lastCall?.[0]).toBe(false);
+  });
+
+  it("reports true when analysis has draft_reply", async () => {
+    orderAnalysisMock.mockResolvedValue({
+      diagnosis: "x",
+      confidence: 80,
+      risk: "LOW",
+      resolution: "y",
+      lines: [],
+      draft_reply: {
+        status: "DRAFTED",
+        subject: "Re: x",
+        body: "...",
+        to: "buyer@example.com",
+      },
+    });
+    const onContentfulChange = vi.fn();
+    render(
+      <RecordPreviewRail
+        selectedRecordId="rec-1"
+        onContentfulChange={onContentfulChange}
+      />,
+    );
+    await waitFor(() => {
+      const lastCall =
+        onContentfulChange.mock.calls[onContentfulChange.mock.calls.length - 1];
+      expect(lastCall?.[0]).toBe(true);
+    });
+  });
+
+  it("reports false on unmount (cleanup) so the rail collapses", async () => {
+    orderAnalysisMock.mockResolvedValue({
+      diagnosis: "x",
+      confidence: 80,
+      risk: "LOW",
+      resolution: "y",
+      lines: [],
+      draft_reply: {
+        status: "DRAFTED",
+        subject: "Re: x",
+        body: "...",
+        to: "x@y",
+      },
+    });
+    const onContentfulChange = vi.fn();
+    const { unmount } = render(
+      <RecordPreviewRail
+        selectedRecordId="rec-1"
+        onContentfulChange={onContentfulChange}
+      />,
+    );
+    await waitFor(() => {
+      expect(onContentfulChange).toHaveBeenCalledWith(true);
+    });
+    unmount();
+    const lastCall =
+      onContentfulChange.mock.calls[onContentfulChange.mock.calls.length - 1];
+    expect(lastCall?.[0]).toBe(false);
+  });
+});
+
 describe("RecordPreviewRail — no draft on analysis", () => {
   it("renders nothing when analysis has no draft_reply", async () => {
     orderAnalysisMock.mockResolvedValue({
