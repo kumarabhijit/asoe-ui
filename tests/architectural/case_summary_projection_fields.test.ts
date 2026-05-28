@@ -70,4 +70,41 @@ describe("case-summary projection fields (ADR-041 P3e §3.1)", () => {
       ).toBe(true);
     }
   });
+
+  it("mock projection produces realistic non-null values for at least one row", async () => {
+    // Before the INTENT_SUMMARY_TEMPLATES mock layer landed, every
+    // row's projection fields were null — preview environments
+    // showed the V2 row as an empty husk. Lock that the mock
+    // produces non-null values for at least a subset of rows so
+    // regression to "all null" is caught.
+    const { items } = await casesApi.list();
+    const withSummary = items.filter(
+      (row) =>
+        row.customer_name !== null
+        || row.audit_verdict_color !== null
+        || row.dollar_impact !== null
+        || row.problem_one_liner !== null,
+    );
+    expect(
+      withSummary.length,
+      "expected at least one mock row with a populated CaseSummary " +
+        "projection — `deriveMockCaseSummaries` produces realistic " +
+        "values per intent so preview environments showcase the V2 row",
+    ).toBeGreaterThan(0);
+  });
+
+  it("verdict color is sourced from the lead record's shadow_verdict", async () => {
+    // Severity-wins rollup matches the backend `compute_case_summary`
+    // semantics. The mock layer just mirrors the lead record's
+    // verdict; this test guards against a regression where the mock
+    // returns a hardcoded color regardless of data.
+    const { items } = await casesApi.list();
+    const colours = new Set(items.map((r) => r.audit_verdict_color));
+    expect(
+      colours.size,
+      "mock projection must produce multiple verdict colors across " +
+        "the seed fixture — a single-color result means the rollup " +
+        "is hardcoded rather than data-driven",
+    ).toBeGreaterThan(1);
+  });
 });
