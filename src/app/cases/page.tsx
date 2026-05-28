@@ -59,6 +59,7 @@ import type { ExceptionDetailResponse } from "@/types/api";
 import { CaseDetailPanel } from "./CaseDetailPanel";
 import { CasesQueueRow } from "./CasesQueueRow";
 import { CasesQueueRowV2 } from "./CasesQueueRowV2";
+import { ComplianceHitsRail } from "./ComplianceHitsRail";
 import { NAV_TABS } from "@/config/nav-tabs";
 import { useRowDensity, type RowDensity } from "@/hooks/useRowDensity";
 
@@ -466,6 +467,11 @@ function CasesWorkspace() {
         //     and clipped their labels at common laptop widths.
         "grid-cols-1",
         "lg:grid-cols-[360px_minmax(0,1fr)]",
+        // ADR-041 P3e §2.3 — at xl (≥1280px) the audit rail mounts
+        // as a third column when CASES_ROW_V2 is on. The xl override
+        // only takes effect when the flag is set; default keeps the
+        // two-column layout.
+        CASES_ROW_V2 && "xl:grid-cols-[360px_minmax(0,1fr)_320px]",
         // Viewport-locked master-detail (the "Outlook" pane pattern the
         // layout tokens describe). Below `lg` the panes stack and use
         // normal document flow so nothing is clipped on tablet/phone.
@@ -649,20 +655,56 @@ function CasesWorkspace() {
           && !detailLoading
           && orderCase
           && orderCase.case_id === selectedCaseId && (
-          <CaseDetailPanel
-            orderCase={orderCase}
-            attachedRecords={records}
-            policyHits={policyHits}
-            selectedRecordId={selectedRecordId}
-            onSelectRecord={handleSelectRecord}
-            onRecordActionComplete={handleRecordActionComplete}
-            // CaseDetailPanel renders the attached-records picker
-            // (RecordListPane) stacked at the top of this pane by
-            // default — the workspace no longer has a separate column
-            // for it, so the operator always picks a record here.
-          />
+          <>
+            {/* ADR-041 P3e §2.3 — when V2 is on, suppress the panel's
+                own inline Compliance Hits and re-render it as a
+                sibling that hides at xl. At xl the third column hosts
+                the rail; below xl the inline render keeps Compliance
+                Hits in the main column (Compliance veto on hiding
+                them at smaller breakpoints). */}
+            {CASES_ROW_V2 && (policyHits ?? []).length > 0 && (
+              <div className="xl:hidden">
+                <ComplianceHitsRail
+                  hits={policyHits ?? []}
+                  variant="inline"
+                />
+              </div>
+            )}
+            <CaseDetailPanel
+              orderCase={orderCase}
+              attachedRecords={records}
+              policyHits={policyHits}
+              selectedRecordId={selectedRecordId}
+              onSelectRecord={handleSelectRecord}
+              onRecordActionComplete={handleRecordActionComplete}
+              suppressInlineComplianceHits={CASES_ROW_V2}
+              // CaseDetailPanel renders the attached-records picker
+              // (RecordListPane) stacked at the top of this pane by
+              // default — the workspace no longer has a separate column
+              // for it, so the operator always picks a record here.
+            />
+          </>
         )}
       </section>
+
+      {/* ── Audit rail (xl-only third column) ───────────────────
+          ADR-041 P3e §2.3 — at xl the Compliance Shadow hits live
+          in their own column so they remain persistently visible
+          without competing with the workspace. The aside is gated
+          on the flag (`hidden` when V2 is off) and on xl breakpoint
+          (`hidden xl:flex` when V2 is on). At lg and below the
+          inline render under CaseDetailPanel takes over. */}
+      <aside
+        aria-label="Compliance audit rail"
+        className={cn(
+          "bg-surface-secondary border border-border-subtle rounded-md min-h-0 flex-col",
+          CASES_ROW_V2 ? "hidden xl:flex" : "hidden",
+        )}
+      >
+        {selectedCaseId && orderCase && (
+          <ComplianceHitsRail hits={policyHits ?? []} variant="rail" />
+        )}
+      </aside>
     </main>
   );
 }

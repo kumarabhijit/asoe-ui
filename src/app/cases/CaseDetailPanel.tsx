@@ -24,12 +24,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Mail, PackageCheck, Clock, ShieldAlert, ChevronRight, ChevronDown } from "lucide-react";
+import { Mail, PackageCheck, Clock, ChevronRight, ChevronDown } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { ClassificationHistoryPanel } from "@/components/cases/ClassificationHistoryPanel";
+import { ComplianceHitsRail } from "./ComplianceHitsRail";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
-import { PolicyHitBadge } from "@/components/ui/PolicyHitBadge";
 import { useClassificationHistory } from "@/hooks/useClassificationHistory";
 import type { Origin, OrderCase, SlaBand } from "@/types/cases";
 import type { ExceptionDetailResponse } from "@/types/api";
@@ -124,6 +124,14 @@ export interface CaseDetailPanelProps {
    * own picker).
    */
   showInlineRecordList?: boolean;
+  /**
+   * ADR-041 P3e §2.3 — suppress the inline Compliance Hits section.
+   * When the `/cases` workspace mounts the audit rail as a third
+   * column at xl, the inline render becomes redundant. Default
+   * `false` keeps today's stacked behaviour for the focused
+   * `/cases/[id]` view and lg/<lg breakpoints.
+   */
+  suppressInlineComplianceHits?: boolean;
 }
 
 export function CaseDetailPanel({
@@ -134,6 +142,7 @@ export function CaseDetailPanel({
   onSelectRecord,
   onRecordActionComplete,
   showInlineRecordList = true,
+  suppressInlineComplianceHits = false,
 }: CaseDetailPanelProps) {
   // PO #20 (issue #133): tick the SLA snapshot once a minute so the
   // header countdown stays live without a refetch.
@@ -328,33 +337,12 @@ export function CaseDetailPanel({
       </header>
       )}
 
-      {/* ── Compliance hits (ADR-039 §4.5 — L1 vs L2 distinction) ── */}
-      {hasPolicyHits && (
-        <section
-          aria-label="Compliance Shadow hits"
-          className="bg-surface-primary border border-border rounded-md p-16 shadow-xs"
-        >
-          <div className="flex items-center gap-8 mb-12">
-            <ShieldAlert size={16} aria-hidden className="text-text-secondary" />
-            <h2 className="text-heading font-semibold text-text-primary m-0">
-              Compliance hits
-            </h2>
-            <span className="ml-auto text-caption text-text-tertiary">
-              {(policyHits ?? []).length}
-            </span>
-          </div>
-          <p className="text-caption text-text-tertiary leading-normal mb-12">
-            L1 rule names render plain; L2 LLM-derived concerns
-            (ADR-039 §4.5) carry the AI badge.
-          </p>
-          <ul className="flex flex-wrap gap-8 m-0 p-0 list-none">
-            {(policyHits ?? []).map((hit) => (
-              <li key={hit}>
-                <PolicyHitBadge hit={hit} />
-              </li>
-            ))}
-          </ul>
-        </section>
+      {/* ── Compliance hits (ADR-039 §4.5 — L1 vs L2 distinction) ──
+          Extracted to `ComplianceHitsRail` (ADR-041 P3e §2.3).
+          Suppressed inline when the workspace mounts it as a third
+          column at xl; otherwise stacks here as before. */}
+      {hasPolicyHits && !suppressInlineComplianceHits && (
+        <ComplianceHitsRail hits={policyHits ?? []} variant="inline" />
       )}
 
       {/* ── Classification history (requirements §8.6) ────────── */}
