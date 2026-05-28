@@ -42,14 +42,23 @@ describe("StickyActionRibbon", () => {
     ).toBeInTheDocument();
   });
 
-  it("applies sticky positioning at top-0 with above-card z-index", () => {
+  it("renders as a card-chromed surface (mounted above the scroll container)", () => {
+    // The previous version applied `position: sticky` inside
+    // ExceptionDetailPanel's inner scroll container — broken,
+    // because the sticky reference was the same surface that
+    // scrolled, so the ribbon scrolled away with its content.
+    // The ribbon now mounts as a sibling of the scroll container
+    // (see file-top comment in StickyActionRibbon.tsx); pinning is
+    // achieved by being outside the scroll surface, not by
+    // `position: sticky`. This test guards against re-adding the
+    // broken sticky positioning.
     const { container } = render(
       <StickyActionRibbon verdict="YELLOW" canApprove onApprove={() => {}} />,
     );
     const section = container.querySelector("section");
-    expect(section?.className).toMatch(/sticky/);
-    expect(section?.className).toMatch(/top-0/);
-    expect(section?.className).toMatch(/z-10/);
+    expect(section?.className).not.toMatch(/\bsticky\b/);
+    expect(section?.className).toMatch(/bg-surface-primary/);
+    expect(section?.className).toMatch(/shadow-sm/);
   });
 
   it("renders the matrix's buttons (delegation, not duplication)", () => {

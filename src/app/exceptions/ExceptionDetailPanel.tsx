@@ -512,6 +512,48 @@ export default function ExceptionDetailPanel({
         impactMetrics={analysis?.impact_metrics}
       />
 
+      {/* ━━ 2b. Sticky action ribbon (ADR-041 P3e §2.2) ━━━━━━━━━━━━━━
+          Mounted as a SIBLING of the inner scroll container below
+          (not inside it) so it stays pinned above the scroll area
+          regardless of how the inner content scrolls.
+
+          The previous mount-inside-the-scroll-container approach
+          was broken: ExceptionDetailPanel owns its own
+          `overflow-auto` scroll surface (the line below at #3); a
+          sticky element inside that container would scroll AWAY
+          with its content because the user's scroll happens INSIDE
+          the same container, not against an outer ancestor.
+
+          Lifting the ribbon out of the scroll container means it
+          renders above the Analysis / Recommendation / enrichment
+          sections in normal flow. Analysis scrolls underneath;
+          Approve / Reject / Override / Escalate / Re-analyze stay
+          one click away no matter how far the operator scrolls. */}
+      {CASES_ROW_V2 && detail?.shadow_verdict && (
+        <div className="px-16 pt-16 border-b border-border-subtle bg-surface-secondary">
+          <StickyActionRibbon
+            verdict={detail.shadow_verdict as ShadowVerdict}
+            executionError={executionError}
+            recommendedAction={_recommendedAction() ?? undefined}
+            onApprove={handleApproveWithTelemetry}
+            onReject={handleRejectWithTelemetry}
+            onEscalate={handleEscalateWithTelemetry}
+            onOverride={handleOverrideWithTelemetry}
+            canApprove={hasPermission("exceptions:approve")}
+            canOverride={hasPermission("exceptions:override")}
+            canEscalate={hasPermission("exceptions:escalate")}
+            canReanalyze={hasPermission("exceptions:override")}
+            onReanalyze={
+              hasPermission("exceptions:override")
+                ? handleReanalyzeWithTelemetry
+                : undefined
+            }
+            reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
+            actionInFlight={actionInFlight}
+          />
+        </div>
+      )}
+
       {/* ━━ 3. Scrollable Body ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="flex-1 overflow-auto p-16">
         <div className="flex flex-col gap-16">
@@ -601,37 +643,6 @@ export default function ExceptionDetailPanel({
                 </div>
               </div>
             </div>
-          )}
-
-          {/* ADR-041 P3e §2.2 — when V2 is on, mount the sticky
-              `<StickyActionRibbon>` first. It carries the verdict ×
-              permission button matrix from the SAME `<ActionButtonMatrix>`
-              the Recommendation card would use, so the buttons are
-              byte-identical regardless of mount. The ribbon sticks to
-              the top of the right-pane scroll container — Approve
-              stays above the fold no matter how long the Analysis
-              section grows below. */}
-          {CASES_ROW_V2 && detail.shadow_verdict && (
-            <StickyActionRibbon
-              verdict={detail.shadow_verdict as ShadowVerdict}
-              executionError={executionError}
-              recommendedAction={_recommendedAction() ?? undefined}
-              onApprove={handleApproveWithTelemetry}
-              onReject={handleRejectWithTelemetry}
-              onEscalate={handleEscalateWithTelemetry}
-              onOverride={handleOverrideWithTelemetry}
-              canApprove={hasPermission("exceptions:approve")}
-              canOverride={hasPermission("exceptions:override")}
-              canEscalate={hasPermission("exceptions:escalate")}
-              canReanalyze={hasPermission("exceptions:override")}
-              onReanalyze={
-                hasPermission("exceptions:override")
-                  ? handleReanalyzeWithTelemetry
-                  : undefined
-              }
-              reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
-              actionInFlight={actionInFlight}
-            />
           )}
 
           {/* ADR-041 P3e §2.2 — Agent Analysis ABOVE Recommendation
