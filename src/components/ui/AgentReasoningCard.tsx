@@ -86,8 +86,13 @@ interface AgentReasoningCardProps {
    *  exactly which action will be applied — e.g. "Apply contract price $9.80".
    *  Optional: when absent, Approve shows its generic label only. */
   recommendedAction?: string;
-  onApprove?: (comment: string) => void;
-  onReject?: (comment: string) => void;
+  // S2 finding #7 (sprint 2026-05-28) — Approve/Reject callbacks
+  // gain an optional `reasonTagOverride`. The card itself does not
+  // surface a tag picker — it proxies the prop to the matrix when
+  // mounted inline (legacy path), and the matrix surfaces the
+  // picker on YELLOW/RED.
+  onApprove?: (comment: string, reasonTagOverride?: string) => void;
+  onReject?: (comment: string, reasonTagOverride?: string) => void;
   onEscalate?: () => void;
   onOverride?: () => void;
   /** Fires when the user confirms a Re-analyze request with a mandatory reason.
@@ -125,6 +130,14 @@ interface AgentReasoningCardProps {
    * so the verdict × permission logic stays in one place.
    */
   hideActionMatrix?: boolean;
+  /**
+   * S2 finding #7 — reason-tag vocabulary for the mandatory tag
+   * Select shown by `ActionButtonMatrix` on YELLOW/RED Approve/
+   * Reject. Sourced from `useHealth` upstream. Proxied through the
+   * card untouched; absent means the matrix keeps today's optional-
+   * comment-only behaviour.
+   */
+  availableReasonTags?: readonly string[];
   className?: string;
 }
 
@@ -209,6 +222,7 @@ export function AgentReasoningCard({
   canReanalyze,
   isAdmin = false,
   hideActionMatrix = false,
+  availableReasonTags,
   className,
 }: AgentReasoningCardProps) {
   const isErrored = executionError !== undefined;
@@ -334,6 +348,7 @@ export function AgentReasoningCard({
             canEscalate={canEscalate}
             canReanalyze={canReanalyze}
             isAdmin={isAdmin}
+            availableReasonTags={availableReasonTags}
           />
         )}
       </div>

@@ -94,6 +94,21 @@ test.describe("mock-mode HITL actions", () => {
     ).toBeVisible({ timeout: 15_000 });
     await approve.click();
 
+    // S2 sprint 2026-05-28 finding #7 — Approve on YELLOW now
+    // requires a reason_tag. The Select renders above the textarea
+    // and Confirm Approval stays disabled until a tag is picked.
+    // Source the option value dynamically (index 0 is the
+    // "Select…" placeholder) so no enum literal leaks into the test
+    // (Guardrail #2 — same pattern as the Override test below).
+    const reasonSel = workspace(page).getByLabel(
+      /approval reason category/i,
+    );
+    const reasonVal = await reasonSel
+      .locator("option")
+      .nth(1)
+      .getAttribute("value");
+    await reasonSel.selectOption(reasonVal);
+
     await workspace(page)
       .getByRole("button", { name: /confirm approval/i })
       .first()

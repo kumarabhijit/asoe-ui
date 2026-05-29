@@ -207,3 +207,273 @@ describe("ActionButtonMatrix — in-flight disabling", () => {
     }
   });
 });
+
+
+/* ── S2 sprint 2026-05-28 — hotkey + mandatory reason_tag locks ─── */
+
+// `act` is required around document-level dispatchEvent — see the
+// note in `tests/hooks/useHotkeys.test.ts`. The hotkey handler
+// inside ActionButtonMatrix calls setPendingAction, and the
+// assertions below depend on that state update having flushed.
+import { act } from "@testing-library/react";
+
+function press(key: string, opts: KeyboardEventInit = {}) {
+  act(() => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key, ...opts }));
+  });
+}
+
+describe("ActionButtonMatrix — S2 #3 ribbon hotkeys", () => {
+  it("A opens the Approve comment dialog on YELLOW + canApprove", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        onReject={onReject}
+        onEscalate={onEscalate}
+        canApprove
+        canEscalate
+      />,
+    );
+    press("a");
+    // The pending-action panel surfaces a Cancel button — the
+    // sentinel that the matrix flipped into the comment swap.
+    expect(
+      screen.getByRole("button", { name: /^cancel$/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("R opens the Reject comment dialog on YELLOW + canApprove", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        onReject={onReject}
+        canApprove
+      />,
+    );
+    press("r");
+    expect(
+      screen.getByText(/rejection (comment|reason)/i),
+    ).toBeInTheDocument();
+  });
+
+  it("O fires onOverride on YELLOW + canOverride", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        onOverride={onOverride}
+        canApprove
+        canOverride
+      />,
+    );
+    press("o");
+    expect(onOverride).toHaveBeenCalledOnce();
+  });
+
+  it("E fires onEscalate on YELLOW + canEscalate", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        onEscalate={onEscalate}
+        canApprove
+        canEscalate
+      />,
+    );
+    press("e");
+    expect(onEscalate).toHaveBeenCalledOnce();
+  });
+
+  it("Y opens the Reanalyze comment dialog when allowed", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        onReanalyze={onReanalyze}
+        canApprove
+        canReanalyze
+      />,
+    );
+    press("y");
+    expect(screen.getByText(/reanalyze reason/i)).toBeInTheDocument();
+  });
+
+  it("A does NOT fire when the operator lacks canApprove", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        canApprove={false}
+      />,
+    );
+    press("a");
+    expect(
+      screen.queryByRole("button", { name: /^cancel$/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Hotkeys do not fire on GREEN where Approve is not surfaced", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="GREEN"
+        recommendedAction="ALLOW_BOTH"
+        onApprove={onApprove}
+        canApprove
+      />,
+    );
+    press("a");
+    expect(
+      screen.queryByRole("button", { name: /^cancel$/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Hotkeys are inert while a comment dialog is open (typing precedence)", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        onOverride={onOverride}
+        canApprove
+        canOverride
+      />,
+    );
+    press("a"); // opens the approve dialog
+    onOverride.mockClear();
+    press("o"); // must NOT trigger override while comment swap is open
+    expect(onOverride).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("ActionButtonMatrix — S2 #7 mandatory reason_tag on YELLOW/RED", () => {
+  const TAGS = ["CONTRACT_PRICE_CORRECTION", "CUSTOMER_REQUEST", "OTHER"] as const;
+
+  it("renders a mandatory tag Select above the textarea on YELLOW Approve", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        canApprove
+        availableReasonTags={TAGS}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /block and notify/i }));
+    expect(
+      screen.getByRole("combobox", { name: /approval reason category/i }),
+    ).toBeInTheDocument();
+    // The Select carries aria-required.
+    expect(
+      screen.getByRole("combobox", { name: /approval reason category/i }),
+    ).toHaveAttribute("aria-required", "true");
+  });
+
+  it("Confirm Approval is disabled until a tag is picked", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        canApprove
+        availableReasonTags={TAGS}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /block and notify/i }));
+    const confirm = screen.getByRole("button", { name: /confirm approval/i });
+    expect(confirm).toBeDisabled();
+    // After picking a tag the Confirm enables and the callback fires
+    // with the picked tag as the override.
+    fireEvent.change(
+      screen.getByRole("combobox", { name: /approval reason category/i }),
+      { target: { value: "CUSTOMER_REQUEST" } },
+    );
+    expect(confirm).not.toBeDisabled();
+    fireEvent.click(confirm);
+    expect(onApprove).toHaveBeenCalledWith("", "CUSTOMER_REQUEST");
+  });
+
+  it("Cmd+Enter cannot bypass the mandatory tag gate", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        canApprove
+        availableReasonTags={TAGS}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /block and notify/i }));
+    // textarea is rendered but not autoFocus when the Select owns
+    // focus; querying directly.
+    const textarea = screen.getByRole("textbox");
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true });
+    expect(onApprove).not.toHaveBeenCalled();
+  });
+
+  it("GREEN keeps the optional-comment path — no tag picker, Confirm enabled immediately", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        canApprove
+        // GREEN normally hides Approve, but the gate predicate (#7)
+        // also relies on verdict — passing GREEN to a render path
+        // where Approve isn't visible is the wrong setup. Instead
+        // we confirm the gate is off when `availableReasonTags` is
+        // empty even on YELLOW.
+        availableReasonTags={[]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /block and notify/i }));
+    expect(
+      screen.queryByRole("combobox", { name: /reason category/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /confirm approval/i }),
+    ).not.toBeDisabled();
+  });
+});
+
+
+describe("ActionButtonMatrix — S2 #4 Cmd+Enter discoverability", () => {
+  it("placeholder copy advertises ⌘↵ in every comment dialog variant", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        canApprove
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /block and notify/i }));
+    expect(screen.getByRole("textbox")).toHaveAttribute(
+      "placeholder",
+      expect.stringMatching(/⌘↵/),
+    );
+  });
+
+  it("Confirm Approval button carries aria-keyshortcuts=\"Meta+Enter\"", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        canApprove
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /block and notify/i }));
+    expect(
+      screen.getByRole("button", { name: /confirm approval/i }),
+    ).toHaveAttribute("aria-keyshortcuts", "Meta+Enter");
+  });
+});

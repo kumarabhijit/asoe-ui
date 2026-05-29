@@ -64,6 +64,7 @@ import { RecordPreviewRail } from "./RecordPreviewRail";
 import { NAV_TABS } from "@/config/nav-tabs";
 import { useRowDensity, type RowDensity } from "@/hooks/useRowDensity";
 import { casesRowV2Enabled } from "@/lib/flags";
+import { HotkeyCheatsheet } from "@/components/ui/HotkeyCheatsheet";
 
 // ADR-041 P3e §2.1 — gates the four-line queue row + density
 // toggle. Rollout policy in `src/lib/flags.ts`: production stays
@@ -743,6 +744,12 @@ function CasesWorkspace() {
           </>
         )}
       </aside>
+      {/* S2 sprint 2026-05-28 #5 — `?` keyboard-shortcut overlay.
+          Self-mounted: zero props, toggles on its own `?` hotkey.
+          Lives on /cases only for now (the surface with ribbon
+          hotkeys); when the keymap reaches other routes the mount
+          will move to the root layout. */}
+      <HotkeyCheatsheet />
     </main>
   );
 }
