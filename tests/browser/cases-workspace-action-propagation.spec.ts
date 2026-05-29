@@ -171,13 +171,16 @@ test("disposition on the selected record re-projects status in BOTH the queue ro
     "queue row's pre-action 'Awaiting review' label must be replaced",
   ).toHaveCount(0, { timeout: 10_000 });
 
-  // The case header (right pane) ALSO re-projects to "Resolved". This
-  // is what closes the second half of the drift — the inner detail
-  // pane refreshed itself pre-fix, but the case status badge above it
-  // (sourced from `OrderCase.status`, not the record) stayed stale.
-  await expect(
-    caseWorkspace.getByText(/^resolved$/i).first(),
-    "case header must re-project to 'Resolved' after the disposition " +
-      "(onRecordActionComplete must trigger refreshCaseDetail())",
-  ).toBeVisible({ timeout: 10_000 });
+  // The right-pane case-header assertion was here historically. After
+  // S2 sprint 2026-05-28 finding #11 (next-case auto-advance), the
+  // workspace flips to the next case in the queue once the action
+  // lands, so the right pane no longer shows the case we just acted
+  // on. The cross-pane propagation contract is now covered by:
+  //   * the backend `lifecycle_state === "RESOLVED"` poll above
+  //     (proves the mutation landed)
+  //   * the queue row re-projecting to "Resolved" (proves the queue
+  //     refetched + the page re-rendered with new state)
+  // Together those still close the drift that motivated this spec —
+  // we just no longer assert a "stays on the same case" side effect
+  // that became false by design.
 });
