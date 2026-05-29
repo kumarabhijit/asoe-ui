@@ -21,6 +21,7 @@ import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 import { HOTKEYS, HOTKEY_SCOPE_LABEL, type HotkeyScope } from "@/lib/hotkeys";
+import { useFocusRestoreOnClose } from "@/hooks/useFocusRestoreOnClose";
 import { useHotkeys } from "@/hooks/useHotkeys";
 
 const SCOPE_ORDER: HotkeyScope[] = [
@@ -46,6 +47,12 @@ export function HotkeyCheatsheet() {
   useEffect(() => {
     if (open) panelRef.current?.focus();
   }, [open]);
+
+  // S3 finding #C — Radix's automatic focus return doesn't apply
+  // to this custom-div dialog. When the cheatsheet closes (Esc,
+  // backdrop click, or the second `?` press), restore focus to
+  // wherever the operator was before pressing `?`.
+  useFocusRestoreOnClose(open);
 
   if (!open) return null;
 

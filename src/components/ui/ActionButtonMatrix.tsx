@@ -31,6 +31,7 @@ import { MessageSquare, RotateCcw } from "lucide-react";
 import { Button } from "./Button";
 import { actionLabel as resolveActionLabel } from "@/lib/cases";
 import { cn } from "@/lib/utils";
+import { useFocusRestoreOnClose } from "@/hooks/useFocusRestoreOnClose";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { getHotkey } from "@/lib/hotkeys";
 import type { ShadowVerdict } from "@/types/exceptions";
@@ -143,6 +144,13 @@ export function ActionButtonMatrix({
   const actionCaption = action?.caption;
   const primaryInProgress = ingForm(primaryLabel);
   const secondaryInProgress = ingForm(secondaryLabel);
+
+  // S3 finding #C — the comment swap is a custom `role="dialog"` div
+  // that bypasses Radix's automatic focus return. When the swap
+  // closes (cancel, submit, or Escape from the textarea), restore
+  // focus to the action button (Approve / Reject / Reanalyze) the
+  // operator opened it from.
+  useFocusRestoreOnClose(pendingAction !== null);
 
   // S2 finding #7 — reason_tag is mandatory on YELLOW/RED Approve/Reject
   // when the consumer supplies the tag vocabulary. GREEN keeps the
@@ -486,8 +494,16 @@ export function ActionButtonMatrix({
           {reasonTagRequired && availableReasonTags && (
             <label className="flex flex-col gap-4 text-caption text-text-secondary">
               <span>
-                Reason category{" "}
-                <span aria-hidden className="text-text-quaternary">
+                Reason category
+                {/* S3 finding #G — visible required indicator. The
+                    Select already declares `aria-required="true"`
+                    but operators with low vision missed the
+                    requirement until they tried to submit. The
+                    asterisk is hidden from the screen reader so
+                    the existing aria-required + the (mandatory)
+                    parenthetical remain the SR sources of truth. */}
+                <span aria-hidden className="text-error ml-2">*</span>
+                <span aria-hidden className="text-text-quaternary ml-4">
                   ({verdict} verdict — mandatory)
                 </span>
               </span>
