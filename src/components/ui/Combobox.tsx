@@ -42,6 +42,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
+import { flushSync } from "react-dom";
 import { ChevronDown, Check, Search } from "lucide-react";
 import { Command } from "cmdk";
 
@@ -149,8 +150,19 @@ export const Combobox = forwardRef<HTMLButtonElement, ComboboxProps>(
 
     const pick = useCallback(
       (next: string) => {
-        onChange(next);
-        setOpen(false);
+        // S2 #6 follow-up — `flushSync` is required here because
+        // cmdk's `Command.Item.onSelect` runs inside cmdk's own
+        // state update, which React batches with the Combobox's
+        // setOpen/setFilter calls. Under Radix Dialog's pointer-
+        // event lock the batch can survive past the next click —
+        // Playwright (and a fast real user) sees the popover still
+        // open and the click intended for the NEXT element gets
+        // intercepted by an option row. Forcing a synchronous
+        // commit closes the popover before any subsequent input.
+        flushSync(() => {
+          onChange(next);
+          setOpen(false);
+        });
         setFilter("");
       },
       [onChange],
@@ -163,7 +175,19 @@ export const Combobox = forwardRef<HTMLButtonElement, ComboboxProps>(
           key={item.value}
           value={item.label}
           data-value={item.value}
+          // Belt-and-suspenders: cmdk's `onSelect` fires reliably on
+          // Enter but in our Radix-Dialog-wrapped context the click
+          // path was leaving the popover open (snapshot confirmed
+          // `aria-expanded=true` survived past the click). `onMouseDown`
+          // with `preventDefault` runs synchronously before the click
+          // chain and before the focus shifts off the option — pick()
+          // commits onChange + setOpen(false) immediately so the
+          // popover unmounts before any subsequent input lands.
           onSelect={() => pick(item.value)}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            pick(item.value);
+          }}
           className={cn(
             "flex items-center gap-8 px-8 py-6 rounded-sm cursor-pointer",
             "text-caption text-text-primary",
