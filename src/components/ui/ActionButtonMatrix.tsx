@@ -263,6 +263,29 @@ export function ActionButtonMatrix({
     return actionInFlight === key ? `${inProgress}…` : base;
   }
 
+  // S2 sprint 2026-05-28 finding #13 — underlined access keys.
+  //
+  // Each ribbon button gets a small kbd-styled hint reinforcing the
+  // S2-#3 hotkey letter. We do NOT underline the first letter of
+  // the visible label because recipe-driven labels ("Block and
+  // notify") don't start with the hotkey letter — that would be a
+  // confusion bug, not a discoverability cue. A kbd suffix is
+  // recipe-agnostic and tracks the hotkey 1:1.
+  //
+  // `aria-hidden` keeps the screen-reader announcement clean — the
+  // hotkey is already on `aria-keyshortcuts` (S2 #4) so SR users
+  // don't need a double-announce.
+  function HotkeyHint({ letter }: { letter: string }) {
+    return (
+      <kbd
+        aria-hidden
+        className="ml-6 px-4 py-px font-mono text-label text-text-tertiary bg-surface-secondary border border-border-subtle rounded-sm"
+      >
+        {letter}
+      </kbd>
+    );
+  }
+
   return (
     <div className={cn("flex flex-col gap-8", className)}>
       {/* YELLOW caption — non-obvious side effect for the recommended
@@ -284,6 +307,7 @@ export function ActionButtonMatrix({
                 aria-label="Send for triage"
               >
                 {visibleLabel("Escalate", "Escalating", "escalate")}
+                <HotkeyHint letter="E" />
               </Button>
             )
           ) : (
@@ -311,6 +335,7 @@ export function ActionButtonMatrix({
                       }
                     >
                       {visibleLabel(primaryLabel, primaryInProgress, "approve")}
+                      <HotkeyHint letter="A" />
                     </Button>
                   )}
                   {onReject && effectiveCanApprove && (
@@ -322,6 +347,7 @@ export function ActionButtonMatrix({
                       aria-label={action ? secondaryLabel : "Reject recommendation"}
                     >
                       {visibleLabel(secondaryLabel, secondaryInProgress, "reject")}
+                      <HotkeyHint letter="R" />
                     </Button>
                   )}
                   {onOverride && effectiveCanOverride && (
@@ -334,6 +360,7 @@ export function ActionButtonMatrix({
                       title="Choose different action"
                     >
                       {actionInFlight === "override" ? "Overriding…" : "Override…"}
+                      <HotkeyHint letter="O" />
                     </Button>
                   )}
                   {onEscalate && effectiveCanEscalate && (
@@ -345,6 +372,7 @@ export function ActionButtonMatrix({
                       aria-label="Send for triage"
                     >
                       {visibleLabel("Escalate", "Escalating", "escalate")}
+                      <HotkeyHint letter="E" />
                     </Button>
                   )}
                 </>
@@ -361,6 +389,7 @@ export function ActionButtonMatrix({
                       title="Choose different action"
                     >
                       {actionInFlight === "override" ? "Overriding…" : "Override…"}
+                      <HotkeyHint letter="O" />
                     </Button>
                   )}
                   {onEscalate && effectiveCanEscalate && (
@@ -372,6 +401,7 @@ export function ActionButtonMatrix({
                       aria-label="Send for triage"
                     >
                       {visibleLabel("Escalate", "Escalating", "escalate")}
+                      <HotkeyHint letter="E" />
                     </Button>
                   )}
                 </>
@@ -386,6 +416,7 @@ export function ActionButtonMatrix({
                   title="Choose different action"
                 >
                   {actionInFlight === "override" ? "Overriding…" : "Override…"}
+                  <HotkeyHint letter="O" />
                 </Button>
               )}
             </>
@@ -404,6 +435,7 @@ export function ActionButtonMatrix({
               <span className="ml-1 font-mono opacity-60">
                 {reanalyzeAttempts}/{reanalyzeMax}
               </span>
+              <HotkeyHint letter="Y" />
             </Button>
           )}
         </div>

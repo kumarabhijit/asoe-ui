@@ -124,10 +124,15 @@ test.describe("mock-mode HITL actions", () => {
     await expect(
       page.getByText(new RegExp(`exception ${APPROVE_RECORD} approved`, "i")).first(),
     ).toBeVisible({ timeout: 10_000 });
-    await expect(
-      workspace(page).getByText(/^resolved$/i).first(),
-      "case header must re-project to Resolved after Approve",
-    ).toBeVisible({ timeout: 10_000 });
+    // S2 sprint 2026-05-28 finding #11 — next-case auto-advance.
+    // After the action completes the workspace moves to the next
+    // case in the SLA-sorted queue; the URL no longer references
+    // the case we just acted on. The success toast above is the
+    // post-condition for the action itself; this assertion is the
+    // post-condition for the advance.
+    await expect
+      .poll(() => page.url(), { timeout: 10_000 })
+      .not.toContain(`case=${APPROVE_CASE}`);
   });
 
   test("an Override survives a full page reload on /home (reload resilience)", async ({
@@ -173,9 +178,13 @@ test.describe("mock-mode HITL actions", () => {
     await dialog.getByLabel(/notes/i).fill("mock e2e — drive to resolved");
     await dialog.getByRole("button", { name: /confirm override/i }).click();
     await expect(dialog).toBeHidden({ timeout: 10_000 });
-    await expect(
-      workspace(page).getByText(/^resolved$/i).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    // S2 #11 — auto-advance: URL flips off OVERRIDE_CASE after the
+    // override completes. The reload-resilience check below (the
+    // tile count drop on /home) is the surviving post-condition for
+    // the override mutation itself.
+    await expect
+      .poll(() => page.url(), { timeout: 10_000 })
+      .not.toContain(`case=${OVERRIDE_CASE}`);
 
     // Soft-nav to /home: count drops by one.
     await page.getByRole("link", { name: /^home$/i }).first().click();

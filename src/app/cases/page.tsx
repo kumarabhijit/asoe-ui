@@ -378,9 +378,40 @@ function CasesWorkspace() {
   }, [selectedCaseId]);
 
   const handleRecordActionComplete = useCallback(() => {
+    // S2 sprint 2026-05-28 finding #11 — next-case auto-advance.
+    //
+    // Snapshot the next case in the VISIBLE queue BEFORE the
+    // post-action refresh so the operator advances to the case
+    // they would have picked next, even when the resolved record
+    // filters out post-mutation and shifts every index. Pinning
+    // (the row stays in place when an agent mutation excludes it
+    // from the filter) is irrelevant here — we're using the
+    // operator's pre-action mental order, not the post-state.
+    //
+    // If the operator was on the last visible case there is no
+    // next pick; we leave the URL alone and the case projects
+    // Resolved chrome. The operator can hit ArrowUp / k to walk
+    // back into the queue.
+    //
+    // Reanalyze deliberately follows the same path: the new
+    // analysis takes seconds to come back via WebSocket, and the
+    // operator can review another case while it computes. They
+    // can navigate back via the queue if they want to wait on the
+    // same case.
+    const idx = cases.findIndex((c) => c.case_.case_id === selectedCaseId);
+    const next =
+      idx >= 0 && idx + 1 < cases.length ? cases[idx + 1].case_ : null;
+
     refetch();
     void refreshCaseDetail();
-  }, [refetch, refreshCaseDetail]);
+
+    if (next) {
+      router.replace(
+        `/cases?case=${encodeURIComponent(next.case_id)}`,
+        { scroll: false },
+      );
+    }
+  }, [refetch, refreshCaseDetail, cases, selectedCaseId, router]);
 
   /* ── URL writes ─────────────────────────────────────────────── */
   // `scroll: false` on every router.replace below — selection is an
