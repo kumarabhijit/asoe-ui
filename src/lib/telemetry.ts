@@ -78,6 +78,39 @@ export function reportTimeToFirstAction(
   void _post("/api/v1/metrics/cases/time-to-first-action", report);
 }
 
+export interface TimeToActionSubmitReport {
+  case_id: string;
+  /** Milliseconds from case-detail mount to the moment the
+   *  confirmAction handler fires — i.e. AFTER the operator typed
+   *  any comment, picked any required reason_tag, and clicked
+   *  Confirm (or pressed Cmd+Enter). Distinct from
+   *  `time-to-first-action` which is the FIRST button click; the
+   *  delta between the two metrics is the operator's
+   *  comment-dialog dwell. */
+  dwell_ms: number;
+  /** Which action the operator actually submitted — restricted to
+   *  the comment-dialog set. Override / Escalate are one-step
+   *  actions and report through their existing channels. */
+  action: "approve" | "reject" | "reanalyze";
+  /** The reason_tag the operator picked, when the YELLOW/RED
+   *  mandatory-tag gate (S2 #7) was active. Undefined for GREEN
+   *  Approves and for Reanalyze (which never had a tag). Lets
+   *  the calibration team join action submits to categorical
+   *  rationale. */
+  reason_tag?: string;
+}
+
+/** Fire when the operator confirms an action (post comment + tag
+ *  pick). Called from `ActionButtonMatrix.confirmAction` via the
+ *  parent telemetry wrapper. S2 sprint 2026-05-28 finding #8 —
+ *  this is the canonical end-to-end CSA-time metric the dashboard
+ *  rolls up to P50/P90. */
+export function reportTimeToActionSubmit(
+  report: TimeToActionSubmitReport,
+): void {
+  void _post("/api/v1/metrics/cases/time-to-action-submit", report);
+}
+
 export interface AnalysisScrollDepthReport {
   case_id: string;
   /** Maximum scroll depth observed on the Agent Analysis section

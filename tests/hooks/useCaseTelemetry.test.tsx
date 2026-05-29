@@ -20,17 +20,21 @@ import { useCaseTelemetry } from "@/hooks/useCaseTelemetry";
 
 const reportTimeToFirstAction = vi.fn();
 const reportAnalysisScrollDepth = vi.fn();
+const reportTimeToActionSubmit = vi.fn();
 
 vi.mock("@/lib/telemetry", () => ({
   reportTimeToFirstAction: (...args: unknown[]) =>
     reportTimeToFirstAction(...args),
   reportAnalysisScrollDepth: (...args: unknown[]) =>
     reportAnalysisScrollDepth(...args),
+  reportTimeToActionSubmit: (...args: unknown[]) =>
+    reportTimeToActionSubmit(...args),
 }));
 
 beforeEach(() => {
   reportTimeToFirstAction.mockReset();
   reportAnalysisScrollDepth.mockReset();
+  reportTimeToActionSubmit.mockReset();
 });
 
 afterEach(() => {
@@ -169,5 +173,59 @@ describe("useCaseTelemetry — trackAnalysisScroll + unmount report", () => {
     expect(
       reportAnalysisScrollDepth.mock.calls[1][0].max_scroll_pct,
     ).toBeCloseTo(0.8);
+  });
+});
+
+
+/* ── S2 sprint 2026-05-28 #8 — time-to-action-submit lock ────── */
+
+describe("useCaseTelemetry — markActionSubmit (S2 #8)", () => {
+  it("fires reportTimeToActionSubmit with action + reason_tag", () => {
+    const { result } = renderHook(() => useCaseTelemetry("case-S2-8"));
+    act(() =>
+      result.current.markActionSubmit("approve", "CUSTOMER_REQUEST"),
+    );
+    expect(reportTimeToActionSubmit).toHaveBeenCalledTimes(1);
+    const report = reportTimeToActionSubmit.mock.calls[0][0];
+    expect(report.case_id).toBe("case-S2-8");
+    expect(report.action).toBe("approve");
+    expect(report.reason_tag).toBe("CUSTOMER_REQUEST");
+    expect(typeof report.dwell_ms).toBe("number");
+    expect(report.dwell_ms).toBeGreaterThanOrEqual(0);
+  });
+
+  it("omits reason_tag for actions that have none (GREEN Approve, Reanalyze)", () => {
+    const { result } = renderHook(() => useCaseTelemetry("case-no-tag"));
+    act(() => result.current.markActionSubmit("reanalyze"));
+    expect(reportTimeToActionSubmit).toHaveBeenCalledTimes(1);
+    const report = reportTimeToActionSubmit.mock.calls[0][0];
+    expect(report.reason_tag).toBeUndefined();
+  });
+
+  it("is NOT idempotent — a reanalyze + re-approve on the same case fires twice", () => {
+    // Distinct from markFirstAction which is a one-shot per case.
+    // The submit metric is per-action by design so a reanalyze loop
+    // produces multiple measurement windows.
+    const { result } = renderHook(() => useCaseTelemetry("case-loop"));
+    act(() => result.current.markActionSubmit("reanalyze"));
+    act(() => result.current.markActionSubmit("approve", "OTHER"));
+    expect(reportTimeToActionSubmit).toHaveBeenCalledTimes(2);
+    expect(reportTimeToActionSubmit.mock.calls[0][0].action).toBe("reanalyze");
+    expect(reportTimeToActionSubmit.mock.calls[1][0].action).toBe("approve");
+  });
+
+  it("is a no-op when case_id is undefined (flag-off pattern)", () => {
+    const { result } = renderHook(() => useCaseTelemetry(undefined));
+    act(() => result.current.markActionSubmit("approve", "OTHER"));
+    expect(reportTimeToActionSubmit).not.toHaveBeenCalled();
+  });
+
+  it("marks acted=true so the unmount scroll report carries it", () => {
+    const { result, unmount } = renderHook(() => useCaseTelemetry("case-acted"));
+    act(() => result.current.trackAnalysisScroll(0.4));
+    act(() => result.current.markActionSubmit("approve", "CUSTOMER_REQUEST"));
+    unmount();
+    expect(reportAnalysisScrollDepth).toHaveBeenCalledTimes(1);
+    expect(reportAnalysisScrollDepth.mock.calls[0][0].acted).toBe(true);
   });
 });
