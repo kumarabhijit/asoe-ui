@@ -1364,3 +1364,41 @@ Cross-repo source-of-truth status table lives at the top of that file.
 - [x] **PARITY-3a** Frontend NextAuth dual-provider scaffold — `src/lib/auth.ts` mounts both `CredentialsProvider` and the `azure-ad` provider unconditionally (NextAuth freezes the provider list at startup); `src/auth/azure-ad.ts` reads `ASOE_CLIENT_ID/SECRET/TENANT_ID`; `src/components/ui/PreprodIdentityBanner.tsx` non-dismissable identity strip when `ASOE_AUTH_MODE !== "seed"`; `src/middleware.ts` three-branch failure (token-missing → /login, token-invalid → /login?reason=session_expired, no-role → /403); `/403` page; `docs/testing/auth-modes.md` matrix.
 - [x] **PARITY-3a follow-up** Playwright entra-mode fixture — `tests/browser/_entra-fixture.ts::createEntraSession` mints the NextAuth session cookie directly with `authMode: "entra"`. Direct-cookie approach (not full OAuth stub) documented inline + in `docs/testing/auth-modes.md`. `tests/browser/entra-mode.spec.ts` reference spec exercises the session shape, banner, and no-role → /403 branch. `tests/architectural/entra_fixture_shape.test.ts` locks the fixture↔auth.ts shape parity AND the NEXTAUTH_SECRET pin between fixture + `playwright.config.ts`.
 - [x] **PARITY-0.5 / PARITY-8 UI** Tenant-facing erasure-certificate download — `src/components/ui/ErasureCertificateButton.tsx` wraps `GET /api/v1/attachments/{id}/erasure-certificate` (manager+admin, tenant-scoped on the backend); packages the PII-free tombstone + hash-chain proof as a JSON Blob with a regulator-correlable filename. `AttachmentErasureCertificate` TS interface in `src/lib/api.ts`. Mock-mode synthesises a deterministic shape (no `content`, no `name`).
+
+## 17. All Cases UX sprint (S1 → S2 → S3, asoe-ui #208–#212, merged 2026-05-28 → 2026-05-29)
+
+Virtual UX panel review across four sessions. Panel composition + per-session punch lists logged in session transcripts. Drift register entries D38 / D39 / D40 (`ui_architecture.md` §9). Per-session DESIGN.md updates on `/cases` workspace section.
+
+### 17.1 S1 — Redundancy & Density audit (PR #208)
+
+- [x] **`embedded` prop** on `ExceptionDetailPanel` / `HeaderRibbon` / `ContextStrip` — drops duplicated case-level chrome (breadcrumb, Audit Result badge, Customer row) when the panel mounts inside `CaseDetailPanel`. Standalone `/exceptions/[id]` keeps full chrome.
+- [x] **Full-header `<dl>` grid trimmed** from six fields to two (Opened + Sales order). Removed: `SLA deadline · {sla.label}` (the literal label was concatenated into its own label), Customer PO (slim-header carries it), Customer (breadcrumb carries it), Skill bundle at open (dev metadata, not operator info).
+- [x] **`h1` demoted** from `text-display` → `text-heading` (case-id was rendered three times: queue row + slim header + h1).
+- [x] **Origin + source_channel collapsed** into one badge (`Customer Inbox · Email` instead of two adjacent chips).
+- [x] **Multi-record auto-mount deferred** — single-record still auto-mounts; multi-record requires explicit pick so the `RecordListPane` gets the first beat of attention.
+- [x] **`SectionAnchorBar`** — sticky in-pane nav with Recommendation / Evidence / Diagnostics anchors between `ContextStrip` and the action ribbon.
+- [x] **Slim-header disclosure `aria-expanded`** bound to state (previously hardcoded `false` — ARIA contract violation when full header was expanded).
+- [x] **Source lock** — `tests/architectural/s1_redundancy_audit_locks.test.ts` pins the embedded-prop wiring + grid-field absences + anchor-bar mount.
+
+### 17.2 S2 — Time-to-action teardown (PRs #209, #210, #211)
+
+- [x] **Ribbon hotkeys** (Tier 1 #3) — `A` Approve / `R` Reject / `O` Override… / `E` Escalate / `Y` Re-analyze. New `useHotkeys` hook in `src/hooks/useHotkeys.ts`; single registry at `src/lib/hotkeys.ts`. Bindings gated by same predicates as visible buttons.
+- [x] **`?` cheatsheet** (Tier 1 #5) — new `HotkeyCheatsheet` mounted on `/cases`. Renders every registry binding grouped by scope.
+- [x] **`⌘+Enter` discoverability** (Tier 1 #4) — placeholder copy advertises the submit shortcut; Confirm button declares `aria-keyshortcuts="Meta+Enter"`.
+- [x] **Mandatory `reason_tag` on YELLOW/RED Approve/Reject** (Tier 1 #7, panel "Option 1") — comment swap renders a tag picker above the textarea; `Confirm` disabled until tag picked; `⌘+Enter` cannot bypass. Vocabulary from `useHealth` (Guardrail #2). Backend already accepted `reason_tag` on disposition — no contract change.
+- [x] **Comment-dialog aria-live** (Tier 2 #10) — every open variant carries `aria-live="polite"` + deterministic `aria-label` (incl. the optional-comment GREEN variant that previously announced nothing).
+- [x] **End-to-end CSA-time telemetry** (Tier 2 #8) — new `reportTimeToActionSubmit` + `markActionSubmit` distinct from existing `time-to-first-action`. Carries `reason_tag` for calibration joins.
+- [x] **Next-case auto-advance** (Tier 3 #11) — `handleRecordActionComplete` on `/cases/page.tsx` flips URL to next case in visible queue; snapshotted before refetch so resolved-case-filter-out doesn't shift the operator's pick.
+- [x] **Hotkey hints on ribbon buttons** (Tier 3 #13) — small aria-hidden `<kbd>` suffix on every visible ribbon button reinforces the binding letter.
+- [x] **Combobox typeahead in `OverrideChooserDialog`** (follow-up #6) — both native `<select>`s swapped for a new cmdk-backed `Combobox` primitive. Cluster grouping (ADR-033 §D) preserved via the new `groups` prop. New `cmdk@^1.1.1` dependency. `jsdom` `ResizeObserver` stub added.
+- [ ] **Undo-toast debounce** (Tier 3 #12) — dropped after re-examination. Math was upside-down: 60 cases/shift × 5s = ~5 min dead wait/shift against ~1% misclick rate. Real undo needs a backend reversal endpoint (separate project).
+- [x] **Source locks** — `s2_hotkey_registry_lock`, `s2_tier3_audit_locks`, `s2_combobox_swap_lock` in `tests/architectural/`.
+
+### 17.3 S3 — Accessibility hardening (PR #212)
+
+- [x] **SLA band-transition announcer** (Tier 1 #B, WCAG 4.1.3) — new `SlaBandAnnouncer` mounted on the selected case in `CaseDetailPanel`. Sr-only `aria-live="polite"` region; emits ONE line when band crosses (`comfortable → at_risk → breached`, or recovery back). Silent on per-minute label ticks and case-switch re-baselines.
+- [x] **Focus restore on custom-dialog close** (Tier 1 #C, WCAG 2.4.3) — new `useFocusRestoreOnClose` hook captures `activeElement` during the closed→open render (effect time is too late — `autoFocus` has stolen focus) and restores via `requestAnimationFrame` on close. Wired into `HotkeyCheatsheet` + `ActionButtonMatrix` comment swap. Radix Dialog handles `OverrideChooserDialog` automatically.
+- [x] **`aria-live="off"` on `Last activity` spans** (Tier 2 #E) — per-minute ticker re-renders should not narrate "2 min ago" → "3 min ago".
+- [x] **Visible required asterisk on mandatory reason_tag label** (Tier 2 #G) — aria-hidden so the SR contract stays on `aria-required` + parenthetical.
+- [x] **Pre-existing pass at recon (no work needed):** `VerdictDot` already pairs colored dot + letter glyph + `aria-label`; `EvidenceBlock`'s "Context Not Required" placeholder already declares `role="note"` + aria-label.
+- [x] **Source lock** — `tests/architectural/s3_a11y_audit_locks.test.ts`.
