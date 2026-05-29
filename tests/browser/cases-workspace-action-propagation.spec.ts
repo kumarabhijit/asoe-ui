@@ -44,6 +44,7 @@ import {
   createPendingReviewException,
   loginAs,
   resetTenant,
+  selectComboboxOption,
 } from "./_helpers";
 
 test.describe.configure({ mode: "serial" });
@@ -131,9 +132,8 @@ test("disposition on the selected record re-projects status in BOTH the queue ro
   await page.getByRole("button", { name: /choose different action/i }).click();
   const dialog = page.getByRole("dialog", { name: /override resolution/i });
   await expect(dialog).toBeVisible({ timeout: 5_000 });
-  await dialog.getByLabel(/^resolution action$/i).selectOption("ALLOW_BOTH");
-  await dialog.getByLabel(/^override reason category$/i)
-    .selectOption("BAND_REVIEW_OVERRIDDEN");
+  await selectComboboxOption(dialog, /^resolution action$/i, "ALLOW_BOTH");
+  await selectComboboxOption(dialog, /^override reason category$/i, "BAND_REVIEW_OVERRIDDEN");
   await dialog.getByLabel(/^override notes$/i)
     .fill("propagation e2e — drive to RESOLVED");
   await dialog.getByRole("button", { name: /confirm override/i }).click();

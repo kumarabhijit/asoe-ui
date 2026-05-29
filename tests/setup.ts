@@ -56,6 +56,28 @@ if (
   };
 }
 
+// jsdom does not implement ResizeObserver. cmdk's Command primitive
+// (S2 sprint follow-up #6 — Combobox in OverrideChooserDialog) uses
+// a ResizeObserver internally to measure its list height. Stub it
+// with a no-op implementation matching the DOM contract so
+// component tests can mount Combobox cleanly. Real browsers (the
+// playwright e2e suites) implement the API natively.
+if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
+  class NoopResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  Object.defineProperty(window, "ResizeObserver", {
+    writable: true,
+    value: NoopResizeObserver,
+  });
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    writable: true,
+    value: NoopResizeObserver,
+  });
+}
+
 // next-auth's client logger POSTs to `/api/auth/_log` on every
 // session event. The URL is relative, so undici's URL parser
 // throws `ERR_INVALID_URL` — surfaced by vitest as "Unhandled

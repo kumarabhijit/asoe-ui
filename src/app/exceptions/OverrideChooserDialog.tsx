@@ -28,7 +28,14 @@
  */
 "use client";
 
+import { useMemo } from "react";
+
 import { Button } from "@/components/ui/Button";
+import {
+  Combobox,
+  type ComboboxGroup,
+  type ComboboxItem,
+} from "@/components/ui/Combobox";
 import {
   Dialog,
   DialogContent,
@@ -112,6 +119,39 @@ export function OverrideChooserDialog({
   const clusters = clustersForIntent(intent);
   const allowedSet = new Set(allowedReasonTags);
 
+  // S2 sprint follow-up #6 — shape the live vocabularies into the
+  // Combobox primitive's contracts. `actionItems` is the flat
+  // resolution-action list; `reasonGroups` is the per-intent
+  // cluster grouping (empty groups skipped) when a mapping exists,
+  // otherwise we pass a flat `reasonItems` list. The label
+  // transformation (`replace(/_/g, " ")`) mirrors the legacy
+  // `<option>` render so the operator sees the same text.
+  const actionItems = useMemo<ComboboxItem[]>(
+    () =>
+      allowedActions.map((a) => ({ value: a, label: a.replace(/_/g, " ") })),
+    [allowedActions],
+  );
+  const reasonGroups = useMemo<ComboboxGroup[] | null>(() => {
+    if (!clusters) return null;
+    const groups: ComboboxGroup[] = [];
+    for (const cluster of clusters) {
+      const items = cluster.codes
+        .filter((code) => allowedSet.has(code))
+        .map((code) => ({ value: code, label: code.replace(/_/g, " ") }));
+      if (items.length > 0) {
+        groups.push({ heading: cluster.label, items });
+      }
+    }
+    return groups;
+  }, [clusters, allowedSet]);
+  const reasonItems = useMemo<ComboboxItem[] | null>(() => {
+    if (clusters) return null;
+    return allowedReasonTags.map((t) => ({
+      value: t,
+      label: t.replace(/_/g, " "),
+    }));
+  }, [clusters, allowedReasonTags]);
+
   // Notes are required only when the reason is `OTHER`/`other` per
   // ADR-033 §D.3. When no reason is selected yet, treat as required so
   // the operator can't sneak past the gate by skipping the dropdown.
@@ -134,54 +174,32 @@ export function OverrideChooserDialog({
         <div className="flex flex-col gap-12">
           <label className="flex flex-col gap-4 text-caption text-text-secondary">
             Action
-            <select
+            {/* S2 sprint follow-up #6 — typeahead Combobox replaces
+                the native dropdown. Keyboard contract (Arrow / Enter
+                / Esc) comes from cmdk; the trigger preserves the same
+                32px row height and aria-label so consumers don't
+                shift visually. Vocabularies still flow as runtime
+                props (Guardrail #2). */}
+            <Combobox
               value={action}
-              onChange={(e) => onActionChange(e.target.value)}
-              aria-label="Resolution action"
-              className="h-[32px] w-full rounded-md border border-border bg-surface-primary px-8 text-caption font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
-            >
-              <option value="">Select an action…</option>
-              {allowedActions.map((a) => (
-                <option key={a} value={a}>{a.replace(/_/g, " ")}</option>
-              ))}
-            </select>
+              onChange={onActionChange}
+              items={actionItems}
+              ariaLabel="Resolution action"
+              placeholder="Select an action…"
+              filterPlaceholder="Filter actions…"
+            />
           </label>
           <label className="flex flex-col gap-4 text-caption text-text-secondary">
             Reason category
-            <select
+            <Combobox
               value={reasonTag}
-              onChange={(e) => onReasonTagChange(e.target.value)}
-              aria-label="Override reason category"
-              className="h-[32px] w-full rounded-md border border-border bg-surface-primary px-8 text-caption font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
-            >
-              <option value="">Select a reason…</option>
-              {clusters
-                ? clusters.map((cluster) => {
-                    // Intersect cluster codes with the live per-intent
-                    // vocabulary so a stale UI-side mapping never leaks
-                    // an unsupported code into the dropdown. Skip empty
-                    // groups so the dialog doesn't render a label with
-                    // no options under it.
-                    const codes = cluster.codes.filter((code) =>
-                      allowedSet.has(code),
-                    );
-                    if (codes.length === 0) return null;
-                    return (
-                      <optgroup key={cluster.label} label={cluster.label}>
-                        {codes.map((code) => (
-                          <option key={code} value={code}>
-                            {code.replace(/_/g, " ")}
-                          </option>
-                        ))}
-                      </optgroup>
-                    );
-                  })
-                : allowedReasonTags.map((t) => (
-                    <option key={t} value={t}>
-                      {t.replace(/_/g, " ")}
-                    </option>
-                  ))}
-            </select>
+              onChange={onReasonTagChange}
+              items={reasonItems ?? undefined}
+              groups={reasonGroups ?? undefined}
+              ariaLabel="Override reason category"
+              placeholder="Select a reason…"
+              filterPlaceholder="Filter reasons…"
+            />
           </label>
           <label className="flex flex-col gap-4 text-caption text-text-secondary">
             Notes {notesRequired ? "(required)" : "(optional)"}

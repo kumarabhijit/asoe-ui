@@ -166,15 +166,17 @@ test.describe("mock-mode HITL actions", () => {
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: 8_000 });
-    // Pick the first real option in each select (index 0 is the
-    // "Select…" placeholder). Sourcing values dynamically keeps the
-    // spec free of hardcoded enum literals (Guardrail #2).
-    const actionSel = dialog.getByLabel(/resolution action/i);
-    const actionVal = await actionSel.locator("option").nth(1).getAttribute("value");
-    await actionSel.selectOption(actionVal);
-    const reasonSel = dialog.getByLabel(/reason categor/i);
-    const reasonVal = await reasonSel.locator("option").nth(1).getAttribute("value");
-    await reasonSel.selectOption(reasonVal);
+    // S2 follow-up #6 — the native `<select>`s for action + reason
+    // are now typeahead Comboboxes. Pick the first available option
+    // from each by opening the combobox and clicking the first
+    // `role="option"`. Sourcing values dynamically keeps the spec
+    // free of hardcoded enum literals (Guardrail #2).
+    await dialog.getByRole("combobox", { name: /resolution action/i }).click();
+    await dialog.getByRole("option").first().click();
+    await dialog
+      .getByRole("combobox", { name: /override reason category/i })
+      .click();
+    await dialog.getByRole("option").first().click();
     await dialog.getByLabel(/notes/i).fill("mock e2e — drive to resolved");
     await dialog.getByRole("button", { name: /confirm override/i }).click();
     await expect(dialog).toBeHidden({ timeout: 10_000 });
