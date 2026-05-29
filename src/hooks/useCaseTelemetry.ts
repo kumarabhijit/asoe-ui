@@ -25,7 +25,9 @@ import { useCallback, useEffect, useRef } from "react";
 import {
   reportAnalysisScrollDepth,
   reportTimeToFirstAction,
+  reportTimeToActionSubmit,
   type TimeToFirstActionReport,
+  type TimeToActionSubmitReport,
 } from "@/lib/telemetry";
 
 export interface UseCaseTelemetryApi {
@@ -33,6 +35,17 @@ export interface UseCaseTelemetryApi {
    *  Idempotent — subsequent calls are no-ops until the next
    *  case-open cycle. */
   markFirstAction: (action: TimeToFirstActionReport["first_action"]) => void;
+  /** S2 finding #8 — fire when the operator confirms an action
+   *  (post comment + reason_tag pick). Distinct from
+   *  `markFirstAction`: that one measures time-to-decide, this one
+   *  measures end-to-end CSA time. Idempotent per case-open cycle
+   *  for the SAME action; a subsequent reanalyze + re-approve on
+   *  the same case-open is allowed to fire again because the
+   *  measurement window is the action, not the case. */
+  markActionSubmit: (
+    action: TimeToActionSubmitReport["action"],
+    reasonTag?: string,
+  ) => void;
   /** Call from the Agent Analysis section's scroll handler with
    *  the current scroll fraction (0..1). The hook keeps the max
    *  observed value and reports it on unmount. */
@@ -92,6 +105,24 @@ export function useCaseTelemetry(caseId: string | undefined): UseCaseTelemetryAp
     [],
   );
 
+  const markActionSubmit = useCallback(
+    (action: TimeToActionSubmitReport["action"], reasonTag?: string) => {
+      if (mountedAtRef.current === null) return;
+      if (!trackedCaseIdRef.current) return;
+      // Also marks "acted" so the analysis-scroll-depth cleanup
+      // reports the operator did follow through with a confirmation
+      // — distinct from the first-action mark which fires earlier.
+      actedRef.current = true;
+      reportTimeToActionSubmit({
+        case_id: trackedCaseIdRef.current,
+        dwell_ms: Math.round(performance.now() - mountedAtRef.current),
+        action,
+        reason_tag: reasonTag,
+      });
+    },
+    [],
+  );
+
   const trackAnalysisScroll = useCallback((pct: number) => {
     // Clamp to [0, 1] — guard against out-of-range observer
     // readings under animated scroll.
@@ -101,5 +132,5 @@ export function useCaseTelemetry(caseId: string | undefined): UseCaseTelemetryAp
     }
   }, []);
 
-  return { markFirstAction, trackAnalysisScroll };
+  return { markFirstAction, markActionSubmit, trackAnalysisScroll };
 }

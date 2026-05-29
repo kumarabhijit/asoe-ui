@@ -412,7 +412,11 @@ export function ActionButtonMatrix({
       {/* Comment input — reanalyze requires a non-empty reason (SOX).
           S2 #4 — Cmd+Enter discoverability hint in placeholder copy.
           S2 #7 — reason_tag Select rendered above the textarea on
-          YELLOW/RED Approve/Reject (mandatory; gates Confirm). */}
+          YELLOW/RED Approve/Reject (mandatory; gates Confirm).
+          S2 #10 — aria-live polite announcement on every open
+          variant so screen reader users hear the state shift the
+          moment the dialog mounts, including the optional-comment
+          GREEN variant which previously announced nothing. */}
       {pendingAction && (
         <div
           className="flex flex-col gap-8 p-12 bg-surface-secondary rounded-sm"
@@ -424,12 +428,15 @@ export function ActionButtonMatrix({
           aria-modal={
             pendingAction === "reanalyze" || reasonTagRequired ? true : undefined
           }
+          aria-live="polite"
           aria-label={
             pendingAction === "reanalyze"
               ? "Reanalyze reason required"
               : reasonTagRequired
                 ? `${pendingAction === "approve" ? "Approval" : "Rejection"} reason required`
-                : undefined
+                : pendingAction === "approve"
+                  ? "Approval comment — optional"
+                  : "Rejection comment — optional"
           }
         >
           <div className="flex items-center gap-6 text-caption font-semibold text-text-secondary">

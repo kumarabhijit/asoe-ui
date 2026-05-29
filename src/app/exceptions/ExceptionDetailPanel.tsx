@@ -267,20 +267,27 @@ export default function ExceptionDetailPanel({
   const telemetryCaseId = CASES_ROW_V2
     ? (detail?.parent_case_id ?? undefined)
     : undefined;
-  const { markFirstAction, trackAnalysisScroll } = useCaseTelemetry(
-    telemetryCaseId,
-  );
+  const { markFirstAction, markActionSubmit, trackAnalysisScroll } =
+    useCaseTelemetry(telemetryCaseId);
 
   // S2 finding #7 (sprint 2026-05-28) — propagate the operator-picked
   // reason_tag (YELLOW/RED Approve/Reject) through the telemetry
   // wrapper into the action hook. Undefined preserves the GREEN
   // auto-pick path.
+  //
+  // S2 finding #8 (sprint 2026-05-28) — fire the end-to-end CSA-time
+  // metric alongside the legacy first-action metric. Both fire from
+  // the same confirm callback today; the new metric carries
+  // reason_tag for calibration joins, the legacy one stays for
+  // backward-compat dashboards.
   const handleApproveWithTelemetry = (comment: string, reasonTagOverride?: string) => {
     markFirstAction("approve");
+    markActionSubmit("approve", reasonTagOverride);
     handleApprove(comment, reasonTagOverride);
   };
   const handleRejectWithTelemetry = (comment: string, reasonTagOverride?: string) => {
     markFirstAction("reject");
+    markActionSubmit("reject", reasonTagOverride);
     handleReject(comment, reasonTagOverride);
   };
   const handleEscalateWithTelemetry = () => {
@@ -293,6 +300,7 @@ export default function ExceptionDetailPanel({
   };
   const handleReanalyzeWithTelemetry = (reason: string) => {
     markFirstAction("reanalyze");
+    markActionSubmit("reanalyze");
     handleReanalyze(reason);
   };
 

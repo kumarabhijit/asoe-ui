@@ -477,3 +477,69 @@ describe("ActionButtonMatrix — S2 #4 Cmd+Enter discoverability", () => {
     ).toHaveAttribute("aria-keyshortcuts", "Meta+Enter");
   });
 });
+
+
+describe("ActionButtonMatrix — S2 #10 aria-live on comment dialog", () => {
+  it("optional-comment variant (no tag picker) carries an explicit aria-label and aria-live=polite", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        canApprove
+        // No availableReasonTags = optional-comment path (no
+        // mandatory tag gate). Pre-S2-#10 this branch had no
+        // aria-label and no live announcement, so screen readers
+        // heard nothing when the dialog opened.
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /block and notify/i }));
+    const container = screen
+      .getByPlaceholderText(/add approval notes \(optional\)/i)
+      .closest("div[aria-live]");
+    expect(container, "comment dialog wrapper must declare aria-live").not.toBeNull();
+    expect(container).toHaveAttribute("aria-live", "polite");
+    expect(container).toHaveAttribute(
+      "aria-label",
+      expect.stringMatching(/approval comment/i),
+    );
+  });
+
+  it("mandatory-tag variant keeps role=dialog + aria-live=polite", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        canApprove
+        availableReasonTags={["A_TAG", "B_TAG"]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /block and notify/i }));
+    const dialog = screen.getByRole("dialog", { name: /approval reason required/i });
+    expect(dialog).toHaveAttribute("aria-live", "polite");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("Rejection optional-comment variant labels itself as a rejection", () => {
+    // No `recommendedAction` so the matrix uses the generic
+    // primary/secondary labels ("Approve" / "Reject") instead of
+    // a recipe-driven label like "Block and notify".
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        onApprove={onApprove}
+        onReject={onReject}
+        canApprove
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /reject/i }));
+    const container = screen
+      .getByRole("textbox")
+      .closest("div[aria-live]");
+    expect(container).toHaveAttribute(
+      "aria-label",
+      expect.stringMatching(/rejection comment/i),
+    );
+  });
+});
