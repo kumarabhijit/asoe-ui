@@ -13,22 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecordPreviewRail } from "@/app/cases/RecordPreviewRail";
 
 const orderAnalysisMock = vi.fn();
-const editDraftReplyMock = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   exceptionsApi: {
     orderAnalysis: (...args: unknown[]) => orderAnalysisMock(...args),
-    editDraftReply: (...args: unknown[]) => editDraftReplyMock(...args),
   },
-}));
-
-// The rail now gates the edit affordance on RBAC and toasts on save; both
-// hooks need providers it doesn't own in unit context, so stub them.
-vi.mock("@/hooks/useAuth", () => ({
-  useAuth: () => ({ hasPermission: () => true }),
-}));
-vi.mock("@/components/ui/Toast", () => ({
-  useToast: () => ({ addToast: vi.fn() }),
 }));
 
 beforeEach(() => {
@@ -196,7 +185,7 @@ describe("RecordPreviewRail — happy path", () => {
     expect(screen.getByText(/Re: Order increase/i)).toBeInTheDocument();
   });
 
-  it("offers Edit + Jump-to-source in the rail when permitted and a source email exists", async () => {
+  it("is read-only in the rail and links to the canonical editor in the detail", async () => {
     orderAnalysisMock.mockResolvedValue({
       diagnosis: "x",
       confidence: 80,
@@ -215,10 +204,12 @@ describe("RecordPreviewRail — happy path", () => {
     await waitFor(() =>
       expect(screen.getByRole("region", { name: /Draft reply preview/i })).toBeInTheDocument(),
     );
-    expect(screen.getByRole("button", { name: /edit draft/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /jump to source email/i })).toHaveAttribute(
+    // No inline editor in the rail (single canonical edit point in the detail).
+    expect(screen.queryByRole("button", { name: /edit draft/i })).not.toBeInTheDocument();
+    // Instead: a link to the detail's draft section.
+    expect(screen.getByRole("link", { name: /edit in record detail/i })).toHaveAttribute(
       "href",
-      "#section-source-email",
+      "#section-draft-reply",
     );
   });
 

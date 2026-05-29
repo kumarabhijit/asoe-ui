@@ -26,11 +26,9 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { exceptionsApi } from "@/lib/api";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/components/ui/Toast";
 import type { OrderAnalysis } from "@/types/exceptions";
 import { DraftReplySection } from "@/app/exceptions/DraftReplySection";
 
@@ -55,8 +53,6 @@ export function RecordPreviewRail({
   onContentfulChange,
 }: RecordPreviewRailProps) {
   const [analysis, setAnalysis] = useState<OrderAnalysis | null>(null);
-  const { hasPermission } = useAuth();
-  const { addToast } = useToast();
 
   useEffect(() => {
     if (!selectedRecordId) {
@@ -78,26 +74,6 @@ export function RecordPreviewRail({
       cancelled = true;
     };
   }, [selectedRecordId]);
-
-  // Operator edit from the rail (PO follow-on — edit parity with the main
-  // record detail). Still a projector: the write is delegated to
-  // editDraftReply (which appends an OPERATOR_EDIT revision); we then refetch
-  // so the rail shows the new revision. Errors propagate to the inline
-  // composer; the success toast fires only on a clean write.
-  const handleEditDraftReply = useCallback(
-    async (edit: { subject: string; body: string }) => {
-      if (!selectedRecordId) return;
-      await exceptionsApi.editDraftReply(selectedRecordId, {
-        subject: edit.subject,
-        body: edit.body,
-        notes: "Operator edited AI draft reply before send.",
-      });
-      const refreshed = await exceptionsApi.orderAnalysis(selectedRecordId);
-      setAnalysis(refreshed);
-      addToast("success", "Draft reply updated — new revision saved.");
-    },
-    [selectedRecordId, addToast],
-  );
 
   const draft = analysis?.draft_reply;
   const hasContent = draft != null;
@@ -123,15 +99,16 @@ export function RecordPreviewRail({
       <div className="text-label uppercase tracking-wider text-text-quaternary font-semibold mb-8">
         Draft reply
       </div>
-      {/* The "Jump to source email" link targets the Source Email section
-          in the sibling record detail (CaseDetailPanel) on the same xl
-          surface — useHashOpen expands + scrolls it. Only offered when the
-          record actually carries a source email. */}
+      {/* Read-only audit glance (UX/usability/a11y review verdict). Editing a
+          financially-relevant buyer reply has ONE canonical home — the record
+          detail. The rail shows the draft + its read-only version history and
+          links to that single editor (useHashOpen expands + scrolls the
+          detail's draft section). `regionLabel` disambiguates this landmark
+          from the detail's "AI draft reply" region for screen-reader users. */}
       <DraftReplySection
         data={draft}
-        sourceSectionId={analysis?.email_source ? "section-source-email" : undefined}
-        onSubmitEdit={handleEditDraftReply}
-        canEdit={hasPermission("exceptions:approve")}
+        regionLabel="AI draft reply — preview"
+        editInDetailHref="#section-draft-reply"
       />
     </section>
   );
