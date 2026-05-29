@@ -213,6 +213,18 @@ test.describe("/cases usability (mock mode)", () => {
     await page.goto(`/cases?case=${MULTI_RECORD_CASE}`);
     const detail = page.locator('section[aria-label="Case workspace"]');
     await expect(detail).toBeVisible({ timeout: 30_000 });
+    // S1 finding #9 (2026-05-28) — multi-record cases no longer
+    // auto-mount the first record's panel. The picker is the first
+    // beat; the operator must commit a selection before the inline
+    // ExceptionDetailPanel (and its Agent Recommendation card) renders.
+    // Pick the first row so the rest of this test continues to
+    // exercise a real detail-pane scroll.
+    const recordPicker = page
+      .getByRole("radiogroup", { name: /select a record/i })
+      .first();
+    await expect(recordPicker).toBeVisible({ timeout: 30_000 });
+    await recordPicker.locator('[role="radio"]').first().click();
+    await page.waitForURL(/record=/, { timeout: 20_000 });
     // Let the detail content render so the pane actually overflows.
     await expect(
       detail.getByText(/Agent Recommendation/i).first(),

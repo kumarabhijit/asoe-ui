@@ -103,6 +103,16 @@ interface ExceptionDetailPanelProps {
     reason: string;
     triggeredBy: string;
   } | null;
+  /**
+   * S1 findings #1, #5, #7, #8 — when this panel is mounted inside
+   * `CaseDetailPanel` on the /cases workspace, the case-level chrome
+   * already surfaces customer, case id, status, SLA, and compliance
+   * verdict. `embedded` propagates into the child layer components
+   * (`HeaderRibbon`, `ContextStrip`) to suppress those duplicated
+   * surfaces so the operator does not parse the same fact twice or
+   * three times before reaching the action ribbon.
+   */
+  embedded?: boolean;
 }
 
 /* ── Component ───────────────────────────────────────────────────────── */
@@ -112,6 +122,7 @@ export default function ExceptionDetailPanel({
   onActionComplete,
   onRefreshRef,
   reanalyzing,
+  embedded = false,
 }: ExceptionDetailPanelProps) {
   const { hasPermission, user } = useAuth();
   const { health } = useHealth();
@@ -505,13 +516,25 @@ export default function ExceptionDetailPanel({
         primarySkuLabel={primarySkuLabel}
         totalPo={totalPo}
         delta={delta}
+        embedded={embedded}
       />
 
       {/* ━━ 2. Context Strip (Entity Profile + Impact Metrics) ━━━━━━━ */}
       <ContextStrip
         entityProfile={analysis?.entity_profile}
         impactMetrics={analysis?.impact_metrics}
+        embedded={embedded}
       />
+
+      {/* ━━ 2c. Section anchor bar (S1 finding #10) ━━━━━━━━━━━━━━━━━
+          Sticky in-pane nav for the three always-present major
+          sections so the operator does not linearly scroll five-to-
+          eight stacked sections to reach Evidence or Diagnostics.
+          Anchors target the section ids set on the major blocks
+          below. The bar itself is a single Tab stop; arrow-key nav
+          inside an `<a>` list is conventional and the focus ring on
+          each link is design-token driven. */}
+      <SectionAnchorBar />
 
       {/* ━━ 2b. Sticky action ribbon (ADR-041 P3e §2.2) ━━━━━━━━━━━━━━
           The ribbon must stay visible regardless of which scroll
@@ -694,6 +717,16 @@ export default function ExceptionDetailPanel({
               onScrollDepth={trackAnalysisScroll}
             />
           )}
+
+          {/* S1 finding #10 — anchor target for the SectionAnchorBar.
+              Zero-height span; the bar's "Recommendation" link
+              scrolls here. Living outside the conditional so the
+              anchor is stable whether or not a verdict is present. */}
+          <span
+            id="section-recommendation"
+            data-section-anchor="recommendation"
+            aria-hidden
+          />
 
           {/* Agent Reasoning Card (Layer 1/2 pattern) — the
               "Recommendation" pane (PO request #4: pane 2 after Entity
@@ -948,24 +981,28 @@ export default function ExceptionDetailPanel({
           )}
 
           {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-          <EvidenceGrid
-            lineItems={lineItems}
-            analysis={analysis}
-            selectedLine={selectedLine}
-            onSelectLine={setSelectedLine}
-            selectedAnalysis={selectedAnalysis}
-            totalErp={totalErp}
-            totalPo={totalPo}
-            onFirstOpen={ensureLineItemsLoaded}
-          />
+          <div id="section-evidence" data-section-anchor="evidence">
+            <EvidenceGrid
+              lineItems={lineItems}
+              analysis={analysis}
+              selectedLine={selectedLine}
+              onSelectLine={setSelectedLine}
+              selectedAnalysis={selectedAnalysis}
+              totalErp={totalErp}
+              totalPo={totalPo}
+              onFirstOpen={ensureLineItemsLoaded}
+            />
+          </div>
 
           {/* ━━ 5. Diagnostics ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-          <DiagnosticsSection
-            detail={detail}
-            trace={trace}
-            showPreview={showPreview}
-            onFirstOpen={ensureTraceLoaded}
-          />
+          <div id="section-diagnostics" data-section-anchor="diagnostics">
+            <DiagnosticsSection
+              detail={detail}
+              trace={trace}
+              showPreview={showPreview}
+              onFirstOpen={ensureTraceLoaded}
+            />
+          </div>
 
           {/* ── Metadata ──────────────────────────────────────────────── */}
           <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-8 text-caption">
@@ -1028,5 +1065,52 @@ export default function ExceptionDetailPanel({
       })()}
     </div>
     </Layer2OpenContext.Provider>
+  );
+}
+
+
+/* ── Section anchor bar ─────────────────────────────────────────────
+ * S1 finding #10 — sticky in-pane navigation for the three always-
+ * present major sections (Recommendation, Evidence, Diagnostics).
+ *
+ * The five-to-eight-section vertical stack on a typical exception
+ * detail forces the operator to scroll past Analysis + enrichment
+ * cards every time they want to reach Evidence or Diagnostics. The
+ * anchor bar adds three keyboard-reachable in-page links that scroll
+ * to the section ids set on the major blocks above.
+ *
+ * Anchors target ids; the browser owns scroll behaviour (no custom
+ * scrollIntoView so we inherit `scroll-padding` / `scroll-margin`
+ * design tokens). The bar is mounted once between ContextStrip and
+ * the StickyActionRibbon so it sits above the scroll body.
+ */
+function SectionAnchorBar() {
+  return (
+    <nav
+      aria-label="Detail sections"
+      className="px-16 py-6 border-b border-border-subtle bg-surface-secondary shrink-0 flex items-center gap-12 text-caption"
+    >
+      <span className="text-label uppercase tracking-wider text-text-quaternary">
+        Jump to
+      </span>
+      <a
+        href="#section-recommendation"
+        className="text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm px-4"
+      >
+        Recommendation
+      </a>
+      <a
+        href="#section-evidence"
+        className="text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm px-4"
+      >
+        Evidence
+      </a>
+      <a
+        href="#section-diagnostics"
+        className="text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm px-4"
+      >
+        Diagnostics
+      </a>
+    </nav>
   );
 }
