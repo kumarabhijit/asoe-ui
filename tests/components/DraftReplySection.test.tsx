@@ -113,6 +113,20 @@ describe("DraftReplySection", () => {
     expect(screen.queryByRole("button", { name: /edit draft/i })).not.toBeInTheDocument();
   });
 
+  it("renders an 'Edit in record detail' link on a read-only mount (no inline editor)", () => {
+    render(<DraftReplySection data={DRAFTED} editInDetailHref="#section-draft-reply" />);
+    expect(screen.queryByRole("button", { name: /edit draft/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /edit in record detail/i })).toHaveAttribute(
+      "href",
+      "#section-draft-reply",
+    );
+  });
+
+  it("uses a distinct region label when provided (a11y disambiguation)", () => {
+    render(<DraftReplySection data={DRAFTED} regionLabel="AI draft reply — preview" />);
+    expect(screen.getByRole("region", { name: "AI draft reply — preview" })).toBeInTheDocument();
+  });
+
   it("renders a REJECTED reply with its reason and no body (no placeholder)", () => {
     render(<DraftReplySection data={REJECTED} />);
     expect(screen.getByText("REJECTED")).toBeInTheDocument();

@@ -1043,7 +1043,7 @@ export default function ExceptionDetailPanel({
               "Jump to source email" link expands the Source Email section
               above when that section is present. */}
           {analysis?.draft_reply && (
-            <CollapsibleSection title="AI Draft Reply" id="section-draft-reply">
+            <CollapsibleSection title="AI Draft Reply" id="section-draft-reply" defaultOpen>
               <DraftReplySection
                 data={analysis.draft_reply}
                 sourceSectionId={analysis.email_source ? "section-source-email" : undefined}

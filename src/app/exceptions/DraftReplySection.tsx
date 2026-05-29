@@ -19,7 +19,7 @@
  */
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Mail, Ban, CornerUpRight, Pencil, History, Check, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
@@ -51,6 +51,21 @@ interface DraftReplySectionProps {
   onSubmitEdit?: (edit: { subject: string; body: string }) => Promise<void>;
   /** RBAC gate for the edit affordance (passed by the parent). */
   canEdit?: boolean;
+  /**
+   * Accessible region name. Defaults to "AI draft reply". A read-only mount
+   * shown alongside the editable one (e.g. the /cases audit rail beside the
+   * record detail) passes a distinct label so screen-reader landmark
+   * navigation can tell the two regions apart (WCAG 2.4.1).
+   */
+  regionLabel?: string;
+  /**
+   * When set on a read-only mount (no `onSubmitEdit`), renders a quiet "Edit
+   * in record detail" link instead of an editor — so editing has exactly one
+   * canonical home (the detail) while peripheral previews point to it rather
+   * than hosting a second composer. Hash target; useHashOpen expands + scrolls
+   * the detail's draft section.
+   */
+  editInDetailHref?: string;
 }
 
 // Visual mapping (allowed — default fallback, not enum dispatch).
@@ -70,9 +85,15 @@ export function DraftReplySection({
   sourceSectionId,
   onSubmitEdit,
   canEdit = false,
+  regionLabel = "AI draft reply",
+  editInDetailHref,
 }: DraftReplySectionProps) {
   const rejected = data.status.toUpperCase() === "REJECTED";
   const editable = canEdit && !!onSubmitEdit && !rejected;
+  // Per-instance unique id so the component is safe to mount more than once on
+  // a page (e.g. detail + rail) without colliding the body field's id/label.
+  const uid = useId();
+  const bodyId = `${uid}-body`;
 
   const [editing, setEditing] = useState(false);
   const [draftSubject, setDraftSubject] = useState(data.subject ?? "");
@@ -106,7 +127,7 @@ export function DraftReplySection({
 
   return (
     <section
-      aria-label="AI draft reply"
+      aria-label={regionLabel}
       className="bg-surface-primary rounded-md shadow-sm p-16 flex flex-col gap-12"
     >
       <div className="flex items-center gap-8">
@@ -137,6 +158,19 @@ export function DraftReplySection({
         </a>
       )}
 
+      {/* Read-only preview surfaces (e.g. the audit rail) point to the single
+          canonical editor in the record detail rather than hosting a second
+          composer — avoids divergent edit state on the SOX revision chain. */}
+      {editInDetailHref && !editable && (
+        <a
+          href={editInDetailHref}
+          className="inline-flex items-center gap-4 self-start text-caption text-text-brand hover:text-text-brand-hover hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm"
+        >
+          <Pencil size={12} aria-hidden />
+          Edit in record detail
+        </a>
+      )}
+
       {/* REJECTED → reason, no body. */}
       <EvidenceBlock tier="contextual" value={data.reason}>
         {(v) => <p className="m-0 text-caption text-status-error">{String(v)}</p>}
@@ -162,13 +196,13 @@ export function DraftReplySection({
           />
           <div className="flex flex-col gap-6">
             <label
-              htmlFor="draft-reply-body"
+              htmlFor={bodyId}
               className="text-label font-bold uppercase tracking-wider text-text-tertiary"
             >
               Body
             </label>
             <textarea
-              id="draft-reply-body"
+              id={bodyId}
               value={draftBody}
               onChange={(e) => setDraftBody(e.target.value)}
               disabled={saving}

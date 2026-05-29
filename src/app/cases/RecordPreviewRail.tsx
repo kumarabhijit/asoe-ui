@@ -99,7 +99,17 @@ export function RecordPreviewRail({
       <div className="text-label uppercase tracking-wider text-text-quaternary font-semibold mb-8">
         Draft reply
       </div>
-      <DraftReplySection data={draft} />
+      {/* Read-only audit glance (UX/usability/a11y review verdict). Editing a
+          financially-relevant buyer reply has ONE canonical home — the record
+          detail. The rail shows the draft + its read-only version history and
+          links to that single editor (useHashOpen expands + scrolls the
+          detail's draft section). `regionLabel` disambiguates this landmark
+          from the detail's "AI draft reply" region for screen-reader users. */}
+      <DraftReplySection
+        data={draft}
+        regionLabel="AI draft reply — preview"
+        editInDetailHref="#section-draft-reply"
+      />
     </section>
   );
 }

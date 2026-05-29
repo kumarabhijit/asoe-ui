@@ -185,6 +185,34 @@ describe("RecordPreviewRail — happy path", () => {
     expect(screen.getByText(/Re: Order increase/i)).toBeInTheDocument();
   });
 
+  it("is read-only in the rail and links to the canonical editor in the detail", async () => {
+    orderAnalysisMock.mockResolvedValue({
+      diagnosis: "x",
+      confidence: 80,
+      risk: "LOW",
+      resolution: "y",
+      lines: [],
+      email_source: { from: "buyer@acme-corp.com", subject: "Order", body: "..." },
+      draft_reply: {
+        status: "DRAFTED",
+        subject: "Re: Order increase",
+        body: "Thank you for your request...",
+        edits_applied: [],
+      },
+    });
+    render(<RecordPreviewRail selectedRecordId="rec-1" />);
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: /Draft reply preview/i })).toBeInTheDocument(),
+    );
+    // No inline editor in the rail (single canonical edit point in the detail).
+    expect(screen.queryByRole("button", { name: /edit draft/i })).not.toBeInTheDocument();
+    // Instead: a link to the detail's draft section.
+    expect(screen.getByRole("link", { name: /edit in record detail/i })).toHaveAttribute(
+      "href",
+      "#section-draft-reply",
+    );
+  });
+
   it("refetches when selectedRecordId changes", async () => {
     orderAnalysisMock.mockResolvedValue({
       diagnosis: "x",
