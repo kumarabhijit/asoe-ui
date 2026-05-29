@@ -655,6 +655,28 @@ export interface DraftReplyEdit {
   after?: string | null;
 }
 
+/**
+ * One entry in a draft reply's append-only revision chain. Version 1 is
+ * always the AI-generated draft; each subsequent operator edit appends a
+ * new revision. The last element is the current draft. Mirrors
+ * `api/schemas.py::DraftReplyRevision`. This is the SOX audit substrate for
+ * "who changed the reply, to what, and when" — never pruned UI-side.
+ */
+export interface DraftReplyRevision {
+  /** 1-based, monotonic. Last element in `revisions` is the current draft. */
+  version: number;
+  subject?: string | null;
+  body?: string | null;
+  /** Field-level before/after diffs introduced BY this revision. */
+  edits_applied: DraftReplyEdit[];
+  /** AI service id for the generated draft, or the operator sub for an edit. */
+  author: string;
+  /** ISO-8601 timestamp this revision was authored. */
+  authored_at: string;
+  /** AI_GENERATED | OPERATOR_EDIT */
+  source: string;
+}
+
 export interface DraftReply {
   /** DRAFTED | REJECTED */
   status: string;
@@ -664,6 +686,10 @@ export interface DraftReply {
   subject?: string | null;
   body?: string | null;
   edits_applied: DraftReplyEdit[];
+  /** Append-only revision chain (ADR-042 Phase 7 follow-on). Empty for legacy
+   *  drafts persisted before versioning landed — readers should synthesize a
+   *  single AI_GENERATED v1 from the top-level fields in that case. */
+  revisions?: DraftReplyRevision[];
   drafted_by?: string | null;
   drafted_at?: string | null;
 }

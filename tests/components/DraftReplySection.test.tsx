@@ -3,8 +3,8 @@
  * projector of the reply draft; REJECTED shows reason + no body; optional fields
  * flow through <EvidenceBlock> (no ad-hoc placeholders, Guardrail #6).
  */
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 import { DraftReplySection } from "@/app/exceptions/DraftReplySection";
 import type { DraftReply } from "@/types/exceptions";
@@ -33,16 +33,84 @@ const REJECTED: DraftReply = {
   drafted_at: null,
 };
 
+const VERSIONED: DraftReply = {
+  ...DRAFTED,
+  edits_applied: [],
+  revisions: [
+    {
+      version: 1,
+      subject: "Re: PO",
+      body: "Hello, could you confirm the requested quantity?",
+      edits_applied: [],
+      author: "ai:ReplyDraftRecipe.py",
+      authored_at: "2026-05-24T10:00:00Z",
+      source: "AI_GENERATED",
+    },
+    {
+      version: 2,
+      subject: "Re: PO 0093847612",
+      body: "Hello, could you confirm the requested quantity?",
+      edits_applied: [{ field: "subject", before: "Re: PO", after: "Re: PO 0093847612" }],
+      author: "csa@acme.example",
+      authored_at: "2026-05-24T10:05:00Z",
+      source: "OPERATOR_EDIT",
+    },
+  ],
+};
+
 describe("DraftReplySection", () => {
-  it("renders a DRAFTED reply with recipient, subject, body, and edits", () => {
+  it("renders a DRAFTED reply with recipient, subject, body", () => {
     render(<DraftReplySection data={DRAFTED} />);
     expect(screen.getByText("DRAFTED")).toBeInTheDocument();
     expect(screen.getByText("buyer@walmart.example")).toBeInTheDocument();
-    // Appears as the subject field + the edit's "after" value.
     expect(screen.getAllByText("Re: PO 0093847612").length).toBeGreaterThan(0);
     expect(screen.getByText(/confirm the requested quantity/)).toBeInTheDocument();
-    expect(screen.getByText("subject")).toBeInTheDocument();
     expect(screen.getByText(/Drafted by analyst-1/)).toBeInTheDocument();
+  });
+
+  it("keeps the edit audit in a collapsed Version history disclosure (#3)", () => {
+    render(<DraftReplySection data={DRAFTED} />);
+    // The before/after edit row is NOT visible until the disclosure is opened
+    // — it used to sit always-on at the bottom of the card (extraneous text).
+    expect(screen.queryByText("subject")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /version history/i }));
+    expect(screen.getByText("subject")).toBeInTheDocument();
+  });
+
+  it("shows the AI → operator revision chain when versions are present (#1)", () => {
+    render(<DraftReplySection data={VERSIONED} />);
+    fireEvent.click(screen.getByRole("button", { name: /version history/i }));
+    expect(screen.getByText("v1")).toBeInTheDocument();
+    expect(screen.getByText("v2")).toBeInTheDocument();
+    expect(screen.getByText("AI")).toBeInTheDocument();
+    expect(screen.getByText("Edited")).toBeInTheDocument();
+  });
+
+  it("renders a Jump to source email link only when sourceSectionId is set (#2)", () => {
+    const { rerender } = render(<DraftReplySection data={DRAFTED} />);
+    expect(screen.queryByRole("link", { name: /jump to source email/i })).not.toBeInTheDocument();
+    rerender(<DraftReplySection data={DRAFTED} sourceSectionId="section-source-email" />);
+    const link = screen.getByRole("link", { name: /jump to source email/i });
+    expect(link).toHaveAttribute("href", "#section-source-email");
+  });
+
+  it("submits an operator edit through onSubmitEdit when canEdit (#1)", async () => {
+    const onSubmitEdit = vi.fn().mockResolvedValue(undefined);
+    render(<DraftReplySection data={DRAFTED} onSubmitEdit={onSubmitEdit} canEdit />);
+    fireEvent.click(screen.getByRole("button", { name: /edit draft/i }));
+    const body = screen.getByLabelText("Body");
+    fireEvent.change(body, { target: { value: "Edited body." } });
+    fireEvent.click(screen.getByRole("button", { name: /save edit/i }));
+    await waitFor(() =>
+      expect(onSubmitEdit).toHaveBeenCalledWith(
+        expect.objectContaining({ body: "Edited body." }),
+      ),
+    );
+  });
+
+  it("hides the edit affordance when canEdit is false", () => {
+    render(<DraftReplySection data={DRAFTED} onSubmitEdit={vi.fn()} canEdit={false} />);
+    expect(screen.queryByRole("button", { name: /edit draft/i })).not.toBeInTheDocument();
   });
 
   it("renders a REJECTED reply with its reason and no body (no placeholder)", () => {

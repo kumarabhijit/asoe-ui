@@ -388,8 +388,35 @@ const SE_DRAFT: DraftReply = {
   subject: "Re: PO EML-PO-2026-0042 — please confirm ship-to",
   body:
     "Hello,\n\nThanks for your order (PO EML-PO-2026-0042). Before we release it we need to confirm one detail:\n\n• Ship-to: you wrote \"Atlanta DC\" — please confirm this is DC #6094.\n\nOnce confirmed we'll process 600 CS of BEV-COLA-12PK and 240 CS of BEV-LEMON-6PK for delivery by 2026-05-24.\n\nThank you,\nAcme Beverages Order Desk",
+  // Mirrors the latest revision's diffs (back-compat with pre-versioning
+  // readers). The full chain lives in `revisions` below.
   edits_applied: [
     { field: "subject", before: "Re: your order", after: "Re: PO EML-PO-2026-0042 — please confirm ship-to" },
+  ],
+  // Append-only history: the agent's v1 draft, then the CSA's subject edit.
+  revisions: [
+    {
+      version: 1,
+      subject: "Re: your order",
+      body:
+        "Hello,\n\nThanks for your order. Before we release it we need to confirm one detail:\n\n• Ship-to: you wrote \"Atlanta DC\" — please confirm this is DC #6094.\n\nThank you,\nAcme Beverages Order Desk",
+      edits_applied: [],
+      author: "ai:ReplyDraftRecipe.py",
+      authored_at: "2026-04-30T10:18:00Z",
+      source: "AI_GENERATED",
+    },
+    {
+      version: 2,
+      subject: "Re: PO EML-PO-2026-0042 — please confirm ship-to",
+      body:
+        "Hello,\n\nThanks for your order (PO EML-PO-2026-0042). Before we release it we need to confirm one detail:\n\n• Ship-to: you wrote \"Atlanta DC\" — please confirm this is DC #6094.\n\nOnce confirmed we'll process 600 CS of BEV-COLA-12PK and 240 CS of BEV-LEMON-6PK for delivery by 2026-05-24.\n\nThank you,\nAcme Beverages Order Desk",
+      edits_applied: [
+        { field: "subject", before: "Re: your order", after: "Re: PO EML-PO-2026-0042 — please confirm ship-to" },
+      ],
+      author: "analyst-1",
+      authored_at: "2026-04-30T10:20:00Z",
+      source: "OPERATOR_EDIT",
+    },
   ],
   drafted_by: "analyst-1",
   drafted_at: "2026-04-30T10:20:00Z",

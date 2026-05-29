@@ -33,6 +33,9 @@ import type {
 import type {
   ClassificationHistoryEntry,
   ClassificationHistoryResponse,
+  DraftReply,
+  DraftReplyEdit,
+  DraftReplyRevision,
   HealthResponse,
   ExceptionSummary,
   LifecycleState,
@@ -2146,6 +2149,107 @@ export const exceptionsApi = {
     }
     await delay(MOCK_DELAY);
     return MOCK_ORDER_ANALYSES[id] ?? null;
+  },
+
+  /**
+   * Apply an operator edit to the AI-drafted reply (ADR-042 Phase 7
+   * follow-on). The edit is a write that appends a new OPERATOR_EDIT
+   * revision to the draft's append-only `revisions` chain — the agent's
+   * original v1 is never overwritten (SOX: the reply that was actually
+   * sent must always be reconstructable alongside the AI original).
+   *
+   * Wire path: the edit reuses the existing DRAFT_REPLY disposition with
+   * the `reply` payload; the backend re-runs the deterministic compose +
+   * versioning and re-projects the draft onto the analysis. We read the
+   * updated draft back off `orderAnalysis` so the caller gets the new
+   * revision chain without re-deriving it client-side (Guardrail #6).
+   */
+  async editDraftReply(
+    id: string,
+    request: { subject?: string | null; body?: string | null; notes: string; reason_tag?: string },
+    options?: RequestOptions,
+  ): Promise<DraftReply> {
+    const idempotencyKey = resolveIdempotencyKey(options);
+    if (USE_REAL_API) {
+      await http<ExceptionDetailResponse>(`/api/v1/exceptions/${id}/disposition`, {
+        method: "PATCH",
+        body: {
+          action: "DRAFT_REPLY",
+          notes: request.notes,
+          reason_tag: request.reason_tag ?? "",
+          reply: { subject: request.subject, body: request.body },
+        },
+        idempotencyKey,
+      });
+      const analysis = await http<OrderAnalysis>(
+        `/api/v1/exceptions/${encodeURIComponent(id)}/analysis`,
+      );
+      const draft = analysis?.draft_reply;
+      if (!draft) {
+        throw new Error("DRAFT_NOT_FOUND: edited draft not present on analysis.");
+      }
+      return draft;
+    }
+
+    // Mock: append an OPERATOR_EDIT revision to the in-memory analysis so the
+    // follow-up orderAnalysis refetch (detail panel + RecordPreviewRail) sees
+    // the new revision chain. Mirrors the backend's append-only persistence.
+    await delay(MOCK_DELAY);
+    const analysis = MOCK_ORDER_ANALYSES[id];
+    const draft = analysis?.draft_reply;
+    if (!draft) {
+      throw new Error("DRAFT_NOT_FOUND: no draft reply to edit on this record.");
+    }
+    if (!request.notes || !request.notes.trim()) {
+      throw new Error("NOTES_REQUIRED: notes are required (SOX audit trail).");
+    }
+    const editor = (await getCurrentMockUserEmail()) ?? "mock-user";
+    const ts = new Date().toISOString();
+    const prevSubject = draft.subject ?? null;
+    const prevBody = draft.body ?? null;
+    const nextSubject = request.subject ?? prevSubject;
+    const nextBody = request.body ?? prevBody;
+    const edits: DraftReplyEdit[] = [];
+    if (nextSubject !== prevSubject) {
+      edits.push({ field: "subject", before: prevSubject, after: nextSubject });
+    }
+    if (nextBody !== prevBody) {
+      edits.push({ field: "body", before: prevBody, after: nextBody });
+    }
+    // Seed a v1 AI_GENERATED revision for legacy drafts that predate
+    // versioning, so the chain always starts from the agent's original.
+    const existing: DraftReplyRevision[] =
+      draft.revisions && draft.revisions.length > 0
+        ? draft.revisions
+        : [
+            {
+              version: 1,
+              subject: prevSubject,
+              body: prevBody,
+              edits_applied: draft.edits_applied ?? [],
+              author: draft.drafted_by ?? "reply-draft-recipe",
+              authored_at: draft.drafted_at ?? ts,
+              source: "AI_GENERATED",
+            },
+          ];
+    const revision: DraftReplyRevision = {
+      version: existing[existing.length - 1].version + 1,
+      subject: nextSubject,
+      body: nextBody,
+      edits_applied: edits,
+      author: editor,
+      authored_at: ts,
+      source: "OPERATOR_EDIT",
+    };
+    const updated: DraftReply = {
+      ...draft,
+      subject: nextSubject,
+      body: nextBody,
+      edits_applied: edits,
+      revisions: [...existing, revision],
+    };
+    analysis.draft_reply = updated;
+    return updated;
   },
 };
 
