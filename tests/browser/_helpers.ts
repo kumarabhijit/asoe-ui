@@ -5,7 +5,12 @@
  * repetitive plumbing (login, seed, backend setup) lives here and is
  * composed via fixtures.
  */
-import { type Page, type APIRequestContext, expect } from "@playwright/test";
+import {
+  type Page,
+  type Locator,
+  type APIRequestContext,
+  expect,
+} from "@playwright/test";
 
 export const BACKEND_URL = process.env.E2E_BACKEND_URL ?? "http://localhost:8000";
 
@@ -235,6 +240,35 @@ export async function expandSection(
   });
   await expect(header.first()).toBeVisible({ timeout: 15_000 });
   await header.first().click();
+}
+
+/**
+ * Pick an option in the typeahead Combobox that replaced the native
+ * `<select>` for the OverrideChooserDialog's Action and Reason
+ * category dropdowns (S2 sprint follow-up — finding #6).
+ *
+ * The new contract: a `<button role="combobox">` opens a list of
+ * `<div role="option">` items whose accessible name is the displayed
+ * label (underscores in the value become spaces, e.g. `ALLOW_BOTH`
+ * surfaces as `ALLOW BOTH`). Tests pass the option's underlying value
+ * — the helper does the visual-label conversion.
+ *
+ * Lives here so the conversion is in one place. If the label
+ * transformation changes in the dialog, only this helper needs an
+ * update — the spec callsites still pass the raw value they used
+ * with `selectOption(...)` in the native-select era.
+ */
+export async function selectComboboxOption(
+  scope: Page | Locator,
+  comboboxName: RegExp,
+  optionValue: string,
+): Promise<void> {
+  await scope.getByRole("combobox", { name: comboboxName }).click();
+  const label = optionValue.replace(/_/g, " ");
+  await scope
+    .getByRole("option", { name: new RegExp(`^${label}$`, "i") })
+    .first()
+    .click();
 }
 
 // Seed user logins (backend accepts any non-empty password — V1 stub).

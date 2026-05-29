@@ -42,6 +42,7 @@ import {
   createPendingReviewException,
   loginAs,
   resetTenant,
+  selectComboboxOption,
 } from "./_helpers";
 
 test.describe.configure({ mode: "serial" });
@@ -83,8 +84,8 @@ test("W1 — detail → override → next record dispatches each via the full pi
   await openOverride.click();
   const dialog = page.getByRole("dialog", { name: /override resolution/i });
   await expect(dialog).toBeVisible({ timeout: 5_000 });
-  await dialog.getByLabel(/^resolution action$/i).selectOption("ALLOW_BOTH");
-  await dialog.getByLabel(/^override reason category$/i).selectOption("BAND_REVIEW_OVERRIDDEN");
+  await selectComboboxOption(dialog, /^resolution action$/i, "ALLOW_BOTH");
+  await selectComboboxOption(dialog, /^override reason category$/i, "BAND_REVIEW_OVERRIDDEN");
   await dialog.getByLabel(/^override notes$/i).fill("W1 first record override");
   await dialog.getByRole("button", { name: /confirm override/i }).click();
   await expect(dialog).toBeHidden({ timeout: 10_000 });
@@ -121,8 +122,8 @@ test("W1 — detail → override → next record dispatches each via the full pi
   await expect(notesB).toHaveValue("");
   // Submit a different action so the assertion downstream
   // distinguishes A from B.
-  await dialogB.getByLabel(/^resolution action$/i).selectOption("SUPERSEDE");
-  await dialogB.getByLabel(/^override reason category$/i).selectOption("SAP_MASTER_PRICE_ERROR");
+  await selectComboboxOption(dialogB, /^resolution action$/i, "SUPERSEDE");
+  await selectComboboxOption(dialogB, /^override reason category$/i, "SAP_MASTER_PRICE_ERROR");
   await notesB.fill("W1 second record override");
   await dialogB.getByRole("button", { name: /confirm override/i }).click();
   await expect(dialogB).toBeHidden({ timeout: 10_000 });
@@ -167,8 +168,8 @@ test("W2 — override → re-override on the same record (PO ruling 2026-05-03)"
   await expect(openOverride).toBeVisible({ timeout: 15_000 });
   await openOverride.click();
   let dialog = page.getByRole("dialog", { name: /override resolution/i });
-  await dialog.getByLabel(/^resolution action$/i).selectOption("MERGE");
-  await dialog.getByLabel(/^override reason category$/i).selectOption("BAND_REVIEW_OVERRIDDEN");
+  await selectComboboxOption(dialog, /^resolution action$/i, "MERGE");
+  await selectComboboxOption(dialog, /^override reason category$/i, "BAND_REVIEW_OVERRIDDEN");
   await dialog.getByLabel(/^override notes$/i).fill("W2 first override");
   await dialog.getByRole("button", { name: /confirm override/i }).click();
   await expect(dialog).toBeHidden({ timeout: 10_000 });
@@ -197,8 +198,8 @@ test("W2 — override → re-override on the same record (PO ruling 2026-05-03)"
   // The dialog's resolution action selector must NOT be pinned to the
   // previously-submitted MERGE — it should default to whatever the
   // dialog's initial state is (recipe-recommended action).
-  await dialog.getByLabel(/^resolution action$/i).selectOption("ALLOW_BOTH");
-  await dialog.getByLabel(/^override reason category$/i).selectOption("OTHER");
+  await selectComboboxOption(dialog, /^resolution action$/i, "ALLOW_BOTH");
+  await selectComboboxOption(dialog, /^override reason category$/i, "OTHER");
   await dialog.getByLabel(/^override notes$/i).fill("W2 self-correction");
   await dialog.getByRole("button", { name: /confirm override/i }).click();
 
@@ -263,8 +264,8 @@ test("W3 — multi-record disposition workflow: 3 distinct resolutions across de
       name: /override resolution/i,
     });
     await expect(dialog).toBeVisible({ timeout: 5_000 });
-    await dialog.getByLabel(/^resolution action$/i).selectOption(rec.action);
-    await dialog.getByLabel(/^override reason category$/i).selectOption(rec.reason);
+    await selectComboboxOption(dialog, /^resolution action$/i, rec.action);
+    await selectComboboxOption(dialog, /^override reason category$/i, rec.reason);
     await dialog.getByLabel(/^override notes$/i).fill(`W3 disposition for ${rec.orderId}`);
     await dialog.getByRole("button", { name: /confirm override/i }).click();
     await expect(dialog).toBeHidden({ timeout: 10_000 });
@@ -305,7 +306,7 @@ test("W4 — override dialog cancel → reopen → submit (no stale form state)"
   await openOverride.click();
   let dialog = page.getByRole("dialog", { name: /override resolution/i });
   await expect(dialog).toBeVisible({ timeout: 5_000 });
-  await dialog.getByLabel(/^resolution action$/i).selectOption("REJECT");
+  await selectComboboxOption(dialog, /^resolution action$/i, "REJECT");
   await dialog.getByLabel(/^override notes$/i).fill("DRAFT — should not persist");
 
   // Cancel via the standard dismiss button (Radix dialog renders an
@@ -329,8 +330,8 @@ test("W4 — override dialog cancel → reopen → submit (no stale form state)"
   await expect(dialog.getByLabel(/^override notes$/i)).toHaveValue("");
 
   // ── Click 3: complete the override successfully ───────────────
-  await dialog.getByLabel(/^resolution action$/i).selectOption("ESCALATE");
-  await dialog.getByLabel(/^override reason category$/i).selectOption("BAND_REVIEW_OVERRIDDEN");
+  await selectComboboxOption(dialog, /^resolution action$/i, "ESCALATE");
+  await selectComboboxOption(dialog, /^override reason category$/i, "BAND_REVIEW_OVERRIDDEN");
   await dialog.getByLabel(/^override notes$/i).fill("W4 final submission after cancel");
   await dialog.getByRole("button", { name: /confirm override/i }).click();
   await expect(dialog).toBeHidden({ timeout: 10_000 });

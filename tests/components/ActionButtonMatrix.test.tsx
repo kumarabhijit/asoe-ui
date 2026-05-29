@@ -521,6 +521,41 @@ describe("ActionButtonMatrix — S2 #10 aria-live on comment dialog", () => {
     expect(dialog).toHaveAttribute("aria-modal", "true");
   });
 
+  it("YELLOW ribbon shows a kbd hint on every visible button (S2 #13)", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        onApprove={onApprove}
+        onReject={onReject}
+        onEscalate={onEscalate}
+        onOverride={onOverride}
+        onReanalyze={onReanalyze}
+        canApprove
+        canEscalate
+        canOverride
+        canReanalyze
+      />,
+    );
+    // Approve/Reject/Override/Escalate/Re-analyze all surfaced on
+    // YELLOW. The kbd hint sits inside the button as an aria-hidden
+    // element; querying via the button accessible name and reading
+    // the kbd child is the cleanest assertion.
+    const buttons = [
+      { name: /approve/i, letter: "A" },
+      { name: /reject/i, letter: "R" },
+      { name: /choose different action/i, letter: "O" },
+      { name: /triage/i, letter: "E" },
+      { name: /re-analyze/i, letter: "Y" },
+    ];
+    for (const { name, letter } of buttons) {
+      const button = screen.getByRole("button", { name });
+      const kbd = button.querySelector("kbd");
+      expect(kbd, `${name} button must carry a kbd hint`).not.toBeNull();
+      expect(kbd?.textContent).toBe(letter);
+      expect(kbd).toHaveAttribute("aria-hidden");
+    }
+  });
+
   it("Rejection optional-comment variant labels itself as a rejection", () => {
     // No `recommendedAction` so the matrix uses the generic
     // primary/secondary labels ("Approve" / "Reject") instead of

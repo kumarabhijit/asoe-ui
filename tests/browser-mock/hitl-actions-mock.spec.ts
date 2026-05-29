@@ -124,10 +124,15 @@ test.describe("mock-mode HITL actions", () => {
     await expect(
       page.getByText(new RegExp(`exception ${APPROVE_RECORD} approved`, "i")).first(),
     ).toBeVisible({ timeout: 10_000 });
-    await expect(
-      workspace(page).getByText(/^resolved$/i).first(),
-      "case header must re-project to Resolved after Approve",
-    ).toBeVisible({ timeout: 10_000 });
+    // S2 sprint 2026-05-28 finding #11 — next-case auto-advance.
+    // After the action completes the workspace moves to the next
+    // case in the SLA-sorted queue; the URL no longer references
+    // the case we just acted on. The success toast above is the
+    // post-condition for the action itself; this assertion is the
+    // post-condition for the advance.
+    await expect
+      .poll(() => page.url(), { timeout: 10_000 })
+      .not.toContain(`case=${APPROVE_CASE}`);
   });
 
   test("an Override survives a full page reload on /home (reload resilience)", async ({
@@ -161,21 +166,27 @@ test.describe("mock-mode HITL actions", () => {
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: 8_000 });
-    // Pick the first real option in each select (index 0 is the
-    // "Select…" placeholder). Sourcing values dynamically keeps the
-    // spec free of hardcoded enum literals (Guardrail #2).
-    const actionSel = dialog.getByLabel(/resolution action/i);
-    const actionVal = await actionSel.locator("option").nth(1).getAttribute("value");
-    await actionSel.selectOption(actionVal);
-    const reasonSel = dialog.getByLabel(/reason categor/i);
-    const reasonVal = await reasonSel.locator("option").nth(1).getAttribute("value");
-    await reasonSel.selectOption(reasonVal);
+    // S2 follow-up #6 — the native `<select>`s for action + reason
+    // are now typeahead Comboboxes. Pick the first available option
+    // from each by opening the combobox and clicking the first
+    // `role="option"`. Sourcing values dynamically keeps the spec
+    // free of hardcoded enum literals (Guardrail #2).
+    await dialog.getByRole("combobox", { name: /resolution action/i }).click();
+    await dialog.getByRole("option").first().click();
+    await dialog
+      .getByRole("combobox", { name: /override reason category/i })
+      .click();
+    await dialog.getByRole("option").first().click();
     await dialog.getByLabel(/notes/i).fill("mock e2e — drive to resolved");
     await dialog.getByRole("button", { name: /confirm override/i }).click();
     await expect(dialog).toBeHidden({ timeout: 10_000 });
-    await expect(
-      workspace(page).getByText(/^resolved$/i).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    // S2 #11 — auto-advance: URL flips off OVERRIDE_CASE after the
+    // override completes. The reload-resilience check below (the
+    // tile count drop on /home) is the surviving post-condition for
+    // the override mutation itself.
+    await expect
+      .poll(() => page.url(), { timeout: 10_000 })
+      .not.toContain(`case=${OVERRIDE_CASE}`);
 
     // Soft-nav to /home: count drops by one.
     await page.getByRole("link", { name: /^home$/i }).first().click();
