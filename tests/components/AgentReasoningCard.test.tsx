@@ -158,8 +158,11 @@ describe("AgentReasoningCard", () => {
         screen.getByRole("button", { name: "Approve recommendation" }),
       );
       expect(screen.getByText("Approval Comment")).toBeInTheDocument();
+      // S2 sprint 2026-05-28 finding #4 — placeholder copy now
+      // advertises the ⌘↵ submit shortcut. Match with a regex so
+      // future copy iterations don't break this test.
       await user.type(
-        screen.getByPlaceholderText("Add approval notes (optional)..."),
+        screen.getByPlaceholderText(/add approval notes \(optional\)/i),
         "Looks correct",
       );
       await user.click(screen.getByText("Confirm Approval"));

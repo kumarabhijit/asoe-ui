@@ -88,8 +88,17 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
     return typeof v === "string" ? v : null;
   }, [detail]);
 
-  /** Approve = endorse the recipe's recommended action. */
-  const handleApprove = useCallback(async (comment: string) => {
+  /**
+   * Approve = endorse the recipe's recommended action.
+   *
+   * S2 finding #7 (sprint 2026-05-28) — `reasonTagOverride` is the
+   * operator-picked reason_tag from the YELLOW/RED comment dialog.
+   * When provided it replaces the auto-pick so ASOE's learning loop
+   * sees the explicit categorical rationale. Undefined means the
+   * caller did not surface the tag picker (GREEN happy path), in
+   * which case the auto-pick remains.
+   */
+  const handleApprove = useCallback(async (comment: string, reasonTagOverride?: string) => {
     if (!hasPermission("exceptions:approve")) {
       addToast("warning", "Permission denied: your role cannot approve exceptions.");
       return;
@@ -99,7 +108,7 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       addToast("warning", "No recipe recommendation on this exception — use Override to choose an action.");
       return;
     }
-    const reasonTag = pickQuickActionReasonTag(detail?.intent, health);
+    const reasonTag = reasonTagOverride ?? pickQuickActionReasonTag(detail?.intent, health);
     if (!reasonTag) {
       addToast("warning", "Health unavailable — actions disabled. Retry in a moment.");
       return;
@@ -121,13 +130,18 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
     } finally { setActionInFlight(null); }
   }, [exceptionId, hasPermission, addToast, announce, recommendedAction, setDetail, onActionComplete, detail, health]);
 
-  /** Reject = NO_ACTION. Server classifies sub_type as REJECT. */
-  const handleReject = useCallback(async (comment: string) => {
+  /**
+   * Reject = NO_ACTION. Server classifies sub_type as REJECT.
+   *
+   * S2 finding #7 — `reasonTagOverride` mirrors the Approve path; see
+   * `handleApprove` for the contract.
+   */
+  const handleReject = useCallback(async (comment: string, reasonTagOverride?: string) => {
     if (!hasPermission("exceptions:approve")) {
       addToast("warning", "Permission denied: your role cannot reject exceptions.");
       return;
     }
-    const reasonTag = pickQuickActionReasonTag(detail?.intent, health);
+    const reasonTag = reasonTagOverride ?? pickQuickActionReasonTag(detail?.intent, health);
     if (!reasonTag) {
       addToast("warning", "Health unavailable — actions disabled. Retry in a moment.");
       return;

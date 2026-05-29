@@ -271,13 +271,17 @@ export default function ExceptionDetailPanel({
     telemetryCaseId,
   );
 
-  const handleApproveWithTelemetry = (comment: string) => {
+  // S2 finding #7 (sprint 2026-05-28) — propagate the operator-picked
+  // reason_tag (YELLOW/RED Approve/Reject) through the telemetry
+  // wrapper into the action hook. Undefined preserves the GREEN
+  // auto-pick path.
+  const handleApproveWithTelemetry = (comment: string, reasonTagOverride?: string) => {
     markFirstAction("approve");
-    handleApprove(comment);
+    handleApprove(comment, reasonTagOverride);
   };
-  const handleRejectWithTelemetry = (comment: string) => {
+  const handleRejectWithTelemetry = (comment: string, reasonTagOverride?: string) => {
     markFirstAction("reject");
-    handleReject(comment);
+    handleReject(comment, reasonTagOverride);
   };
   const handleEscalateWithTelemetry = () => {
     markFirstAction("escalate");
@@ -609,6 +613,18 @@ export default function ExceptionDetailPanel({
           }
           reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
           actionInFlight={actionInFlight}
+          // S2 finding #7 — reason-tag vocabulary for the mandatory
+          // tag Select on YELLOW/RED Approve/Reject. Per-intent
+          // when available, falling back to the global list. Both
+          // shapes come from `useHealth` so the picker is Guardrail
+          // #2-clean (no hardcoded enums).
+          availableReasonTags={
+            detail.intent
+              ? (health?.allowed_override_reason_tags_by_intent?.[detail.intent]
+                  ?? health?.allowed_override_reason_tags
+                  ?? [])
+              : (health?.allowed_override_reason_tags ?? [])
+          }
         />
       )}
 
@@ -784,6 +800,18 @@ export default function ExceptionDetailPanel({
               reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
               actionInFlight={actionInFlight}
               hideActionMatrix={CASES_ROW_V2}
+              // S2 finding #7 — same per-intent fallback shape used
+              // by the StickyActionRibbon mount above. The legacy
+              // inline matrix surfaces the same mandatory tag picker
+              // so the two mount points stay byte-for-byte identical
+              // (SOX-grade audit invariant).
+              availableReasonTags={
+                detail.intent
+                  ? (health?.allowed_override_reason_tags_by_intent?.[detail.intent]
+                      ?? health?.allowed_override_reason_tags
+                      ?? [])
+                  : (health?.allowed_override_reason_tags ?? [])
+              }
             />
           ) : executionError ? (
             // Lifecycle=FAILED with no shadow_verdict means the pipeline

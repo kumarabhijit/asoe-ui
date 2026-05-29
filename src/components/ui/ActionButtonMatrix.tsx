@@ -31,6 +31,8 @@ import { MessageSquare, RotateCcw } from "lucide-react";
 import { Button } from "./Button";
 import { actionLabel as resolveActionLabel } from "@/lib/cases";
 import { cn } from "@/lib/utils";
+import { useHotkeys } from "@/hooks/useHotkeys";
+import { getHotkey } from "@/lib/hotkeys";
 import type { ShadowVerdict } from "@/types/exceptions";
 import type { ActionInFlight, ExecutionError } from "./AgentReasoningCard";
 
@@ -47,8 +49,12 @@ export interface ActionButtonMatrixProps {
   verdict: ShadowVerdict;
   executionError?: ExecutionError;
   recommendedAction?: string;
-  onApprove?: (comment: string) => void;
-  onReject?: (comment: string) => void;
+  // S2 finding #7 (sprint 2026-05-28) — Approve/Reject callbacks
+  // gain an optional `reasonTagOverride`. On YELLOW/RED the operator
+  // picks the tag in the comment dialog; on GREEN the hook's
+  // auto-pick (`pickQuickActionReasonTag`) remains the source.
+  onApprove?: (comment: string, reasonTagOverride?: string) => void;
+  onReject?: (comment: string, reasonTagOverride?: string) => void;
   onEscalate?: () => void;
   onOverride?: () => void;
   onReanalyze?: (reason: string) => void;
@@ -62,6 +68,15 @@ export interface ActionButtonMatrixProps {
   canReanalyze?: boolean;
   isAdmin?: boolean;
   className?: string;
+  /**
+   * S2 finding #7 — reason-tag options for the mandatory tag Select
+   * shown above the comment textarea on YELLOW/RED Approve/Reject.
+   * Sourced from `useHealth().allowed_override_reason_tags_by_intent`
+   * by the consumer (Guardrail #2 — never hardcoded). Empty array or
+   * undefined keeps today's optional-comment-only behaviour, so a
+   * caller that has not yet wired the prop still works.
+   */
+  availableReasonTags?: readonly string[];
 }
 
 function formatActionLabel(action: string): string {
@@ -96,12 +111,18 @@ export function ActionButtonMatrix({
   canReanalyze: canReanalyzeProp,
   isAdmin = false,
   className,
+  availableReasonTags,
 }: ActionButtonMatrixProps) {
   const isErrored = executionError !== undefined;
   const [pendingAction, setPendingAction] = useState<
     "approve" | "reject" | "reanalyze" | null
   >(null);
   const [comment, setComment] = useState("");
+  // S2 finding #7 — reason_tag the operator picks before confirming
+  // an Approve/Reject on YELLOW/RED. Blank by default to force a
+  // conscious choice (panel decision: pre-selecting defeats the
+  // learning-signal goal). Reset alongside `comment` on cancel.
+  const [reasonTag, setReasonTag] = useState<string>("");
 
   const effectiveCanOverride = canOverride ?? isAdmin;
   const effectiveCanApprove = canApprove ?? true;
@@ -123,18 +144,116 @@ export function ActionButtonMatrix({
   const primaryInProgress = ingForm(primaryLabel);
   const secondaryInProgress = ingForm(secondaryLabel);
 
+  // S2 finding #7 — reason_tag is mandatory on YELLOW/RED Approve/Reject
+  // when the consumer supplies the tag vocabulary. GREEN keeps the
+  // pre-S2 contract (the hook auto-picks). The `pendingAction` ===
+  // "reanalyze" branch is unaffected; reanalyze never had a tag.
+  const reasonTagRequired =
+    (pendingAction === "approve" || pendingAction === "reject") &&
+    (verdict === "YELLOW" || verdict === "RED") &&
+    !!availableReasonTags &&
+    availableReasonTags.length > 0;
+
+  // Cmd+Enter submit is gated on the same predicate as the Confirm
+  // button, so the hotkey cannot bypass the mandatory reason_tag.
+  const canSubmit =
+    !actionLoading &&
+    actionInFlight === null &&
+    pendingAction !== null &&
+    !(pendingAction === "reanalyze" && comment.trim().length === 0) &&
+    !(reasonTagRequired && !reasonTag);
+
   function confirmAction() {
-    if (pendingAction === "approve" && onApprove) onApprove(comment);
-    else if (pendingAction === "reject" && onReject) onReject(comment);
-    else if (pendingAction === "reanalyze" && onReanalyze) onReanalyze(comment);
+    if (!canSubmit) return;
+    // Only pass the second argument when there's actually a tag to
+    // forward — otherwise `vi.fn().toHaveBeenCalledWith("comment")`
+    // matchers in legacy tests would fail on the trailing
+    // `undefined` arg.
+    if (pendingAction === "approve" && onApprove) {
+      if (reasonTagRequired) onApprove(comment, reasonTag);
+      else onApprove(comment);
+    } else if (pendingAction === "reject" && onReject) {
+      if (reasonTagRequired) onReject(comment, reasonTag);
+      else onReject(comment);
+    } else if (pendingAction === "reanalyze" && onReanalyze) {
+      onReanalyze(comment);
+    }
     setPendingAction(null);
     setComment("");
+    setReasonTag("");
   }
 
   function cancelAction() {
     setPendingAction(null);
     setComment("");
+    setReasonTag("");
   }
+
+  // S2 finding #3 — ribbon hotkeys (A/R/O/E/Y). The registry in
+  // `src/lib/hotkeys.ts` is the canonical key/label source; this
+  // hook wires the behaviours. Each binding mirrors its visible
+  // button's gating so a hidden button cannot be triggered from
+  // the keyboard. The hook also bails on input/textarea/select
+  // targets, so typing in the comment dialog does not collide.
+  const anyActionInFlightForHotkey = actionInFlight !== null || actionLoading;
+  const showApproveAction =
+    !pendingAction && !isErrored && verdict === "YELLOW";
+  const showOverrideAction =
+    !pendingAction &&
+    !isErrored &&
+    (verdict === "GREEN" || verdict === "YELLOW" || verdict === "RED");
+  const showEscalateAction =
+    !pendingAction && (isErrored || verdict === "YELLOW" || verdict === "RED");
+  const showReanalyzeAction = !pendingAction && (
+    onReanalyze !== undefined &&
+    (canReanalyzeProp ?? (canOverride ?? isAdmin)) &&
+    (verdict === "YELLOW" || verdict === "RED" || isErrored) &&
+    reanalyzeAttempts < reanalyzeMax
+  );
+
+  useHotkeys([
+    {
+      key: getHotkey("ribbon.approve")!.key,
+      handler: () => setPendingAction("approve"),
+      enabled:
+        showApproveAction &&
+        !!onApprove &&
+        (canApprove ?? true) &&
+        !anyActionInFlightForHotkey,
+    },
+    {
+      key: getHotkey("ribbon.reject")!.key,
+      handler: () => setPendingAction("reject"),
+      enabled:
+        showApproveAction &&
+        !!onReject &&
+        (canApprove ?? true) &&
+        !anyActionInFlightForHotkey,
+    },
+    {
+      key: getHotkey("ribbon.override")!.key,
+      handler: () => onOverride?.(),
+      enabled:
+        showOverrideAction &&
+        !!onOverride &&
+        (canOverride ?? isAdmin) &&
+        !anyActionInFlightForHotkey,
+    },
+    {
+      key: getHotkey("ribbon.escalate")!.key,
+      handler: () => onEscalate?.(),
+      enabled:
+        showEscalateAction &&
+        !!onEscalate &&
+        (canEscalate ?? true) &&
+        !anyActionInFlightForHotkey,
+    },
+    {
+      key: getHotkey("ribbon.reanalyze")!.key,
+      handler: () => setPendingAction("reanalyze"),
+      enabled: showReanalyzeAction && !anyActionInFlightForHotkey,
+    },
+  ]);
 
   function visibleLabel(
     base: string,
@@ -290,39 +409,91 @@ export function ActionButtonMatrix({
         </div>
       )}
 
-      {/* Comment input — reanalyze requires a non-empty reason (SOX). */}
+      {/* Comment input — reanalyze requires a non-empty reason (SOX).
+          S2 #4 — Cmd+Enter discoverability hint in placeholder copy.
+          S2 #7 — reason_tag Select rendered above the textarea on
+          YELLOW/RED Approve/Reject (mandatory; gates Confirm). */}
       {pendingAction && (
         <div
           className="flex flex-col gap-8 p-12 bg-surface-secondary rounded-sm"
-          role={pendingAction === "reanalyze" ? "dialog" : undefined}
-          aria-modal={pendingAction === "reanalyze" ? true : undefined}
+          role={
+            pendingAction === "reanalyze" || reasonTagRequired
+              ? "dialog"
+              : undefined
+          }
+          aria-modal={
+            pendingAction === "reanalyze" || reasonTagRequired ? true : undefined
+          }
           aria-label={
-            pendingAction === "reanalyze" ? "Reanalyze reason required" : undefined
+            pendingAction === "reanalyze"
+              ? "Reanalyze reason required"
+              : reasonTagRequired
+                ? `${pendingAction === "approve" ? "Approval" : "Rejection"} reason required`
+                : undefined
           }
         >
           <div className="flex items-center gap-6 text-caption font-semibold text-text-secondary">
             <MessageSquare size={14} />
             {pendingAction === "approve"
-              ? "Approval Comment"
+              ? reasonTagRequired
+                ? "Approval Reason (required)"
+                : "Approval Comment"
               : pendingAction === "reject"
-                ? "Rejection Comment"
+                ? reasonTagRequired
+                  ? "Rejection Reason (required)"
+                  : "Rejection Comment"
                 : "Reanalyze Reason (required)"}
           </div>
+          {reasonTagRequired && availableReasonTags && (
+            <label className="flex flex-col gap-4 text-caption text-text-secondary">
+              <span>
+                Reason category{" "}
+                <span aria-hidden className="text-text-quaternary">
+                  ({verdict} verdict — mandatory)
+                </span>
+              </span>
+              <select
+                value={reasonTag}
+                onChange={(e) => setReasonTag(e.target.value)}
+                aria-required="true"
+                aria-label={`${pendingAction === "approve" ? "Approval" : "Rejection"} reason category`}
+                autoFocus
+                className="w-full px-8 py-6 border border-border rounded-sm text-caption font-sans text-text-primary bg-surface-primary outline-none focus:border-brand"
+              >
+                <option value="">Select a reason…</option>
+                {availableReasonTags.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder={
               pendingAction === "approve"
-                ? "Add approval notes (optional)..."
+                ? reasonTagRequired
+                  ? "Add approval notes (optional) — ⌘↵ to submit"
+                  : "Add approval notes (optional) — ⌘↵ to submit"
                 : pendingAction === "reject"
-                  ? "Provide rejection reason..."
-                  : "Why should this be re-run? (e.g., new contract uploaded, gateway was down)"
+                  ? reasonTagRequired
+                    ? "Add rejection notes (optional) — ⌘↵ to submit"
+                    : "Provide rejection reason — ⌘↵ to submit"
+                  : "Why should this be re-run? (e.g., new contract uploaded, gateway was down) — ⌘↵ to submit"
             }
-            autoFocus
+            // When the reason-tag Select is shown it owns autoFocus
+            // so the operator's eye lands on the mandatory choice
+            // first. Otherwise the textarea is the only field and
+            // takes focus directly.
+            autoFocus={!reasonTagRequired}
             rows={3}
+            aria-keyshortcuts="Meta+Enter"
             className="w-full px-12 py-8 border border-border rounded-sm text-caption font-sans text-text-primary bg-surface-primary resize-y outline-none focus:border-brand"
             onKeyDown={(e) => {
               if (e.key === "Enter" && e.metaKey) confirmAction();
+              if (e.key === "Escape") cancelAction();
             }}
             required={pendingAction === "reanalyze"}
           />
@@ -333,11 +504,9 @@ export function ActionButtonMatrix({
             <Button
               variant={pendingAction === "approve" ? "brand" : "neutral"}
               size="sm"
-              disabled={
-                anyActionInFlight
-                || (pendingAction === "reanalyze" && comment.trim().length === 0)
-              }
+              disabled={!canSubmit}
               onClick={confirmAction}
+              aria-keyshortcuts="Meta+Enter"
             >
               {actionLoading
                 ? "Processing..."
