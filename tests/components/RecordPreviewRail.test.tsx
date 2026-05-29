@@ -13,11 +13,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecordPreviewRail } from "@/app/cases/RecordPreviewRail";
 
 const orderAnalysisMock = vi.fn();
+const editDraftReplyMock = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   exceptionsApi: {
     orderAnalysis: (...args: unknown[]) => orderAnalysisMock(...args),
+    editDraftReply: (...args: unknown[]) => editDraftReplyMock(...args),
   },
+}));
+
+// The rail now gates the edit affordance on RBAC and toasts on save; both
+// hooks need providers it doesn't own in unit context, so stub them.
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({ hasPermission: () => true }),
+}));
+vi.mock("@/components/ui/Toast", () => ({
+  useToast: () => ({ addToast: vi.fn() }),
 }));
 
 beforeEach(() => {
@@ -183,6 +194,32 @@ describe("RecordPreviewRail — happy path", () => {
     // DraftReplySection should mount inside the rail section.
     // The subject text comes from the canned draft data above.
     expect(screen.getByText(/Re: Order increase/i)).toBeInTheDocument();
+  });
+
+  it("offers Edit + Jump-to-source in the rail when permitted and a source email exists", async () => {
+    orderAnalysisMock.mockResolvedValue({
+      diagnosis: "x",
+      confidence: 80,
+      risk: "LOW",
+      resolution: "y",
+      lines: [],
+      email_source: { from: "buyer@acme-corp.com", subject: "Order", body: "..." },
+      draft_reply: {
+        status: "DRAFTED",
+        subject: "Re: Order increase",
+        body: "Thank you for your request...",
+        edits_applied: [],
+      },
+    });
+    render(<RecordPreviewRail selectedRecordId="rec-1" />);
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: /Draft reply preview/i })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("button", { name: /edit draft/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /jump to source email/i })).toHaveAttribute(
+      "href",
+      "#section-source-email",
+    );
   });
 
   it("refetches when selectedRecordId changes", async () => {
