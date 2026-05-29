@@ -1750,6 +1750,10 @@ export interface components {
          *     output a DRAFT_REPLY disposition persisted). `status` ∈ DRAFTED | REJECTED;
          *     a REJECTED draft carries a `reason` and no body. Read-only evidence — sending
          *     is a separate Shadow-gated disposition (SEND_REPLY).
+         *
+         *     `revisions` is the append-only version history (operator edit + versioned
+         *     history); the top-level `subject`/`body`/`edits_applied` always mirror the
+         *     LATEST revision so existing readers keep working.
          */
         DraftReply: {
             /** Body */
@@ -1764,6 +1768,8 @@ export interface components {
             reason?: string | null;
             /** Recipient */
             recipient?: string | null;
+            /** Revisions */
+            revisions?: components["schemas"]["DraftReplyRevision"][];
             /** Status */
             status: string;
             /** Subject */
@@ -1782,6 +1788,31 @@ export interface components {
             before?: string | null;
             /** Field */
             field: string;
+        };
+        /**
+         * DraftReplyRevision
+         * @description One entry in the versioned history of a reply draft (operator edit +
+         *     versioned history). The chain is append-only: version 1 is the AI-generated
+         *     draft; each operator edit appends a new revision. The last element is always
+         *     the current draft (mirrored onto the top-level `DraftReply` fields for
+         *     back-compat). `source` ∈ AI_GENERATED | OPERATOR_EDIT records WHO authored
+         *     the revision — the SOX who/what/when of a financially-relevant buyer reply.
+         */
+        DraftReplyRevision: {
+            /** Author */
+            author: string;
+            /** Authored At */
+            authored_at: string;
+            /** Body */
+            body?: string | null;
+            /** Edits Applied */
+            edits_applied?: components["schemas"]["DraftReplyEdit"][];
+            /** Source */
+            source: string;
+            /** Subject */
+            subject?: string | null;
+            /** Version */
+            version: number;
         };
         /**
          * DuplicateDetectionData

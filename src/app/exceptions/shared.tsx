@@ -14,9 +14,11 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 /**
@@ -55,6 +57,40 @@ export const HITL_LIFECYCLE_STATES: ReadonlySet<string> = new Set([
   "PENDING_COSIGN",
   "BLOCKED",
 ]);
+
+/**
+ * Hash-driven expand + scroll (S1 finding #10 follow-on). When the URL hash
+ * targets `#<id>`, invoke `onMatch` (the caller opens its section + fires any
+ * first-open telemetry) and scroll the referenced element into view on the
+ * next frame, after the children have mounted. Runs on mount and on every
+ * `hashchange` so an in-page anchor works repeatedly. No-op without an `id`.
+ *
+ * One mechanism shared by CollapsibleSection, EvidenceGrid, and
+ * DiagnosticsSection so every "Jump to …" link reveals its target rather than
+ * scrolling to a collapsed shell.
+ */
+export function useHashOpen<T extends HTMLElement>(
+  id: string | undefined,
+  ref: RefObject<T | null>,
+  onMatch: () => void,
+) {
+  useEffect(() => {
+    if (!id || typeof window === "undefined") return;
+    const handle = () => {
+      if (window.location.hash !== `#${id}`) return;
+      onMatch();
+      requestAnimationFrame(() => {
+        ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    };
+    handle();
+    window.addEventListener("hashchange", handle);
+    return () => window.removeEventListener("hashchange", handle);
+    // `onMatch`/`ref` are stable for the caller's purpose; the open-state guard
+    // makes re-runs idempotent. Keyed on `id` so it re-binds if that changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+}
 
 /** Collapsible section header — matches Evidence Detail card pattern */
 export function CollapsibleHeader({ title, open, onToggle, badge, badgeVariant = "neutral" }: {
@@ -109,6 +145,7 @@ export function CollapsibleHeader({ title, open, onToggle, badge, badgeVariant =
  */
 export function CollapsibleSection({
   title,
+  id,
   defaultOpen = false,
   badge,
   badgeVariant,
@@ -116,6 +153,11 @@ export function CollapsibleSection({
   onFirstOpen,
 }: {
   title: string;
+  /** Stable anchor id (S1 finding #10 follow-on). When set, the section
+   *  auto-expands and scrolls into view if the URL hash targets it
+   *  (`#<id>`) — so every "Jump to …" link both navigates AND reveals a
+   *  collapsed section, not just scrolls to a collapsed shell. */
+  id?: string;
   defaultOpen?: boolean;
   badge?: string;
   badgeVariant?: string;
@@ -126,20 +168,40 @@ export function CollapsibleSection({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const firedRef = useRef(false);
+  const sectionRef = useRef<HTMLElement>(null);
   const reportLayer2Open = useContext(Layer2OpenContext);
+  // First-open side effects (telemetry) fire exactly once, whether the
+  // section is opened by a click or by a hash jump.
+  const fireFirstOpen = () => {
+    if (firedRef.current) return;
+    firedRef.current = true;
+    onFirstOpen?.();
+    reportLayer2Open?.();
+  };
   const toggle = () => {
     setOpen((v) => {
       const next = !v;
-      if (next && !firedRef.current) {
-        firedRef.current = true;
-        onFirstOpen?.();
-        reportLayer2Open?.();
-      }
+      if (next) fireFirstOpen();
       return next;
     });
   };
+
+  // Hash-driven expand + scroll (anchor bar, "Jump to source email" link, the
+  // Knowledge Graph link). Open first (mounting children) + fire telemetry,
+  // then the hook scrolls on the next frame once the target has full height.
+  useHashOpen(id, sectionRef, () => {
+    setOpen((v) => {
+      if (!v) fireFirstOpen();
+      return true;
+    });
+  });
+
   return (
-    <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
+    <section
+      ref={sectionRef}
+      id={id}
+      className="scroll-mt-[var(--nav-height)] bg-surface-primary rounded-md shadow-sm overflow-hidden"
+    >
       <CollapsibleHeader
         title={title}
         open={open}

@@ -15,9 +15,9 @@
  */
 "use client";
 
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import { ChevronDown, Terminal, ClipboardCopy, CheckCircle2, GitBranch, ListOrdered } from "lucide-react";
-import { CollapsibleHeader } from "./shared";
+import { CollapsibleHeader, useHashOpen } from "./shared";
 import { EventsTimeline } from "@/components/ui/EventsTimeline";
 import { useTopology } from "@/hooks/useTopology";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,9 @@ interface DiagnosticsSectionProps {
    *  pane opens. Lets the parent defer the trace fetch until the
    *  operator asks to see it (PO request #4). */
   onFirstOpen?: () => void;
+  /** Anchor id for the "Jump to" bar (#4). When the hash targets it, the
+   *  pane expands (firing onFirstOpen) and scrolls into view. */
+  anchorId?: string;
 }
 
 interface AttemptOption {
@@ -83,8 +86,9 @@ function buildAttemptOptions(
   return options;
 }
 
-export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen }: DiagnosticsSectionProps) {
+export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen, anchorId }: DiagnosticsSectionProps) {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const [pipelineOpen, setPipelineOpen] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -132,16 +136,26 @@ export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen }: 
     selectedAttempt.executedNodes,
   );
 
+  // Expand + scroll when the "Jump to → Diagnostics" link targets this pane.
+  useHashOpen(anchorId, toggleRef, () =>
+    setDiagnosticsOpen((v) => {
+      if (!v && onFirstOpen) onFirstOpen();
+      return true;
+    }),
+  );
+
   return (
     <>
       {/* Diagnostics toggle */}
       <button
+        ref={toggleRef}
+        id={anchorId}
         onClick={() => {
           const next = !diagnosticsOpen;
           setDiagnosticsOpen(next);
           if (next && onFirstOpen) onFirstOpen();
         }}
-        className="flex items-center justify-center gap-6 w-full py-8 bg-transparent border-none cursor-pointer font-sans text-caption font-semibold text-text-tertiary transition-colors duration-fast"
+        className="scroll-mt-[var(--nav-height)] flex items-center justify-center gap-6 w-full py-8 bg-transparent border-none cursor-pointer font-sans text-caption font-semibold text-text-tertiary transition-colors duration-fast"
         aria-expanded={diagnosticsOpen}
       >
         <Terminal size={12} />

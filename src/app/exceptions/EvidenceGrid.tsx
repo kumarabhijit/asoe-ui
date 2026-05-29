@@ -7,12 +7,12 @@
  */
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FileText, ChevronDown } from "lucide-react";
 import { PricingWaterfall } from "@/components/ui/PricingWaterfall";
 import { Badge, rootCauseVariant } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
-import { fmtPrice } from "./shared";
+import { fmtPrice, useHashOpen } from "./shared";
 import type { LineItem, OrderAnalysis, LineItemAnalysis } from "@/types/exceptions";
 
 interface EvidenceGridProps {
@@ -27,6 +27,9 @@ interface EvidenceGridProps {
    *  Used by the parent to defer the lineItems API call until the
    *  operator actually opens this section (PO request #4). */
   onFirstOpen?: () => void;
+  /** Anchor id for the "Jump to" bar (#4). When the hash targets it, the
+   *  section expands (firing onFirstOpen) and scrolls into view. */
+  anchorId?: string;
 }
 
 export function EvidenceGrid({
@@ -38,15 +41,29 @@ export function EvidenceGrid({
   totalErp,
   totalPo,
   onFirstOpen,
+  anchorId,
 }: EvidenceGridProps) {
   const [expanded, setExpanded] = useState(false);
+  const rootRef = useRef<HTMLElement>(null);
 
   // Allow the section to render even when lineItems hasn't loaded yet
   // — the operator can open it and the parent's lazy fetcher kicks in.
   // The "no lines" branch below handles the empty state.
 
+  // Expand + scroll when the "Jump to → Evidence" link targets this section.
+  useHashOpen(anchorId, rootRef, () =>
+    setExpanded((v) => {
+      if (!v && onFirstOpen) onFirstOpen();
+      return true;
+    }),
+  );
+
   return (
-    <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
+    <section
+      ref={rootRef}
+      id={anchorId}
+      className="scroll-mt-[var(--nav-height)] bg-surface-primary rounded-md shadow-sm overflow-hidden"
+    >
       {/* Toggle header */}
       <button
         onClick={() => {

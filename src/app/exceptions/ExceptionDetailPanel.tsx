@@ -27,6 +27,7 @@ import {
   type ExecutionError,
 } from "@/components/ui/AgentReasoningCard";
 import { StickyActionRibbon } from "@/components/ui/StickyActionRibbon";
+import { useToast } from "@/components/ui/Toast";
 import { useCaseTelemetry } from "@/hooks/useCaseTelemetry";
 import { casesRowV2Enabled } from "@/lib/flags";
 import { cn } from "@/lib/utils";
@@ -126,6 +127,7 @@ export default function ExceptionDetailPanel({
 }: ExceptionDetailPanelProps) {
   const { hasPermission, user } = useAuth();
   const { health } = useHealth();
+  const { addToast } = useToast();
   const [detail, setDetail] = useState<ExceptionDetail | null>(null);
   const [trace, setTrace] = useState<TraceResponse | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -233,6 +235,29 @@ export default function ExceptionDetailPanel({
       setFetchError(classified);
     }
   }, [exceptionId, lineItemsLoaded, traceLoaded]);
+
+  /**
+   * Operator edit of the AI draft reply (ADR-042 Phase 7 follow-on). The
+   * write goes through `editDraftReply` (which appends an OPERATOR_EDIT
+   * revision server-side) and then a full refresh re-projects the new
+   * revision chain onto `analysis.draft_reply`. Errors propagate to the
+   * inline composer in `DraftReplySection` (which surfaces the message);
+   * the success toast fires only on a clean write. Kept here rather than in
+   * `useExceptionActions` because it targets the analysis projection, not
+   * the exception lifecycle — no `actionInFlight` coupling.
+   */
+  const handleEditDraftReply = useCallback(
+    async (edit: { subject: string; body: string }) => {
+      await exceptionsApi.editDraftReply(exceptionId, {
+        subject: edit.subject,
+        body: edit.body,
+        notes: "Operator edited AI draft reply before send.",
+      });
+      await refreshDetail();
+      addToast("success", "Draft reply updated — new revision saved.");
+    },
+    [exceptionId, refreshDetail, addToast],
+  );
 
   /* ── Actions (RBAC-gated, toast-routed) ──────────────────────────────
    * All HITL handlers — approve / reject / escalate / override /
@@ -546,7 +571,11 @@ export default function ExceptionDetailPanel({
           below. The bar itself is a single Tab stop; arrow-key nav
           inside an `<a>` list is conventional and the focus ring on
           each link is design-token driven. */}
-      <SectionAnchorBar />
+      <SectionAnchorBar
+        hasSourceEmail={!!analysis?.email_source}
+        hasKnowledgeGraph={!!analysis?.knowledge_graph}
+        hasDraftReply={!!analysis?.draft_reply}
+      />
 
       {/* ━━ 2b. Sticky action ribbon (ADR-041 P3e §2.2) ━━━━━━━━━━━━━━
           The ribbon must stay visible regardless of which scroll
@@ -948,7 +977,7 @@ export default function ExceptionDetailPanel({
               email substrate first, then the agent's recommendation.
               Both gated by data-presence; no per-intent dispatch. */}
           {analysis?.email_source && (
-            <CollapsibleSection title="Source Email">
+            <CollapsibleSection title="Source Email" id="section-source-email">
               <EmailSourceSection
                 data={analysis.email_source}
                 caseId={detail.parent_case_id ?? undefined}
@@ -1003,21 +1032,32 @@ export default function ExceptionDetailPanel({
               Data-presence gated; preview-only / deferrable until the
               knowledge_graph producer lands. */}
           {analysis?.knowledge_graph && (
-            <CollapsibleSection title="Knowledge Graph">
+            <CollapsibleSection title="Knowledge Graph" id="section-knowledge-graph">
               <KnowledgeGraphSection data={analysis.knowledge_graph} />
             </CollapsibleSection>
           )}
           {/* ADR-042 Phase 7 — AI Draft Reply evidence (projected from
               resolution_data.reply_draft). Data-presence gated; absent until a
-              DRAFT_REPLY disposition runs. */}
+              DRAFT_REPLY disposition runs. The CSA can edit the draft in place
+              (RBAC-gated) — the edit appends an OPERATOR_EDIT revision; the
+              "Jump to source email" link expands the Source Email section
+              above when that section is present. */}
           {analysis?.draft_reply && (
-            <CollapsibleSection title="AI Draft Reply">
-              <DraftReplySection data={analysis.draft_reply} />
+            <CollapsibleSection title="AI Draft Reply" id="section-draft-reply">
+              <DraftReplySection
+                data={analysis.draft_reply}
+                sourceSectionId={analysis.email_source ? "section-source-email" : undefined}
+                onSubmitEdit={handleEditDraftReply}
+                canEdit={hasPermission("exceptions:approve")}
+              />
             </CollapsibleSection>
           )}
 
-          {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-          <div id="section-evidence" data-section-anchor="evidence">
+          {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              The anchor id lives on EvidenceGrid's own root (so the
+              "Jump to → Evidence" link expands + scrolls it, #4); the
+              wrapper keeps data-section-anchor for the pane-focus cycle. */}
+          <div data-section-anchor="evidence">
             <EvidenceGrid
               lineItems={lineItems}
               analysis={analysis}
@@ -1027,16 +1067,18 @@ export default function ExceptionDetailPanel({
               totalErp={totalErp}
               totalPo={totalPo}
               onFirstOpen={ensureLineItemsLoaded}
+              anchorId="section-evidence"
             />
           </div>
 
           {/* ━━ 5. Diagnostics ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-          <div id="section-diagnostics" data-section-anchor="diagnostics">
+          <div data-section-anchor="diagnostics">
             <DiagnosticsSection
               detail={detail}
               trace={trace}
               showPreview={showPreview}
               onFirstOpen={ensureTraceLoaded}
+              anchorId="section-diagnostics"
             />
           </div>
 
@@ -1120,33 +1162,45 @@ export default function ExceptionDetailPanel({
  * design tokens). The bar is mounted once between ContextStrip and
  * the StickyActionRibbon so it sits above the scroll body.
  */
-function SectionAnchorBar() {
+function SectionAnchorBar({
+  hasSourceEmail = false,
+  hasKnowledgeGraph = false,
+  hasDraftReply = false,
+}: {
+  hasSourceEmail?: boolean;
+  hasKnowledgeGraph?: boolean;
+  hasDraftReply?: boolean;
+}) {
+  // Data-presence-driven (Guardrail #1): the three always-present majors plus
+  // any optional enrichment section that actually rendered for this record.
+  // Targeting a collapsed section's id makes CollapsibleSection open + scroll
+  // (shared.tsx), so every link reveals its section rather than scrolling to a
+  // collapsed shell. Order follows the on-page vertical order.
+  const links: { href: string; label: string }[] = [
+    { href: "#section-recommendation", label: "Recommendation" },
+    ...(hasSourceEmail ? [{ href: "#section-source-email", label: "Source Email" }] : []),
+    ...(hasKnowledgeGraph ? [{ href: "#section-knowledge-graph", label: "Knowledge Graph" }] : []),
+    ...(hasDraftReply ? [{ href: "#section-draft-reply", label: "AI Draft Reply" }] : []),
+    { href: "#section-evidence", label: "Evidence" },
+    { href: "#section-diagnostics", label: "Diagnostics" },
+  ];
   return (
     <nav
       aria-label="Detail sections"
-      className="px-16 py-6 border-b border-border-subtle bg-surface-secondary shrink-0 flex items-center gap-12 text-caption"
+      className="px-16 py-6 border-b border-border-subtle bg-surface-secondary shrink-0 flex items-center gap-12 text-caption overflow-x-auto"
     >
-      <span className="text-label uppercase tracking-wider text-text-quaternary">
+      <span className="text-label uppercase tracking-wider text-text-quaternary shrink-0">
         Jump to
       </span>
-      <a
-        href="#section-recommendation"
-        className="text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm px-4"
-      >
-        Recommendation
-      </a>
-      <a
-        href="#section-evidence"
-        className="text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm px-4"
-      >
-        Evidence
-      </a>
-      <a
-        href="#section-diagnostics"
-        className="text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm px-4"
-      >
-        Diagnostics
-      </a>
+      {links.map((l) => (
+        <a
+          key={l.href}
+          href={l.href}
+          className="text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm px-4 whitespace-nowrap"
+        >
+          {l.label}
+        </a>
+      ))}
     </nav>
   );
 }

@@ -138,35 +138,34 @@ describe("S1 audit — SectionAnchorBar deliverable (finding #10)", () => {
   it("ExceptionDetailPanel mounts SectionAnchorBar", () => {
     const src = readFileSync(EXCEPTION_PANEL_PATH, "utf-8");
     expect(
-      /<SectionAnchorBar \/>/.test(src),
+      /<SectionAnchorBar[\s/>]/.test(src),
       "SectionAnchorBar must be mounted between ContextStrip and the sticky action ribbon",
     ).toBe(true);
   });
 
-  it("ExceptionDetailPanel defines all three anchor targets", () => {
+  it("the three always-present anchor targets resolve to real elements", () => {
     const src = readFileSync(EXCEPTION_PANEL_PATH, "utf-8");
-    for (const id of [
-      "section-recommendation",
-      "section-evidence",
-      "section-diagnostics",
-    ]) {
-      expect(
-        src.includes(`id="${id}"`),
-        `anchor target id="${id}" must remain in the source so the anchor bar's link scrolls to a real element`,
-      ).toBe(true);
-    }
+    // Recommendation lives on a span id in the panel; Evidence + Diagnostics
+    // now carry the id on their own section root via `anchorId` (so the jump
+    // both scrolls AND expands the collapsed section — #4). Either form is a
+    // real target the bar's href resolves to.
+    expect(src.includes('id="section-recommendation"')).toBe(true);
+    expect(src.includes('anchorId="section-evidence"')).toBe(true);
+    expect(src.includes('anchorId="section-diagnostics"')).toBe(true);
   });
 
   it("SectionAnchorBar declares the three matching hrefs", () => {
     const src = readFileSync(EXCEPTION_PANEL_PATH, "utf-8");
+    // The bar builds links from a data-presence-driven list, so the hrefs are
+    // string literals in the link array rather than inline href="" attrs.
     for (const href of [
       "#section-recommendation",
       "#section-evidence",
       "#section-diagnostics",
     ]) {
       expect(
-        src.includes(`href="${href}"`),
-        `anchor bar must render <a href="${href}"> — bar and target ids must stay in sync`,
+        src.includes(`"${href}"`),
+        `anchor bar must declare href ${href} — bar and target ids must stay in sync`,
       ).toBe(true);
     }
   });

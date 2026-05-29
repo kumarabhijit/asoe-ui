@@ -23,7 +23,10 @@ describe("DraftReplySection deliverable", () => {
 
   it("ExceptionDetailPanel imports and mounts DraftReplySection", () => {
     expect(PANEL).toContain("import { DraftReplySection }");
-    expect(PANEL).toContain("<DraftReplySection data={analysis.draft_reply}");
+    // Mounted with the draft projection (props may span multiple lines now
+    // that the section also takes the jump-to-source + edit wiring).
+    expect(PANEL).toContain("<DraftReplySection");
+    expect(PANEL).toContain("data={analysis.draft_reply}");
   });
 
   it("mounts behind the draft_reply data-presence guard", () => {
