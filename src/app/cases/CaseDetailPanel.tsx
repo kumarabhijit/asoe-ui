@@ -31,6 +31,7 @@ import { ClassificationHistoryPanel } from "@/components/cases/ClassificationHis
 import { ComplianceHitCountChip } from "@/components/ui/ComplianceHitCountChip";
 import { ComplianceHitsRail } from "./ComplianceHitsRail";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
+import { SlaBandAnnouncer } from "@/components/ui/SlaBandAnnouncer";
 import { useClassificationHistory } from "@/hooks/useClassificationHistory";
 import type { Origin, OrderCase, SlaBand } from "@/types/cases";
 import type { ExceptionDetailResponse } from "@/types/api";
@@ -193,6 +194,13 @@ export function CaseDetailPanel({
 
   return (
     <div className="space-y-24">
+      {/* S3 finding #B — announce SLA band transitions for the
+          selected case so screen-reader users hear it when the
+          chip's color flips. The component renders only an
+          sr-only `aria-live` region; no visible chrome. Silent on
+          ticker re-renders that don't cross a band, silent on
+          case switches (baselines instead). */}
+      <SlaBandAnnouncer sla={sla} caseId={orderCase.case_id} />
       {renderSlimHeader ? (
         <header
           aria-label="Case context"
@@ -254,6 +262,13 @@ export function CaseDetailPanel({
             const activity = lastActivityLabel(orderCase.updated_at, now);
             return activity ? (
               <span
+                // S3 finding #E — `aria-live="off"` is explicit
+                // silence: the ticker re-renders this label every
+                // minute, but the "2 min ago → 3 min ago" delta
+                // is noise to a screen-reader user. The SLA
+                // announcer (#B) carries the truly operator-
+                // meaningful transitions.
+                aria-live="off"
                 className="text-text-tertiary"
                 aria-label={`Last activity ${activity}`}
                 title={orderCase.updated_at ?? undefined}
@@ -323,6 +338,10 @@ export function CaseDetailPanel({
             const activity = lastActivityLabel(orderCase.updated_at, now);
             return activity ? (
               <span
+                // S3 finding #E — same explicit `aria-live="off"`
+                // as the slim-header variant; the per-minute
+                // ticks should not narrate.
+                aria-live="off"
                 className="text-caption text-text-tertiary"
                 aria-label={`Last activity ${activity}`}
                 title={orderCase.updated_at ?? undefined}
