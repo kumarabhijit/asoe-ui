@@ -22,22 +22,45 @@ import type {
   Origin,
   OrderCase,
 } from "@/types/cases";
-import { SG_BLOCK_UNMAPPED, SG_NEEDS_TRIAGE } from "@/generated/taxonomy";
+import {
+  INTENTS_BY_SUPERGROUP,
+  SG_BLOCK_UNMAPPED,
+  SG_NEEDS_TRIAGE,
+  type SupergroupCode,
+} from "@/generated/taxonomy";
 
 import { MOCK_EXCEPTIONS } from "./exceptions";
 
 
-// Coarse intent→supergroup projection for the mock layer. The live
-// classifier resolves this against `INTENTS_BY_SUPERGROUP`; the
-// mock keeps a small switch so the fixture surface mirrors the
-// live shape without pulling in the full taxonomy.
+// Inverse of the generated `INTENTS_BY_SUPERGROUP` (intent code →
+// supergroup), built once at module load. This is the same source
+// of truth the live classifier resolves against: regenerating the
+// taxonomy from `case_taxonomy.yaml` propagates here with zero
+// hand-editing, so the mock cannot drift from the backend. (The mock
+// previously hand-authored this map, which silently disagreed with
+// the taxonomy for CONTRACTUAL_CORRECTION — order-integrity, not
+// pricing; it is now backend-driven.)
+const SUPERGROUP_BY_INTENT_CODE: Record<string, SupergroupCode> =
+  Object.entries(INTENTS_BY_SUPERGROUP).reduce((acc, [sg, intents]) => {
+    for (const code of intents) acc[code] = sg as SupergroupCode;
+    return acc;
+  }, {} as Record<string, SupergroupCode>);
+
+
+// Project a mock record onto its supergroup.
 //
 // CUSTOMER-origin cases project off `event_type` first because the
 // seed exception fixtures reuse `intent: MANUAL_ORDER_INTAKE` for
 // every email shape (entry / change / inquiry / complaint /
 // general) — projecting off intent alone collapses the whole
 // Customer Inbox to SG_NEW_ORDER, which hides the supergroup
-// variety the classification-history strip is meant to show.
+// variety the classification-history strip is meant to show. This
+// `event_type`→supergroup heuristic is mock-fixture demo plumbing,
+// not a taxonomy claim.
+//
+// Everything else derives from the generated taxonomy SoT. The
+// taxonomy keys on `INT_`-prefixed intent codes; the wire/mock
+// `intent` is the bare form, so we prefix to look it up.
 function supergroupFor(exc: ExceptionSummary, origin: Origin): string {
   if (origin === "CUSTOMER") {
     const et = exc.event_type ?? "";
@@ -46,35 +69,14 @@ function supergroupFor(exc: ExceptionSummary, origin: Origin): string {
     if (et === "EMAIL_COMPLAINT") return "SG_COMPLAINT_SERVICE";
     if (et === "EMAIL_GENERAL") return "SG_DOCUMENTATION";
     if (et === "EMAIL_ORDER_ENTRY_REQUEST") return "SG_NEW_ORDER";
-    // ORDER_RECEIVED falls through to the intent switch — these
+    // ORDER_RECEIVED falls through to the taxonomy lookup — these
     // are full-text-arrived orders that may carry pricing /
     // logistics / availability concerns regardless of channel.
   }
   const intent = exc.intent ?? "";
-  switch (intent) {
-    case "CREDIT_BLOCK":
-      return "SG_BLOCK_CREDIT";
-    case "PRICE_MISMATCH":
-    case "MASS_PRICING_ERROR":
-    case "PRICE_HOLD_RELEASE":
-    case "CONTRACTUAL_CORRECTION":
-      return "SG_BLOCK_PRICING";
-    case "DUPLICATE_PO":
-    case "EDI_MISMATCH":
-      return "SG_BLOCK_ORDER_INTEGRITY";
-    case "BACK_ORDER":
-    case "MIN_ORDER_QTY":
-    case "OVER_MAX":
-      return "SG_BLOCK_AVAILABILITY";
-    case "BROKEN_PALLET":
-    case "DELIVERY_DELAY":
-    case "PALLET_CONFIG":
-      return "SG_BLOCK_LOGISTICS";
-    case "MANUAL_ORDER_INTAKE":
-      return "SG_NEW_ORDER";
-    default:
-      return origin === "CUSTOMER" ? SG_NEEDS_TRIAGE : SG_BLOCK_UNMAPPED;
-  }
+  const supergroup = SUPERGROUP_BY_INTENT_CODE[`INT_${intent}`];
+  if (supergroup) return supergroup;
+  return origin === "CUSTOMER" ? SG_NEEDS_TRIAGE : SG_BLOCK_UNMAPPED;
 }
 
 
