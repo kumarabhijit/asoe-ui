@@ -1,0 +1,200 @@
+/**
+ * ConfidenceDisplay — the single cross-case renderer for a confidence
+ * score (asoe-ui CLAUDE.md Guardrail #1 visual-mapping pattern).
+ *
+ * Every case type that surfaces a confidence — manual order intake
+ * (`composite_confidence`), the Agent Recommendation card
+ * (`OrderAnalysis.confidence`), duplicate detection, extracted entities,
+ * the extracted order form — renders it through this component so the
+ * scale (0–1 vs 0–100), the band colours, the icon+text accessibility
+ * pairing, and the honesty framing are identical everywhere.
+ *
+ * Honesty posture (Verdict 2026-04-22 / the trust review):
+ *   The score is a raw model output, not a calibrated probability of
+ *   correctness, until the backend reports a calibration claim. The
+ *   `calibrated` prop carries that claim:
+ *     - `true`  → framed as "Calibrated confidence".
+ *     - `false` / `undefined` → framed as a model score, with a visible,
+ *       keyboard-reachable note that calibration is not reported. We do
+ *       NOT silently present an uncalibrated number as a precise
+ *       probability — that was the #1 trust hazard the review flagged.
+ *
+ * Accessibility: the band is never colour-only. The band label (text)
+ * and the percentage are always rendered, and the root carries an
+ * `aria-label` that states the value, band, and calibration posture
+ * (WCAG 1.4.1).
+ */
+"use client";
+
+import { ShieldCheck, Gauge } from "lucide-react";
+import {
+  toCanonicalConfidence,
+  confidenceBand,
+  confidencePct,
+  type ConfidenceScale,
+  type ConfidenceBand,
+} from "@/lib/confidence";
+import { cn } from "@/lib/utils";
+
+/** Band → visual mapping (design tokens only). Default-fallback safe:
+ *  `confidenceBand` only ever returns one of these three keys. */
+const BAND_META: Record<
+  ConfidenceBand,
+  { label: string; barClass: string; textClass: string }
+> = {
+  high: { label: "High", barClass: "bg-success", textClass: "text-success" },
+  review: { label: "Needs check", barClass: "bg-warning", textClass: "text-warning" },
+  low: { label: "Low", barClass: "bg-error", textClass: "text-error" },
+};
+
+export type ConfidenceVariant = "bar" | "inline" | "prominent";
+
+export interface ConfidenceDisplayProps {
+  /** Raw score from the producer. */
+  value: number;
+  /** Producer units. `"unit"` for 0–1 fields, `"percent"` for 0–100. */
+  scale?: ConfidenceScale;
+  /**
+   * Backend calibration claim. `undefined` means the backend did not
+   * report one — the component frames the value as a raw model score
+   * rather than asserting a calibration the data does not support.
+   */
+  calibrated?: boolean;
+  /** Layout. `bar` (Layer-1 card), `inline` (chip), `prominent` (hero). */
+  variant?: ConfidenceVariant;
+  /** Visible label. Defaults to "Confidence". */
+  label?: string;
+  className?: string;
+}
+
+/** Short, accessible note on calibration posture. Shown as muted text in
+ *  `prominent`, and folded into the `aria-label` in every variant. */
+function calibrationNote(calibrated?: boolean): string {
+  return calibrated === true
+    ? "Calibrated confidence"
+    : "Model score — calibration not reported; not a validated probability";
+}
+
+export function ConfidenceDisplay({
+  value,
+  scale = "unit",
+  calibrated,
+  variant = "inline",
+  label = "Confidence",
+  className,
+}: ConfidenceDisplayProps) {
+  const canonical = toCanonicalConfidence(value, scale);
+  const band = confidenceBand(canonical);
+  const pct = confidencePct(canonical);
+  const meta = BAND_META[band];
+  const note = calibrationNote(calibrated);
+  const ariaLabel = `${label}: ${pct} percent, ${meta.label} band. ${note}.`;
+
+  if (variant === "bar") {
+    return (
+      <div
+        className={cn("flex items-center gap-8", className)}
+        role="group"
+        aria-label={ariaLabel}
+      >
+        <div
+          className="flex-1 h-1.5 bg-surface-tertiary rounded-full overflow-hidden"
+          aria-hidden
+        >
+          <div
+            className={cn(
+              "h-full rounded-full transition-[width] duration-normal ease-out",
+              meta.barClass,
+            )}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span
+          className={cn(
+            "text-label font-mono font-semibold min-w-[32px] text-right",
+            meta.textClass,
+          )}
+          aria-hidden
+        >
+          {pct}%
+        </span>
+        <span
+          className="text-label font-semibold uppercase tracking-wider text-text-tertiary"
+          aria-hidden
+        >
+          {meta.label}
+        </span>
+      </div>
+    );
+  }
+
+  if (variant === "prominent") {
+    // Raw producer value preserved for audit fidelity (confidence is
+    // audit-bearing). Unit-scale producers show two decimals; percent
+    // producers show the integer they emitted.
+    const rawLabel = scale === "percent" ? String(Math.round(value)) : value.toFixed(2);
+    return (
+      <div className={className} aria-label={ariaLabel} role="group">
+        <div className="flex items-baseline gap-8">
+          <span className={cn("text-display font-bold leading-tight", meta.textClass)} aria-hidden>
+            {pct}%
+          </span>
+          <ChipLabel meta={meta} />
+          <span className="text-caption text-text-tertiary font-mono" aria-hidden>
+            raw {rawLabel}
+          </span>
+        </div>
+        {/* Visible, keyboard-reachable calibration honesty note. */}
+        <div
+          className="mt-4 flex items-center gap-6 text-caption text-text-tertiary"
+          tabIndex={0}
+        >
+          {calibrated === true ? (
+            <ShieldCheck size={12} className="text-success shrink-0" aria-hidden />
+          ) : (
+            <Gauge size={12} className="text-text-tertiary shrink-0" aria-hidden />
+          )}
+          <span aria-hidden>{note}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // inline
+  return (
+    <span
+      className={cn("inline-flex items-center gap-6", className)}
+      role="img"
+      aria-label={ariaLabel}
+    >
+      <span className={cn("font-mono font-semibold", meta.textClass)} aria-hidden>
+        {pct}%
+      </span>
+      <ChipLabel meta={meta} />
+    </span>
+  );
+}
+
+function ChipLabel({ meta }: { meta: (typeof BAND_META)[ConfidenceBand] }) {
+  return (
+    <span
+      className={cn(
+        "text-label font-semibold uppercase tracking-wider",
+        meta.textClass,
+      )}
+      aria-hidden
+    >
+      {meta.label}
+    </span>
+  );
+}
+
+/** Re-export so a section can compose its own layout while still using
+ *  the canonical band colour (rare; prefer a variant above). */
+export function confidenceBandMeta(canonical: number): {
+  label: string;
+  barClass: string;
+  textClass: string;
+} {
+  return BAND_META[confidenceBand(canonical)];
+}

@@ -33,6 +33,7 @@
 import { type ReactNode } from "react";
 import { Zap, Check, AlertTriangle, ShieldX, XCircle } from "lucide-react";
 import { Badge, verdictVariant } from "./Badge";
+import { ConfidenceDisplay } from "./ConfidenceDisplay";
 import { ActionButtonMatrix } from "./ActionButtonMatrix";
 import { PolicyHitBadge } from "./PolicyHitBadge";
 import { cn } from "@/lib/utils";
@@ -178,26 +179,6 @@ function formatActionLabel(action: string): string {
     .join(" ");
 }
 
-function ConfidenceBar({ value }: { value: number }) {
-  const pct = Math.round(value * 100);
-  return (
-    <div className="flex items-center gap-8 flex-1">
-      <div className="flex-1 h-1.5 bg-surface-tertiary rounded-full overflow-hidden">
-        <div
-          className={cn(
-            "h-full rounded-full transition-[width] duration-normal ease-out",
-            pct >= 80 ? "bg-success" : pct >= 50 ? "bg-warning" : "bg-error",
-          )}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className="text-label font-mono text-text-tertiary font-semibold min-w-[32px] text-right">
-        {pct}%
-      </span>
-    </div>
-  );
-}
-
 export function AgentReasoningCard({
   verdict,
   executionError,
@@ -276,13 +257,15 @@ export function AgentReasoningCard({
           </div>
         )}
 
-        {/* Confidence bar */}
+        {/* Confidence bar — canonical cross-case renderer. `confidence`
+            reaches the card already normalised to 0–1 (the parent divides
+            the 0–100 OrderAnalysis.confidence via toCanonicalConfidence). */}
         {confidence !== undefined && (
           <div className="mb-12">
             <span className="block text-label text-text-tertiary font-semibold tracking-wider uppercase mb-4">
               Confidence
             </span>
-            <ConfidenceBar value={confidence} />
+            <ConfidenceDisplay value={confidence} scale="unit" variant="bar" />
           </div>
         )}
 

@@ -38,7 +38,11 @@ describe("EntitiesSection", () => {
 
   it("shows confidence + source_span when present", () => {
     render(<EntitiesSection data={FULL} />);
-    expect(screen.getByText(/confidence 97%/)).toBeInTheDocument();
+    // Confidence now renders through the canonical ConfidenceDisplay,
+    // which exposes value + band + calibration posture via aria-label.
+    expect(
+      screen.getByLabelText(/primary confidence: 97 percent/i),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/change to order 4500023421/),
     ).toBeInTheDocument();
@@ -47,7 +51,7 @@ describe("EntitiesSection", () => {
   it("suppresses confidence + source_span when absent (no placeholder)", () => {
     render(<EntitiesSection data={MINIMAL} />);
     expect(screen.getByText("0093847612")).toBeInTheDocument();
-    expect(screen.queryByText(/confidence/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/confidence/i)).not.toBeInTheDocument();
     // No ad-hoc dash/N/A placeholder leaked in.
     expect(screen.queryByText(/^(—|N\/A)$/)).not.toBeInTheDocument();
   });

@@ -35,7 +35,12 @@ const MINIMAL: OrderEntryExtraction = {
 describe("OrderEntrySection", () => {
   it("renders source/confidence, header, customer, and line items", () => {
     render(<OrderEntrySection data={FULL} />);
-    expect(screen.getByText(/PDF · 94%/)).toBeInTheDocument();
+    // Source type and confidence are now distinct elements; confidence
+    // renders through the canonical ConfidenceDisplay (aria-labelled).
+    expect(screen.getByText("PDF")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/extraction confidence: 94 percent/i),
+    ).toBeInTheDocument();
     expect(screen.getByText("0093847612")).toBeInTheDocument();
     expect(screen.getByText("Walmart Stores Inc")).toBeInTheDocument();
     expect(screen.getByText("BEV-COLA-12PK")).toBeInTheDocument();

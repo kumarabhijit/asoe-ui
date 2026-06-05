@@ -12,6 +12,7 @@
 
 import { Copy, ArrowRight, Shield, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { ConfidenceDisplay } from "@/components/ui/ConfidenceDisplay";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { fmtPrice } from "./shared";
 import { autonomyLevelLabel } from "@/lib/cases";
@@ -44,9 +45,16 @@ export function DuplicateDetectionSection({ data }: DuplicateDetectionSectionPro
         <span className="text-subhead font-semibold text-text-primary">
           Duplicate Detection
         </span>
-        <Badge variant="warning" size="sm">
-          {data.confidence}% confidence
-        </Badge>
+        {/* Detection confidence — canonical renderer (percent-scale
+            producer). Band colour replaces the always-warning badge so a
+            high-confidence detection no longer reads as a caution. */}
+        <ConfidenceDisplay
+          value={data.confidence}
+          scale="percent"
+          variant="inline"
+          label="Detection confidence"
+          className="ml-auto"
+        />
       </div>
 
       {/* Original vs Duplicate side-by-side */}

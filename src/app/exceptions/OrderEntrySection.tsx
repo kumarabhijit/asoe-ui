@@ -14,6 +14,7 @@
 
 import { ClipboardList, AlertTriangle } from "lucide-react";
 
+import { ConfidenceDisplay } from "@/components/ui/ConfidenceDisplay";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import type {
   OrderEntryExtraction,
@@ -55,8 +56,14 @@ export function OrderEntrySection({ data }: OrderEntrySectionProps) {
         <span className="text-subhead font-semibold text-text-primary">
           Extracted order
         </span>
-        <span className="ml-auto text-caption text-text-tertiary font-mono">
-          {data.source_type} · {Math.round(data.confidence * 100)}%
+        <span className="ml-auto flex items-center gap-8 text-caption text-text-tertiary">
+          <span className="font-mono">{data.source_type}</span>
+          <ConfidenceDisplay
+            value={data.confidence}
+            scale="unit"
+            variant="inline"
+            label="Extraction confidence"
+          />
         </span>
       </div>
 

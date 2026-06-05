@@ -31,6 +31,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useCaseTelemetry } from "@/hooks/useCaseTelemetry";
 import { casesRowV2Enabled } from "@/lib/flags";
 import { cn } from "@/lib/utils";
+import { toCanonicalConfidence } from "@/lib/confidence";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useExceptionActions } from "@/hooks/useExceptionActions";
@@ -799,7 +800,7 @@ export default function ExceptionDetailPanel({
               // (a fabricated default would silently disagree with the
               // pipeline classify-node confidence — Verdict 2026-04-22
               // partial-truth violation).
-              confidence={typeof analysis?.confidence === "number" ? analysis.confidence / 100 : undefined}
+              confidence={typeof analysis?.confidence === "number" ? toCanonicalConfidence(analysis.confidence, "percent") : undefined}
               recipeName={detail.selected_recipe ?? undefined}
               // Surfaced as a hover tooltip on the Approve button so the
               // reviewer sees the exact action they're accepting.

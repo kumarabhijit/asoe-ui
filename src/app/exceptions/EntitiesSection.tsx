@@ -16,6 +16,7 @@
 
 import { Tags } from "lucide-react";
 
+import { ConfidenceDisplay } from "@/components/ui/ConfidenceDisplay";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import type { EntitiesAnalysisData } from "@/types/exceptions";
 
@@ -57,11 +58,17 @@ export function EntitiesSection({ data }: EntitiesSectionProps) {
               </span>
             </div>
 
-            {/* Confidence — contextual; suppressed when absent. */}
+            {/* Confidence — contextual; suppressed when absent. Rendered
+                through the canonical cross-case ConfidenceDisplay. */}
             <EvidenceBlock tier="contextual" value={entity.confidence}>
               {(value) => (
-                <div className="mt-4 text-caption text-text-tertiary">
-                  confidence {Math.round(Number(value) * 100)}%
+                <div className="mt-4">
+                  <ConfidenceDisplay
+                    value={Number(value)}
+                    scale="unit"
+                    variant="inline"
+                    label={`${entity.key} confidence`}
+                  />
                 </div>
               )}
             </EvidenceBlock>
