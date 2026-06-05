@@ -79,6 +79,7 @@ src/
 ├── hooks/
 │   ├── useAuth.ts                # Wraps NextAuth session with typed user + visibleTabs, assignedAccounts
 │   ├── useErpProfile.ts          # ERP-vendor-aware label resolver (useIntentLabel, useSubTypeLabel)
+│   ├── useEvidenceSelection.tsx  # ADR-043 field↔source linking — shared evidence selection (provider + hook) keyed on a backend-authoritative supports_ref / evidence_ref
 │   ├── useExceptionActions.ts    # HITL handlers (approve / reject / escalate / override / cosign / reanalyze)
 │   ├── useHealth.ts              # Fetches runtime enums from /api/v1/health
 │   ├── useKeyboardListNav.ts     # ArrowUp/Down + j/k + Home/End on a sorted single-select listbox. Consumed by /cases workspace queue (ADR-041 P3c).

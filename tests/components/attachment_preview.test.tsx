@@ -5,10 +5,11 @@
  * client is mocked so no bytes are fetched; PDF.js is never reached (text/SVG
  * paths only) so no canvas/worker is needed.
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { AttachmentPreview } from "@/components/ui/AttachmentPreview";
+import { EvidenceSelectionProvider } from "@/hooks/useEvidenceSelection";
 import type { EmailAttachmentManifestEntry, EvidenceAnchor } from "@/types/exceptions";
 
 vi.mock("@/lib/api", () => ({
@@ -118,6 +119,38 @@ describe("AttachmentPreview", () => {
     render(<AttachmentPreview caseId="case-1" attachment={attachment()} anchors={[poAnchor()]} />);
     await screen.findByTestId("pdf-canvas-layer");
     expect(screen.queryByTestId("spatial-overlay")).toBeNull();
+  });
+
+  it("field↔source: selecting a safety-bar row toggles aria-pressed and emphasises the matching overlay", async () => {
+    // %PDF blob → pdf renderer; a verified spatial anchor draws an overlay
+    // keyed by supports_ref. Selecting the row foregrounds that overlay.
+    getBlob.mockResolvedValue(new Blob(["%PDF-1.4\nmock"], { type: "application/pdf" }));
+    const spatial: EvidenceAnchor = {
+      ...poAnchor(),
+      anchor_source: "spatial_extracted",
+      page: 1,
+      bbox: [0.1, 0.2, 0.5, 0.3],
+      confidence: 0.97,
+      rendition_hash: "rh-1",
+    };
+    render(
+      <EvidenceSelectionProvider>
+        <AttachmentPreview caseId="case-1" attachment={attachment()} anchors={[spatial]} />
+      </EvidenceSelectionProvider>,
+    );
+    const row = await screen.findByRole("button", { name: /PO number/i });
+    expect(row).toHaveAttribute("aria-pressed", "false");
+    const overlay = await screen.findByTestId("spatial-overlay");
+    expect(overlay.getAttribute("data-selected")).toBeNull();
+
+    fireEvent.click(row);
+    expect(row).toHaveAttribute("aria-pressed", "true");
+    expect(overlay.getAttribute("data-selected")).toBe("true");
+
+    // Toggling off clears the selection (and the overlay emphasis).
+    fireEvent.click(row);
+    expect(row).toHaveAttribute("aria-pressed", "false");
+    expect(overlay.getAttribute("data-selected")).toBeNull();
   });
 
   it("default-denies SVG (does not render the markup) and offers download", async () => {

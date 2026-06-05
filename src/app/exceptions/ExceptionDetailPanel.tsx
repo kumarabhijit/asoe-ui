@@ -35,6 +35,7 @@ import { toCanonicalConfidence } from "@/lib/confidence";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useExceptionActions } from "@/hooks/useExceptionActions";
+import { EvidenceSelectionProvider } from "@/hooks/useEvidenceSelection";
 import { exceptionsApi } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { OverrideChooserDialog } from "./OverrideChooserDialog";
@@ -545,6 +546,10 @@ export default function ExceptionDetailPanel({
 
   return (
     <Layer2OpenContext.Provider value={markLayer2Opened}>
+    {/* ADR-043 field↔source linking — shared evidence selection across the
+        entity sections and the in-document viewer. Keyed by exceptionId so
+        switching records drops a stale highlight (provider remounts). */}
+    <EvidenceSelectionProvider key={exceptionId}>
     <div className="h-full flex flex-col font-sans min-w-0">
 
       {/* ━━ 1. Dynamic Header Ribbon ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
@@ -1143,6 +1148,7 @@ export default function ExceptionDetailPanel({
         );
       })()}
     </div>
+    </EvidenceSelectionProvider>
     </Layer2OpenContext.Provider>
   );
 }

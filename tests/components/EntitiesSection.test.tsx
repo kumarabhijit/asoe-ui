@@ -6,9 +6,10 @@
  * when null) — never an ad-hoc placeholder (Guardrail #6).
  */
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 
 import { EntitiesSection } from "@/app/exceptions/EntitiesSection";
+import { EvidenceSelectionProvider } from "@/hooks/useEvidenceSelection";
 import type { EntitiesAnalysisData } from "@/types/exceptions";
 
 const FULL: EntitiesAnalysisData = {
@@ -54,5 +55,49 @@ describe("EntitiesSection", () => {
     expect(screen.queryByLabelText(/confidence/i)).not.toBeInTheDocument();
     // No ad-hoc dash/N/A placeholder leaked in.
     expect(screen.queryByText(/^(—|N\/A)$/)).not.toBeInTheDocument();
+  });
+
+  // ── ADR-043 field↔source linking ──────────────────────────────────────────
+  it("offers a 'Show in source' control only when the entity carries an evidence_ref", () => {
+    render(
+      <EvidenceSelectionProvider>
+        <EntitiesSection
+          data={{
+            extracted: [
+              { ...FULL.extracted[0], evidence_ref: "order_entry.primary" },
+              { key: "po", value: "0093847612", kind: "po" }, // no ref
+            ],
+          }}
+        />
+      </EvidenceSelectionProvider>,
+    );
+    // Exactly one linkable row → one control.
+    const controls = screen.getAllByRole("button", { name: /show in source/i });
+    expect(controls).toHaveLength(1);
+  });
+
+  it("toggles the shared selection when the link control is activated", () => {
+    render(
+      <EvidenceSelectionProvider>
+        <EntitiesSection
+          data={{ extracted: [{ ...FULL.extracted[0], evidence_ref: "order_entry.primary" }] }}
+        />
+      </EvidenceSelectionProvider>,
+    );
+    const control = screen.getByRole("button", { name: /show in source/i });
+    expect(control).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(control);
+    expect(
+      screen.getByRole("button", { name: /showing in source/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("renders no link control when no entity carries an evidence_ref", () => {
+    render(
+      <EvidenceSelectionProvider>
+        <EntitiesSection data={MINIMAL} />
+      </EvidenceSelectionProvider>,
+    );
+    expect(screen.queryByRole("button", { name: /show in source/i })).not.toBeInTheDocument();
   });
 });

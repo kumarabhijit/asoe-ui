@@ -714,6 +714,13 @@ export interface ExtractedEntity {
   kind: string;
   confidence?: number | null;
   source_span?: string | null;
+  /** ADR-043 field↔source linking. The deterministic locate key of the
+   *  EvidenceAnchor that supports this entity (the anchor's `supports_ref`).
+   *  When present, the UI couples the entity row to its in-document
+   *  highlight. Mirrors `api/schemas.py::ExtractedEntity.evidence_ref`.
+   *  preview-only — populated by the extraction producer (pass-through),
+   *  not synthesised; null until that producer lands. */
+  evidence_ref?: string | null;
 }
 
 export interface EntitiesAnalysisData {
