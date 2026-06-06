@@ -966,6 +966,9 @@ export interface DuplicateDetectionData {
   days_between: number;
   /** Detection confidence 0-100 */
   confidence: number;
+  /** ADR-032 — `confidence` as a typed signal (canonical 0-1) with
+   *  calibration provenance. Mirrors `api/schemas.py`; null until projected. */
+  confidence_signal?: ConfidenceSignal | null;
   /** Agent-recommended action (e.g., "Cancel duplicate SO-002") */
   recommended_action: string;
   /** SO number the agent recommends cancelling */

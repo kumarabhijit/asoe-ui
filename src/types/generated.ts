@@ -1874,6 +1874,7 @@ export interface components {
             cancellation_target: string;
             /** Confidence */
             confidence: number;
+            confidence_signal?: components["schemas"]["ConfidenceSignal"] | null;
             /** Days Between */
             days_between: number;
             /** Detection Method */

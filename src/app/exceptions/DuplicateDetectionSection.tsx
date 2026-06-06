@@ -53,6 +53,7 @@ export function DuplicateDetectionSection({ data }: DuplicateDetectionSectionPro
           scale="percent"
           variant="inline"
           label="Detection confidence"
+          calibrated={data.confidence_signal?.calibrated}
           className="ml-auto"
         />
       </div>

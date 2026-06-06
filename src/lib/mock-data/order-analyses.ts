@@ -156,6 +156,9 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       detection_method: "Same customer + identical SKUs + identical quantities within 48-hour window",
       days_between: 1.5,
       confidence: 88,
+      // ADR-032 — canonical 0-1 signal mirroring the backend projection
+      // (uncalibrated until the loop ships). The scalar above stays 0-100.
+      confidence_signal: { value: 0.88, calibrated: false, method: "duplicate_detection_composite_raw" },
       recommended_action: "Block duplicate SO-1042 and notify buyer QuickMart for confirmation",
       cancellation_target: "SO-1042",
       autonomy_applied: "L2 — Review required, value $6,720 exceeds auto-block threshold ($1,000)",
