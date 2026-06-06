@@ -21,6 +21,10 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
   "exc-001": {
     diagnosis: "Two line items reference promo pricing from an expired Q4 trade promotion (ZPROM condition valid through 12/31). One line has a $0.02 EDI rounding variance within tolerance. Recommend auto-override for the rounding and promo reload for the expired conditions.",
     confidence: 92,
+    // ADR-032 — the same score as a typed signal. Uncalibrated until the
+    // calibration loop ships (mirrors the backend `from_raw` projection), so
+    // the card frames it as a model score, not a validated probability.
+    confidence_signal: { value: 0.92, calibrated: false, method: "llm_intent_classifier_raw" },
     risk: "MEDIUM",
     resolution: "AUTO_OVERRIDE",
     root_cause: "Promotional condition ZPROM/155 expired 12/31/2025. PO still references promo pricing.",

@@ -1064,6 +1064,7 @@ export interface components {
             change_analysis?: components["schemas"]["ChangeAnalysis"] | null;
             /** Confidence */
             confidence: number;
+            confidence_signal?: components["schemas"]["ConfidenceSignal"] | null;
             delivery_delay_analysis?: components["schemas"]["DeliveryDelayAnalysisData"] | null;
             /** Diagnosis */
             diagnosis: string;
@@ -1497,6 +1498,34 @@ export interface components {
             status: string;
             /** Total Value */
             total_value: number;
+        };
+        /**
+         * ConfidenceSignal
+         * @description A confidence score plus its calibration provenance (trust surface).
+         *
+         *     `value` is the canonical 0.0–1.0 score. `calibrated` states whether
+         *     `value` has been calibrated to an observed-accuracy definition (ECE /
+         *     Brier per ADR-032) — until that loop ships it is False, and the UI must
+         *     frame the number as a raw model score, never a validated probability of
+         *     correctness. `method` names the producer so an auditor can reconstruct
+         *     WHICH scorer produced the number; `sample_n` is the cohort size behind a
+         *     calibrated band (None for a raw single score).
+         *
+         *     Honesty rule (Verdict 2026-04-22 / Guardrail #6): the projector restates
+         *     the raw model score with calibrated=False — it never fabricates a
+         *     calibration claim, and it returns None for a missing / non-positive score
+         *     so the surface stays absent rather than showing a synthetic 0 the operator
+         *     can't distinguish from a real low-confidence reading.
+         */
+        ConfidenceSignal: {
+            /** Calibrated */
+            calibrated: boolean;
+            /** Method */
+            method?: string | null;
+            /** Sample N */
+            sample_n?: number | null;
+            /** Value */
+            value: number;
         };
         /** ConfigAuditEntry */
         ConfigAuditEntry: {
@@ -2535,6 +2564,8 @@ export interface components {
         ExtractedEntity: {
             /** Confidence */
             confidence?: number | null;
+            /** Evidence Ref */
+            evidence_ref?: string | null;
             /** Key */
             key: string;
             /** Kind */

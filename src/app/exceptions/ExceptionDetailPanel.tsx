@@ -511,6 +511,16 @@ export default function ExceptionDetailPanel({
 
   /* ── Derived values ──────────────────────────────────────────────── */
 
+  // ADR-032 — prefer the typed confidence signal (canonical 0–1 + calibration
+  // provenance) over the legacy 0–100 scalar. Both carry the same raw score;
+  // the signal also tells the card whether to frame it as calibrated.
+  const confidenceSignal = analysis?.confidence_signal ?? null;
+  const confidenceValue = confidenceSignal
+    ? toCanonicalConfidence(confidenceSignal.value, "unit")
+    : typeof analysis?.confidence === "number"
+      ? toCanonicalConfidence(analysis.confidence, "percent")
+      : undefined;
+
   const selectedAnalysis = analysis?.lines?.find((l) => l.line_id === selectedLine);
   const totalErp = lineItems.reduce((s, l) => s + l.erp_price * l.quantity, 0);
   const totalPo = lineItems.reduce((s, l) => s + l.po_price * l.quantity, 0);
@@ -805,7 +815,8 @@ export default function ExceptionDetailPanel({
               // (a fabricated default would silently disagree with the
               // pipeline classify-node confidence — Verdict 2026-04-22
               // partial-truth violation).
-              confidence={typeof analysis?.confidence === "number" ? toCanonicalConfidence(analysis.confidence, "percent") : undefined}
+              confidence={confidenceValue}
+              confidenceCalibrated={confidenceSignal?.calibrated}
               recipeName={detail.selected_recipe ?? undefined}
               // Surfaced as a hover tooltip on the Approve button so the
               // reviewer sees the exact action they're accepting.

@@ -348,10 +348,29 @@ export interface LineItemAnalysis {
   waterfall: PricingWaterfallStep[];
 }
 
+/**
+ * Confidence score plus its calibration provenance (ADR-032 trust surface).
+ * Mirrors `api/schemas.py::ConfidenceSignal`. `value` is canonical 0.0–1.0;
+ * `calibrated` is false until the ADR-032 calibration loop ships — when false,
+ * the UI frames the score as a raw model score, not a validated probability.
+ */
+export interface ConfidenceSignal {
+  value: number;
+  calibrated: boolean;
+  method?: string | null;
+  sample_n?: number | null;
+}
+
 /** Order-level agent analysis (drives detail panel enrichments) */
 export interface OrderAnalysis {
   diagnosis: string;
+  /** @deprecated 0–100 scalar retained for back-compat. Prefer
+   *  `confidence_signal` (canonical 0–1 + calibration provenance). */
   confidence: number;
+  /** Typed confidence + calibration provenance. Mirrors
+   *  `api/schemas.py::AnalysisResponse.confidence_signal`. Null when no real
+   *  classifier score is available (the UI then hides the bar). */
+  confidence_signal?: ConfidenceSignal | null;
   risk: "LOW" | "MEDIUM" | "HIGH";
   resolution: string;
   /** Underlying deterministic root cause prose (e.g. "Promo Expired").

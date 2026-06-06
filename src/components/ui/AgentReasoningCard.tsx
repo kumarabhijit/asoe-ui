@@ -79,6 +79,11 @@ interface AgentReasoningCardProps {
   executionError?: ExecutionError;
   intent?: string;
   confidence?: number;
+  /** Backend calibration claim for `confidence` (ADR-032). When omitted /
+   *  false, ConfidenceDisplay frames the score as a raw model score rather
+   *  than a validated probability. Sourced from
+   *  `analysis.confidence_signal.calibrated`. */
+  confidenceCalibrated?: boolean;
   recipeName?: string;
   explanation?: string;
   policyHits?: string[];
@@ -184,6 +189,7 @@ export function AgentReasoningCard({
   executionError,
   intent,
   confidence,
+  confidenceCalibrated,
   recipeName,
   explanation,
   policyHits,
@@ -265,7 +271,12 @@ export function AgentReasoningCard({
             <span className="block text-label text-text-tertiary font-semibold tracking-wider uppercase mb-4">
               Confidence
             </span>
-            <ConfidenceDisplay value={confidence} scale="unit" variant="bar" />
+            <ConfidenceDisplay
+              value={confidence}
+              scale="unit"
+              variant="bar"
+              calibrated={confidenceCalibrated}
+            />
           </div>
         )}
 

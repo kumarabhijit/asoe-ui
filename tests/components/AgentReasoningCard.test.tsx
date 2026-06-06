@@ -30,6 +30,22 @@ describe("AgentReasoningCard", () => {
       expect(screen.getByText("92%")).toBeInTheDocument();
     });
 
+    it("frames confidence as a model score when calibration is not reported (ADR-032)", () => {
+      render(<AgentReasoningCard verdict="GREEN" confidence={0.92} />);
+      // The bar's accessible name carries the calibration posture so the
+      // operator is never shown an uncalibrated number as a precise probability.
+      expect(
+        screen.getByRole("group", { name: /model score.*not a validated probability/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("frames confidence as calibrated when the backend reports it", () => {
+      render(<AgentReasoningCard verdict="GREEN" confidence={0.92} confidenceCalibrated />);
+      expect(
+        screen.getByRole("group", { name: /calibrated confidence/i }),
+      ).toBeInTheDocument();
+    });
+
     it("renders intent when provided", () => {
       render(<AgentReasoningCard verdict="GREEN" intent="CONTRACTUAL_CORRECTION" />);
       // The card resolves intent labels via useIntentLabel → intentLabelFor
