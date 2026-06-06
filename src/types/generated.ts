@@ -904,6 +904,10 @@ export interface paths {
         /**
          * Reviewer Activity Read
          * @description Structured snapshot of the automation-bias review-quality SLIs.
+         *
+         *     Typed response (not a bare dict) so the OpenAPI contract carries the shape
+         *     and the UI's generated type can't drift between the mock payload (local /
+         *     Vercel) and the live endpoint (Azure).
          */
         get: operations["reviewer_activity_read_api_v1_metrics_reviewer_activity_get"];
         put?: never;
@@ -3016,6 +3020,9 @@ export interface components {
          *     master; None when the master lookup hasn't run.
          */
         OrderEntryLineItem: {
+            /** Confidence */
+            confidence?: number | null;
+            confidence_signal?: components["schemas"]["ConfidenceSignal"] | null;
             /** Description */
             description?: string | null;
             /** Line Num */
@@ -3602,6 +3609,49 @@ export interface components {
             shadow_verdict?: string | null;
             /** Trace Id */
             trace_id?: string | null;
+        };
+        /** ReviewerActivityByHighlight */
+        ReviewerActivityByHighlight: {
+            not_shown: components["schemas"]["ReviewerActivityCohort"];
+            shown: components["schemas"]["ReviewerActivityCohort"];
+        };
+        /** ReviewerActivityCohort */
+        ReviewerActivityCohort: {
+            /** Decisions */
+            decisions: number;
+            /** Layer2 Open Rate */
+            layer2_open_rate: number;
+        };
+        /**
+         * ReviewerActivityDwellBucket
+         * @description Cumulative histogram bucket. `le_seconds` is the upper edge; None is the
+         *     +Inf overflow bucket.
+         */
+        ReviewerActivityDwellBucket: {
+            /** Count */
+            count: number;
+            /** Le Seconds */
+            le_seconds?: number | null;
+        };
+        /**
+         * ReviewerActivitySnapshot
+         * @description Automation-bias review-scrutiny SLIs (the "reviewing vs rubber-stamping"
+         *     signal). Process-local since restart; the fleet view is in Grafana.
+         */
+        ReviewerActivitySnapshot: {
+            by_highlight: components["schemas"]["ReviewerActivityByHighlight"];
+            /** Decisions */
+            decisions: number;
+            /** Dwell Seconds Histogram */
+            dwell_seconds_histogram?: components["schemas"]["ReviewerActivityDwellBucket"][];
+            /** Dwell Seconds Sum */
+            dwell_seconds_sum: number;
+            /** Layer2 Open Rate */
+            layer2_open_rate: number;
+            /** Layer2 Opened */
+            layer2_opened: number;
+            /** Scope */
+            scope: string;
         };
         /**
          * RoundUpPlanLine
@@ -5609,9 +5659,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ReviewerActivitySnapshot"];
                 };
             };
             /** @description Validation Error */

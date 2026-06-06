@@ -503,6 +503,10 @@ export interface OrderEntryLineItem {
   uom?: string | null;
   unit_price?: number | null;
   mdm_matched?: boolean | null;
+  /** ADR-032 — per-line extraction confidence (0–1) so the operator sees which
+   *  line the model was unsure about. Mirrors `api/schemas.py`. */
+  confidence?: number | null;
+  confidence_signal?: ConfidenceSignal | null;
 }
 
 export interface OrderEntryValidationFlag {

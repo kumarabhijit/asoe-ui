@@ -364,9 +364,13 @@ const SE_ORDER_ENTRY: OrderEntryExtraction = {
   header: { customer_po: "EML-PO-2026-0042", order_type: "ZOR", sales_org: "1000", dist_channel: "10", requested_date: "2026-05-24", ship_window_from: null, ship_window_to: null },
   customer_name: "Southeast Beverage Distributors",
   customer_bp: "300042",
+  // Per-line confidence (ADR-032): line 002 is deliberately lower so the
+  // operator can see WHICH line the model was unsure about — the gap the
+  // section-level score alone hid. confidence_signal mirrors the backend
+  // from_raw projection (uncalibrated until the loop ships).
   line_items: [
-    { line_num: "001", material: "BEV-COLA-12PK", description: "Cola 12-pack case", quantity: 600, uom: "CS", unit_price: 8.64, mdm_matched: true },
-    { line_num: "002", material: "BEV-LEMON-6PK", description: "Lemon 6-pack case", quantity: 240, uom: "CS", unit_price: 5.5, mdm_matched: true },
+    { line_num: "001", material: "BEV-COLA-12PK", description: "Cola 12-pack case", quantity: 600, uom: "CS", unit_price: 8.64, mdm_matched: true, confidence: 0.96, confidence_signal: { value: 0.96, calibrated: false, method: "order_entry_line_raw" } },
+    { line_num: "002", material: "BEV-LEMON-6PK", description: "Lemon 6-pack case", quantity: 240, uom: "CS", unit_price: 5.5, mdm_matched: true, confidence: 0.61, confidence_signal: { value: 0.61, calibrated: false, method: "order_entry_line_raw" } },
   ],
   validation_flags: [
     { field: "ship_to", severity: "WARNING", message: "Ship-to 'Atlanta DC' is ambiguous — confirm DC #6094." },

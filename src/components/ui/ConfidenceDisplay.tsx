@@ -14,15 +14,17 @@
  *   correctness, until the backend reports a calibration claim. The
  *   `calibrated` prop carries that claim:
  *     - `true`  → framed as "Calibrated confidence".
- *     - `false` / `undefined` → framed as a model score, with a visible,
- *       keyboard-reachable note that calibration is not reported. We do
- *       NOT silently present an uncalibrated number as a precise
- *       probability — that was the #1 trust hazard the review flagged.
+ *     - `false` / `undefined` → framed as a model score, with a
+ *       **visible** "model score" marker (not aria-only) so a sighted
+ *       operator sees the caveat too — the rendered-experience audit
+ *       (2026-06) found the note was previously screen-reader-only on the
+ *       `bar` / `inline` variants, leaving a confident-looking "98% High"
+ *       chip with no visible honesty cue. Every variant now shows it.
  *
  * Accessibility: the band is never colour-only. The band label (text)
- * and the percentage are always rendered, and the root carries an
- * `aria-label` that states the value, band, and calibration posture
- * (WCAG 1.4.1).
+ * and the percentage are always rendered, the visible calibration marker
+ * is `text-secondary` (legible, AA), and the root carries an `aria-label`
+ * that states the value, band, and calibration posture (WCAG 1.4.1).
  */
 "use client";
 
@@ -93,37 +95,41 @@ export function ConfidenceDisplay({
   if (variant === "bar") {
     return (
       <div
-        className={cn("flex items-center gap-8", className)}
+        className={cn("flex flex-col gap-4", className)}
         role="group"
         aria-label={ariaLabel}
       >
-        <div
-          className="flex-1 h-1.5 bg-surface-tertiary rounded-full overflow-hidden"
-          aria-hidden
-        >
+        <div className="flex items-center gap-8">
           <div
+            className="flex-1 h-1.5 bg-surface-tertiary rounded-full overflow-hidden"
+            aria-hidden
+          >
+            <div
+              className={cn(
+                "h-full rounded-full transition-[width] duration-normal ease-out",
+                meta.barClass,
+              )}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span
             className={cn(
-              "h-full rounded-full transition-[width] duration-normal ease-out",
-              meta.barClass,
+              "text-label font-mono font-semibold min-w-[32px] text-right",
+              meta.textClass,
             )}
-            style={{ width: `${pct}%` }}
-          />
+            aria-hidden
+          >
+            {pct}%
+          </span>
+          <span
+            className="text-label font-semibold uppercase tracking-wider text-text-tertiary"
+            aria-hidden
+          >
+            {meta.label}
+          </span>
         </div>
-        <span
-          className={cn(
-            "text-label font-mono font-semibold min-w-[32px] text-right",
-            meta.textClass,
-          )}
-          aria-hidden
-        >
-          {pct}%
-        </span>
-        <span
-          className="text-label font-semibold uppercase tracking-wider text-text-tertiary"
-          aria-hidden
-        >
-          {meta.label}
-        </span>
+        {/* Visible calibration cue (not aria-only). */}
+        <CalibrationMark calibrated={calibrated} />
       </div>
     );
   }
@@ -171,6 +177,46 @@ export function ConfidenceDisplay({
         {pct}%
       </span>
       <ChipLabel meta={meta} />
+      {/* Visible calibration cue (compact) — not aria-only. */}
+      <CalibrationMark calibrated={calibrated} compact />
+    </span>
+  );
+}
+
+/**
+ * Visible calibration cue. `compact` (inline) shows a short "model score" /
+ * "calibrated" tag; non-compact (bar) shows the fuller caveat. Always
+ * `aria-hidden` — the root group/img `aria-label` already states the
+ * calibration posture, so this avoids a double announcement while making the
+ * cue visible to sighted operators. `text-secondary` keeps it legible (AA).
+ */
+function CalibrationMark({
+  calibrated,
+  compact = false,
+}: {
+  calibrated?: boolean;
+  compact?: boolean;
+}) {
+  const ok = calibrated === true;
+  const Icon = ok ? ShieldCheck : Gauge;
+  const text = ok
+    ? "calibrated"
+    : compact
+      ? "model score"
+      : "Model score — not a calibrated probability";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-4 text-text-secondary",
+        compact ? "text-label" : "text-caption",
+      )}
+      aria-hidden
+    >
+      <Icon
+        size={compact ? 11 : 12}
+        className={cn("shrink-0", ok ? "text-success" : "text-text-tertiary")}
+      />
+      <span>{text}</span>
     </span>
   );
 }

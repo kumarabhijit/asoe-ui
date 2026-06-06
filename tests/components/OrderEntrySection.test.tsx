@@ -17,7 +17,7 @@ const FULL: OrderEntryExtraction = {
   customer_name: "Walmart Stores Inc",
   customer_bp: "300001",
   line_items: [
-    { line_num: "001", material: "BEV-COLA-12PK", quantity: 480, uom: "CS", unit_price: 8.64, mdm_matched: true },
+    { line_num: "001", material: "BEV-COLA-12PK", quantity: 480, uom: "CS", unit_price: 8.64, mdm_matched: true, confidence: 0.62 },
   ],
   validation_flags: [
     { field: "line 003", severity: "WARNING", message: "promo allowance" },
@@ -50,11 +50,18 @@ describe("OrderEntrySection", () => {
     expect(screen.getByText("BEV-COLA-12PK")).toBeInTheDocument();
     expect(screen.getByText("$8.64")).toBeInTheDocument();
     expect(screen.getByText(/line 003: promo allowance/)).toBeInTheDocument();
+    // ADR-032 — per-line confidence renders so the operator sees which line
+    // the model was unsure about.
+    expect(
+      screen.getByLabelText(/Line 001 confidence: 62 percent/i),
+    ).toBeInTheDocument();
   });
 
   it("suppresses absent header/customer/validation (no placeholder)", () => {
     render(<OrderEntrySection data={MINIMAL} />);
     expect(screen.getByText("SKU-X")).toBeInTheDocument();
+    // No per-line confidence on the minimal line → suppressed, no placeholder.
+    expect(screen.queryByLabelText(/Line 1 confidence/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Customer PO/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Customer$/)).not.toBeInTheDocument();
     // No unit price for the minimal line → no $ rendered.
