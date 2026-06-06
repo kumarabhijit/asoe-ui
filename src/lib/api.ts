@@ -1271,6 +1271,70 @@ export const healthApi = {
   },
 };
 
+/* ── Metrics / Review-Quality API (/api/v1/metrics) ───────────────────
+ * Read projection of the backend's automation-bias SLI counters — the
+ * "are operators scrutinising or rubber-stamping?" signal that gates a safe
+ * path to autonomy. Real, request-time-readable counters only; the backend
+ * deliberately exposes no counterfactual-STP or calibration-reliability data
+ * (no source yet), so the console renders those as honest "not available".
+ */
+export interface ReviewerActivityCohort {
+  decisions: number;
+  layer2_open_rate: number;
+}
+export interface ReviewerActivityDwellBucket {
+  /** Upper edge in seconds; null is the +Inf (overflow) bucket. */
+  le_seconds: number | null;
+  /** Cumulative count of decisions at or below this dwell. */
+  count: number;
+}
+/** Mirrors `api/metrics.py::reviewer_activity_snapshot`. */
+export interface ReviewerActivitySnapshot {
+  /** Data scope — process-local since restart; the fleet view is in Grafana. */
+  scope: string;
+  decisions: number;
+  layer2_opened: number;
+  layer2_open_rate: number;
+  dwell_seconds_histogram: ReviewerActivityDwellBucket[];
+  dwell_seconds_sum: number;
+  by_highlight: {
+    shown: ReviewerActivityCohort;
+    not_shown: ReviewerActivityCohort;
+  };
+}
+
+const MOCK_REVIEWER_ACTIVITY: ReviewerActivitySnapshot = {
+  scope: "process_local_since_restart",
+  decisions: 184,
+  layer2_opened: 121,
+  layer2_open_rate: 0.6576,
+  dwell_seconds_histogram: [
+    { le_seconds: 1, count: 9 },
+    { le_seconds: 3, count: 41 },
+    { le_seconds: 5, count: 78 },
+    { le_seconds: 10, count: 128 },
+    { le_seconds: 30, count: 167 },
+    { le_seconds: 60, count: 179 },
+    { le_seconds: 300, count: 184 },
+    { le_seconds: null, count: 184 },
+  ],
+  dwell_seconds_sum: 2317.4,
+  by_highlight: {
+    shown: { decisions: 96, layer2_open_rate: 0.7292 },
+    not_shown: { decisions: 88, layer2_open_rate: 0.5795 },
+  },
+};
+
+export const metricsApi = {
+  async getReviewerActivity(): Promise<ReviewerActivitySnapshot> {
+    if (USE_REAL_API) {
+      return http<ReviewerActivitySnapshot>("/api/v1/metrics/reviewer-activity");
+    }
+    await delay(120);
+    return MOCK_REVIEWER_ACTIVITY;
+  },
+};
+
 /* ── Attachments API (/api/v1/cases/{id}/attachments/{id}) ─────────── */
 
 /**

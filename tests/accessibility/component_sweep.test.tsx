@@ -18,6 +18,7 @@ import { ThemeProvider } from "next-themes";
 
 import { AgentReasoningCard } from "@/components/ui/AgentReasoningCard";
 import { ConfidenceDisplay } from "@/components/ui/ConfidenceDisplay";
+import { ReviewQualityPanel } from "@/components/ui/ReviewQualityPanel";
 import { NavBar } from "@/components/ui/NavBar";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -151,6 +152,26 @@ describe("a11y sweep: ConfidenceDisplay", () => {
     ));
   it("prominent variant (calibration not reported)", async () =>
     expectNoViolations(<ConfidenceDisplay value={0.42} variant="prominent" />));
+});
+
+describe("a11y sweep: ReviewQualityPanel", () => {
+  const snap = {
+    scope: "process_local_since_restart",
+    decisions: 100,
+    layer2_opened: 70,
+    layer2_open_rate: 0.7,
+    dwell_seconds_histogram: [
+      { le_seconds: 1, count: 10 },
+      { le_seconds: 5, count: 40 },
+      { le_seconds: null, count: 100 },
+    ],
+    dwell_seconds_sum: 1234,
+    by_highlight: {
+      shown: { decisions: 50, layer2_open_rate: 0.8 },
+      not_shown: { decisions: 50, layer2_open_rate: 0.6 },
+    },
+  };
+  it("renders axe-clean", async () => expectNoViolations(<ReviewQualityPanel data={snap} />));
 });
 
 describe("a11y sweep: NavBar", () => {
