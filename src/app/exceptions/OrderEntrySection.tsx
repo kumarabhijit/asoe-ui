@@ -112,6 +112,21 @@ export function OrderEntrySection({ data }: OrderEntrySectionProps) {
                   </span>
                 )}
               </EvidenceBlock>
+              {/* Per-line extraction confidence — contextual; suppressed when
+                  absent. Lets the operator spot WHICH line the model was
+                  unsure about, not just a section-level number. */}
+              <EvidenceBlock tier="contextual" value={li.confidence}>
+                {(v) => (
+                  <ConfidenceDisplay
+                    value={Number(v)}
+                    scale="unit"
+                    variant="inline"
+                    label={`Line ${li.line_num} confidence`}
+                    calibrated={li.confidence_signal?.calibrated}
+                    className="shrink-0"
+                  />
+                )}
+              </EvidenceBlock>
             </li>
           ))}
         </ul>
