@@ -1174,7 +1174,13 @@ export interface OverMaxLine {
   sku: string;
   description: string;
   qty: number;
-  max_line_qty: number;
+  /**
+   * Per-line maximum order quantity. Nullable to mirror the backend
+   * contract (api/schemas.py::OverMaxLine.max_line_qty is
+   * `Optional[float] = None`) — the OMS does not always carry a
+   * per-line cap. Renderers MUST null-guard before formatting.
+   */
+  max_line_qty: number | null;
   excess: number;
   is_even_layer_item: boolean;
 }
