@@ -64,6 +64,13 @@ const ROUTE_BASELINE: Record<string, number> = {
   "/cases/:id": 1,
   "/dashboard": 1,
   "/settings": 1,
+  // Same documented small-caption color-contrast debt as every sibling
+  // route — `text-text-tertiary` / `text-text-quaternary` captions/labels,
+  // including via the shared `MetricTile` (the irreducible source until the
+  // design-token contrast fix lands). axe aggregates these into a single
+  // `serious` violation object. Rationale in UX_ACCESSIBILITY.md "Known
+  // shortfalls"; drive to 0 with the token fix, not a per-page workaround.
+  "/settings/autonomy": 1,
 };
 
 // Rule ids that may be disabled per-route while an underlying
