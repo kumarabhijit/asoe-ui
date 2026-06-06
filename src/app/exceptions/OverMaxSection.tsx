@@ -162,7 +162,13 @@ export function OverMaxSection({ data }: OverMaxSectionProps) {
                     <span className="text-text-tertiary ml-4">{line.description}</span>
                   </div>
                   <span className="text-right font-mono text-text-primary">{line.qty.toLocaleString()}</span>
-                  <span className="text-right font-mono text-text-secondary">{line.max_line_qty.toLocaleString()}</span>
+                  <span className="text-right font-mono text-text-secondary">
+                    {line.max_line_qty != null ? (
+                      line.max_line_qty.toLocaleString()
+                    ) : (
+                      <span className="text-text-quaternary">—</span>
+                    )}
+                  </span>
                   <span className={cn(
                     "text-right font-mono font-bold",
                     line.excess > 0 ? "text-error" : "text-success",
