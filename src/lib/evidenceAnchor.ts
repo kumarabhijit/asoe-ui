@@ -40,3 +40,19 @@ export function resolveAnchorStatus(docText: string | null, anchor: EvidenceAnch
   if (n === 1) return "located";
   return "ambiguous";
 }
+
+/**
+ * Find the anchor whose `supports_ref` matches a selected evidence ref
+ * (ADR-043 field↔source linking). Pure lookup — the ref is backend-
+ * authoritative (it comes from `EvidenceAnchor.supports_ref` /
+ * `ExtractedEntity.evidence_ref`), so the UI never derives or guesses a
+ * pairing. Returns null when no anchor supports the ref (e.g. the producer
+ * stamped a ref but no matching anchor was located for this attachment).
+ */
+export function anchorForRef(
+  anchors: EvidenceAnchor[],
+  ref: string | null | undefined,
+): EvidenceAnchor | null {
+  if (!ref) return null;
+  return anchors.find((a) => a.supports_ref === ref) ?? null;
+}

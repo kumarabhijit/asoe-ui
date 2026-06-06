@@ -21,6 +21,10 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
   "exc-001": {
     diagnosis: "Two line items reference promo pricing from an expired Q4 trade promotion (ZPROM condition valid through 12/31). One line has a $0.02 EDI rounding variance within tolerance. Recommend auto-override for the rounding and promo reload for the expired conditions.",
     confidence: 92,
+    // ADR-032 — the same score as a typed signal. Uncalibrated until the
+    // calibration loop ships (mirrors the backend `from_raw` projection), so
+    // the card frames it as a model score, not a validated probability.
+    confidence_signal: { value: 0.92, calibrated: false, method: "llm_intent_classifier_raw" },
     risk: "MEDIUM",
     resolution: "AUTO_OVERRIDE",
     root_cause: "Promotional condition ZPROM/155 expired 12/31/2025. PO still references promo pricing.",
@@ -152,6 +156,9 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       detection_method: "Same customer + identical SKUs + identical quantities within 48-hour window",
       days_between: 1.5,
       confidence: 88,
+      // ADR-032 — canonical 0-1 signal mirroring the backend projection
+      // (uncalibrated until the loop ships). The scalar above stays 0-100.
+      confidence_signal: { value: 0.88, calibrated: false, method: "duplicate_detection_composite_raw" },
       recommended_action: "Block duplicate SO-1042 and notify buyer QuickMart for confirmation",
       cancellation_target: "SO-1042",
       autonomy_applied: "L2 — Review required, value $6,720 exceeds auto-block threshold ($1,000)",

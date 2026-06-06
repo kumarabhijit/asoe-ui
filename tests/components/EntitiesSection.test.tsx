@@ -6,9 +6,10 @@
  * when null) — never an ad-hoc placeholder (Guardrail #6).
  */
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 
 import { EntitiesSection } from "@/app/exceptions/EntitiesSection";
+import { EvidenceSelectionProvider } from "@/hooks/useEvidenceSelection";
 import type { EntitiesAnalysisData } from "@/types/exceptions";
 
 const FULL: EntitiesAnalysisData = {
@@ -38,7 +39,11 @@ describe("EntitiesSection", () => {
 
   it("shows confidence + source_span when present", () => {
     render(<EntitiesSection data={FULL} />);
-    expect(screen.getByText(/confidence 97%/)).toBeInTheDocument();
+    // Confidence now renders through the canonical ConfidenceDisplay,
+    // which exposes value + band + calibration posture via aria-label.
+    expect(
+      screen.getByLabelText(/primary confidence: 97 percent/i),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/change to order 4500023421/),
     ).toBeInTheDocument();
@@ -47,8 +52,68 @@ describe("EntitiesSection", () => {
   it("suppresses confidence + source_span when absent (no placeholder)", () => {
     render(<EntitiesSection data={MINIMAL} />);
     expect(screen.getByText("0093847612")).toBeInTheDocument();
-    expect(screen.queryByText(/confidence/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/confidence/i)).not.toBeInTheDocument();
     // No ad-hoc dash/N/A placeholder leaked in.
     expect(screen.queryByText(/^(—|N\/A)$/)).not.toBeInTheDocument();
+  });
+
+  // ── ADR-032 per-entity calibration framing ─────────────────────────────────
+  it("frames per-entity confidence as calibrated when the signal reports it", () => {
+    render(
+      <EntitiesSection
+        data={{
+          extracted: [
+            { ...FULL.extracted[0], confidence_signal: { value: 0.97, calibrated: true } },
+          ],
+        }}
+      />,
+    );
+    expect(
+      screen.getByLabelText(/primary confidence.*calibrated confidence/i),
+    ).toBeInTheDocument();
+  });
+
+  // ── ADR-043 field↔source linking ──────────────────────────────────────────
+  it("offers a 'Show in source' control only when the entity carries an evidence_ref", () => {
+    render(
+      <EvidenceSelectionProvider>
+        <EntitiesSection
+          data={{
+            extracted: [
+              { ...FULL.extracted[0], evidence_ref: "order_entry.primary" },
+              { key: "po", value: "0093847612", kind: "po" }, // no ref
+            ],
+          }}
+        />
+      </EvidenceSelectionProvider>,
+    );
+    // Exactly one linkable row → one control.
+    const controls = screen.getAllByRole("button", { name: /show in source/i });
+    expect(controls).toHaveLength(1);
+  });
+
+  it("toggles the shared selection when the link control is activated", () => {
+    render(
+      <EvidenceSelectionProvider>
+        <EntitiesSection
+          data={{ extracted: [{ ...FULL.extracted[0], evidence_ref: "order_entry.primary" }] }}
+        />
+      </EvidenceSelectionProvider>,
+    );
+    const control = screen.getByRole("button", { name: /show in source/i });
+    expect(control).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(control);
+    expect(
+      screen.getByRole("button", { name: /showing in source/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("renders no link control when no entity carries an evidence_ref", () => {
+    render(
+      <EvidenceSelectionProvider>
+        <EntitiesSection data={MINIMAL} />
+      </EvidenceSelectionProvider>,
+    );
+    expect(screen.queryByRole("button", { name: /show in source/i })).not.toBeInTheDocument();
   });
 });

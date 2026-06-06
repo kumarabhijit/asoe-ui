@@ -31,9 +31,11 @@ import { useToast } from "@/components/ui/Toast";
 import { useCaseTelemetry } from "@/hooks/useCaseTelemetry";
 import { casesRowV2Enabled } from "@/lib/flags";
 import { cn } from "@/lib/utils";
+import { toCanonicalConfidence } from "@/lib/confidence";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useExceptionActions } from "@/hooks/useExceptionActions";
+import { EvidenceSelectionProvider } from "@/hooks/useEvidenceSelection";
 import { exceptionsApi } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { OverrideChooserDialog } from "./OverrideChooserDialog";
@@ -509,6 +511,16 @@ export default function ExceptionDetailPanel({
 
   /* ── Derived values ──────────────────────────────────────────────── */
 
+  // ADR-032 — prefer the typed confidence signal (canonical 0–1 + calibration
+  // provenance) over the legacy 0–100 scalar. Both carry the same raw score;
+  // the signal also tells the card whether to frame it as calibrated.
+  const confidenceSignal = analysis?.confidence_signal ?? null;
+  const confidenceValue = confidenceSignal
+    ? toCanonicalConfidence(confidenceSignal.value, "unit")
+    : typeof analysis?.confidence === "number"
+      ? toCanonicalConfidence(analysis.confidence, "percent")
+      : undefined;
+
   const selectedAnalysis = analysis?.lines?.find((l) => l.line_id === selectedLine);
   const totalErp = lineItems.reduce((s, l) => s + l.erp_price * l.quantity, 0);
   const totalPo = lineItems.reduce((s, l) => s + l.po_price * l.quantity, 0);
@@ -544,6 +556,10 @@ export default function ExceptionDetailPanel({
 
   return (
     <Layer2OpenContext.Provider value={markLayer2Opened}>
+    {/* ADR-043 field↔source linking — shared evidence selection across the
+        entity sections and the in-document viewer. Keyed by exceptionId so
+        switching records drops a stale highlight (provider remounts). */}
+    <EvidenceSelectionProvider key={exceptionId}>
     <div className="h-full flex flex-col font-sans min-w-0">
 
       {/* ━━ 1. Dynamic Header Ribbon ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
@@ -799,7 +815,8 @@ export default function ExceptionDetailPanel({
               // (a fabricated default would silently disagree with the
               // pipeline classify-node confidence — Verdict 2026-04-22
               // partial-truth violation).
-              confidence={typeof analysis?.confidence === "number" ? analysis.confidence / 100 : undefined}
+              confidence={confidenceValue}
+              confidenceCalibrated={confidenceSignal?.calibrated}
               recipeName={detail.selected_recipe ?? undefined}
               // Surfaced as a hover tooltip on the Approve button so the
               // reviewer sees the exact action they're accepting.
@@ -1142,6 +1159,7 @@ export default function ExceptionDetailPanel({
         );
       })()}
     </div>
+    </EvidenceSelectionProvider>
     </Layer2OpenContext.Provider>
   );
 }

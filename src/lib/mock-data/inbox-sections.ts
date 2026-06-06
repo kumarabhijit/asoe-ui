@@ -336,13 +336,18 @@ type InboxSections = Pick<
   | "email_source"
 >;
 
+// `evidence_ref` mirrors the anchor ref `emailSourceFor` derives for the same
+// entity (`order_entry.${key}`). In production the extraction producer stamps
+// both; here the mock keeps the two sides in lockstep so the field↔source
+// cross-link (click an entity → its in-document anchor foregrounds) is
+// exercisable in dev / Vercel previews and the browser e2e.
 const SE_ENTITIES: EntitiesAnalysisData = {
   extracted: [
-    { key: "customer_po", value: "EML-PO-2026-0042", kind: "po", confidence: 0.98, source_span: "PO# EML-PO-2026-0042" },
-    { key: "customer", value: "Southeast Beverage Distributors", kind: "customer", confidence: 0.95, source_span: "From: buyer@southeast-distrib.example" },
-    { key: "ship_to", value: "Atlanta DC #6094", kind: "location", confidence: 0.88, source_span: "ship to Atlanta DC" },
-    { key: "requested_date", value: "2026-05-24", kind: "date", confidence: 0.9, source_span: "need by May 24" },
-    { key: "material", value: "BEV-COLA-12PK", kind: "material", confidence: 0.94, source_span: "Cola 12pk x 600" },
+    { key: "customer_po", value: "EML-PO-2026-0042", kind: "po", confidence: 0.98, source_span: "PO# EML-PO-2026-0042", evidence_ref: "order_entry.customer_po" },
+    { key: "customer", value: "Southeast Beverage Distributors", kind: "customer", confidence: 0.95, source_span: "From: buyer@southeast-distrib.example", evidence_ref: "order_entry.customer" },
+    { key: "ship_to", value: "Atlanta DC #6094", kind: "location", confidence: 0.88, source_span: "ship to Atlanta DC", evidence_ref: "order_entry.ship_to" },
+    { key: "requested_date", value: "2026-05-24", kind: "date", confidence: 0.9, source_span: "need by May 24", evidence_ref: "order_entry.requested_date" },
+    { key: "material", value: "BEV-COLA-12PK", kind: "material", confidence: 0.94, source_span: "Cola 12pk x 600", evidence_ref: "order_entry.material" },
   ],
 };
 

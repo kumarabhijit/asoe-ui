@@ -348,10 +348,29 @@ export interface LineItemAnalysis {
   waterfall: PricingWaterfallStep[];
 }
 
+/**
+ * Confidence score plus its calibration provenance (ADR-032 trust surface).
+ * Mirrors `api/schemas.py::ConfidenceSignal`. `value` is canonical 0.0–1.0;
+ * `calibrated` is false until the ADR-032 calibration loop ships — when false,
+ * the UI frames the score as a raw model score, not a validated probability.
+ */
+export interface ConfidenceSignal {
+  value: number;
+  calibrated: boolean;
+  method?: string | null;
+  sample_n?: number | null;
+}
+
 /** Order-level agent analysis (drives detail panel enrichments) */
 export interface OrderAnalysis {
   diagnosis: string;
+  /** @deprecated 0–100 scalar retained for back-compat. Prefer
+   *  `confidence_signal` (canonical 0–1 + calibration provenance). */
   confidence: number;
+  /** Typed confidence + calibration provenance. Mirrors
+   *  `api/schemas.py::AnalysisResponse.confidence_signal`. Null when no real
+   *  classifier score is available (the UI then hides the bar). */
+  confidence_signal?: ConfidenceSignal | null;
   risk: "LOW" | "MEDIUM" | "HIGH";
   resolution: string;
   /** Underlying deterministic root cause prose (e.g. "Promo Expired").
@@ -496,6 +515,9 @@ export interface OrderEntryValidationFlag {
 export interface OrderEntryExtraction {
   source_type: string;
   confidence: number;
+  /** ADR-032 — `confidence` as a typed signal with calibration provenance.
+   *  Mirrors `api/schemas.py`; null until projected. */
+  confidence_signal?: ConfidenceSignal | null;
   header: OrderEntryHeader;
   customer_name?: string | null;
   customer_bp?: string | null;
@@ -713,7 +735,17 @@ export interface ExtractedEntity {
   value: string;
   kind: string;
   confidence?: number | null;
+  /** ADR-032 — per-entity `confidence` as a typed signal with calibration
+   *  provenance. Mirrors `api/schemas.py`; null until projected. */
+  confidence_signal?: ConfidenceSignal | null;
   source_span?: string | null;
+  /** ADR-043 field↔source linking. The deterministic locate key of the
+   *  EvidenceAnchor that supports this entity (the anchor's `supports_ref`).
+   *  When present, the UI couples the entity row to its in-document
+   *  highlight. Mirrors `api/schemas.py::ExtractedEntity.evidence_ref`.
+   *  preview-only — populated by the extraction producer (pass-through),
+   *  not synthesised; null until that producer lands. */
+  evidence_ref?: string | null;
 }
 
 export interface EntitiesAnalysisData {
@@ -895,6 +927,9 @@ export type EmailOrderEntryRejectReason =
 export interface EmailOrderEntryAnalysisData {
   /** Composite extraction + resolution confidence in [0.0, 1.0]. */
   composite_confidence: number;
+  /** ADR-032 — `composite_confidence` as a typed signal with calibration
+   *  provenance. Mirrors `api/schemas.py`; null until projected. */
+  composite_confidence_signal?: ConfidenceSignal | null;
   classification: EmailOrderEntryClassification;
   /** Recipe-recommended action — must be a member of ResolutionAction. */
   recommended_action: ResolutionAction;
@@ -931,6 +966,9 @@ export interface DuplicateDetectionData {
   days_between: number;
   /** Detection confidence 0-100 */
   confidence: number;
+  /** ADR-032 — `confidence` as a typed signal (canonical 0-1) with
+   *  calibration provenance. Mirrors `api/schemas.py`; null until projected. */
+  confidence_signal?: ConfidenceSignal | null;
   /** Agent-recommended action (e.g., "Cancel duplicate SO-002") */
   recommended_action: string;
   /** SO number the agent recommends cancelling */

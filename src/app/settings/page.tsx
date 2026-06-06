@@ -11,7 +11,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSignOut } from "@/hooks/useSignOut";
-import { Settings, Users, Shield, Zap, Bell, ShieldAlert } from "lucide-react";
+import { Settings, Users, Shield, Zap, Bell, ShieldAlert, Activity } from "lucide-react";
 import { NavBar } from "@/components/ui/NavBar";
 import { Card } from "@/components/ui/Card";
 import { useHealth } from "@/hooks/useHealth";
@@ -25,9 +25,10 @@ import { NAV_TABS } from "@/config/nav-tabs";
 const SETTING_SECTIONS = [
   { icon: Users, label: "User Management", description: "Manage users, roles, and permissions", status: "Coming soon" },
   { icon: Shield, label: "SSO & Authentication", description: "Configure SSO providers and MFA policies", status: "Coming soon" },
+  { icon: Activity, label: "Autonomy & Review Quality", description: "Review-scrutiny signals that gate a safe path to autonomy", status: "View", href: "/settings/autonomy" },
   { icon: Zap, label: "Agent Configuration", description: "Kill switch, explain mode, and agent thresholds", status: "Coming soon" },
   { icon: Bell, label: "Notifications", description: "Email alerts, webhook integrations, and escalation rules", status: "Coming soon" },
-];
+] as const;
 
 export const requiresAuth = true;
 
@@ -113,8 +114,9 @@ export default function SettingsPage() {
 
         {/* Settings cards */}
         <div className="grid grid-cols-2 gap-16">
-          {SETTING_SECTIONS.map((section) => (
-            <Card key={section.label}>
+          {SETTING_SECTIONS.map((section) => {
+            const href = "href" in section ? section.href : undefined;
+            const body = (
               <div className="p-20 flex items-start gap-16">
                 <div className="w-40 h-40 rounded-sm bg-surface-secondary flex items-center justify-center text-text-secondary shrink-0">
                   <section.icon size={20} />
@@ -131,8 +133,19 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
-            </Card>
-          ))}
+            );
+            return href ? (
+              <Link
+                key={section.label}
+                href={href}
+                className="block rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+              >
+                <Card>{body}</Card>
+              </Link>
+            ) : (
+              <Card key={section.label}>{body}</Card>
+            );
+          })}
         </div>
       </main>
     </div>

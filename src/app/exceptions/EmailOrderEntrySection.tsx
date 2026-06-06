@@ -17,6 +17,7 @@ import {
   AlertTriangle, CheckCircle2, Clock, Mail, ShieldCheck, ShieldX,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { ConfidenceDisplay } from "@/components/ui/ConfidenceDisplay";
 import { ConstraintsPipeline } from "@/components/ui/ConstraintsPipeline";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { autonomyLevelLabel } from "@/lib/cases";
@@ -62,8 +63,6 @@ export function EmailOrderEntrySection({ data }: EmailOrderEntrySectionProps) {
     label: String(data.classification),
   };
 
-  const confidencePct = Math.round(data.composite_confidence * 100);
-
   return (
     <section
       aria-label="Email order intake analysis"
@@ -92,14 +91,13 @@ export function EmailOrderEntrySection({ data }: EmailOrderEntrySectionProps) {
         <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
           Composite extraction confidence
         </div>
-        <div className="flex items-baseline gap-8">
-          <span className="text-display font-bold text-text-primary leading-tight">
-            {confidencePct}%
-          </span>
-          <span className="text-caption text-text-tertiary">
-            (raw {data.composite_confidence.toFixed(2)})
-          </span>
-        </div>
+        <ConfidenceDisplay
+          value={data.composite_confidence}
+          scale="unit"
+          variant="prominent"
+          label="Composite extraction confidence"
+          calibrated={data.composite_confidence_signal?.calibrated}
+        />
       </div>
 
       {/* Constraints pipeline — graphical projection of the gate

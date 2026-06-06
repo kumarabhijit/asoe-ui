@@ -37,6 +37,8 @@ import { AttachmentDownloadButton } from "@/components/ui/AttachmentDownloadButt
 import { detectPreviewFormat, type PreviewFormat } from "@/lib/previewFormat";
 import { resolveAnchorStatus, type AnchorStatus } from "@/lib/evidenceAnchor";
 import { spatialOverlays } from "@/lib/spatialOverlay";
+import { useEvidenceSelection } from "@/hooks/useEvidenceSelection";
+import { cn } from "@/lib/utils";
 import type { EmailAttachmentManifestEntry, EvidenceAnchor } from "@/types/exceptions";
 
 // PDF.js Phase-1 renders page 1 only; spatial overlays are drawn for that page.
@@ -106,6 +108,11 @@ async function renderPdfAndExtractText(
 }
 
 export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShown }: AttachmentPreviewProps) {
+  // ADR-043 field↔source linking — the selected evidence ref shared with the
+  // entity sections. Selecting a safety-bar row foregrounds it here AND lets a
+  // sibling section's row light up; clicking an entity elsewhere foregrounds
+  // the matching row + overlay here. Default (no provider) is a safe no-op.
+  const { selectedRef, selectRef } = useEvidenceSelection();
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [format, setFormat] = useState<PreviewFormat | null | undefined>(undefined);
   const [docText, setDocText] = useState<string | null>(null);
@@ -214,20 +221,39 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
           {anchors.map((anchor, idx) => {
             const status = resolveAnchorStatus(docText, anchor);
             const meta = STATUS_META[status];
+            const isSelected = selectedRef === anchor.supports_ref;
             return (
-              <li
-                key={`${anchor.supports_ref}-${idx}`}
-                data-status={status}
-                className="flex items-center gap-8 px-10 py-6 bg-surface-secondary rounded-sm"
-              >
-                <meta.Icon size={14} className="shrink-0 text-text-tertiary" aria-hidden />
-                <span className="text-body font-semibold text-text-primary">
-                  {anchor.label}
-                </span>
-                <span className="font-mono text-caption text-text-secondary truncate">
-                  {anchor.text}
-                </span>
-                <span className="ml-auto text-caption text-text-tertiary">{meta.label}</span>
+              <li key={`${anchor.supports_ref}-${idx}`} data-status={status}>
+                {/* The row is a toggle: selecting it foregrounds the matching
+                    in-document overlay (and any sibling entity row on the same
+                    ref). Keyboard-operable; selection is conveyed by
+                    aria-pressed + a ring, never colour alone. */}
+                <button
+                  type="button"
+                  data-supports-ref={anchor.supports_ref}
+                  data-selected={isSelected || undefined}
+                  aria-pressed={isSelected}
+                  onClick={() => selectRef(anchor.supports_ref)}
+                  className={cn(
+                    "w-full flex items-center gap-8 px-10 py-6 bg-surface-secondary rounded-sm text-left",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+                    isSelected && "ring-2 ring-brand bg-brand-subtle",
+                  )}
+                >
+                  <meta.Icon size={14} className="shrink-0 text-text-tertiary" aria-hidden />
+                  <span className="text-body font-semibold text-text-primary">
+                    {anchor.label}
+                  </span>
+                  <span className="font-mono text-caption text-text-secondary truncate">
+                    {anchor.text}
+                  </span>
+                  <span className="ml-auto text-caption text-text-tertiary">{meta.label}</span>
+                  {isSelected && (
+                    <span className="text-label font-semibold uppercase tracking-wider text-brand shrink-0">
+                      Highlighted
+                    </span>
+                  )}
+                </button>
               </li>
             );
           })}
@@ -256,23 +282,34 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
             {/* Spatial bbox overlays (ADR-045) — best-effort, drawn only for
                 VERIFIED spatial anchors on this page. The safety bar above stays
                 the authoritative surface; a degraded/text anchor has no box. */}
-            {spatialOverlays(anchors, PREVIEW_PAGE).map((o) => (
-              <div
-                key={o.supportsRef}
-                data-testid="spatial-overlay"
-                data-supports-ref={o.supportsRef}
-                aria-hidden
-                className="absolute pointer-events-none rounded-sm"
-                style={{
-                  left: `${o.leftPct}%`,
-                  top: `${o.topPct}%`,
-                  width: `${o.widthPct}%`,
-                  height: `${o.heightPct}%`,
-                  border: "2px solid var(--color-brand)",
-                  background: "var(--color-brand-subtle, rgba(90,75,214,0.12))",
-                }}
-              />
-            ))}
+            {spatialOverlays(anchors, PREVIEW_PAGE).map((o) => {
+              const isSelected = selectedRef === o.supportsRef;
+              return (
+                <div
+                  key={o.supportsRef}
+                  data-testid="spatial-overlay"
+                  data-supports-ref={o.supportsRef}
+                  data-selected={isSelected || undefined}
+                  aria-hidden
+                  className="absolute pointer-events-none rounded-sm transition-[box-shadow,opacity] duration-normal"
+                  style={{
+                    left: `${o.leftPct}%`,
+                    top: `${o.topPct}%`,
+                    width: `${o.widthPct}%`,
+                    height: `${o.heightPct}%`,
+                    // Selected overlay is emphasised (thicker border + ring);
+                    // unselected ones dim slightly so the foregrounded box
+                    // stands out when a ref is active.
+                    border: isSelected
+                      ? "3px solid var(--color-brand)"
+                      : "2px solid var(--color-brand)",
+                    boxShadow: isSelected ? "0 0 0 3px var(--color-brand-ring)" : "none",
+                    opacity: selectedRef && !isSelected ? 0.4 : 1,
+                    background: "var(--color-brand-subtle, rgba(90,75,214,0.12))",
+                  }}
+                />
+              );
+            })}
           </div>
         )}
 

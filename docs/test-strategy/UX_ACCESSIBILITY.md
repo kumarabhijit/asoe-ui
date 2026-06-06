@@ -296,6 +296,11 @@ the build red.
   `ROUTE_BASELINE` — every entry currently allows 1 violation;
   drive each to 0 by either lifting the colour or moving the
   text to a larger size that satisfies the AA-large-text rule.
+  `/settings/autonomy` (the Autonomy & Review Quality console)
+  joins the inventory at `baseline: 1` for the same reason — its
+  captions and the reused `MetricTile` subtitle render in
+  `text-text-tertiary`; it ratchets to 0 with the shared
+  design-token fix, not a per-page workaround.
 
 ## Roadmap (not in this PR)
 

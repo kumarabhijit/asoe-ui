@@ -74,6 +74,7 @@ export const AUTHENTICATED_ROUTES: readonly AuthenticatedRoute[] = [
   },
   { path: "/dashboard", source: "src/app/dashboard/page.tsx" },
   { path: "/settings", source: "src/app/settings/page.tsx" },
+  { path: "/settings/autonomy", source: "src/app/settings/autonomy/page.tsx" },
 ] as const;
 
 // The chrome contract every authenticated page must render.

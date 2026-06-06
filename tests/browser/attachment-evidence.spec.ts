@@ -112,6 +112,32 @@ test.describe("ADR-043 — attachment preview & evidence highlighting", () => {
     await expect(row).toContainText(SE_EXAMPLE.poText);
   });
 
+  test("field↔source: selecting an evidence row foregrounds it (verify-against-source)", async ({ page, request }) => {
+    // GIVEN a located PO anchor
+    const token = await backendToken(request, USERS.MANAGER);
+    await resetTenant(request, token);
+    const exId = await seedAttachmentWithAnchors(request, token, {
+      documentText: `Purchase Order ${SE_EXAMPLE.poText} — ship to Atlanta DC, need by May 24. Cola 12pk x 600.`,
+      attachmentName: SE_EXAMPLE.attachmentName,
+      attachmentMime: SE_EXAMPLE.attachmentMime,
+      anchors: SE_EXAMPLE.anchors,
+    });
+    await loginAs(page, USERS.MANAGER);
+    await openPreview(request, token, page, exId);
+
+    // WHEN the operator activates the PO evidence row (the row is a toggle)
+    const rowButton = poRow(page).getByRole("button").first();
+    await expect(rowButton).toHaveAttribute("aria-pressed", "false");
+    await rowButton.click();
+
+    // THEN it is foregrounded (aria-pressed + a visible "Highlighted" marker),
+    // and toggling again clears it — never colour alone (WCAG 1.4.1).
+    await expect(rowButton).toHaveAttribute("aria-pressed", "true");
+    await expect(rowButton).toContainText(/highlighted/i);
+    await rowButton.click();
+    await expect(rowButton).toHaveAttribute("aria-pressed", "false");
+  });
+
   test("a value absent from the document is shown UNLOCATED, never silently", async ({ page, request }) => {
     // GIVEN the PO anchor whose text does not appear in the rendered (scanned) doc
     const token = await backendToken(request, USERS.MANAGER);
