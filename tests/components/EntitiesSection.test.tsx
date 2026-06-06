@@ -57,6 +57,22 @@ describe("EntitiesSection", () => {
     expect(screen.queryByText(/^(—|N\/A)$/)).not.toBeInTheDocument();
   });
 
+  // ── ADR-032 per-entity calibration framing ─────────────────────────────────
+  it("frames per-entity confidence as calibrated when the signal reports it", () => {
+    render(
+      <EntitiesSection
+        data={{
+          extracted: [
+            { ...FULL.extracted[0], confidence_signal: { value: 0.97, calibrated: true } },
+          ],
+        }}
+      />,
+    );
+    expect(
+      screen.getByLabelText(/primary confidence.*calibrated confidence/i),
+    ).toBeInTheDocument();
+  });
+
   // ── ADR-043 field↔source linking ──────────────────────────────────────────
   it("offers a 'Show in source' control only when the entity carries an evidence_ref", () => {
     render(

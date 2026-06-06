@@ -96,6 +96,7 @@ function EntityRow({ entity }: { entity: ExtractedEntity }) {
               scale="unit"
               variant="inline"
               label={`${entity.key} confidence`}
+              calibrated={entity.confidence_signal?.calibrated}
             />
           </div>
         )}

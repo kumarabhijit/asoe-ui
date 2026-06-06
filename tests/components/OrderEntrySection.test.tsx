@@ -41,6 +41,10 @@ describe("OrderEntrySection", () => {
     expect(
       screen.getByLabelText(/extraction confidence: 94 percent/i),
     ).toBeInTheDocument();
+    // ADR-032 — no signal → framed as a model score, not a calibrated probability.
+    expect(
+      screen.getByLabelText(/extraction confidence.*model score/i),
+    ).toBeInTheDocument();
     expect(screen.getByText("0093847612")).toBeInTheDocument();
     expect(screen.getByText("Walmart Stores Inc")).toBeInTheDocument();
     expect(screen.getByText("BEV-COLA-12PK")).toBeInTheDocument();

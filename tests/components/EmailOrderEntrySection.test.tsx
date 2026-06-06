@@ -133,6 +133,28 @@ describe("EmailOrderEntrySection", () => {
       expect(screen.getByText(/0\.88/)).toBeInTheDocument();
     });
 
+    it("frames the composite as a model score when calibration is not reported (ADR-032)", () => {
+      render(<EmailOrderEntrySection data={{ ...base, composite_confidence: 0.88 }} />);
+      expect(
+        screen.getByRole("group", { name: /model score.*not a validated probability/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("frames the composite as calibrated when the signal reports it", () => {
+      render(
+        <EmailOrderEntrySection
+          data={{
+            ...base,
+            composite_confidence: 0.88,
+            composite_confidence_signal: { value: 0.88, calibrated: true },
+          }}
+        />,
+      );
+      expect(
+        screen.getByRole("group", { name: /calibrated confidence/i }),
+      ).toBeInTheDocument();
+    });
+
     it("rounds 0.954 to 95% rather than displaying the raw float as the headline", () => {
       render(<EmailOrderEntrySection data={{ ...base, composite_confidence: 0.954 }} />);
       expect(screen.getByText("95%")).toBeInTheDocument();

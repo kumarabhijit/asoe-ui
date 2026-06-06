@@ -515,6 +515,9 @@ export interface OrderEntryValidationFlag {
 export interface OrderEntryExtraction {
   source_type: string;
   confidence: number;
+  /** ADR-032 — `confidence` as a typed signal with calibration provenance.
+   *  Mirrors `api/schemas.py`; null until projected. */
+  confidence_signal?: ConfidenceSignal | null;
   header: OrderEntryHeader;
   customer_name?: string | null;
   customer_bp?: string | null;
@@ -732,6 +735,9 @@ export interface ExtractedEntity {
   value: string;
   kind: string;
   confidence?: number | null;
+  /** ADR-032 — per-entity `confidence` as a typed signal with calibration
+   *  provenance. Mirrors `api/schemas.py`; null until projected. */
+  confidence_signal?: ConfidenceSignal | null;
   source_span?: string | null;
   /** ADR-043 field↔source linking. The deterministic locate key of the
    *  EvidenceAnchor that supports this entity (the anchor's `supports_ref`).
@@ -921,6 +927,9 @@ export type EmailOrderEntryRejectReason =
 export interface EmailOrderEntryAnalysisData {
   /** Composite extraction + resolution confidence in [0.0, 1.0]. */
   composite_confidence: number;
+  /** ADR-032 — `composite_confidence` as a typed signal with calibration
+   *  provenance. Mirrors `api/schemas.py`; null until projected. */
+  composite_confidence_signal?: ConfidenceSignal | null;
   classification: EmailOrderEntryClassification;
   /** Recipe-recommended action — must be a member of ResolutionAction. */
   recommended_action: ResolutionAction;

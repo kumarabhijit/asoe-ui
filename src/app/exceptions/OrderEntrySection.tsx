@@ -63,6 +63,7 @@ export function OrderEntrySection({ data }: OrderEntrySectionProps) {
             scale="unit"
             variant="inline"
             label="Extraction confidence"
+            calibrated={data.confidence_signal?.calibrated}
           />
         </span>
       </div>

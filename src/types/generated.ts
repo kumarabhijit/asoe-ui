@@ -2196,6 +2196,7 @@ export interface components {
             classification: "ONE_CLICK_APPROVE" | "STANDARD_REVIEW" | "LOW_CONFIDENCE" | "FATAL_REJECT";
             /** Composite Confidence */
             composite_confidence: number;
+            composite_confidence_signal?: components["schemas"]["ConfidenceSignal"] | null;
             /**
              * Floor Breaches
              * @default []
@@ -2564,6 +2565,7 @@ export interface components {
         ExtractedEntity: {
             /** Confidence */
             confidence?: number | null;
+            confidence_signal?: components["schemas"]["ConfidenceSignal"] | null;
             /** Evidence Ref */
             evidence_ref?: string | null;
             /** Key */
@@ -2954,6 +2956,7 @@ export interface components {
         OrderEntryExtraction: {
             /** Confidence */
             confidence: number;
+            confidence_signal?: components["schemas"]["ConfidenceSignal"] | null;
             /** Customer Bp */
             customer_bp?: string | null;
             /** Customer Name */

@@ -96,6 +96,7 @@ export function EmailOrderEntrySection({ data }: EmailOrderEntrySectionProps) {
           scale="unit"
           variant="prominent"
           label="Composite extraction confidence"
+          calibrated={data.composite_confidence_signal?.calibrated}
         />
       </div>
 
