@@ -239,7 +239,14 @@ export async function expandSection(
     name: title instanceof RegExp ? title : new RegExp(title, "i"),
   });
   await expect(header.first()).toBeVisible({ timeout: 15_000 });
-  await header.first().click();
+  // Idempotent: a section may already be open — the primary comparison
+  // section auto-expands off the backend `primary_section` hint (detail-
+  // pane hierarchy refactor 2026-06-07). Only click when it's collapsed,
+  // so we never toggle an already-expanded section back closed.
+  const expanded = await header.first().getAttribute("aria-expanded");
+  if (expanded !== "true") {
+    await header.first().click();
+  }
 }
 
 /**

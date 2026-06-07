@@ -1902,3 +1902,31 @@ for (const [id, sections] of Object.entries(INBOX_SECTION_BUNDLES)) {
     Object.assign(MOCK_ORDER_ANALYSES[id], sections);
   }
 }
+
+// Presentation hint — stamp `primary_section` so preview mode auto-expands
+// the primary comparison delta, mirroring the backend read path
+// (api/routes/exceptions.py sets it to the field the primary projection
+// lands on). A mock record carries a single primary enrichment field, so
+// "first present in precedence order" resolves to that one field; the
+// precedence only disambiguates the (mock-absent) multi-field case. Skips
+// records that already declare it explicitly and records with no primary
+// comparison (e.g. auto-resolved EDI orders).
+const PRIMARY_SECTION_KEYS = [
+  "price_hold_analysis",
+  "edi_mismatch_analysis",
+  "price_analysis",
+  "duplicate_detection",
+  "order_comparison",
+  "backorder_analysis",
+  "overmax_analysis",
+  "moq_analysis",
+  "pallet_analysis",
+  "delivery_delay_analysis",
+] as const;
+for (const analysis of Object.values(MOCK_ORDER_ANALYSES)) {
+  if (analysis.primary_section) continue;
+  const present = PRIMARY_SECTION_KEYS.find(
+    (key) => (analysis as unknown as Record<string, unknown>)[key] != null,
+  );
+  if (present) analysis.primary_section = present;
+}

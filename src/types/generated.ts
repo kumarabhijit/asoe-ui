@@ -1111,6 +1111,8 @@ export interface components {
             pallet_analysis?: components["schemas"]["PalletAnalysisData"] | null;
             price_analysis?: components["schemas"]["PriceAnalysisData"] | null;
             price_hold_analysis?: components["schemas"]["PriceHoldAnalysisData"] | null;
+            /** Primary Section */
+            primary_section?: string | null;
             /** Recommendation */
             recommendation?: string | null;
             /** Resolution */

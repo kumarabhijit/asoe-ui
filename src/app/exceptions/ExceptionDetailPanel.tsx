@@ -7,19 +7,22 @@
  * (e.g., duplicate_detection, order_comparison) get their sections
  * rendered automatically — zero UI code changes.
  *
- * Layout:
- *   1. HeaderRibbon      — breadcrumb context identifiers
- *   2. ContextStrip      — entity profile + impact metrics
- *   3. AgentAnalysis     — problem / root cause / recommendation
- *      + data-presence enrichment sections (DuplicateDetection, OrderComparison, etc.)
- *   4. EvidenceGrid      — collapsed line items + pricing waterfall
- *   5. Diagnostics       — pipeline progress, trace evidence, resolution
+ * Layout (information hierarchy — 2026-06-07 UX pass):
+ *   1. HeaderRibbon      — breadcrumb context identifiers          (Priority 1)
+ *   1b. ImpactBar        — financial/business impact, always shown (Priority 1)
+ *   2. ContextStrip      — entity profile (impact moved to ImpactBar)
+ *   3. AgentReasoningCard — Layer 1/2 recommendation + actions     (Priority 1)
+ *   3b. AgentAnalysis    — problem / root cause / recommendation prose
+ *      + data-presence enrichment sections; the section named by the
+ *        backend `primary_section` hint auto-expands               (Priority 2)
+ *   4+5. Evidence / Diagnostics — tabbed; Diagnostics isolated     (Priority 4)
  *
+ * The Agent recommendation is never tabbed (Guardrail #4).
  * Governance: Human = Review Authority (Approve/Reject/Escalate only).
  */
 "use client";
 
-import { useState, useEffect, useRef, useCallback, type MutableRefObject } from "react";
+import { useState, useEffect, useRef, useCallback, type ComponentProps, type MutableRefObject } from "react";
 import { signIn } from "next-auth/react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import {
@@ -48,6 +51,8 @@ import type { TraceResponse } from "@/types/api";
 import { COSIGN_LIFECYCLE_STATE, CollapsibleSection, HITL_LIFECYCLE_STATES, Layer2OpenContext } from "./shared";
 import { HeaderRibbon } from "./HeaderRibbon";
 import { ContextStrip } from "./ContextStrip";
+import { ImpactBar } from "./ImpactBar";
+import { Tabs } from "@/components/ui/Tabs";
 import { AgentAnalysisSection } from "./AgentAnalysisSection";
 import { DuplicateDetectionSection } from "./DuplicateDetectionSection";
 import { OrderComparisonSection } from "./OrderComparisonSection";
@@ -524,6 +529,14 @@ export default function ExceptionDetailPanel({
       ? toCanonicalConfidence(analysis.confidence, "percent")
       : undefined;
 
+  // Presentation hint (backend `AnalysisResponse.primary_section`): the
+  // OrderAnalysis field name of the recipe-authoritative comparison. The
+  // matching enrichment section auto-expands so the Priority-2 delta is
+  // visible without a click. Data-driven — no hardcoded intent dispatch
+  // (Guardrail #1); a new intent that sets primary_section to its own
+  // field auto-expands with zero UI changes.
+  const primarySection = analysis?.primary_section ?? null;
+
   const selectedAnalysis = analysis?.lines?.find((l) => l.line_id === selectedLine);
   const totalErp = lineItems.reduce((s, l) => s + l.erp_price * l.quantity, 0);
   const totalPo = lineItems.reduce((s, l) => s + l.po_price * l.quantity, 0);
@@ -575,10 +588,19 @@ export default function ExceptionDetailPanel({
         embedded={embedded}
       />
 
-      {/* ━━ 2. Context Strip (Entity Profile + Impact Metrics) ━━━━━━━ */}
+      {/* ━━ 1b. Impact Bar (Priority-1 financial impact) ━━━━━━━━━━━━━
+          Lifts the quantitative blast radius to the top of the viewport
+          so revenue-at-risk + delta are answerable in <3s without
+          expanding ContextStrip. Owns the impact half of the old two-pane
+          ContextStrip; the strip below now carries the entity profile
+          only, so the figure is not rendered twice (S1 redundancy). */}
+      <ImpactBar impactMetrics={analysis?.impact_metrics} />
+
+      {/* ━━ 2. Context Strip (Entity Profile) ━━━━━━━━━━━━━━━━━━━━━━━━
+          Impact metrics moved up into the always-visible ImpactBar; the
+          strip carries customer master-data only now (no duplication). */}
       <ContextStrip
         entityProfile={analysis?.entity_profile}
-        impactMetrics={analysis?.impact_metrics}
         embedded={embedded}
       />
 
@@ -904,23 +926,27 @@ export default function ExceptionDetailPanel({
               renders stay deferred. Section titles match the spec
               expectations exactly so playwright tests can click them
               by name to expand. */}
+          {/* Comparison-bearing enrichment sections. The one named by
+              `primary_section` auto-expands (Priority-2 delta visible on
+              open); the rest stay collapsed. `defaultOpen` is data-driven
+              off the backend hint — no hardcoded intent dispatch. */}
           {analysis?.price_analysis && (
-            <CollapsibleSection title="Price Analysis">
+            <CollapsibleSection title="Price Analysis" defaultOpen={primarySection === "price_analysis"}>
               <PriceAnalysisSection data={analysis.price_analysis} />
             </CollapsibleSection>
           )}
           {analysis?.duplicate_detection && (
-            <CollapsibleSection title="Duplicate Detection">
+            <CollapsibleSection title="Duplicate Detection" defaultOpen={primarySection === "duplicate_detection"}>
               <DuplicateDetectionSection data={analysis.duplicate_detection} />
             </CollapsibleSection>
           )}
           {analysis?.order_comparison && (
-            <CollapsibleSection title="Order Comparison">
+            <CollapsibleSection title="Order Comparison" defaultOpen={primarySection === "order_comparison"}>
               <OrderComparisonSection data={analysis.order_comparison} />
             </CollapsibleSection>
           )}
           {analysis?.backorder_analysis && (
-            <CollapsibleSection title="Back-Order Analysis">
+            <CollapsibleSection title="Back-Order Analysis" defaultOpen={primarySection === "backorder_analysis"}>
               <BackOrderSection
                 data={analysis.backorder_analysis}
                 resolvedAction={detail.resolved_action}
@@ -928,32 +954,32 @@ export default function ExceptionDetailPanel({
             </CollapsibleSection>
           )}
           {analysis?.overmax_analysis && (
-            <CollapsibleSection title="Over-Max Analysis">
+            <CollapsibleSection title="Over-Max Analysis" defaultOpen={primarySection === "overmax_analysis"}>
               <OverMaxSection data={analysis.overmax_analysis} />
             </CollapsibleSection>
           )}
           {analysis?.moq_analysis && (
-            <CollapsibleSection title="MOQ Analysis">
+            <CollapsibleSection title="MOQ Analysis" defaultOpen={primarySection === "moq_analysis"}>
               <MOQSection data={analysis.moq_analysis} />
             </CollapsibleSection>
           )}
           {analysis?.pallet_analysis && (
-            <CollapsibleSection title="Pallet Configuration">
+            <CollapsibleSection title="Pallet Configuration" defaultOpen={primarySection === "pallet_analysis"}>
               <PalletConfigSection data={analysis.pallet_analysis} />
             </CollapsibleSection>
           )}
           {analysis?.delivery_delay_analysis && (
-            <CollapsibleSection title="Delivery Delay">
+            <CollapsibleSection title="Delivery Delay" defaultOpen={primarySection === "delivery_delay_analysis"}>
               <DeliveryDelaySection data={analysis.delivery_delay_analysis} />
             </CollapsibleSection>
           )}
           {analysis?.price_hold_analysis && (
-            <CollapsibleSection title="Price Hold">
+            <CollapsibleSection title="Price Hold" defaultOpen={primarySection === "price_hold_analysis"}>
               <PriceHoldSection data={analysis.price_hold_analysis} />
             </CollapsibleSection>
           )}
           {analysis?.edi_mismatch_analysis && (
-            <CollapsibleSection title="EDI Mismatch">
+            <CollapsibleSection title="EDI Mismatch" defaultOpen={primarySection === "edi_mismatch_analysis"}>
               <EdiMismatchSection data={analysis.edi_mismatch_analysis} />
             </CollapsibleSection>
           )}
@@ -1038,34 +1064,30 @@ export default function ExceptionDetailPanel({
             </CollapsibleSection>
           )}
 
-          {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              The anchor id lives on EvidenceGrid's own root (so the
-              "Jump to → Evidence" link expands + scrolls it, #4); the
-              wrapper keeps data-section-anchor for the pane-focus cycle. */}
-          <div data-section-anchor="evidence">
-            <EvidenceGrid
-              lineItems={lineItems}
-              analysis={analysis}
-              selectedLine={selectedLine}
-              onSelectLine={setSelectedLine}
-              selectedAnalysis={selectedAnalysis}
-              totalErp={totalErp}
-              totalPo={totalPo}
-              onFirstOpen={ensureLineItemsLoaded}
-              anchorId="section-evidence"
-            />
-          </div>
-
-          {/* ━━ 5. Diagnostics ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-          <div data-section-anchor="diagnostics">
-            <DiagnosticsSection
-              detail={detail}
-              trace={trace}
-              showPreview={showPreview}
-              onFirstOpen={ensureTraceLoaded}
-              anchorId="section-diagnostics"
-            />
-          </div>
+          {/* ━━ 4+5. Evidence / Diagnostics — tabbed ━━━━━━━━━━━━━━━━━━
+              System Diagnostics (raw trace, executed-node timeline, LLM
+              metrics) is isolated into its own tab (Priority 4) so it no
+              longer sits in the primary scroll under Evidence. Evidence is
+              the default tab. The Agent recommendation is NOT tabbed (it
+              stays in the persistent header above) — Guardrail #4 forbids
+              hiding the AI behind a tab. The "Jump to → Evidence /
+              Diagnostics" anchor links still work: DetailLowerTabs selects
+              the matching tab on hash, then the inner section's
+              useHashOpen expands + scrolls it (jump-to-expand preserved). */}
+          <DetailLowerTabs
+            detail={detail}
+            trace={trace}
+            analysis={analysis}
+            lineItems={lineItems}
+            selectedLine={selectedLine}
+            onSelectLine={setSelectedLine}
+            selectedAnalysis={selectedAnalysis}
+            totalErp={totalErp}
+            totalPo={totalPo}
+            showPreview={showPreview}
+            onEvidenceFirstOpen={ensureLineItemsLoaded}
+            onDiagnosticsFirstOpen={ensureTraceLoaded}
+          />
 
           {/* ── Metadata ──────────────────────────────────────────────── */}
           <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-8 text-caption">
@@ -1188,5 +1210,97 @@ function SectionAnchorBar({
         </a>
       ))}
     </nav>
+  );
+}
+
+/* ── Lower-detail tabs: Evidence / Diagnostics ──────────────────────
+ * Isolates the System Diagnostics surface (raw trace, executed-node
+ * timeline, LLM token/cost metrics) into a dedicated tab so it no
+ * longer shares the primary scroll with Evidence (Priority 4). Evidence
+ * is the default tab.
+ *
+ * The Agent recommendation is deliberately NOT tabbed — it lives in the
+ * persistent header above this control (Guardrail #4: the AI is never
+ * hidden behind a tab).
+ *
+ * Hash-aware: the SectionAnchorBar's "Jump to → Evidence / Diagnostics"
+ * links still resolve. On a matching hash this selects the right tab,
+ * which mounts the section; the section's own `useHashOpen(anchorId, …)`
+ * then expands + scrolls it (the jump-to-expand mechanism, finding #4,
+ * is preserved unchanged). Prop types are picked straight off the child
+ * components so this passthrough can't drift from their contracts.
+ */
+function DetailLowerTabs({
+  showPreview,
+  onEvidenceFirstOpen,
+  onDiagnosticsFirstOpen,
+  ...rest
+}: {
+  showPreview: boolean;
+  onEvidenceFirstOpen: () => void;
+  onDiagnosticsFirstOpen: () => void;
+} & Pick<
+  ComponentProps<typeof EvidenceGrid>,
+  | "lineItems"
+  | "analysis"
+  | "selectedLine"
+  | "onSelectLine"
+  | "selectedAnalysis"
+  | "totalErp"
+  | "totalPo"
+> &
+  Pick<ComponentProps<typeof DiagnosticsSection>, "detail" | "trace">) {
+  const [active, setActive] = useState<"evidence" | "diagnostics">("evidence");
+
+  // Select the tab named by the URL hash so the anchor-bar jump links
+  // reveal the right surface (then the inner useHashOpen expands it).
+  useEffect(() => {
+    const sync = () => {
+      const h = typeof window !== "undefined" ? window.location.hash : "";
+      if (h === "#section-diagnostics") setActive("diagnostics");
+      else if (h === "#section-evidence") setActive("evidence");
+    };
+    sync();
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+
+  return (
+    <Tabs
+      ariaLabel="Evidence and diagnostics"
+      value={active}
+      onValueChange={(id) => setActive(id as "evidence" | "diagnostics")}
+      tabs={[
+        { id: "evidence", label: "Evidence" },
+        { id: "diagnostics", label: "Diagnostics" },
+      ]}
+      renderPanel={(id) =>
+        id === "evidence" ? (
+          <div data-section-anchor="evidence" className="pt-12">
+            <EvidenceGrid
+              lineItems={rest.lineItems}
+              analysis={rest.analysis}
+              selectedLine={rest.selectedLine}
+              onSelectLine={rest.onSelectLine}
+              selectedAnalysis={rest.selectedAnalysis}
+              totalErp={rest.totalErp}
+              totalPo={rest.totalPo}
+              onFirstOpen={onEvidenceFirstOpen}
+              anchorId="section-evidence"
+            />
+          </div>
+        ) : (
+          <div data-section-anchor="diagnostics" className="pt-12">
+            <DiagnosticsSection
+              detail={rest.detail}
+              trace={rest.trace}
+              showPreview={showPreview}
+              onFirstOpen={onDiagnosticsFirstOpen}
+              anchorId="section-diagnostics"
+            />
+          </div>
+        )
+      }
+    />
   );
 }

@@ -3,7 +3,7 @@
  * button; backend records the lifecycle transition as ESCALATED.
  *
  * Exercises:
- *   - handleEscalate() window.prompt() reason flow
+ *   - handleEscalate() in-panel reason dialog flow (ADR-045 CP3)
  *   - exceptionsApi.escalate() fetch branch (POST /exceptions/{id}/escalate)
  *   - Dedicated permission gate exceptions:escalate (analyst has it)
  *   - Audit event EXCEPTION_ESCALATED emitted server-side (verified via
@@ -47,11 +47,19 @@ test("analyst escalates a YELLOW exception → lifecycle flips to ESCALATED", as
   const escalateButton = page.getByRole("button", { name: /send for triage/i });
   await expect(escalateButton).toBeVisible({ timeout: 15_000 });
 
-  // page.once("dialog", …) must be registered BEFORE clicking —
-  // window.prompt() blocks JS synchronously, so Playwright only sees
-  // the dialog if the handler is attached in advance.
-  page.once("dialog", (d) => d.accept("needs senior review"));
+  // ADR-045 CP3 — Escalate captures its mandatory reason through an
+  // in-panel dialog (the window.prompt path was retired). Clicking
+  // "Send for triage" opens the reason dialog; fill the textarea and
+  // Confirm to actually dispatch the escalation.
   await escalateButton.click();
+  const escalationDialog = page.getByRole("dialog", {
+    name: /escalation reason required/i,
+  });
+  await expect(escalationDialog).toBeVisible({ timeout: 5_000 });
+  await escalationDialog.getByRole("textbox").fill("needs senior review");
+  await escalationDialog
+    .getByRole("button", { name: /confirm escalate/i })
+    .click();
 
   // Backend truth-of-record wins. Poll because setDetail() is async.
   await expect
