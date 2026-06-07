@@ -61,15 +61,15 @@ not hardcode enum values.
 ## Batch 5 — remaining "Needs Rework" items (each its own regression test)
 | ☐ | Item | Location | Notes | Expert / decision | PR |
 |---|------|----------|-------|-------------------|----|
-| ☐ | GapBar shortfall branch unreachable | `GapBar.tsx:47-48` | both branches need `primary > secondary` | | |
+| ☑ | GapBar shortfall branch unreachable | `GapBar.tsx:47-48` | gate on `hasGap` (mode + gap), not `primary > secondary`; added icon + "Short by"/"Over by" so direction isn't colour-only | | #222 |
 | ☐ | OverMax partial-truth + UI totals (Guardrail #6) | `OverMaxSection.tsx:28-29,166-183` | EvidenceBlock + backend totals | | |
 | ☐ | GravitationalOrbs motion/tokens/dark-mode/aria | `GravitationalOrbs.tsx` | `prefers-reduced-motion`, tokens, `aria-hidden` | | |
-| ☐ | ChromeBoundary missing `home` tab | `ChromeBoundary.tsx` (`NAV_TABS`) | `/home` highlights nothing | | |
-| ☐ | Dashboard fabricated `RECENT_ACTIVITY` + no fetch-error state | `dashboard/page.tsx:40-47,72-74` | **see scaffolding note** | | |
-| ☐ | Login: hardcoded SSO list, "any password", fake counts | `login/page.tsx:27,46-48,272-280` | **see scaffolding note** | | |
-| ☐ | Auth callback fixed `jane@acme.com` identity | `auth/callback/page.tsx:21-27` | **see scaffolding note** | | |
-| ☐ | Cases `[id]` dead 404 path + `agentCount={3}` + missing kbd nav | `cases/[id]/page.tsx:40,94,110` | parity w/ workspace | | |
-| ☐ | `error.tsx` leaks raw `error.message` | all four route `error.tsx:17-19` | use `error.digest` | | |
+| ☑ | ChromeBoundary missing `home` tab | `ChromeBoundary.tsx` (`NAV_TABS`) | import canonical `NAV_TABS` from `@/config/nav-tabs` (kills the drifted local copy) | | #222 |
+| ☐ | Dashboard fabricated `RECENT_ACTIVITY` + no fetch-error state | `dashboard/page.tsx:40-47,72-74` | **(a) fix error state + (b) gate+label** per expert | expert: 2a fix, 2b gate behind `NEXT_PUBLIC_USE_REAL_API` + label | |
+| ☐ | Login: hardcoded SSO list, "any password", fake counts | `login/page.tsx:27,46-48,272-280` | gate copy to seed mode; remove fake counts | expert: (a) fix | |
+| ☐ | Auth callback fixed `jane@acme.com` identity | `auth/callback/page.tsx:21-27` | drop fixed identity; branch on auth mode | expert: (a) fix (real IdP wired) | |
+| ☑ | Cases `[id]` dead 404 path + `agentCount={3}` + missing kbd nav | `cases/[id]/page.tsx:40,94,110` | `notFound()` (revives `not-found.tsx`); `agentCount` from `useHealth`; mounts `HotkeyCheatsheet` | | #222 |
+| ☑ | `error.tsx` leaks raw `error.message` | all five route `error.tsx` | new shared `BoundaryError` (generic copy + `error.digest`, no raw message); all 5 boundaries use it | DRY: one component prevents future drift | #222 |
 
 ## Batch 6 — Minor sweep (opportunistic, low-risk)
 Pick up remaining "Needs Minor Tweaks" items per slice (see reports `01`–`08`)
@@ -140,7 +140,27 @@ _(Append expert decisions here as they're made: date · item · expert · outcom
   `fmtMoney` so a negative RESULT keeps its minus. `asoe2` untouched (no contract
   change — the fields already carry the sign; the UI was hiding it).
 
+- **2026-06-07 · Batch 5 scaffolding · expert subagent (compliance + frontend-arch)** —
+  Decisions: **Auth callback / login → (a) FIX**: the fixed `jane@acme.com`
+  identity is NOT demo-load-bearing (seed mode uses the real `/login` +
+  `MOCK_USERS` multi-persona; entra mode wires real Azure AD via
+  `ASOE_AUTH_MODE`). Drop the hardcoded identity; branch the callback on auth
+  mode; gate the login "not configured in this demo / enter any password" copy
+  to seed mode; **remove** the fabricated pre-auth footer counts (no source on
+  an unauthenticated screen). **Dashboard fetch-error → (a) FIX** (real bug:
+  skeletons hang forever) mirroring the Settings→Autonomy tri-state.
+  **Dashboard `RECENT_ACTIVITY` → (b) GATE+LABEL**: no recent-activity endpoint
+  exists, so gate behind `NEXT_PUBLIC_USE_REAL_API` and label as sample via a
+  new `ScaffoldDataBanner` primitive (modeled on `PreprodIdentityBanner`). No
+  new env flag — reuse `NEXT_PUBLIC_USE_REAL_API` (data) / `ASOE_AUTH_MODE`
+  (auth).
+
 ## Review checkpoints
+- **After Batch 4 (Batches 3–4)** — focused correctness review over
+  `98af8a3..HEAD` (Button label-retention, Attachment span wrapper, Toast roles,
+  home `<main>` balance, Intl formatters, PricingWaterfall null/ERROR handling,
+  signed-vs-magnitude call sites). **No real bugs.** Full vitest 1812 pass +
+  build green.
 - **After Batch 2 (3 commits)** — ran `/code-review` (high) over `1fc6faa..HEAD`,
   typecheck, full vitest (1788 pass), and `npm run build`. No correctness
   findings. Verified dashboard verdict-colour parity (GREEN/YELLOW/RED unchanged;

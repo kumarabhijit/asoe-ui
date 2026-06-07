@@ -12,11 +12,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams, notFound } from "next/navigation";
 import { useSignOut } from "@/hooks/useSignOut";
 
 import { NavBar } from "@/components/ui/NavBar";
+import { HotkeyCheatsheet } from "@/components/ui/HotkeyCheatsheet";
 import { useAuth } from "@/hooks/useAuth";
+import { useHealth } from "@/hooks/useHealth";
 import { casesApi } from "@/lib/api";
 import type { OrderCase } from "@/types/cases";
 import type { ExceptionDetailResponse } from "@/types/api";
@@ -33,11 +35,12 @@ export default function CaseDetailPage() {
   const router = useRouter();
   const search = useSearchParams();
   const { user } = useAuth();
+  const { health } = useHealth();
   const handleSignOut = useSignOut();
   const caseId = params?.id;
   const [orderCase, setOrderCase] = useState<OrderCase | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const [caseMissing, setCaseMissing] = useState(false);
   // Phase 28.5.x §28.5 — attached records load on mount alongside
   // the case header so the "Attached records" placeholder section
   // can render concrete data (and so `aggregated_policy_hits`
@@ -69,7 +72,7 @@ export default function CaseDetailPage() {
     if (!caseId) return;
     let cancelled = false;
     setLoading(true);
-    setNotFound(false);
+    setCaseMissing(false);
     // Two parallel fetches — case header + attached-record stack.
     // We Promise.all so the UI flips out of `loading` only when both
     // settle, which avoids a flicker where the header renders without
@@ -91,7 +94,7 @@ export default function CaseDetailPage() {
           setRecords(r.items);
           setPolicyHits(r.aggregated_policy_hits);
         } else {
-          setNotFound(true);
+          setCaseMissing(true);
         }
       })
       .finally(() => {
@@ -102,12 +105,19 @@ export default function CaseDetailPage() {
     };
   }, [caseId]);
 
+  // Reach the /cases not-found.tsx boundary (parity with the workspace) when
+  // the case id resolves to nothing — the previous inline `setNotFound`
+  // branch rendered a bespoke string and left not-found.tsx dead code.
+  if (!loading && caseMissing) {
+    notFound();
+  }
+
   return (
     <div className="min-h-screen bg-surface-page flex flex-col">
       <NavBar
         tabs={NAV_TABS}
         activeTab="cases"
-        agentCount={3}
+        agentCount={health?.allowed_intents?.length || 0}
         userName={userName}
         userInitials={userInitials}
         userTitle={userTitle}
@@ -130,12 +140,6 @@ export default function CaseDetailPage() {
           </div>
         )}
 
-        {!loading && notFound && (
-          <div role="status" className="text-text-tertiary py-24">
-            Case not found: <code>{caseId}</code>
-          </div>
-        )}
-
         {!loading && orderCase && (
           <CaseDetailPanel
             orderCase={orderCase}
@@ -146,6 +150,10 @@ export default function CaseDetailPage() {
           />
         )}
       </main>
+
+      {/* Keyboard-shortcut surface — parity with the /cases workspace so
+          operators get the same hotkeys + discoverable cheatsheet here. */}
+      <HotkeyCheatsheet />
     </div>
   );
 }

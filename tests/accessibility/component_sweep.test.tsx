@@ -27,6 +27,8 @@ import { ComplianceHitCountChip } from "@/components/ui/ComplianceHitCountChip";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { StickyActionRibbon } from "@/components/ui/StickyActionRibbon";
 import { VerdictDot } from "@/components/ui/VerdictDot";
+import { BoundaryError } from "@/components/ui/BoundaryError";
+import { GapBar } from "@/components/ui/GapBar";
 import { EventsTimeline } from "@/components/ui/EventsTimeline";
 import { AttachmentPreview } from "@/components/ui/AttachmentPreview";
 import {
@@ -296,6 +298,32 @@ describe("a11y sweep: VerdictDot", () => {
 
   it("GREEN at md size", async () =>
     expectNoViolations(<VerdictDot color="G" size="md" />));
+});
+
+// ---------------------------------------------------------------------------
+// BoundaryError — shared App Router error.tsx body (Batch 5). role=alert +
+// labelled retry; no raw error.message.
+// ---------------------------------------------------------------------------
+describe("a11y sweep: BoundaryError", () => {
+  const err = Object.assign(new Error("boom"), { digest: "d1" });
+  it("with digest", async () =>
+    expectNoViolations(
+      <BoundaryError title="Dashboard failed to load" error={err} reset={() => {}} retryLabel="Retry loading dashboard" />,
+    ));
+});
+
+// ---------------------------------------------------------------------------
+// GapBar — quantity gap viz (Batch 5). Direction is icon + text, not colour.
+// ---------------------------------------------------------------------------
+describe("a11y sweep: GapBar", () => {
+  it("shortfall (under-case)", async () =>
+    expectNoViolations(
+      <GapBar primaryQty={30} primaryLabel="Ordered" secondaryQty={100} secondaryLabel="MOQ" uom="CS" mode="shortfall" />,
+    ));
+  it("excess (over-case)", async () =>
+    expectNoViolations(
+      <GapBar primaryQty={150} primaryLabel="Ordered" secondaryQty={100} secondaryLabel="Max" uom="CS" mode="excess" />,
+    ));
 });
 
 // ---------------------------------------------------------------------------
