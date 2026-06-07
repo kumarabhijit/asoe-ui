@@ -45,31 +45,40 @@ Usability, Simplicity** — using the standard review template (see
 
 | Slice | Pass | Minor | Rework | Total |
 |-------|:----:|:-----:|:------:|:-----:|
-| 01 Chrome & entry | 4 | 3 | 2 | 9 |
-| 02 Dashboard/Inbox/Settings | 3 | 1 | 1 | 5 |
-| 03 Cases workspace | 3 | 6 | 2 | 11 |
+| 01 Chrome & entry | 6 | 3 | 0 | 9 |
+| 02 Dashboard/Inbox/Settings | 4 | 1 | 0 | 5 |
+| 03 Cases workspace | 5 | 6 | 0 | 11 |
 | 04 Exceptions core | 6 | 8 | 0 | 14 |
-| 05 Exceptions enrichment | 7 | 5 | 1 | 13 |
-| 06 Shared data-viz & evidence | 3 | 5 | 2 | 10 |
-| 07 Shared chrome/status | 9 | 3 | 1 | 13 |
+| 05 Exceptions enrichment | 8 | 5 | 0 | 13 |
+| 06 Shared data-viz & evidence | 5 | 5 | 0 | 10 |
+| 07 Shared chrome/status | 10 | 3 | 0 | 13 |
 | 07 Per-route page states | 4 | 4 | 0 | 8 |
-| 08 Shared interactive primitives | 3 | 8 | 2 | 13 |
+| 08 Shared interactive primitives | 5 | 8 | 0 | 13 |
 | AgentReasoningCard (sep.) | — | 1 | — | 1 |
-| **Total** | **42** | **44** | **11** | **97** |
+| **Total** | **53** | **44** | **0** | **97** |
+
+> **Remediation progress (batches 1–5):** **all 11 Needs-Rework items resolved**
+> and flipped to Pass. Themes T8 (tokens), T9/Guardrail #2 (enum maps), T5
+> (accessibility), T3 (signed money), T1 (fabricated-data) and the Guardrail #6
+> OverMax totals are remediated. Many "Minor" components had their flagged
+> issues fixed too but retain other minor items (Batch 6 sweep), so they stay
+> Minor for now. See `REMEDIATION.md` for the per-item decision log + PR.
 
 ### Needs Rework (priority queue)
 
-1. **Login Page** (`src/app/login/page.tsx`) — hardcoded SSO allow-list, "enter any password" demo copy, fabricated agent/exception counts on a public screen.
-2. **Auth Callback** (`src/app/auth/callback/page.tsx:21-27`) — ignores OAuth `code`, signs everyone in as a fixed `jane@acme.com` identity.
-3. **Dashboard** (`src/app/dashboard/page.tsx`) — hardcoded `RECENT_ACTIVITY` rendered as live; fetch failure only `console.error`s (tiles vanish / skeletons hang forever).
-4. **Cases `[id]` route** (`src/app/cases/[id]/page.tsx`) — dead 404 path (`setNotFound(true)` instead of `notFound()`), hardcoded `agentCount={3}`, missing keyboard nav present on the workspace.
-5. **Cases `not-found.tsx`** — never reached (see #4); also uses the undefined `text-h4` token.
-6. **OverMaxSection** (`src/app/exceptions/OverMaxSection.tsx`) — partial-truth `—` fallbacks bypassing EvidenceBlock (Guardrail #6) + client-side `reduce` of audit totals.
-7. **GapBar** (`src/components/ui/GapBar.tsx:47-48`) — both `isExcess` and `isShortfall` require `primaryQty > secondaryQty`, so the back-order/MOQ shortfall case (ordered < available) is **never** rendered as a shortfall; severity also rides on color alone.
-8. **PricingWaterfall** (`src/components/ui/PricingWaterfall.tsx:40-42,104-109`) — signed-money bug: `fmtPrice` `Math.abs` strips the sign on a SOX-relevant figure; direction conveyed by color only.
-9. **GravitationalOrbs** (`src/components/ui/GravitationalOrbs.tsx`) — perpetual `requestAnimationFrame` with no `prefers-reduced-motion` guard (WCAG 2.3.3), hardcoded RGB/hex colors, hardcoded light background breaks dark mode, decorative canvas missing `aria-hidden`.
-10. **ActivityIndicator** (`src/components/ui/ActivityIndicator.tsx:20-41,58-63`) — hardcodes intent enum literals (Guardrail #2) **and** has no `aria-live` despite being the named example in CLAUDE.md.
-11. **ErasureCertificateButton** (`src/components/ui/ErasureCertificateButton.tsx:93-105`) — GDPR/regulator export with no `aria-busy`, contradictory `role="alert"`+`aria-live="polite"`, and an error styled with the nonexistent `text-status-error` class (renders unstyled).
+_All 11 resolved across batches 1–5 — see `REMEDIATION.md`. Struck through below._
+
+1. ~~**Login Page**~~ — ✅ B5: removed fabricated counts; gated SSO copy by auth mode (real Azure AD in entra).
+2. ~~**Auth Callback**~~ — ✅ B5: dropped fixed `jane@acme.com`; branches on auth mode.
+3. ~~**Dashboard**~~ — ✅ B5: added fetch-error+retry tri-state; gated `RECENT_ACTIVITY` behind mock-mode + `SampleDataTag`.
+4. ~~**Cases `[id]` route**~~ — ✅ B5: `notFound()`, `agentCount` from health, mounts `HotkeyCheatsheet`.
+5. ~~**Cases `not-found.tsx`**~~ — ✅ B5 (now reached via #4) / B1 (`text-h4`→`text-heading`).
+6. ~~**OverMaxSection**~~ — ✅ B5: server-computed totals (asoe2 `model_validator`) + `EvidenceBlock`, no UI `reduce`/`—`.
+7. ~~**GapBar**~~ — ✅ B5: gate on `hasGap`; icon + "Short by"/"Over by" (not colour-only).
+8. ~~**PricingWaterfall**~~ — ✅ **Resolved (Batch 4)**: signed via `fmtSignedPrice`/`fmtMoney`; negative RESULT keeps its sign; `step.record` empty-chip guarded.
+9. ~~**GravitationalOrbs**~~ — ✅ B5: `prefers-reduced-motion` (static frame), token-resolved colours (dark-mode aware), `aria-hidden`.
+10. ~~**ActivityIndicator**~~ — ✅ **Resolved (Batch 2+3)**: templated via `intentLabelFor` (no enum literals); `role="status"`+`aria-live="polite"`.
+11. ~~**ErasureCertificateButton**~~ — ✅ **Resolved (Batch 1+3)**: `aria-busy`; single `role="alert"` rule; `text-error` token.
 
 ---
 
@@ -105,6 +114,13 @@ with **direction conveyed by color only** (WCAG 1.4.1 risk):
 
 **Fix theme:** one canonical signed-currency formatter used everywhere; never rely on color alone for sign.
 
+> ✅ **Resolved — Batch 4** (see `REMEDIATION.md`). Added canonical
+> `fmtSignedPrice` (explicit +/-) and `fmtMoney` (sign-preserving, no forced +)
+> in `@/lib/format`; switched the 6 signed-delta sites (HeaderRibbon, ContextStrip,
+> BackOrderSection freight, PricingWaterfall) to them so the sign is textual.
+> `fmtPrice` stays magnitude-only (defensive) for the 18 always-positive sites
+> per the expert subagent's call. 10 regression tests added.
+
 ### T4 — Partial-truth & client-side composition (Guardrail #6)
 - Hard violation: OverMaxSection `—` fallbacks (`:166-183`) instead of EvidenceBlock.
 - Audit totals computed in the UI via `reduce`: MOQSection (`:29-30`), OverMaxSection (`:28-29`).
@@ -118,6 +134,15 @@ with **direction conveyed by color only** (WCAG 1.4.1 risk):
 - Missing semantics: Diagnostics tabs lack `role="tab"` (`:333`); `CollapsibleHeader` has `aria-expanded` but no `aria-controls` (affects every section); silent loading skeletons.
 - Broken skip-link target on `/home` (empty `<div id="main-content" />`, `home/page.tsx:191`; no `<main>` landmark).
 - Undefined `text-h4` token renders headings at body size (`cases/error.tsx:16`, `cases/not-found.tsx:14`).
+
+> ✅ **Resolved — Batch 3** (see `REMEDIATION.md`). `ActivityIndicator` is now a
+> polite live region; `Button`/`AttachmentDownloadButton`/`ErasureCertificateButton`
+> expose `aria-busy` (Button retains its label while loading); the attachment
+> download surfaces failures via `role="alert"`; `Toast` announces errors
+> assertively; `PipelineDAG` keeps its focus ring; `ConfidenceDisplay` dropped the
+> stray `tabIndex`; `/home` has a real `<main>` skip-link target; Sidebar/NavBar
+> icon controls are 44px hit targets. (`text-h4` token fixed in Batch 1.)
+> 11 regression tests added.
 
 ### T6 — Vocabulary & label inconsistency
 Raw enums in one place, humanized labels in another, on the same journey:
@@ -139,12 +164,28 @@ renders unstyled — invisible in code review, visible only at runtime:
 - Hardcoded numeric `fontSize` / RGB-hex in SVG viz (PipelineDAG, EventsTimeline, GravitationalOrbs).
 - **Fix theme:** a CI lint guard failing on Tailwind classes not resolvable to a token would kill this whole class of bug.
 
+> ✅ **Resolved — Batch 1** (see `REMEDIATION.md`). All `text-h4`/`text-h2`,
+> `text-status-*`, `pl-30` and off-scale `-14` classes mapped to real tokens;
+> PipelineDAG SVG `fontSize` now token-backed; `GravitationalOrbs` colour/motion
+> deferred to Batch 5 (full rework). The CI guard
+> (`tests/architectural/token_class_resolution.test.ts`) now fails the build on
+> any unresolvable spacing/font-size/colour class and caught 4 latent extras.
+
 ### T9 — Missing default-fallback in enum→display maps (added in pass 2)
 Maps keyed off backend enums with no `default` branch render **blank** for a new
 enum value — the inverse of Guardrail #2 (not hardcoded, but silently dropped):
 - `EventsTimeline` `statusIndicator`, `ClassificationHistoryPanel` classifier maps, `WaterfallStepper` "skipped" (icon-only, no text).
 - Hard Guardrail #2 violation found in pass 2: `ActivityIndicator.tsx:20-41` hardcodes the intent enum as map keys.
 - **Fix theme:** every enum→display map needs a `default` fallback + icon+text, mirroring `verdictVariant()` in `Badge.tsx`.
+
+> ✅ **Resolved — Batch 2** (see `REMEDIATION.md`). `ActivityIndicator` now
+> templates domain-aware copy through `intentLabelFor` (no hardcoded intent
+> literals; new intents need zero UI change); `EventsTimeline.statusIndicator`
+> and `ClassificationHistoryPanel` got neutral default fallbacks;
+> `WaterfallStepper` "skipped" gained a text cue; the dashboard verdict bar
+> routes colour through `variantColorVar(verdictVariant())`. Also fixed a latent
+> double-icon bug in every classifier badge. Six regression tests added (each
+> fails on the parent commit).
 
 ### Reinforced by pass 2
 - **T3 (signed money)** now also covers the shared `PricingWaterfall` (`fmtPrice` `Math.abs`) — fix the helper at the source, once.

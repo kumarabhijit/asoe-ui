@@ -836,6 +836,11 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
         { sku: "SKU-9015", description: "Still Mineral 12pk", ordered: 800, trimmed_to: 800, delta: 0, action: "OK" },
         { sku: "SKU-9020", description: "Flavored Water 24pk", ordered: 600, trimmed_to: 288, delta: 312, action: "TRIM" },
       ],
+      // Server-computed roll-ups (api/schemas.py model_validator): sum of
+      // trimmed_to / delta across trim_plan. Mirrored here so the mock layer
+      // matches the backend contract (Guardrail #6).
+      trimmed_total: 1988,
+      delta_total: 612,
     },
   },
   /* ── MIN_ORDER_QTY: Pending Review (YELLOW) ────────────────────────── */
@@ -1629,6 +1634,9 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
         { sku: "SKU-COST-EOQ-A", description: "Costco Club-Pack Bundle 36ct", ordered: 2_000, trimmed_to: 1_500, delta: 500, action: "TRIM" },
         { sku: "SKU-COST-EOQ-B", description: "Costco Club-Pack Bundle 48ct", ordered: 2_000, trimmed_to: 1_500, delta: 500, action: "TRIM" },
       ],
+      // Server-computed roll-ups (api/schemas.py model_validator).
+      trimmed_total: 3_000,
+      delta_total: 1_000,
     },
   },
 

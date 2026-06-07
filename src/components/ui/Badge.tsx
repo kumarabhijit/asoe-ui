@@ -118,6 +118,24 @@ export function inboxStatusVariant(status?: string): BadgeVariant {
   }
 }
 
+/** Map a badge variant to its primary CSS colour token, for non-badge
+ *  surfaces (bars, sparklines, dots) that need the raw colour rather than
+ *  the tinted badge classes. Default-safe via the BadgeVariant union, so
+ *  callers route enum→colour through {@link verdictVariant} et al. instead
+ *  of branching on raw enum literals (Guardrail #2). */
+const VARIANT_COLOR_VAR: Record<BadgeVariant, string> = {
+  success: "var(--color-success)",
+  warning: "var(--color-warning)",
+  error: "var(--color-error)",
+  info: "var(--color-info)",
+  brand: "var(--color-brand)",
+  neutral: "var(--color-text-tertiary)",
+};
+
+export function variantColorVar(variant: BadgeVariant): string {
+  return VARIANT_COLOR_VAR[variant];
+}
+
 /** Default icon per variant (WCAG: status not conveyed by color alone) */
 const DEFAULT_ICONS: Record<BadgeVariant, React.ReactNode> = {
   success: <Check size={12} />,

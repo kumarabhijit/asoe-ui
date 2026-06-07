@@ -23,7 +23,10 @@ function expandOrderLines() {
   fireEvent.click(screen.getByRole("button", { name: /Order Lines/i }));
 }
 
-function makeData(line: Partial<OverMaxLine>): OverMaxAnalysisData {
+function makeData(
+  line: Partial<OverMaxLine>,
+  totals?: { trimmed_total?: number; delta_total?: number },
+): OverMaxAnalysisData {
   return {
     total_ordered: 1200,
     max_qty: 1000,
@@ -52,6 +55,9 @@ function makeData(line: Partial<OverMaxLine>): OverMaxAnalysisData {
         action: "TRIM",
       },
     ],
+    // Server-computed roll-ups (the section renders these, not a UI reduce).
+    trimmed_total: totals?.trimmed_total ?? 1000,
+    delta_total: totals?.delta_total ?? 200,
   };
 }
 
@@ -64,12 +70,29 @@ describe("OverMaxSection", () => {
 
   it("does not crash when max_line_qty is null (backend Optional[float])", () => {
     // The backend legitimately emits null for a line with no per-line cap.
-    // Before the fix, expanding the table threw inside `.toLocaleString()`
-    // and unmounted the whole detail panel.
+    // Now routed through EvidenceBlock (structural omission — renders nothing,
+    // no ad-hoc "—"), so the line still renders without crashing.
     render(<OverMaxSection data={makeData({ max_line_qty: null })} />);
     expect(() => expandOrderLines()).not.toThrow();
-    // The line still renders — the operator sees the SKU and qty, with a
-    // placeholder in the cap column rather than a blank screen.
     expect(screen.getAllByText("SKU-7800").length).toBeGreaterThan(0);
+  });
+
+  // REGRESSION (fails on parent): the TOTAL row derived its figures with a
+  // client-side `reduce` over trim_plan (Guardrail #6 — audit totals must come
+  // from the backend). The section now renders the server-computed
+  // trimmed_total / delta_total. Distinct-from-sum values prove the field is
+  // the source, not the reduce.
+  it("renders the backend-computed trim totals, not a UI reduce", () => {
+    render(
+      <OverMaxSection
+        data={makeData({}, { trimmed_total: 777, delta_total: 42 })}
+      />,
+    );
+    // trimmed_total in the "Trim To" total cell (distinct from the per-line
+    // trimmed_to=1,000, so this can only come from the backend field)…
+    expect(screen.getByText("777")).toBeInTheDocument();
+    // …and delta_total in the "Delta" total cell (rendered as "-42", distinct
+    // from the per-line delta of -200).
+    expect(screen.getByText("-42")).toBeInTheDocument();
   });
 });

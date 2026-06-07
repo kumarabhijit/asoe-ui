@@ -132,7 +132,7 @@ export function DraftReplySection({
     >
       <div className="flex items-center gap-8">
         {rejected ? (
-          <Ban size={14} className="text-status-error" aria-hidden />
+          <Ban size={14} className="text-error" aria-hidden />
         ) : (
           <Mail size={14} className="text-text-tertiary" aria-hidden />
         )}
@@ -173,7 +173,7 @@ export function DraftReplySection({
 
       {/* REJECTED → reason, no body. */}
       <EvidenceBlock tier="contextual" value={data.reason}>
-        {(v) => <p className="m-0 text-caption text-status-error">{String(v)}</p>}
+        {(v) => <p className="m-0 text-caption text-error">{String(v)}</p>}
       </EvidenceBlock>
 
       <div className="grid grid-cols-2 gap-12">
@@ -211,7 +211,7 @@ export function DraftReplySection({
             />
           </div>
           {editError && (
-            <p role="alert" className="m-0 text-caption text-status-error">
+            <p role="alert" className="m-0 text-caption text-error">
               {editError}
             </p>
           )}

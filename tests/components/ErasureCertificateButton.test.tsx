@@ -72,6 +72,10 @@ describe("ErasureCertificateButton", () => {
     );
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/FORBIDDEN/);
+    // REGRESSION (fails on parent): the error carried BOTH role="alert" and
+    // aria-live="polite" — a contradiction (alert implies assertive). Only the
+    // role should remain.
+    expect(alert).not.toHaveAttribute("aria-live");
   });
 
   it("compact variant hides the text label but keeps the aria-label", () => {

@@ -166,4 +166,26 @@ describe("EventsTimeline", () => {
     );
     expect(screen.getByText("1.23s")).toBeInTheDocument();
   });
+
+  // REGRESSION (fails on parent): statusIndicator switched on
+  // completed|halted|errored with NO default, returning undefined for any
+  // other status — so a new contract status dropped the row's marker
+  // entirely. It must now fall back to a neutral indicator.
+  it("renders a neutral indicator for an unmapped status (default branch)", () => {
+    const { container } = render(
+      <EventsTimeline
+        executedNodes={[
+          makeNode({ node: "ingest", status: "completed" }),
+          // Simulate a status the contract has not declared yet. The cast is a
+          // deliberate forward-compat probe, not a real ExecutedNode value.
+          makeNode({ node: "classify", status: "queued" as ExecutedNode["status"] }),
+        ]}
+      />,
+    );
+    const indicators = Array.from(container.querySelectorAll("span")).filter(
+      (el) =>
+        el.className.includes("w-[20px]") && el.className.includes("rounded-full"),
+    );
+    expect(indicators).toHaveLength(2);
+  });
 });

@@ -9,6 +9,7 @@
 import { ChevronRight } from "lucide-react";
 import { Badge, lifecycleVariant, verdictVariant } from "@/components/ui/Badge";
 import { fmtPrice } from "./shared";
+import { fmtSignedPrice } from "@/lib/format";
 import type { ExceptionDetail, EntityProfile } from "@/types/exceptions";
 
 interface HeaderRibbonProps {
@@ -98,7 +99,7 @@ export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, total
         </span>
         {delta !== 0 && (
           <span className="font-mono font-semibold text-caption text-error">
-            {"\u0394"} {fmtPrice(Math.abs(delta))}
+            {"\u0394"} {fmtSignedPrice(delta)}
           </span>
         )}
       </div>

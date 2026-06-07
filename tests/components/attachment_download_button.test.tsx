@@ -42,4 +42,16 @@ describe("AttachmentDownloadButton", () => {
     render(<AttachmentDownloadButton caseId="case-1" attachment={att({ attachment_id: null })} />);
     expect(screen.getByRole("button", { name: /download/i })).toBeDisabled();
   });
+
+  // REGRESSION (fails on parent): the download used try/finally with NO catch,
+  // so a failed evidence fetch was swallowed silently on a SOX surface. The
+  // failure must now surface to the operator (role=alert).
+  it("surfaces a failed download instead of swallowing it", async () => {
+    getBlob.mockRejectedValue(new Error("403 forbidden"));
+    render(<AttachmentDownloadButton caseId="case-1" attachment={att()} />);
+    fireEvent.click(screen.getByRole("button", { name: /download PO_8842\.pdf/i }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(/403 forbidden/i),
+    );
+  });
 });

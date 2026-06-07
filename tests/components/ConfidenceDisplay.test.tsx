@@ -32,4 +32,14 @@ describe("ConfidenceDisplay — visible calibration cue", () => {
     render(<ConfidenceDisplay value={0.88} variant="prominent" />);
     expect(screen.getByText(/calibration not reported/i)).toBeInTheDocument();
   });
+
+  // REGRESSION (fails on parent): the static calibration-note div carried
+  // tabIndex={0}, creating an empty keyboard stop on non-interactive text
+  // (its content is aria-hidden and the group already names it).
+  it("does not place a stray tabIndex on the static calibration note", () => {
+    const { container } = render(
+      <ConfidenceDisplay value={0.88} variant="prominent" />,
+    );
+    expect(container.querySelectorAll('[tabindex="0"]')).toHaveLength(0);
+  });
 });

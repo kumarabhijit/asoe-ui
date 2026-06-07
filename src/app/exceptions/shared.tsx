@@ -214,7 +214,13 @@ export function CollapsibleSection({
   );
 }
 
-/** Price formatting helper */
+/**
+ * Magnitude price formatter — for values that are always >= 0 (unit prices,
+ * totals, at-risk amounts). `Math.abs` is a defensive guard against an
+ * accidental negative on these magnitude fields. For SIGNED deltas (variances,
+ * freight deltas, price adjustments) use `fmtSignedPrice` / `fmtMoney` from
+ * `@/lib/format` — those keep the sign so direction is never colour-only (T3).
+ */
 export function fmtPrice(n: number): string {
   return `$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

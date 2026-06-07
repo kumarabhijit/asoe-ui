@@ -10,6 +10,7 @@
  */
 "use client";
 
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface GapBarProps {
@@ -44,8 +45,12 @@ export function GapBar({
   const gapPct = maxVal > 0 ? (gap / maxVal) * 100 : 0;
   const hasGap = gap > 0;
 
-  const isExcess = mode === "excess" && primaryQty > secondaryQty;
-  const isShortfall = mode === "shortfall" && primaryQty > secondaryQty;
+  // A gap in `shortfall` mode is a shortfall regardless of which side is
+  // larger — back-order is ordered > available, but MOQ is ordered < MOQ.
+  // The previous `primaryQty > secondaryQty` gate made the MOQ/back-order
+  // under-case (ordered < target) never render as a shortfall.
+  const isExcess = mode === "excess" && hasGap;
+  const isShortfall = mode === "shortfall" && hasGap;
 
   return (
     <div className={cn("flex flex-col gap-6", className)}>
@@ -104,8 +109,15 @@ export function GapBar({
               )}
               style={{ width: `${Math.max(gapPct, 8)}%` }}
             />
+            {/* Icon + explicit direction word so severity is not colour-only
+                (WCAG 1.4.1). */}
+            {isExcess ? (
+              <TrendingUp size={12} className="shrink-0" aria-hidden />
+            ) : (
+              <TrendingDown size={12} className="shrink-0" aria-hidden />
+            )}
             <span className="shrink-0">
-              {isExcess ? "Excess" : "Gap"}: {gap.toLocaleString()} {uom} ({((gap / Math.max(primaryQty, secondaryQty)) * 100).toFixed(1)}%)
+              {isExcess ? "Over by" : "Short by"}: {gap.toLocaleString()} {uom} ({((gap / Math.max(primaryQty, secondaryQty)) * 100).toFixed(1)}%)
             </span>
           </div>
         </div>

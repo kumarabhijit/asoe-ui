@@ -36,9 +36,9 @@ function flagClasses(severity: string): string {
   // Visual mapping with a default fallback (allowed — not enum dispatch).
   switch (severity.toUpperCase()) {
     case "ERROR":
-      return "text-status-error";
+      return "text-error";
     case "WARNING":
-      return "text-status-warning";
+      return "text-warning";
     default:
       return "text-text-tertiary";
   }

@@ -6,7 +6,36 @@
  * row's aria-label. Both wrap Intl.NumberFormat with explicit
  * locale so test output is stable regardless of CI locale.
  */
-import { formatCurrency, formatCurrencyForA11y } from "@/lib/format";
+import {
+  formatCurrency,
+  formatCurrencyForA11y,
+  fmtMoney,
+  fmtSignedPrice,
+} from "@/lib/format";
+
+describe("fmtMoney (sign-preserving, no forced +)", () => {
+  it("formats positive magnitudes without a sign", () => {
+    expect(fmtMoney(10)).toBe("$10.00");
+  });
+  it("keeps the minus on negatives (e.g. a net-credit RESULT)", () => {
+    expect(fmtMoney(-3.5)).toBe("-$3.50");
+  });
+  it("zero has no sign", () => {
+    expect(fmtMoney(0)).toBe("$0.00");
+  });
+});
+
+describe("fmtSignedPrice (explicit +/- for deltas)", () => {
+  it("prefixes + on positive deltas", () => {
+    expect(fmtSignedPrice(3.5)).toBe("+$3.50");
+  });
+  it("prefixes - on negative deltas (never colour-only)", () => {
+    expect(fmtSignedPrice(-3.5)).toBe("-$3.50");
+  });
+  it("zero has no sign", () => {
+    expect(fmtSignedPrice(0)).toBe("$0.00");
+  });
+});
 
 describe("formatCurrency", () => {
   it("renders USD with narrow symbol", () => {

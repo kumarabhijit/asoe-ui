@@ -40,7 +40,7 @@ Files reviewed:
 | AttachmentPreview | Needs Minor Tweaks |
 | ErasureCertificateButton | Needs Rework |
 
-**Counts — Pass: 3 · Needs Minor Tweaks: 8 · Needs Rework: 2**
+**Counts (post Batch 1–3) — Pass: 5 · Needs Minor Tweaks: 8 · Needs Rework: 0** (was 3/8/2 — ActivityIndicator and ErasureCertificateButton flipped to Pass)
 
 ---
 
@@ -250,7 +250,7 @@ Files reviewed:
 
 ### ActivityIndicator
 **Context** — Live agent-status text on the pipeline (Section 11.2, agent-first) · Primary Goal: show domain-aware "what the agent is doing now" · Target Audience: operators watching autonomous resolution.
-**Overall Verdict:** Needs Rework
+**Overall Verdict:** ~~Needs Rework~~ → **Pass** ✅ (remediated Batch 2+3 — templated via `intentLabelFor`, `role=status`+`aria-live=polite`)
 
 **Correctness Issues:**
 - `ActivityIndicator.tsx:16-46` — **Guardrail #2 violation.** The `NODE_MESSAGES` map hardcodes intent enum literals as object keys driving display selection: `CONTRACTUAL_CORRECTION`, `CREDIT_BLOCK`, `MASS_PRICING_ERROR`, `DUPLICATE_PO` appear at `:20-23`, `:28-31`, `:38-41`. The `getMessage` function (`:48-53`) selects the displayed string by matching `intent` against these literals. CLAUDE.md Guardrail #1/#2 forbids "hardcoded intent values ... in display labels" and requires that "adding a new intent in asoe2 must require zero UI code changes." Adding a 5th intent here yields the generic `_default` with **no** per-intent message and requires editing this file to add one — exactly the forbidden coupling. The `PipelineNode` keys (`:16`) are fine (a compile-time type, allowed), but the *intent* sub-keys are runtime enum literals and must come from a runtime source (e.g. `useHealth` + a backend-provided message template), not be baked in.
@@ -321,7 +321,7 @@ Files reviewed:
 
 ### ErasureCertificateButton
 **Context** — Downloads regulator-facing GDPR erasure certificate (PARITY-0.5/8, ADR-023) · Primary Goal: export the hash-chain proof of erasure for an auditor/regulator · Target Audience: managers/admins (RBAC manager+admin only).
-**Overall Verdict:** Needs Rework
+**Overall Verdict:** ~~Needs Rework~~ → **Pass** ✅ (remediated Batch 1+3 — `aria-busy`, single `role=alert` rule, `text-error` token)
 
 **Correctness Issues:**
 - `ErasureCertificateButton.tsx:103` — **Design-token defect (Guardrail #2).** The error message uses `className="text-caption text-status-error"`. There is **no `status` color namespace** in `tailwind.config.ts` (verified: the error color is exposed as `error` → `text-error`, lines 78-83; no `status:` key exists). `text-status-error` therefore resolves to **no color** — the error text renders in the inherited/default color, not the intended red. The rest of the codebase uses `text-error` for this; `text-status-error` is a recurring typo cluster (also in `DraftReplySection.tsx`, `OrderEntrySection.tsx`) but within this slice it is a confirmed live bug: the regulator-erasure failure message is not visually styled as an error.

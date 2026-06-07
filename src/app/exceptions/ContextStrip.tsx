@@ -11,6 +11,7 @@ import { useState } from "react";
 import { Building2, DollarSign, Shield, Clock, User, MapPin, Package } from "lucide-react";
 import { CollapsibleHeader } from "./shared";
 import { fmtPrice } from "./shared";
+import { fmtSignedPrice } from "@/lib/format";
 import type { EntityProfile, ImpactMetrics } from "@/types/exceptions";
 
 interface ContextStripProps {
@@ -77,7 +78,7 @@ export function ContextStrip({ entityProfile: ep, impactMetrics: im, defaultOpen
             {im && (
               <div className="flex flex-col gap-4 text-caption">
                 <ContextRow icon={<DollarSign size={11} />} label="At Risk" value={fmtPrice(im.revenue_at_risk)} highlight />
-                <ContextRow icon={<DollarSign size={11} />} label="Delta" value={`${fmtPrice(im.delta_amount)} (${im.delta_percentage.toFixed(1)}%)`} />
+                <ContextRow icon={<DollarSign size={11} />} label="Delta" value={`${fmtSignedPrice(im.delta_amount)} (${im.delta_percentage.toFixed(1)}%)`} />
                 {im.fulfillment_gap_pct !== undefined && (
                   <ContextRow icon={<Package size={11} />} label="Gap" value={`${im.fulfillment_gap_pct.toFixed(1)}%`} />
                 )}

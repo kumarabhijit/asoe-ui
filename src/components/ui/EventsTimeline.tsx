@@ -15,7 +15,7 @@
  */
 "use client";
 
-import { Check, AlertTriangle, AlertOctagon, ChevronDown, Server } from "lucide-react";
+import { Check, AlertTriangle, AlertOctagon, ChevronDown, Server, Circle } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { PolicyHitBadge } from "@/components/ui/PolicyHitBadge";
@@ -60,6 +60,15 @@ function statusIndicator(status: ExecutedNode["status"]) {
       return (
         <span className={cn(indicatorBase, "bg-error text-white")}>
           <AlertOctagon size={12} />
+        </span>
+      );
+    default:
+      // Forward-compat: an unmapped status still renders a neutral
+      // indicator rather than nothing (mirrors the verdictVariant default
+      // branch). Without this a new contract status drops the row's marker.
+      return (
+        <span className={cn(indicatorBase, "bg-surface-secondary text-text-tertiary")}>
+          <Circle size={12} />
         </span>
       );
   }
@@ -247,7 +256,7 @@ function TimelineRow({ node, isHalt }: { node: ExecutedNode; isHalt: boolean }) 
         )}
       </button>
       {expanded && (
-        <div className="pl-30 flex flex-col gap-8">
+        <div className="pl-32 flex flex-col gap-8">
           {hasDecision && (
             <DecisionPayload decision={node.decision} />
           )}

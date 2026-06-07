@@ -29,6 +29,38 @@ export function formatCurrency(
 }
 
 /**
+ * Sign-preserving money for whole currency units (NOT cents): "$10.00",
+ * "-$3.50", "$0.00". No leading "+" on positives — use this for magnitudes
+ * that can legitimately be negative (e.g. a net-credit RESULT in a pricing
+ * waterfall), where forcing a "+" would be wrong. The minus is textual, so
+ * direction never depends on colour alone (WCAG 1.4.1).
+ */
+export function fmtMoney(n: number, locale = "en-US"): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    signDisplay: "auto",
+  }).format(n);
+}
+
+/**
+ * Explicit-sign money for DELTAS (price adjustments, freight deltas,
+ * variances) in whole currency units: "+$2.00", "-$3.50", "$0.00". The
+ * canonical signed formatter the UX audit (T3) calls for — replaces the
+ * `Math.abs`-then-colour pattern so a negative delta is never shown as a
+ * positive amount distinguished only by colour. For magnitudes that are
+ * always >= 0 (prices, totals, at-risk) keep `fmtPrice` in
+ * app/exceptions/shared.tsx.
+ */
+export function fmtSignedPrice(n: number, locale = "en-US"): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    signDisplay: "exceptZero",
+  }).format(n);
+}
+
+/**
  * A11y-spoken form: digits + currency word ("4,147.20 USD"). The
  * "$" glyph pronounces inconsistently across screen readers — NVDA
  * says "dollars", JAWS says "dollar sign", VoiceOver may skip it

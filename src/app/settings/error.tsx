@@ -2,6 +2,7 @@
 "use client";
 
 import { ChromeBoundary } from "@/components/ui/ChromeBoundary";
+import { BoundaryError } from "@/components/ui/BoundaryError";
 
 export default function Error({
   error,
@@ -12,20 +13,12 @@ export default function Error({
 }) {
   return (
     <ChromeBoundary activeTab="settings">
-      <div role="alert" className="py-24 flex flex-col gap-12">
-        <h1 className="text-h4 text-text-primary">Settings failed to load</h1>
-        <p className="text-text-tertiary">
-          {error?.message || "An unexpected error occurred."}
-        </p>
-        <button
-          type="button"
-          onClick={() => reset()}
-          className="self-start text-brand hover:underline"
-          aria-label="Retry loading settings"
-        >
-          Retry
-        </button>
-      </div>
+      <BoundaryError
+        title="Settings failed to load"
+        error={error}
+        reset={reset}
+        retryLabel="Retry loading settings"
+      />
     </ChromeBoundary>
   );
 }

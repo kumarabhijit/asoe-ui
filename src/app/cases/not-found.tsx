@@ -11,7 +11,7 @@ export default function NotFound() {
   return (
     <ChromeBoundary activeTab="cases">
       <div role="status" className="py-24 flex flex-col gap-12">
-        <h1 className="text-h4 text-text-primary">Case not found</h1>
+        <h1 className="text-heading text-text-primary">Case not found</h1>
         <p className="text-text-tertiary">
           The case you requested doesn&apos;t exist or has been deleted.
         </p>

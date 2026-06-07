@@ -5,6 +5,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { intentLabelFor } from "@/config/erp-label-map";
 import type { PipelineNode } from "@/types/exceptions";
 
 interface ActivityIndicatorProps {
@@ -13,34 +14,30 @@ interface ActivityIndicatorProps {
   className?: string;
 }
 
-const NODE_MESSAGES: Record<PipelineNode, string | Record<string, string>> = {
+/**
+ * Per-node progress copy. Intent-specialised nodes hold a template that
+ * receives the *humanised* intent label, so the message stays domain-aware
+ * (Guardrail #4) WITHOUT branching on hardcoded enum literals (Guardrail #2):
+ * adding a new intent in asoe2 requires zero changes here. `label` is null
+ * when no intent is known yet, falling back to neutral copy.
+ */
+type NodeMessage = string | ((label: string | null) => string);
+
+const NODE_MESSAGES: Record<PipelineNode, NodeMessage> = {
   ingest: "Validating order event fields...",
   classify: "Classifying exception intent...",
-  load_skill: {
-    CONTRACTUAL_CORRECTION: "Loading pricing correction skill...",
-    CREDIT_BLOCK: "Loading credit hold skill...",
-    MASS_PRICING_ERROR: "Loading mass pricing skill...",
-    DUPLICATE_PO: "Loading duplicate PO detection skill...",
-    _default: "Loading skill definition...",
-  },
+  load_skill: (label) =>
+    label ? `Loading ${label} skill...` : "Loading skill definition...",
   validate_circuit_breaker: "Checking circuit breaker thresholds...",
-  shadow_audit: {
-    CONTRACTUAL_CORRECTION: "Auditing price adjustment against compliance policies...",
-    CREDIT_BLOCK: "Auditing credit exposure against policies...",
-    MASS_PRICING_ERROR: "Auditing batch update against penalty matrix...",
-    DUPLICATE_PO: "Auditing duplicate PO against compliance policies...",
-    _default: "Running compliance shadow audit...",
-  },
+  shadow_audit: (label) =>
+    label
+      ? `Auditing ${label} against compliance policies...`
+      : "Running compliance shadow audit...",
   select_recipe: "Selecting execution recipe...",
   validate_types: "Validating recipe parameters and policy thresholds...",
   resolve_dependencies: "Fetching gateway dependencies...",
-  execute_recipe: {
-    CONTRACTUAL_CORRECTION: "Executing price adjustment recipe...",
-    CREDIT_BLOCK: "Executing credit hold release recipe...",
-    MASS_PRICING_ERROR: "Executing mass pricing correction...",
-    DUPLICATE_PO: "Executing duplicate PO detection...",
-    _default: "Executing recipe...",
-  },
+  execute_recipe: (label) =>
+    label ? `Executing ${label} recipe...` : "Executing recipe...",
   apply_effects: "Applying effects to external systems...",
   build_analysis: "Enforcing audit-bearing field coverage...",
 };
@@ -48,16 +45,19 @@ const NODE_MESSAGES: Record<PipelineNode, string | Record<string, string>> = {
 function getMessage(node: PipelineNode, intent?: string): string {
   const entry = NODE_MESSAGES[node];
   if (typeof entry === "string") return entry;
-  if (intent && intent in entry) return entry[intent];
-  return entry._default;
+  return entry(intent ? intentLabelFor(intent) : null);
 }
 
 export function ActivityIndicator({ node, intent, className }: ActivityIndicatorProps) {
   const message = getMessage(node, intent);
 
   return (
-    <span className={cn("inline-flex items-center gap-6 text-caption text-text-tertiary font-medium italic", className)}>
-      <span className="agent-active-dot w-1.5 h-1.5 shrink-0" />
+    <span
+      role="status"
+      aria-live="polite"
+      className={cn("inline-flex items-center gap-6 text-caption text-text-tertiary font-medium italic", className)}
+    >
+      <span className="agent-active-dot w-1.5 h-1.5 shrink-0" aria-hidden />
       {message}
     </span>
   );

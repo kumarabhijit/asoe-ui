@@ -42,10 +42,15 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: strin
     return () => clearTimeout(timer);
   }, [item.id, item.duration, onDismiss]);
 
+  // Errors/warnings interrupt (assertive + alert); success/info wait their
+  // turn (polite + status). A failure the operator must act on shouldn't sit
+  // silently behind other announcements.
+  const isUrgent = item.variant === "error" || item.variant === "warning";
+
   return (
     <div
-      role="status"
-      aria-live="polite"
+      role={isUrgent ? "alert" : "status"}
+      aria-live={isUrgent ? "assertive" : "polite"}
       className={cn(
         "flex items-center gap-10 px-16 py-12 [color:white] rounded-md shadow-lg text-body font-medium max-w-[400px] animate-in slide-in-from-right-6 duration-normal",
         v.className,

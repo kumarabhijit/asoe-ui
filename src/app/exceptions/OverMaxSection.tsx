@@ -25,8 +25,10 @@ export function OverMaxSection({ data }: OverMaxSectionProps) {
   const orderedPct = (data.total_ordered / maxVal) * 100;
   const maxPct = (data.max_qty / maxVal) * 100;
 
-  const trimmedTotal = data.trim_plan.reduce((s, l) => s + l.trimmed_to, 0);
-  const deltaTotal = data.trim_plan.reduce((s, l) => s + l.delta, 0);
+  // Audit totals come from the backend contract (server-computed), not a
+  // client-side reduce in this projector (Guardrail #6).
+  const trimmedTotal = data.trimmed_total;
+  const deltaTotal = data.delta_total;
 
   return (
     <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
@@ -163,11 +165,12 @@ export function OverMaxSection({ data }: OverMaxSectionProps) {
                   </div>
                   <span className="text-right font-mono text-text-primary">{line.qty.toLocaleString()}</span>
                   <span className="text-right font-mono text-text-secondary">
-                    {line.max_line_qty != null ? (
-                      line.max_line_qty.toLocaleString()
-                    ) : (
-                      <span className="text-text-quaternary">—</span>
-                    )}
+                    {/* max_line_qty is null when the contract carries no
+                        per-line cap — structural omission via EvidenceBlock,
+                        not an ad-hoc "—" (Guardrail #6). */}
+                    <EvidenceBlock tier="contextual" value={line.max_line_qty}>
+                      {(v) => <>{(v as number).toLocaleString()}</>}
+                    </EvidenceBlock>
                   </span>
                   <span className={cn(
                     "text-right font-mono font-bold",
@@ -176,10 +179,10 @@ export function OverMaxSection({ data }: OverMaxSectionProps) {
                     {line.excess > 0 ? `+${line.excess.toLocaleString()}` : "OK"}
                   </span>
                   <span className="text-center">
-                    {line.is_even_layer_item ? (
+                    {/* EL badge for even-layer items; a non-even-layer line is a
+                        known-false flag, rendered as no badge (no ad-hoc "—"). */}
+                    {line.is_even_layer_item && (
                       <span className="text-label px-2 py-px rounded-full bg-info-subtle text-info">EL</span>
-                    ) : (
-                      <span className="text-text-quaternary">—</span>
                     )}
                   </span>
                 </div>

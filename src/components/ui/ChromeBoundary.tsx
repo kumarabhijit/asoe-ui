@@ -31,16 +31,12 @@
 
 import { NavBar } from "@/components/ui/NavBar";
 import { useSignOut } from "@/hooks/useSignOut";
+import { NAV_TABS } from "@/config/nav-tabs";
 
-// Kept in sync with `src/config/nav-tabs.ts` (single source of truth).
-// ADR-041 P2 retires the "Exception Queue" tab — `/cases` is the
-// canonical queue surface.
-const NAV_TABS = [
-  { id: "inbox", label: "Customer Inbox", href: "/inbox" },
-  { id: "cases", label: "Cases", href: "/cases" },
-  { id: "dashboard", label: "Dashboard", href: "/dashboard" },
-  { id: "settings", label: "Settings", href: "/settings" },
-];
+// NAV_TABS is imported from the single source of truth (`src/config/nav-tabs.ts`)
+// rather than duplicated here — the local copy had drifted (missing the `home`
+// tab and using stale `inbox`/label values), so a `/home` boundary highlighted
+// no tab. Importing keeps the boundary chrome in lockstep with the pages.
 
 export interface ChromeBoundaryProps {
   /** Optional active tab hint. Boundary surfaces typically don't

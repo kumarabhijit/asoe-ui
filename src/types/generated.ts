@@ -3099,6 +3099,11 @@ export interface components {
             block_status?: string | null;
             /** Contract Ref */
             contract_ref?: string | null;
+            /**
+             * Delta Total
+             * @default 0
+             */
+            delta_total: number;
             /** Exceedance Pct */
             exceedance_pct: number;
             /** Excess Qty */
@@ -3111,6 +3116,11 @@ export interface components {
             total_ordered: number;
             /** Trim Plan */
             trim_plan?: components["schemas"]["TrimPlanLine"][];
+            /**
+             * Trimmed Total
+             * @default 0
+             */
+            trimmed_total: number;
             /**
              * Uom
              * @default

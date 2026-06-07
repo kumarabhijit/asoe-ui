@@ -28,11 +28,13 @@ export function AttachmentDownloadButton({
   compact = false,
 }: AttachmentDownloadButtonProps) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const disabled = busy || !attachment.attachment_id;
 
   async function handleDownload() {
     if (!attachment.attachment_id || busy) return;
     setBusy(true);
+    setError(null);
     try {
       const blob = await attachmentsApi.getBlob(caseId, attachment.attachment_id, {
         mimeType: attachment.mime_type,
@@ -46,25 +48,39 @@ export function AttachmentDownloadButton({
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+    } catch (err) {
+      // A failed evidence download must not be swallowed silently on a SOX
+      // surface — surface it so the operator knows the bytes weren't served.
+      setError(err instanceof Error ? err.message : "Download failed");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleDownload}
-      disabled={disabled}
-      aria-label={`Download ${attachment.name}`}
-      className="inline-flex items-center gap-4 px-8 py-4 rounded-sm border border-border-subtle text-caption text-text-secondary hover:bg-surface-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring disabled:opacity-50"
-    >
-      {busy ? (
-        <Loader2 size={12} className="animate-spin" aria-hidden />
-      ) : (
-        <Download size={12} aria-hidden />
-      )}
-      {compact ? null : <span>Download</span>}
-    </button>
+    <span className="inline-flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={handleDownload}
+        disabled={disabled}
+        aria-busy={busy || undefined}
+        aria-label={`Download ${attachment.name}`}
+        className="inline-flex items-center gap-4 px-8 py-4 rounded-sm border border-border-subtle text-caption text-text-secondary hover:bg-surface-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring disabled:opacity-50"
+      >
+        {busy ? (
+          <Loader2 size={12} className="animate-spin" aria-hidden />
+        ) : (
+          <Download size={12} aria-hidden />
+        )}
+        {compact ? null : <span>Download</span>}
+      </button>
+      {error ? (
+        // role="alert" already implies an assertive live region — no separate
+        // aria-live (that pairing is contradictory).
+        <span role="alert" className="text-caption text-error">
+          {error}
+        </span>
+      ) : null}
+    </span>
   );
 }

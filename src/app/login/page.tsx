@@ -24,6 +24,15 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Seed (default) vs Entra auth mode. In seed/preview there is no real IdP,
+  // so an SSO-domain email falls back to the credentials form; in entra mode
+  // it hands off to the real Azure AD flow. Mirrors ASOE_AUTH_MODE in
+  // src/lib/auth.ts (NEXT_PUBLIC_ prefix is the client-readable mirror).
+  const AUTH_MODE =
+    (process.env.NEXT_PUBLIC_ASOE_AUTH_MODE ?? "seed").toLowerCase();
+
+  // UI heuristic only (which emails attempt SSO). In entra mode the IdP is the
+  // real authority; in seed mode this just routes to the demo password step.
   const SSO_DOMAINS = ["acme.com", "walmart.com", "kroger.com"];
 
   function isSSODomain(emailValue: string): boolean {
@@ -42,9 +51,17 @@ function LoginForm() {
     await new Promise((r) => setTimeout(r, 600));
 
     if (email.includes("@") && isSSODomain(email)) {
+      if (AUTH_MODE === "entra") {
+        // Real SSO is configured — hand off to the Azure AD provider.
+        setStep("sso-redirect");
+        await signIn("azure-ad", { callbackUrl });
+        return;
+      }
+      // Seed/preview: no IdP wired. Be honest that this is a preview and fall
+      // back to the credentials form (which validates against MOCK_USERS).
       setStep("sso-redirect");
       await new Promise((r) => setTimeout(r, 2000));
-      setError("SSO is not configured in this demo. Enter any password to continue.");
+      setError("SSO isn't configured in this preview. Enter any password to continue.");
       setStep("password");
     } else {
       setStep("password");
@@ -266,17 +283,14 @@ export default function LoginPage() {
         </Suspense>
       </Card>
 
-      {/* Agent Activity Footer */}
+      {/* Footer — a pre-auth screen has no session to source live counts from,
+          so the previous fabricated "12 agents / 847 resolved" metrics were
+          removed (audit T1). A neutral product descriptor keeps the affordance
+          without presenting fake operational figures as live. */}
       <div className="flex items-center gap-8 mt-32">
         <span className="agent-active-dot" />
         <span className="text-caption text-text-tertiary font-medium">
-          12 agents active
-        </span>
-        <span className="text-caption text-text-quaternary">
-          &middot;
-        </span>
-        <span className="text-caption text-text-tertiary font-medium">
-          847 exceptions resolved today
+          Agentic order-to-cash exception resolution
         </span>
       </div>
 

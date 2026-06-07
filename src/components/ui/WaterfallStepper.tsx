@@ -78,7 +78,9 @@ function NodeIndicator({ status }: { status: NodeState["status"] }) {
 }
 
 function formatDuration(ms?: number): string {
-  if (!ms) return "";
+  // `if (!ms)` treated a genuine 0ms (sub-millisecond, rounded) node as
+  // "no duration" and rendered nothing; only an absent value should be blank.
+  if (ms === undefined) return "";
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
 }
@@ -255,6 +257,14 @@ export function WaterfallStepper({ nodes, intent, className, allowReplay }: Wate
                 {n.duration_ms !== undefined && n.status === "completed" && (
                   <span className="text-label text-text-quaternary font-mono">
                     {formatDuration(n.duration_ms)}
+                  </span>
+                )}
+                {n.status === "skipped" && (
+                  // WCAG 1.4.1: the dashed-ring icon is not enough on its own;
+                  // a text cue distinguishes "skipped" from "pending" for SR /
+                  // low-vision users.
+                  <span className="text-label text-text-quaternary font-medium uppercase tracking-wide">
+                    Skipped
                   </span>
                 )}
               </div>
