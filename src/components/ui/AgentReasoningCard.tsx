@@ -99,7 +99,8 @@ interface AgentReasoningCardProps {
   // picker on YELLOW/RED.
   onApprove?: (comment: string, reasonTagOverride?: string) => void;
   onReject?: (comment: string, reasonTagOverride?: string) => void;
-  onEscalate?: () => void;
+  // ADR-045 CP3 — Escalate reason captured by the matrix dialog.
+  onEscalate?: (reason: string) => void;
   onOverride?: () => void;
   /** Fires when the user confirms a Re-analyze request with a mandatory reason.
    *  Parent is responsible for calling exceptionsApi.reanalyze and refreshing. */

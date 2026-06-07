@@ -317,9 +317,9 @@ export default function ExceptionDetailPanel({
     markActionSubmit("reject", reasonTagOverride);
     handleReject(comment, reasonTagOverride);
   };
-  const handleEscalateWithTelemetry = () => {
+  const handleEscalateWithTelemetry = (reason: string) => {
     markFirstAction("escalate");
-    handleEscalate();
+    handleEscalate(reason);
   };
   const handleOverrideWithTelemetry = () => {
     markFirstAction("override");

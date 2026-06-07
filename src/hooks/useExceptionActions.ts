@@ -165,18 +165,16 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
 
   /**
    * Escalate is a routing action — its own endpoint with its own
-   * permission (`exceptions:escalate`). Reason is mandatory per SOX;
-   * fall back to window.prompt for Phase 1 (richer dialog tracked
-   * separately).
+   * permission (`exceptions:escalate`). Reason is mandatory per SOX and is
+   * now captured by the constrained in-panel dialog in ActionButtonMatrix
+   * (ADR-045 CP3 — replaced window.prompt for a consistent, accessible,
+   * keyboard-navigable reason-capture pattern shared with Reanalyze).
    */
-  const handleEscalate = useCallback(async () => {
+  const handleEscalate = useCallback(async (reason: string) => {
     if (!hasPermission("exceptions:escalate")) {
       addToast("warning", "Permission denied: your role cannot escalate exceptions.");
       return;
     }
-    const reason = typeof window !== "undefined"
-      ? window.prompt("Reason for escalation (required):")
-      : null;
     if (!reason || !reason.trim()) {
       addToast("warning", "A reason is required to escalate.");
       return;
