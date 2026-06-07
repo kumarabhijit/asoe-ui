@@ -12,6 +12,14 @@ import {
   ALLOWED_OVERRIDE_REASON_TAGS,
   ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT,
 } from "@/lib/__generated__/curated_reason_tags";
+// ADR-045 — display labels + fan-out sourced from the generated taxonomy
+// constants (same source the api.ts MOCK_HEALTH uses) so the two mock
+// payloads stay in parity and neither hand-authors a label.
+import {
+  INTENT_LABELS,
+  INTENTS_BY_SUPERGROUP,
+  SUPERGROUP_LABELS,
+} from "@/generated/taxonomy";
 
 /* ── Auth fixtures (one per role) ──────────────────────────────────── */
 
@@ -200,6 +208,14 @@ export const MOCK_HEALTH: HealthResponse = {
     Object.entries(ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT).map(
       ([intent, tags]) => [intent, [...tags]],
     ),
+  ),
+  // ADR-045 — operator display strings + fan-out, mirroring src/lib/api.ts.
+  display_labels: {
+    supergroups: { ...SUPERGROUP_LABELS },
+    intents: { ...INTENT_LABELS },
+  },
+  intents_by_supergroup: Object.fromEntries(
+    Object.entries(INTENTS_BY_SUPERGROUP).map(([sg, codes]) => [sg, [...codes]]),
   ),
 };
 
