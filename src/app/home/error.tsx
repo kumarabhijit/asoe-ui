@@ -13,7 +13,7 @@ export default function Error({
   return (
     <ChromeBoundary activeTab="home">
       <div role="alert" className="py-24 flex flex-col gap-12">
-        <h1 className="text-h4 text-text-primary">Home failed to load</h1>
+        <h1 className="text-heading text-text-primary">Home failed to load</h1>
         <p className="text-text-tertiary">
           {error?.message || "An unexpected error occurred."}
         </p>

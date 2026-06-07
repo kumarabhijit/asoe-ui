@@ -328,7 +328,7 @@ export function PipelineDAG({
                         x={mid.x}
                         y={mid.y + 3}
                         textAnchor="middle"
-                        fontSize={10}
+                        style={{ fontSize: "var(--font-size-label)" }}
                         fontFamily="ui-monospace, monospace"
                         fontWeight={600}
                         fill="var(--color-brand)"
@@ -341,7 +341,7 @@ export function PipelineDAG({
                       x={mid.x}
                       y={mid.y + 3}
                       textAnchor="middle"
-                      fontSize={9}
+                      style={{ fontSize: "var(--font-size-label)" }}
                       fontFamily="ui-monospace, monospace"
                       fontWeight={isSelected ? 600 : 400}
                       fill={
@@ -387,7 +387,7 @@ export function PipelineDAG({
                 x={node.x + node.width / 2}
                 y={node.y + node.height / 2 + 4}
                 textAnchor="middle"
-                fontSize={11}
+                style={{ fontSize: "var(--font-size-caption)" }}
                 fill={
                   isExecuted
                     ? "var(--color-brand)"

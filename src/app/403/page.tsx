@@ -37,7 +37,7 @@ function ForbiddenInner() {
       <Card className="w-full max-w-lg p-32 flex flex-col gap-16">
         <div className="flex items-center gap-12">
           <ShieldAlert size={28} className="text-warning" />
-          <h1 className="text-h2 text-text-primary">No access to this tenant</h1>
+          <h1 className="text-title text-text-primary">No access to this tenant</h1>
         </div>
         <p className="text-body text-text-secondary">
           You are signed in as <strong>{email}</strong>, but no ASOE roles

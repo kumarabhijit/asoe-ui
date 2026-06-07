@@ -18,13 +18,13 @@ tick items, set status, and record the expert decision + PR for each.
 ## Batch 1 — T8: undefined tokens & typo'd CSS classes (safe, mechanical)
 Classes that name a non-existent token render unstyled at runtime.
 
-| ☐ | Finding | Location | Fix | Expert / decision | PR |
+| ☑ | Finding | Location | Fix | Expert / decision | PR |
 |---|---------|----------|-----|-------------------|----|
-| ☐ | `text-h4` undefined font-size | `cases/error.tsx:16`, `cases/not-found.tsx:14`, `home/dashboard/inbox/settings/error.tsx:16` | → `text-heading` | | |
-| ☐ | `text-status-error` undefined color class | `ErasureCertificateButton.tsx:103`, `OrderEntrySection.tsx:39`, `DraftReplySection.tsx:135,176,214` | → `text-error` | | |
-| ☐ | `pl-30` undefined spacing token | `EventsTimeline.tsx:250` | use a real scale step | | |
-| ☐ | Hardcoded numeric `fontSize` / RGB-hex in SVG | `PipelineDAG.tsx`, `EventsTimeline.tsx`, `GravitationalOrbs.tsx` | tokens | | |
-| ☐ | **Guard:** CI lint that fails on Tailwind classes not resolvable to a token | new `tests/architectural/*` | prevents recurrence | | |
+| ☑ | `text-h4` undefined font-size | `cases/error.tsx:16`, `cases/not-found.tsx:14`, `home/dashboard/inbox/settings/error.tsx:16` | → `text-heading` | Mechanical token-map; no expert needed | #batch1 |
+| ☑ | `text-status-error` undefined color class | `ErasureCertificateButton.tsx:103`, `OrderEntrySection.tsx:39,41`, `DraftReplySection.tsx:135,176,214` | → `text-error` (+ `text-status-warning`→`text-warning` found alongside) | Mechanical token-map | #batch1 |
+| ☑ | `pl-30` undefined spacing token | `EventsTimeline.tsx:250` | → `pl-32` (nearest scale step) | Mechanical token-map | #batch1 |
+| ☑ | Hardcoded numeric `fontSize` / RGB-hex in SVG | `PipelineDAG.tsx` (3 `fontSize`) | → `style={{fontSize:"var(--font-size-label/caption)"}}` | EventsTimeline had none; GravitationalOrbs colour/motion deferred to **Batch 5** (full rework) to avoid double-touch | #batch1 |
+| ☑ | **Guard:** CI lint that fails on Tailwind classes not resolvable to a token | `tests/architectural/token_class_resolution.test.ts` | spacing steps derived from `--space-*`; font-alias + `-status-` namespace denylists. Caught 4 latent extras (`gap-14`,`px-14`,`py-14`,`text-h2`) → fixed | Guard scans raw text (catches cn()/cva()) | #batch1 |
 
 ## Batch 2 — T9 + Guardrail #2: enum→display maps
 Maps keyed off backend enums must have a `default` fallback (icon+text) and must
@@ -92,6 +92,16 @@ choice in the table's "Expert / decision" column and the PR body.
 
 ## Decision log
 _(Append expert decisions here as they're made: date · item · expert · outcome · rationale.)_
+
+- **2026-06-07 · Batch 1 (T8) · self (mechanical)** — Undefined token classes
+  are pure token-mapping with no design ambiguity, so no expert subagent was
+  spawned. Mapping rules: `text-h4`→`text-heading`, `text-h2`→`text-title`,
+  `text-status-{error,warning}`→`text-{error,warning}`, off-scale spacing
+  (`pl-30`,`*-14`) → nearest valid `--space-*` step, SVG numeric `fontSize` →
+  `var(--font-size-*)`. GravitationalOrbs colour/motion/dark-mode left to Batch 5
+  (it needs a full rework, not a one-line token swap — touching it twice would
+  churn the diff). The new guard derives its valid spacing scale from
+  `design-tokens.css`, so it stays in sync if the scale changes.
 
 ## Scorecard sync
 As items move to ☑, update the verdict in the matching `0X-*.md` report and the

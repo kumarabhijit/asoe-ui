@@ -347,7 +347,7 @@ export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen, an
                 </div>
 
                 {detailTab === "evidence" && trace && (
-                  <div className="text-caption text-text-secondary flex flex-col gap-14">
+                  <div className="text-caption text-text-secondary flex flex-col gap-16">
                     {trace.narrative && <NarrativeBlock text={trace.narrative} />}
                     {trace.resolution_steps && trace.resolution_steps.length > 0 && (
                       <ResolutionSteps steps={trace.resolution_steps} />

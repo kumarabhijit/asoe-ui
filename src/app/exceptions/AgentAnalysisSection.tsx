@@ -84,7 +84,7 @@ export function AgentAnalysisSection({
         onToggle={() => setOpen((v) => !v)}
       />
       {open && (
-        <div ref={contentRef} className="border-t border-border px-16 py-14">
+        <div ref={contentRef} className="border-t border-border px-16 py-16">
           {/* Each block renders only when its prose is present
               (CLAUDE.md Guardrail #6 — structural omission, not a
               "—" or empty colored bar). On Azure today, root_cause

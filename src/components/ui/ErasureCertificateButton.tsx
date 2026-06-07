@@ -100,7 +100,7 @@ export function ErasureCertificateButton({
       {error ? (
         <div
           role="alert"
-          className="text-caption text-status-error"
+          className="text-caption text-error"
           aria-live="polite"
         >
           {error}

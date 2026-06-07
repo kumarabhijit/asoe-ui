@@ -247,7 +247,7 @@ function TimelineRow({ node, isHalt }: { node: ExecutedNode; isHalt: boolean }) 
         )}
       </button>
       {expanded && (
-        <div className="pl-30 flex flex-col gap-8">
+        <div className="pl-32 flex flex-col gap-8">
           {hasDecision && (
             <DecisionPayload decision={node.decision} />
           )}

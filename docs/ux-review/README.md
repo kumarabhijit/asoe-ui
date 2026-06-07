@@ -139,6 +139,13 @@ renders unstyled — invisible in code review, visible only at runtime:
 - Hardcoded numeric `fontSize` / RGB-hex in SVG viz (PipelineDAG, EventsTimeline, GravitationalOrbs).
 - **Fix theme:** a CI lint guard failing on Tailwind classes not resolvable to a token would kill this whole class of bug.
 
+> ✅ **Resolved — Batch 1** (see `REMEDIATION.md`). All `text-h4`/`text-h2`,
+> `text-status-*`, `pl-30` and off-scale `-14` classes mapped to real tokens;
+> PipelineDAG SVG `fontSize` now token-backed; `GravitationalOrbs` colour/motion
+> deferred to Batch 5 (full rework). The CI guard
+> (`tests/architectural/token_class_resolution.test.ts`) now fails the build on
+> any unresolvable spacing/font-size/colour class and caught 4 latent extras.
+
 ### T9 — Missing default-fallback in enum→display maps (added in pass 2)
 Maps keyed off backend enums with no `default` branch render **blank** for a new
 enum value — the inverse of Guardrail #2 (not hardcoded, but silently dropped):

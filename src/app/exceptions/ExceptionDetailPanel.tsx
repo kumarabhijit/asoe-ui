@@ -700,7 +700,7 @@ export default function ExceptionDetailPanel({
               <div
                 role="status"
                 aria-live="polite"
-                className="flex flex-col gap-10 px-14 py-10 bg-warning-subtle border border-warning-border rounded-sm"
+                className="flex flex-col gap-10 px-16 py-10 bg-warning-subtle border border-warning-border rounded-sm"
               >
                 <div className="text-caption font-semibold text-warning">
                   Awaiting second-reviewer cosign
@@ -755,7 +755,7 @@ export default function ExceptionDetailPanel({
             <div
               role="status"
               aria-live="polite"
-              className="flex items-center gap-10 px-14 py-10 bg-info-subtle border border-info-border rounded-sm"
+              className="flex items-center gap-10 px-16 py-10 bg-info-subtle border border-info-border rounded-sm"
             >
               <RotateCcw size={16} className="text-info shrink-0 animate-spin" />
               <div className="flex-1">
