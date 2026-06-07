@@ -305,7 +305,7 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
                       : "2px solid var(--color-brand)",
                     boxShadow: isSelected ? "0 0 0 3px var(--color-brand-ring)" : "none",
                     opacity: selectedRef && !isSelected ? 0.4 : 1,
-                    background: "var(--color-brand-subtle, rgba(90,75,214,0.12))",
+                    background: "var(--color-brand-subtle)",
                   }}
                 />
               );

@@ -18,6 +18,7 @@
 import { Check, AlertTriangle, AlertOctagon, ChevronDown, Server, Circle } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { humanizeNodeId, formatDurationMs } from "@/lib/format";
 import { PolicyHitBadge } from "@/components/ui/PolicyHitBadge";
 import type { ExecutedNode } from "@/types/api";
 
@@ -97,15 +98,6 @@ function verdictVariant(label: string): string {
   return "bg-surface-secondary text-text-tertiary";
 }
 
-/** Human-readable node label without a closed enum mapping. Title-cases
- *  snake_case and replaces underscores with spaces. */
-function humanizeNode(id: string): string {
-  return id
-    .split("_")
-    .map((p) => (p.length === 0 ? "" : p[0].toUpperCase() + p.slice(1)))
-    .join(" ");
-}
-
 /** Map a TerminalStatus value to a halt-banner verb. Visual mapping
  *  with a default branch — Guardrail #1: open-set, no enum gate.
  *  "Halted" was the generic verb the prior version used; this gives
@@ -129,12 +121,6 @@ function haltOutcomeLabel(finalStatus: string): string {
     default:
       return "Halted";
   }
-}
-
-function fmtDuration(ms?: number): string | null {
-  if (typeof ms !== "number") return null;
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
 }
 
 function isHaltOrError(node: ExecutedNode): boolean {
@@ -179,7 +165,7 @@ export function EventsTimeline({
       {haltNode && finalStatus && (
         <div className="border-l-[3px] border-error pl-12 py-4 text-caption">
           <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-2">
-            {haltOutcomeLabel(finalStatus)} at {humanizeNode(haltNode.node)}
+            {haltOutcomeLabel(finalStatus)} at {humanizeNodeId(haltNode.node)}
           </div>
           <div className="text-text-secondary">
             Final status: <span className="font-mono">{finalStatus}</span>
@@ -198,7 +184,7 @@ export function EventsTimeline({
 
 function TimelineRow({ node, isHalt }: { node: ExecutedNode; isHalt: boolean }) {
   const [expanded, setExpanded] = useState(false);
-  const duration = fmtDuration(node.duration_ms);
+  const duration = formatDurationMs(node.duration_ms);
   const hasSubSpans = node.sub_spans && node.sub_spans.length > 0;
   const hasDecision =
     node.decision && Object.keys(node.decision).length > 0;
@@ -222,7 +208,7 @@ function TimelineRow({ node, isHalt }: { node: ExecutedNode; isHalt: boolean }) 
       >
         {statusIndicator(node.status)}
         <span className="text-caption font-semibold text-text-primary">
-          {humanizeNode(node.node)}
+          {humanizeNodeId(node.node)}
         </span>
         {duration && (
           <span className="text-label font-mono text-text-tertiary">
@@ -322,7 +308,7 @@ function SubSpansList({
             <span className="font-mono text-text-secondary">{s.gateway}</span>
             {typeof s.duration_ms === "number" && (
               <span className="font-mono text-text-tertiary">
-                {fmtDuration(s.duration_ms)}
+                {formatDurationMs(s.duration_ms)}
               </span>
             )}
             <span

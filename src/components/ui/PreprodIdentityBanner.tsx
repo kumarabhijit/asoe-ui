@@ -20,7 +20,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { ShieldCheck } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 
 export interface PreprodIdentityBannerProps {
   /** Override the env-derived mode. Used by tests and Storybook;
@@ -50,8 +50,11 @@ export function PreprodIdentityBanner({
 
   if (mode === "seed") return null;
 
+  // `session.user.email` is already typed by next-auth's DefaultSession,
+  // so the previous double-cast was unnecessary and concealed the contract
+  // on a SOX-relevant surface.
   const email =
-    (session?.user as unknown as { email?: string } | undefined)?.email ??
+    session?.user?.email ??
     (status === "loading" ? "Loading…" : "(no session)");
 
   return (
@@ -68,16 +71,15 @@ export function PreprodIdentityBanner({
       ].join(" ")}
     >
       <div className="flex items-center gap-8">
-        <ShieldCheck size={14} className="text-warning shrink-0" />
+        {/* Warning-toned alert shield — the prior reassuring check-mark
+            shield contradicted the caution intent of an identity cue. */}
+        <ShieldAlert size={14} className="text-warning shrink-0" aria-hidden="true" />
         <span>
           <strong className="text-text-primary">Preprod (Entra ID)</strong>{" "}
           — Logged in as:{" "}
           <strong className="text-text-primary">{email}</strong>
         </span>
       </div>
-      <span className="text-caption text-text-tertiary">
-        ASOE_AUTH_MODE=entra
-      </span>
     </div>
   );
 }

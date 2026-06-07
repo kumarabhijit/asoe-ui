@@ -42,12 +42,16 @@ const workspace = (page: Page) =>
 /** Read a /home KPI tile value by its label. */
 async function tileValue(page: Page, label: string): Promise<number> {
   const raw = await page.evaluate((wanted) => {
-    const spans = Array.from(
-      document.querySelectorAll("span.text-heading.font-mono"),
-    );
-    for (const v of spans) {
-      const lbl = v.parentElement?.querySelector("span.text-label")?.textContent?.trim();
-      if (lbl === wanted) return v.textContent?.trim() ?? null;
+    // Locate the MetricTile by its label span, then read the monospace value
+    // span that sits beside it. (The value used to carry a `.text-heading`
+    // class; it now uses the dedicated mono-metric token via inline style, so
+    // we match on the label↔value relationship rather than a styling class.)
+    const labels = Array.from(document.querySelectorAll("span.text-label"));
+    for (const lblEl of labels) {
+      if (lblEl.textContent?.trim() === wanted) {
+        const valueEl = lblEl.parentElement?.querySelector("span.font-mono");
+        return valueEl?.textContent?.trim() ?? null;
+      }
     }
     return null;
   }, label);

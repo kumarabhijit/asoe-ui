@@ -4,7 +4,7 @@
  */
 "use client";
 
-import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext, type ReactNode } from "react";
 import { X, Check, AlertTriangle, ShieldX, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,13 +34,43 @@ const VARIANT_CONFIG: Record<ToastVariant, { className: string; icon: ReactNode 
   info: { className: "bg-info", icon: <Info size={16} /> },
 };
 
-function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: string) => void }) {
+function ToastRow({ item, onDismiss }: { item: ToastItem; onDismiss: (id: string) => void }) {
   const v = VARIANT_CONFIG[item.variant];
 
+  // WCAG 2.2.1 (Timing Adjustable): the auto-dismiss timer pauses while the
+  // toast is hovered or keyboard-focused, so slow readers / AT users don't
+  // lose a message (especially a long error) before they've read it. The
+  // timer resumes with the remaining time when the pointer/focus leaves.
+  const remainingRef = useRef(item.duration || 4500);
+  const startedRef = useRef(Date.now());
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const resume = useCallback(() => {
+    clearTimer();
+    startedRef.current = Date.now();
+    timerRef.current = setTimeout(() => onDismiss(item.id), remainingRef.current);
+  }, [clearTimer, item.id, onDismiss]);
+
+  const pause = useCallback(() => {
+    if (timerRef.current == null) return;
+    clearTimer();
+    remainingRef.current = Math.max(
+      0,
+      remainingRef.current - (Date.now() - startedRef.current),
+    );
+  }, [clearTimer]);
+
   useEffect(() => {
-    const timer = setTimeout(() => onDismiss(item.id), item.duration || 4500);
-    return () => clearTimeout(timer);
-  }, [item.id, item.duration, onDismiss]);
+    resume();
+    return clearTimer;
+  }, [resume, clearTimer]);
 
   // Errors/warnings interrupt (assertive + alert); success/info wait their
   // turn (polite + status). A failure the operator must act on shouldn't sit
@@ -51,6 +81,10 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: strin
     <div
       role={isUrgent ? "alert" : "status"}
       aria-live={isUrgent ? "assertive" : "polite"}
+      onMouseEnter={pause}
+      onMouseLeave={resume}
+      onFocus={pause}
+      onBlur={resume}
       className={cn(
         "flex items-center gap-10 px-16 py-12 [color:white] rounded-md shadow-lg text-body font-medium max-w-[400px] animate-in slide-in-from-right-6 duration-normal",
         v.className,
@@ -61,7 +95,7 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: strin
       <button
         onClick={() => onDismiss(item.id)}
         aria-label="Dismiss"
-        className="bg-transparent border-none cursor-pointer text-white/80 p-px flex shrink-0 hover:text-white"
+        className="bg-transparent border-none cursor-pointer text-white/80 p-px flex shrink-0 hover:text-white rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
       >
         <X size={14} />
       </button>
@@ -87,7 +121,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {toasts.length > 0 && (
         <div className="fixed bottom-24 right-24 flex flex-col gap-8 z-toast">
           {toasts.map((t) => (
-            <ToastItem key={t.id} item={t} onDismiss={dismiss} />
+            <ToastRow key={t.id} item={t} onDismiss={dismiss} />
           ))}
         </div>
       )}

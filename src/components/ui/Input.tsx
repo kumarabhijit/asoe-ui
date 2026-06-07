@@ -11,8 +11,13 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, rightIcon, id, type, ...props }, ref) => {
-    const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
-    const errorId = inputId ? `${inputId}-error` : undefined;
+    // Label-slug ids collided when two inputs shared a label (e.g. two
+    // "Amount" fields), breaking htmlFor + aria-describedby. useId() gives a
+    // guaranteed-unique id, so the error is always associable even when
+    // neither `id` nor `label` is supplied.
+    const reactId = React.useId();
+    const inputId = id ?? reactId;
+    const errorId = `${inputId}-error`;
 
     return (
       <div className="flex flex-col gap-6">

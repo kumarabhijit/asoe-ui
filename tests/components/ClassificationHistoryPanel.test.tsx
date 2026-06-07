@@ -64,6 +64,19 @@ describe("ClassificationHistoryPanel", () => {
     expect(screen.getByText("HUMAN")).toBeInTheDocument();
   });
 
+  // REGRESSION (report 06): the audit strip printed the raw ISO string as the
+  // visible label. It should show a human-readable timestamp while keeping the
+  // ISO value in the <time dateTime> attribute for machine/audit fidelity.
+  it("formats classified_at for humans, keeping the raw ISO in dateTime", () => {
+    const { container } = render(
+      <ClassificationHistoryPanel entries={[entry()]} />,
+    );
+    const time = container.querySelector("time")!;
+    expect(time.getAttribute("datetime")).toBe("2026-05-27T09:00:00Z");
+    expect(time.textContent).not.toBe("2026-05-27T09:00:00Z");
+    expect(time.textContent).toMatch(/2026/);
+  });
+
   it("renders partner-redacted rows with the coarse internal: attribution (no user: prefix)", () => {
     render(
       <ClassificationHistoryPanel

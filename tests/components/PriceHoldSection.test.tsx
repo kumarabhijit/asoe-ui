@@ -63,11 +63,13 @@ describe("PriceHoldSection", () => {
       expect(screen.getByText("-3.4%")).toBeInTheDocument();
     });
 
-    it("renders tolerance threshold as a percentage", () => {
+    // REGRESSION (report 05): thresholds are magnitudes, not signed deltas,
+    // so they must render UNSIGNED ("2.0%", not "+2.0%"). The signed `+`
+    // prefix belongs only on the directional variance figure.
+    it("renders the tolerance threshold unsigned (no + prefix)", () => {
       render(<PriceHoldSection data={{ ...baseData, tolerance_pct: 0.02 }} />);
-      // Expect to find "+2.0%" somewhere (could overlap with variance, so
-      // use getAllByText)
-      expect(screen.getAllByText("+2.0%").length).toBeGreaterThan(0);
+      expect(screen.getByText("2.0%")).toBeInTheDocument();
+      expect(screen.queryByText("+2.0%")).not.toBeInTheDocument();
     });
   });
 

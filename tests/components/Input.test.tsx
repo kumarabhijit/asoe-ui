@@ -34,4 +34,31 @@ describe("Input", () => {
     render(<Input label="Search" rightIcon={<span data-testid="search-icon">S</span>} />);
     expect(screen.getByTestId("search-icon")).toBeInTheDocument();
   });
+
+  // REGRESSION (report 08): ids were derived from the label slug, so two
+  // inputs sharing a label collided — breaking htmlFor + aria-describedby.
+  it("gives two inputs with the same label distinct ids + error associations", () => {
+    render(
+      <>
+        <Input label="Amount" error="First error" />
+        <Input label="Amount" error="Second error" />
+      </>,
+    );
+    const inputs = screen.getAllByLabelText("Amount");
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0].id).not.toBe(inputs[1].id);
+    expect(inputs[0].getAttribute("aria-describedby")).toBe(
+      `${inputs[0].id}-error`,
+    );
+  });
+
+  // REGRESSION (report 08): with neither id nor label, the error rendered but
+  // aria-describedby pointed nowhere. useId() guarantees an association.
+  it("associates the error message even without an id or label", () => {
+    render(<Input error="Required" />);
+    const input = screen.getByRole("textbox");
+    const describedBy = input.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(document.getElementById(describedBy!)).toHaveTextContent("Required");
+  });
 });

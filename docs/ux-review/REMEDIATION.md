@@ -76,10 +76,55 @@ Pick up remaining "Needs Minor Tweaks" items per slice (see reports `01`–`08`)
 where the fix is isolated. Skip anything that grows beyond a small diff and log
 it here as ⊘ Deferred with a reason.
 
+Worked slice by slice; each row ships a regression test (unit or source-grep
+lock) that fails on the parent commit. PR **#223** (asoe-ui).
+
 | status | Item | Location | Notes | PR |
 |--------|------|----------|-------|----|
 | ☑ | `formatDuration(0)` returned `""` (0ms node showed no duration) | `WaterfallStepper.tsx:80-84` | `if (!ms)` → `if (ms === undefined)` so a real 0ms renders "0ms" | #222 |
-| ⊘ | Remaining ~44 "Needs Minor Tweaks" across reports 01–08 | various | **Deferred** — out of scope for this remediation pass, which targeted the 11 Needs-Rework items + the cross-cutting themes (T1/T3/T5/T8/T9 + Guardrail #6). The minor items are non-blocking polish (e.g. MetricTile `--font-size-mono-metric`, raw-timestamp formatting, `humanizeNode` dedup, SVG font-size token discipline). Each still needs its own regression test per the per-bug rule, so they belong in a dedicated follow-up sweep rather than being rushed at the tail of this PR. They remain catalogued in reports 01–08. |
+| ☑ | `humanizeNode` duplicated (PipelineDAG + EventsTimeline) + divergent duration formatters (1dp vs 2dp) | `PipelineDAG`, `EventsTimeline`, `WaterfallStepper` | Extracted canonical `humanizeNodeId` + `formatDurationMs` (2dp audit precision) to `@/lib/format`; adopted in all three. Added `formatTimestamp` for audit-strip use. Unit tests + dedup source-lock. | #223 |
+| ☑ | MetricTile: no group semantics; value under-emphasised | `MetricTile.tsx:34-46,38` | `role="group"` + composed `aria-label`; value sized with `--font-size-mono-metric` (was `--font-size-heading`); icon `aria-hidden`; documented the `tint` contrast contract. | #223 |
+| ☑ | ClassificationHistoryPanel: raw ISO timestamp shown | `ClassificationHistoryPanel.tsx:143` | `formatTimestamp(classified_at)` human label; raw ISO kept in `<time dateTime>`. | #223 |
+| ☑ | WaterfallStepper: reduced-motion read once (stale on OS toggle) | `WaterfallStepper.tsx:139-147` | New reactive `usePrefersReducedMotion` hook (subscribes to the media query `change`). | #223 |
+| ☑ | PipelineDAG: audit path colour-only; panel focus not managed | `PipelineDAG.tsx:301-310,267-284` | Non-colour cue (taken solid / un-taken **dashed**, WCAG 1.4.1); focus moves into `EdgeDetailPanel` on open + restores to the edge on close (`useFocusRestoreOnClose`). | #223 |
+| ☑ | ConstraintsPipeline: JSDoc claims ✓/✗ icons not rendered; SVG `fontSize` literals | `ConstraintsPipeline.tsx:25,228,238` | Corrected the doc (captions carry meaning); `fontSize` → `--font-size-caption/-label` tokens. | #223 |
+| ☑ | EvidenceBlock: confirm `0`/`false` count as present | `EvidenceBlock.tsx:92-100` | Already covered by `tests/components/EvidenceBlock.test.tsx` `isPresent` table — no change needed. | — |
+
+### Report 07 — shared chrome / status
+| status | Item | Location | Notes | PR |
+|--------|------|----------|-------|----|
+| ☑ | PreprodIdentityBanner: reassuring icon ≠ warning intent; unsafe email cast; raw env-var leak | `PreprodIdentityBanner.tsx:23,54,79` | `ShieldCheck`→`ShieldAlert`; drop `as unknown as { email }` (use typed `session.user.email`); remove `ASOE_AUTH_MODE=entra` chip; icon `aria-hidden`. | #223 |
+| ☑ | CaseViewBanner: duplicate /cases link; dev-jargon copy; "info-blue" doc | `CaseViewBanner.tsx:11,52,61` | Single trailing CTA; plain-language copy; doc corrected (info = brand violet); icons `aria-hidden`. | #223 |
+| ☑ | StatusAnnouncer: inline style duplicates `.sr-only` | `StatusAnnouncer.tsx:107-117` | Drop the inline clip-rect style; rely on the `sr-only` class. | #223 |
+| ☑ | PolicyHitBadge: rule branch has no aria-label (asymmetric SR) | `PolicyHitBadge.tsx:47-58,80` | Symmetric `aria-label="Policy rule: …"`; middot `aria-hidden`. | #223 |
+| ☑ | Logo: decorative icon not `aria-hidden` | `Logo.tsx:21-22` | `aria-hidden` on the `Layers` brand glyph. | #223 |
+| ⊘ | Logo: arbitrary `text-[15px]/[20px]/[24px]` font sizes | `Logo.tsx:10-12` | **Deferred** — the wordmark sizes don't map 1:1 to the token scale (15/24 are off-scale); remapping changes the brand mark's appearance and needs design sign-off. Not a clean low-risk swap. | — |
+
+### Report 08 — shared interactive primitives
+| status | Item | Location | Notes | PR |
+|--------|------|----------|-------|----|
+| ☑ | Toast: no pause-on-hover (WCAG 2.2.1); dismiss focus ring; component shadows type | `Toast.tsx:37,40-43,59` | Pause/resume timer on hover+focus; white focus ring on the solid fill; `ToastItem`→`ToastRow`. | #223 |
+| ☑ | Input: label-slug ids collide; error not always associable | `Input.tsx:14-15` | `React.useId()` ids; `errorId` always defined. | #223 |
+| ☑ | MultiSelect: trigger aria-label omits selection count | `MultiSelect.tsx:86-106` | Compose count + names into the accessible name; `title` on truncation. | #223 |
+| ☑ | AttachmentPreview: hardcoded rgba token fallback | `AttachmentPreview.tsx:308` | `var(--color-brand-subtle)` (token is defined; literal bypassed it). | #223 |
+| ☑ | Button: redundant `Variant`/`Size` redeclaration | `Button.tsx:33-45` | Rely on `VariantProps<typeof buttonVariants>`. Focus ring already from global `:focus-visible`. | #223 |
+| ☑ | Button: base CVA "no focus ring" finding | `Button.tsx:10` | **No-op** — the global `:focus-visible` rule (`globals.css:56`) already rings every focusable; the audit missed it. | — |
+
+### Report 04 — core sections (a11y)
+| status | Item | Location | Notes | PR |
+|--------|------|----------|-------|----|
+| ☑ | CollapsibleHeader: `aria-expanded` but no `aria-controls` (affects every section) | `shared.tsx:96-136` | Wire `aria-controls` to the region; region element now always present (resolves the reference) but `hidden` when collapsed; children still mount lazily on first open. | #223 |
+| ☑ | DiagnosticsSection Trace-Evidence tabs are bare `<button>`s | `DiagnosticsSection.tsx:333-346` | `role="tablist"/tab"` + `aria-selected` + `role="tabpanel"` + `aria-controls`/`aria-labelledby`. | #223 |
+
+### CI follow-up
+| status | Item | Location | Notes | PR |
+|--------|------|----------|-------|----|
+| ☑ | `browser-e2e-mock` tileValue coupled to `.text-heading` | `tests/browser-mock/hitl-actions-mock.spec.ts:43` | The MetricTile mono-metric change removed `.text-heading`; e2e helper now matches the label↔value relationship. CI `browser-e2e-mock` green again. | #223 |
+
+### In progress / remaining
+| status | Item | Location | Notes | PR |
+|--------|------|----------|-------|----|
+| ◐ | Remaining "Needs Minor Tweaks" across reports 01–04 | various | Working through isolated, low-risk items slice by slice (see catalogue). Items that balloon beyond a small diff are logged ⊘ Deferred with a reason. Larger residuals catalogued for a follow-up: EvidenceGrid keyboard-selectable rows (medium), RecordListPane raw `lifecycle_state` vocabulary, CaseDetailPanel dangling `aria-controls`, dashboard responsive grid/heading order, ExceptionDetailPanel action-code humanisation. | #223 |
 
 ---
 
@@ -168,6 +213,25 @@ _(Append expert decisions here as they're made: date · item · expert · outcom
   openapi regen → UI `generated.ts` regen + hand-written type + mock fixtures +
   mock-parity lock mirroring the validator (per CLAUDE.md test strategy). The
   validator always recomputes, so an injected total can't drift from the lines.
+
+- **2026-06-07 · Batch 6 (minor sweep) · self + review subagent** — Worked
+  reports 06→07→08→05→04 slice by slice; each fix ships a regression test (unit
+  or source-grep lock) verified to fail on the parent. Key calls: (1) extracted
+  shared `humanizeNodeId`/`formatDurationMs`/`formatTimestamp`/`humanizeEnumLabel`
+  to `@/lib/format` to kill the duplicated node-humanizers + divergent duration
+  precision (unified on 2dp audit precision). (2) ChangeAnalysis severity was
+  **inverted** (WARNING→red error, CONDITIONAL→amber) — corrected to
+  WARNING→warning, CONDITIONAL→info, PASS→success. (3) Toast gained WCAG-2.2.1
+  pause-on-hover/focus. (4) CollapsibleHeader `aria-controls` keeps the region
+  element present-but-`hidden` so the reference resolves while children stay
+  lazy. **Deferred:** Logo wordmark font-sizes (off-scale 15/24px; needs design
+  sign-off, not a clean token swap). **No-op:** Button base focus ring (global
+  `:focus-visible` in `globals.css:56` already covers it — the audit missed it).
+  A correctness review subagent over the `7ce33bb..HEAD` src diff found **no
+  bugs**; its one suggestion (key `EdgeDetailPanel` on the edge so focus
+  re-moves when switching edges) was applied. CI `browser-e2e-mock` failed on a
+  test coupled to the removed `.text-heading` class → fixed the e2e selector
+  (now green). asoe2 backend untouched (all UI display-mapping / a11y).
 
 ## Review checkpoints
 - **After Batch 5 (5a/5b/5c, cross-repo)** — correctness review over the asoe-ui

@@ -21,6 +21,8 @@ import type { PipelineNode } from "@/types/exceptions";
 import { ActivityIndicator } from "./ActivityIndicator";
 import { Button } from "./Button";
 import { cn } from "@/lib/utils";
+import { formatDurationMs } from "@/lib/format";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 export interface NodeState {
   node: PipelineNode;
@@ -77,14 +79,6 @@ function NodeIndicator({ status }: { status: NodeState["status"] }) {
   }
 }
 
-function formatDuration(ms?: number): string {
-  // `if (!ms)` treated a genuine 0ms (sub-millisecond, rounded) node as
-  // "no duration" and rendered nothing; only an absent value should be blank.
-  if (ms === undefined) return "";
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
 function dataSummary(node: PipelineNode, data?: Record<string, unknown>): string | null {
   if (!data) return null;
   switch (node) {
@@ -127,26 +121,24 @@ const REPLAY_PACE_DIVISOR = 3;
  *  perceivable. */
 const REPLAY_MIN_MS = 180;
 
-function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-}
-
 export function WaterfallStepper({ nodes, intent, className, allowReplay }: WaterfallStepperProps) {
   const [replayIndex, setReplayIndex] = useState<number | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Reactive: if the operator toggles OS reduced-motion after mount, the
+  // replay gate updates (was snapshotted once inside the useMemo before).
+  const reducedMotion = usePrefersReducedMotion();
 
   // Replay is only meaningful when every node finished and we have real
   // timings to play back. Hide the button otherwise.
   const canReplay = useMemo(() => {
     if (!allowReplay) return false;
-    if (prefersReducedMotion()) return false;
+    if (reducedMotion) return false;
     return (
       nodes.length > 0
       && nodes.every((n) => n.status === "completed" || n.status === "skipped")
       && nodes.some((n) => (n.duration_ms ?? 0) > 0)
     );
-  }, [allowReplay, nodes]);
+  }, [allowReplay, nodes, reducedMotion]);
 
   function clearTimers() {
     timersRef.current.forEach(clearTimeout);
@@ -256,7 +248,7 @@ export function WaterfallStepper({ nodes, intent, className, allowReplay }: Wate
                 </span>
                 {n.duration_ms !== undefined && n.status === "completed" && (
                   <span className="text-label text-text-quaternary font-mono">
-                    {formatDuration(n.duration_ms)}
+                    {formatDurationMs(n.duration_ms)}
                   </span>
                 )}
                 {n.status === "skipped" && (

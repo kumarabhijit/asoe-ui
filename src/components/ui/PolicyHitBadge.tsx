@@ -47,6 +47,9 @@ export function PolicyHitBadge({ hit, className }: PolicyHitBadgeProps) {
   if (!isLlmDerived) {
     return (
       <span
+        // SR parity with the LLM branch: name the source ("Policy rule")
+        // so a screen-reader user hears the provenance, not a bare token.
+        aria-label={`Policy rule: ${concernName}`}
         className={[
           "text-label text-text-secondary font-mono",
           className || "",
@@ -77,7 +80,7 @@ export function PolicyHitBadge({ hit, className }: PolicyHitBadgeProps) {
         <Bot size={10} aria-hidden="true" />
         AI
       </span>
-      <span className="opacity-60">·</span>
+      <span className="opacity-60" aria-hidden="true">·</span>
       <span>{concernName}</span>
     </span>
   );

@@ -8,7 +8,8 @@
  * explicit so users can navigate from the legacy view to the
  * canonical case list and back.
  *
- * Visual: thin info-blue strip directly under the page header,
+ * Visual: thin info-toned strip directly under the page header
+ * (the `--color-info` token is the brand violet, not literally blue),
  * dismissible? No — the relationship is permanent product
  * direction, not a transient notice.
  */
@@ -45,24 +46,19 @@ export function CaseViewBanner({
       ].join(" ")}
     >
       <div className="flex items-center gap-8">
-        <LayoutList size={14} className="text-info shrink-0" />
+        <LayoutList size={14} className="text-info shrink-0" aria-hidden="true" />
+        {/* Plain-text mention; the single trailing CTA is the one link
+            (was a duplicate inline `/cases` link with dev-jargon text). */}
         <span>
           Showing <strong className="text-text-primary">{scopeLabel}</strong>{" "}
-          — a filtered view of all OrderCases. Open{" "}
-          <Link
-            href={casesHref}
-            className="text-brand underline underline-offset-2 hover:text-brand-hover"
-          >
-            /cases
-          </Link>{" "}
-          for the unified surface.
+          — a filtered view of the unified case list.
         </span>
       </div>
       <Link
         href={casesHref}
         className="flex items-center gap-4 text-brand hover:text-brand-hover whitespace-nowrap"
       >
-        Open in /cases <ArrowRight size={12} />
+        Open the case list <ArrowRight size={12} aria-hidden="true" />
       </Link>
     </div>
   );

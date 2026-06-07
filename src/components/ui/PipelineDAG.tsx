@@ -14,10 +14,12 @@
  */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dagre from "dagre";
 import type { PipelineTopology, PipelineTopologyEdge, ExecutedNode } from "@/types/api";
 import { cn } from "@/lib/utils";
+import { humanizeNodeId, formatDurationMs } from "@/lib/format";
+import { useFocusRestoreOnClose } from "@/hooks/useFocusRestoreOnClose";
 
 interface PipelineDAGProps {
   topology: PipelineTopology;
@@ -164,13 +166,6 @@ function buildPath(points: { x: number; y: number }[]): string {
   return d;
 }
 
-function humanizeNode(id: string): string {
-  return id
-    .split("_")
-    .map((p) => (p.length === 0 ? "" : p[0].toUpperCase() + p.slice(1)))
-    .join(" ");
-}
-
 export function PipelineDAG({
   topology,
   executedNodes,
@@ -207,6 +202,9 @@ export function PipelineDAG({
     if (!taken.has(edgeKey(selectedEdge))) return null;
     return executedNodes.find((n) => n.node === selectedEdge.from_node) ?? null;
   }, [selectedEdge, taken, executedNodes]);
+  // Keyboard users open the panel from a focused edge `<g>`; restore focus
+  // back to that edge when the panel closes so they don't drop to <body>.
+  useFocusRestoreOnClose(!!selectedEdge);
 
   return (
     <div className={cn(className)}>
@@ -309,6 +307,11 @@ export function PipelineDAG({
                     : "var(--color-border)"
                 }
                 strokeWidth={isTaken ? 2 : isSelected ? 1.5 : 1}
+                // Non-colour differentiator (WCAG 1.4.1): the taken path is a
+                // SOLID line, every un-taken edge is DASHED — so "which path
+                // executed" survives grayscale / colour-blindness, not just the
+                // brand-vs-border stroke colour.
+                strokeDasharray={isTaken ? undefined : "4 3"}
                 markerEnd={isTaken ? "url(#dag-arrow-taken)" : "url(#dag-arrow)"}
                 opacity={isTaken ? 1 : isSelected ? 0.85 : 0.5}
                 pointerEvents="none"
@@ -398,7 +401,7 @@ export function PipelineDAG({
                 }
                 fontWeight={isExecuted ? 600 : 400}
               >
-                {humanizeNode(node.label)}
+                {humanizeNodeId(node.label)}
               </text>
             </g>
           );
@@ -418,6 +421,10 @@ export function PipelineDAG({
       </div>
       {selectedEdge && (
         <EdgeDetailPanel
+          // Key on the edge so selecting a DIFFERENT edge while the panel is
+          // open remounts it — re-running the focus-on-open effect for the
+          // refreshed content (not just the first open).
+          key={selectedEdgeKey}
           edge={selectedEdge}
           isTaken={taken.has(edgeKey(selectedEdge))}
           sourceExecutedNode={selectedSourceNode}
@@ -450,8 +457,17 @@ function EdgeDetailPanel({
   const verdictTone = isTaken
     ? "bg-brand-subtle text-brand"
     : "bg-surface-secondary text-text-tertiary";
+  // Move focus into the panel on open so keyboard users land on the new
+  // content (and the global :focus-visible ring anchors it); focus is
+  // restored to the originating edge on close by useFocusRestoreOnClose.
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, []);
   return (
     <div
+      ref={panelRef}
+      tabIndex={-1}
       className="mt-12 rounded-md bg-surface-primary border border-border p-12 flex flex-col gap-10"
       role="region"
       aria-label="Edge details"
@@ -459,11 +475,11 @@ function EdgeDetailPanel({
       <div className="flex items-baseline justify-between gap-10">
         <div className="flex items-baseline gap-8 flex-wrap text-caption">
           <span className="font-semibold text-text-primary">
-            {humanizeNode(edge.from_node)}
+            {humanizeNodeId(edge.from_node)}
           </span>
           <span className="text-text-quaternary" aria-hidden="true">→</span>
           <span className="font-semibold text-text-primary">
-            {humanizeNode(edge.to_node)}
+            {humanizeNodeId(edge.to_node)}
           </span>
           {edge.verdict_label && (
             <span
@@ -502,7 +518,7 @@ function EdgeDetailPanel({
       {isTaken && !sourceExecutedNode && (
         <div className="text-caption text-text-tertiary">
           This edge is on the taken path, but no executed-node entry
-          was recorded for {humanizeNode(edge.from_node)}. (Trace may
+          was recorded for {humanizeNodeId(edge.from_node)}. (Trace may
           predate Phase B per-node instrumentation.)
         </div>
       )}
@@ -513,13 +529,7 @@ function EdgeDetailPanel({
             <Field label="Status" value={sourceExecutedNode.status} mono />
             <Field
               label="Duration"
-              value={
-                typeof sourceExecutedNode.duration_ms === "number"
-                  ? sourceExecutedNode.duration_ms < 1000
-                    ? `${sourceExecutedNode.duration_ms}ms`
-                    : `${(sourceExecutedNode.duration_ms / 1000).toFixed(2)}s`
-                  : null
-              }
+              value={formatDurationMs(sourceExecutedNode.duration_ms)}
               mono
             />
             <Field
@@ -537,7 +547,7 @@ function EdgeDetailPanel({
           {Object.keys(sourceExecutedNode.decision).length > 0 && (
             <div>
               <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
-                Decision (from {humanizeNode(sourceExecutedNode.node)})
+                Decision (from {humanizeNodeId(sourceExecutedNode.node)})
               </div>
               <pre className="m-0 px-10 py-6 rounded-sm bg-surface-secondary text-label font-mono text-text-secondary overflow-auto">
                 {JSON.stringify(sourceExecutedNode.decision, null, 2)}
@@ -579,9 +589,7 @@ function EdgeDetailPanel({
                     </span>
                     {typeof s.duration_ms === "number" && (
                       <span className="font-mono text-text-tertiary">
-                        {s.duration_ms < 1000
-                          ? `${s.duration_ms}ms`
-                          : `${(s.duration_ms / 1000).toFixed(2)}s`}
+                        {formatDurationMs(s.duration_ms)}
                       </span>
                     )}
                     <span

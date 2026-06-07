@@ -114,6 +114,49 @@ describe("WaterfallStepper", () => {
       expect(screen.queryByRole("button", { name: /replay/i })).not.toBeInTheDocument();
     });
 
+    // REGRESSION (fails on parent): the reduced-motion check was read ONCE
+    // inside a useMemo, so toggling the OS preference after mount never
+    // updated the replay gate. The component now subscribes to the media
+    // query's `change` event via usePrefersReducedMotion.
+    it("re-evaluates the replay gate when OS reduced-motion toggles after mount", () => {
+      const original = window.matchMedia;
+      let listeners: Array<(e: { matches: boolean }) => void> = [];
+      const mql = {
+        matches: false,
+        media: "(prefers-reduced-motion: reduce)",
+        onchange: null,
+        addEventListener: (_t: string, cb: (e: { matches: boolean }) => void) =>
+          listeners.push(cb),
+        removeEventListener: (_t: string, cb: (e: { matches: boolean }) => void) => {
+          listeners = listeners.filter((l) => l !== cb);
+        },
+        addListener: (cb: (e: { matches: boolean }) => void) => listeners.push(cb),
+        removeListener: (cb: (e: { matches: boolean }) => void) => {
+          listeners = listeners.filter((l) => l !== cb);
+        },
+        dispatchEvent: () => true,
+      };
+      // @ts-expect-error — partial MediaQueryList mock is sufficient here.
+      window.matchMedia = () => mql;
+      try {
+        const nodes = makeNodeStates(10);
+        render(<WaterfallStepper nodes={nodes} allowReplay />);
+        expect(
+          screen.getByRole("button", { name: /replay/i }),
+        ).toBeInTheDocument();
+        // User enables reduced motion in the OS — the gate must react.
+        act(() => {
+          mql.matches = true;
+          listeners.forEach((l) => l({ matches: true }));
+        });
+        expect(
+          screen.queryByRole("button", { name: /replay/i }),
+        ).not.toBeInTheDocument();
+      } finally {
+        window.matchMedia = original;
+      }
+    });
+
     it("swaps Replay for Stop while animating, and Stop cancels back", async () => {
       const user = userEvent.setup();
       const nodes = makeNodeStates(10);

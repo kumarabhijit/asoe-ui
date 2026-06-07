@@ -76,6 +76,22 @@ describe("ChangeAnalysisSection", () => {
     expect(screen.getByText("600")).toBeInTheDocument();
   });
 
+  // REGRESSION (report 05): constraint status was rendered as the raw enum
+  // token, and WARNING was mapped to the red `error` treatment — inverting
+  // the severity scale (a warning looked like a hard failure while a
+  // CONDITIONAL pass took amber).
+  it("humanises the constraint status and tones WARNING as warning, not error", () => {
+    render(<ChangeAnalysisSection data={DATA} />);
+    // Humanised label, not the raw "WARNING" token.
+    const warningBadge = screen.getByText("Warning");
+    expect(screen.queryByText("WARNING")).not.toBeInTheDocument();
+    // WARNING is the cautionary peak → amber, never the red error treatment.
+    expect(warningBadge.className).toMatch(/warning/);
+    expect(warningBadge.className).not.toMatch(/error/);
+    // CONDITIONAL humanises and is informational, not amber.
+    expect(screen.getByText("Conditional")).toBeInTheDocument();
+  });
+
   it("suppresses absent optional fields and omits empty sections (no placeholder)", () => {
     render(<ChangeAnalysisSection data={MINIMAL} />);
     expect(screen.getByText("Constraints (1)")).toBeInTheDocument();

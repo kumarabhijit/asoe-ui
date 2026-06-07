@@ -41,6 +41,13 @@ function fmtVariance(variance: number): string {
   return `${sign}${pct.toFixed(1)}%`;
 }
 
+/** Unsigned percentage for THRESHOLDS (tolerance, hard-block) — a threshold
+ *  is a magnitude, not a signed delta, so it must not carry the `+` prefix
+ *  that `fmtVariance` adds for the directional variance figure. */
+function fmtPct(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
 const ACTION_BADGE: Record<PriceHoldAction, { variant: "success" | "warning" | "error"; label: string }> = {
   AUTO_RELEASE: { variant: "success", label: "Auto-release" },
   ESCALATE:     { variant: "warning", label: "Escalate" },
@@ -89,8 +96,8 @@ export function PriceHoldSection({ data }: PriceHoldSectionProps) {
       {/* Hold status + thresholds */}
       <div className="grid grid-cols-3 gap-12 mb-12">
         <Threshold label="Hold Status" value={data.hold_status} />
-        <Threshold label="Tolerance" value={fmtVariance(data.tolerance_pct)} />
-        <Threshold label="Hard Block" value={fmtVariance(data.hard_block_pct)} />
+        <Threshold label="Tolerance" value={fmtPct(data.tolerance_pct)} />
+        <Threshold label="Hard Block" value={fmtPct(data.hard_block_pct)} />
       </div>
 
       {/* Recommended action / reason. aria-live="polite" because the
