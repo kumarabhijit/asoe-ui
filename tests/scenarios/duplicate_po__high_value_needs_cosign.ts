@@ -31,6 +31,7 @@ export const DUPLICATE_PO__high_value_needs_cosign: BehaviourScenario = {
     intent: "DUPLICATE_PO",
     dollar_impact: null,
     audit_verdict_color: null,
+    attention_state: "NEEDS_HUMAN",
   },
   records: [
     {

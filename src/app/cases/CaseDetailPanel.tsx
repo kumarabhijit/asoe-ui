@@ -158,7 +158,6 @@ export function CaseDetailPanel({
     error: classificationHistoryError,
   } = useClassificationHistory(orderCase.case_id);
   const records = attachedRecords ?? [];
-  const hasAttachedRecords = records.length > 0;
   // When a record is selected, the per-record HITL ribbon is the
   // primary work surface; the case header collapses to a slim
   // context strip so the ribbon starts near the top of the
@@ -412,19 +411,16 @@ export function CaseDetailPanel({
         <ComplianceHitsRail hits={policyHits ?? []} variant="inline" />
       )}
 
-      {/* ── Classification history (requirements §8.6) ────────── */}
-      <ClassificationHistoryPanel
-        entries={classificationHistory}
-        loading={classificationHistoryLoading}
-        error={classificationHistoryError}
-      />
-
       {/* ── Attached records picker ──────────────────────────────
-          Stacked at the top of the detail pane so the operator picks
-          which attached record to act on. Shown on every surface that
-          mounts CaseDetailPanel (the `/cases` workspace + the focused
-          `/cases/[id]` view). */}
-      {showInlineRecordList && hasAttachedRecords && (
+          Council 2026-06-07 (Guardrail #0): a single-record case has
+          nothing to pick — the one record auto-mounts below, so the
+          standalone "Attached records" section was pure overhead
+          (the operator's own Q2). The picker now renders ONLY for
+          multi-record cases, where choosing which record to act on is
+          a real decision. Classification history moved to the
+          Diagnostics & Audit drawer at the bottom (it is provenance,
+          not a decision input — the operator's Q1). */}
+      {showInlineRecordList && records.length > 1 && (
         <RecordListPane
           caseId={orderCase.case_id}
           records={records}
@@ -460,6 +456,37 @@ export function CaseDetailPanel({
             embedded
           />
         </section>
+      )}
+
+      {/* ── Diagnostics & Audit drawer (council 2026-06-07) ──────────
+          Classification provenance — how/when this case was classified
+          and under which taxonomy — is what an AUDITOR reconstructs, not
+          what the operator needs to make the decision. Relocated here
+          from a prominent top-of-page panel into a collapsed drawer
+          (Guardrail #0: available, not shown). Nothing is removed — the
+          full ClassificationHistoryPanel renders inside, so the
+          compliance commitment is intact (Guardrail #7). */}
+      {(classificationHistoryLoading || classificationHistory.length > 0) && (
+        <details className="group bg-surface-secondary border border-border-subtle rounded-md">
+          <summary className="flex items-center gap-8 px-16 py-10 cursor-pointer list-none text-caption font-semibold text-text-secondary rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring">
+            <ChevronRight
+              size={14}
+              aria-hidden
+              className="shrink-0 transition-transform group-open:rotate-90"
+            />
+            <span>Diagnostics &amp; Audit</span>
+            <span className="font-normal text-text-tertiary">
+              Classification provenance
+            </span>
+          </summary>
+          <div className="px-16 pb-16 pt-4">
+            <ClassificationHistoryPanel
+              entries={classificationHistory}
+              loading={classificationHistoryLoading}
+              error={classificationHistoryError}
+            />
+          </div>
+        </details>
       )}
     </div>
   );

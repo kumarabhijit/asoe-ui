@@ -1109,6 +1109,7 @@ export interface components {
             order_entry_extraction?: components["schemas"]["OrderEntryExtraction"] | null;
             overmax_analysis?: components["schemas"]["OverMaxAnalysisData"] | null;
             pallet_analysis?: components["schemas"]["PalletAnalysisData"] | null;
+            presentation?: components["schemas"]["PresentationContract"] | null;
             price_analysis?: components["schemas"]["PriceAnalysisData"] | null;
             price_hold_analysis?: components["schemas"]["PriceHoldAnalysisData"] | null;
             /** Primary Section */
@@ -3365,6 +3366,39 @@ export interface components {
             policy_key: string;
             /** Value */
             value: unknown;
+        };
+        /**
+         * PresentationAudit
+         * @description Engine internals — `presentation_tier: audit` (council 2026-06-07).
+         *
+         *     The recipe that ran and the raw intent enum. These reconstruct HOW
+         *     the system decided; they are never operator-facing Layer 1 — they
+         *     live in the Diagnostics & Audit surface. Emitted (Guardrail #7:
+         *     available, not removed), just not shown front-and-center.
+         */
+        PresentationAudit: {
+            /** Intent Code */
+            intent_code?: string | null;
+            /** Recipe Name */
+            recipe_name?: string | null;
+        };
+        /**
+         * PresentationContract
+         * @description Deterministic presentation projection (council 2026-06-07).
+         *
+         *     Tells the UI WHERE the contested elements belong so placement is
+         *     backend-owned, not per-session UI taste (asoe-ui Guardrail #0). The
+         *     UI honors this; it never re-derives it.
+         */
+        PresentationContract: {
+            audit?: components["schemas"]["PresentationAudit"];
+            /**
+             * Show Intent
+             * @default false
+             */
+            show_intent: boolean;
+            /** Situation Headline */
+            situation_headline?: string | null;
         };
         /**
          * PriceAnalysisData

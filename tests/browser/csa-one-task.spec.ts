@@ -54,10 +54,15 @@ test("single-record case: visiting /cases/<id> auto-mounts the action ribbon", a
     page.getByRole("button", { name: /choose different action/i }).first(),
   ).toBeVisible({ timeout: 15_000 });
 
-  // The picker section header is still present (it shows "Attached
-  // records 1"), but the picker itself does not gate the ribbon —
-  // the ribbon renders on first paint.
-  await expect(page.getByText(/attached records/i).first()).toBeVisible();
+  // Council 2026-06-07 (operator Q2): a single-record case no longer
+  // renders the "Attached records" picker — there is nothing to pick, so
+  // the one record auto-mounts directly. Lock the new IA: the picker is
+  // absent and the record detail is mounted on the surface. (The
+  // multi-record picker is covered by RecordListPane's unit test.)
+  await expect(page.getByText(/attached records/i)).toHaveCount(0);
+  await expect(
+    page.getByTestId("case-selected-record-detail"),
+  ).toBeVisible();
 });
 
 test("deep-link via ?record=<id> lands directly on that record's ribbon", async ({
@@ -80,9 +85,14 @@ test("deep-link via ?record=<id> lands directly on that record's ribbon", async 
     page.getByRole("button", { name: /choose different action/i }).first(),
   ).toBeVisible({ timeout: 15_000 });
 
-  // The selected record row carries aria-checked="true" — the picker
-  // honoured the URL query.
+  // Council 2026-06-07 (operator Q2): a single-record case has no picker
+  // to "check" — the record auto-mounts. The deep-link landed on the
+  // record iff its detail surface mounted AND the URL preserved the
+  // explicit ?record=<id> query (selection source of truth).
   await expect(
-    page.locator(`[data-testid="record-picker-row-${exceptionId}"]`),
-  ).toHaveAttribute("aria-checked", "true");
+    page.getByTestId("case-selected-record-detail"),
+  ).toBeVisible();
+  await expect(page).toHaveURL(
+    new RegExp(`record=${encodeURIComponent(exceptionId)}`),
+  );
 });

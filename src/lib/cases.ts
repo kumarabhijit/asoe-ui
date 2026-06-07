@@ -80,6 +80,44 @@ export function isTerminalStatus(status: string | null | undefined): boolean {
 }
 
 /**
+ * Council 2026-06-07 — queue grouping for the backend `attention_state`
+ * disposition (needs-human vs already-done). This is a visual-mapping
+ * function — the Guardrail #1 *allowed* pattern (cf. `verdictVariant`
+ * in `Badge.tsx` and `STATUS_LABEL` above): it maps the API-provided
+ * disposition to a section rank + label, with a `default` fallback so
+ * a new backend disposition never crashes the queue.
+ *
+ * `rank` is scan priority: what needs the operator is sorted first;
+ * agent-in-flight work next; resolved work last. The UI groups by the
+ * backend field — it does NOT re-derive the disposition from `status`.
+ */
+export interface AttentionGroup {
+  /** Stable group key (the disposition itself, or `OTHER`). */
+  key: string;
+  /** Sort/scan priority — lower comes first. */
+  rank: number;
+  /** Section header label. */
+  label: string;
+}
+
+const ATTENTION_GROUPS: Readonly<Record<string, AttentionGroup>> = {
+  NEEDS_HUMAN: { key: "NEEDS_HUMAN", rank: 0, label: "Needs you" },
+  IN_FLIGHT: { key: "IN_FLIGHT", rank: 1, label: "Agents working" },
+  DONE: { key: "DONE", rank: 2, label: "Resolved by agents" },
+};
+
+const ATTENTION_GROUP_FALLBACK: AttentionGroup = {
+  key: "OTHER",
+  rank: 3,
+  label: "Other",
+};
+
+export function attentionGroup(state: string | null | undefined): AttentionGroup {
+  if (!state) return ATTENTION_GROUP_FALLBACK;
+  return ATTENTION_GROUPS[state] ?? ATTENTION_GROUP_FALLBACK;
+}
+
+/**
  * Pretty-print a free-form `source_channel` string from the backend
  * (issue #133, PO points #10 / #12). The backend emits raw machine
  * identifiers like `edi_x12_850`, `email`, `non_edi`, `phone`,

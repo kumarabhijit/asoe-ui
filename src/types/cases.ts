@@ -41,6 +41,13 @@ export type CaseStatus =
   | "FAILED"
   | "BLOCKED";
 
+/** Council 2026-06-07 — backend-owned queue disposition. Mirrors
+ *  `asoe2/api/case_summary.py::AttentionState`. The /cases queue
+ *  groups by this so it never switches on `status` to decide
+ *  needs-human (Guardrail #1; detection/resolution boundary is
+ *  backend-owned, Reis ruling). Always present on a CaseListItem. */
+export type AttentionState = "NEEDS_HUMAN" | "IN_FLIGHT" | "DONE";
+
 /** ADR-038 §7.1 — graduated materialisation tier. Phase 2 §8.4 SLA
  *  bucketing introduced tier 4 (no-SLA / inert) alongside the original
  *  1/2/3 ladder. */

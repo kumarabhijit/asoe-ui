@@ -41,6 +41,7 @@ import type {
   LifecycleState,
   LineItem,
   OrderAnalysis,
+  PresentationContract,
   ReanalysisEntry,
 } from "@/types/exceptions";
 import {
@@ -68,10 +69,14 @@ import {
   MOCK_EXCEPTIONS,
   persistMockExceptionMutation,
 } from "./mock-data/exceptions";
-import { deriveMockCases, deriveMockCaseSummaries } from "./mock-data/cases";
+import {
+  INTENT_SUMMARY_TEMPLATES,
+  deriveMockCases,
+  deriveMockCaseSummaries,
+} from "./mock-data/cases";
 import { MOCK_LINE_ITEMS } from "./mock-data/line-items";
 import { mockAttachmentBlob } from "./mock-data/attachment-bytes";
-import type { OrderCase } from "@/types/cases";
+import type { AttentionState, OrderCase } from "@/types/cases";
 
 // Mirrors asoe2/constraints/specs.py::is_valid_reason_tag_for_write.
 // Curated intents narrow the vocab to their per-intent UPPERCASE
@@ -2231,7 +2236,13 @@ export const exceptionsApi = {
       }
     }
     await delay(MOCK_DELAY);
-    return MOCK_ORDER_ANALYSES[id] ?? null;
+    const base = MOCK_ORDER_ANALYSES[id];
+    if (!base) return null;
+    // Mock-mode backend stand-in for `api.presentation_composer`. The
+    // real backend ships `presentation` on the AnalysisResponse; mock
+    // mode derives the SAME deterministic projection from the record's
+    // intent + recipe so the cockpit behaves identically in preview.
+    return { ...base, presentation: mockPresentation(id) };
   },
 
   /**
@@ -2500,6 +2511,60 @@ export interface CaseListItem extends OrderCase {
   /** Audit-bearing — shadow-rollup verdict color, gated by
    *  per-intent never-RED / never-GREEN rules in the backend. */
   audit_verdict_color: "R" | "A" | "G" | null;
+
+  /** Council 2026-06-07 — backend-owned queue disposition the /cases
+   *  queue groups by (mirrors `CaseListItem.attention_state` in
+   *  `asoe2/api/schemas.py`). Always present. */
+  attention_state: AttentionState;
+}
+
+// Mock-mode backend stand-in for `api.case_summary._attention_of`.
+// USE_REAL_API takes the disposition straight off the wire; in mock
+// mode this layer IS the backend, so it replicates the SAME
+// deterministic CaseStatus -> attention_state mapping. The
+// architectural lock `tests/architectural/attention_state_mapping.test.ts`
+// asserts this stays in lockstep with the backend mapping.
+export const MOCK_ATTENTION_BY_STATUS: Readonly<Record<string, AttentionState>> = {
+  OPEN_AWAITING_HUMAN: "NEEDS_HUMAN",
+  FAILED: "NEEDS_HUMAN",
+  BLOCKED: "NEEDS_HUMAN",
+  OPEN_AGENT_PROCESSING: "IN_FLIGHT",
+  OPEN_AWAITING_BUYER: "IN_FLIGHT",
+  OPEN_AWAITING_ERP: "IN_FLIGHT",
+  RESOLVED: "DONE",
+};
+
+function mockAttentionState(status: string | null | undefined): AttentionState {
+  // Unknown / unmapped → NEEDS_HUMAN: never silently bury a case
+  // (parity with the backend `_attention_of` fallback).
+  return MOCK_ATTENTION_BY_STATUS[status ?? ""] ?? "NEEDS_HUMAN";
+}
+
+// Mock-mode backend stand-in for `api.presentation_composer`. Mirrors
+// `_NON_DISCRIMINATING_INTENTS` — channel/intake intents that restate
+// the arrival path rather than name a problem, so they don't earn
+// Layer 1 (lock: tests/architectural/attention_state_mapping.test.ts).
+const MOCK_NON_DISCRIMINATING_INTENTS: ReadonlySet<string> = new Set([
+  "MANUAL_ORDER_INTAKE",
+  "UNKNOWN",
+]);
+
+function mockPresentation(id: string): PresentationContract {
+  const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
+  const intent = exc?.intent ?? null;
+  return {
+    // Mock-mode stand-in for the backend reusing render_template: the
+    // governed per-intent one-liner is the plain-language Situation
+    // headline. Null when the intent has no template (honest omission).
+    situation_headline: intent
+      ? INTENT_SUMMARY_TEMPLATES[intent]?.one_liner ?? null
+      : null,
+    show_intent: !!intent && !MOCK_NON_DISCRIMINATING_INTENTS.has(intent),
+    audit: {
+      recipe_name: exc?.selected_recipe ?? null,
+      intent_code: intent,
+    },
+  };
 }
 
 export const casesApi = {
@@ -2580,6 +2645,9 @@ export const casesApi = {
         intent: s?.intent ?? null,
         dollar_impact: s?.dollar_impact ?? null,
         audit_verdict_color: s?.audit_verdict_color ?? null,
+        // Backend-owned disposition; in mock mode this layer derives
+        // it from the case lifecycle exactly as the backend does.
+        attention_state: mockAttentionState(c.status),
       };
     });
     if (params?.origin) items = items.filter((c) => c.origin === params.origin);

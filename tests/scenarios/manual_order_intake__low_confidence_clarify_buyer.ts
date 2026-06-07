@@ -30,6 +30,7 @@ export const MANUAL_ORDER_INTAKE__low_confidence_clarify_buyer: BehaviourScenari
     intent: "MANUAL_ORDER_INTAKE",
     dollar_impact: null,
     audit_verdict_color: null,
+    attention_state: "NEEDS_HUMAN",
   },
   records: [
     {

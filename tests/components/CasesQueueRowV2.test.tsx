@@ -58,6 +58,7 @@ const FULL_CASE: CaseListItem = {
   intent: "EMAIL_COMPLAINT",
   dollar_impact: { amount_cents: 414720, currency: "USD" },
   audit_verdict_color: "R",
+  attention_state: "NEEDS_HUMAN",
 };
 
 const BARE_CASE: CaseListItem = {

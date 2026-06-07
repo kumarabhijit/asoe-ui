@@ -29,6 +29,7 @@ export const BACK_ORDER__failed_terminal: BehaviourScenario = {
     intent: "BACK_ORDER",
     dollar_impact: null,
     audit_verdict_color: null,
+    attention_state: "NEEDS_HUMAN",
   },
   records: [
     {

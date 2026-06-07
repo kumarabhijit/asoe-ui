@@ -21,6 +21,55 @@ Optimize for:
 
 ## Core Guardrails
 
+### 0) Information architecture: shown vs available (the L1 test)
+
+This is the governing principle the other guardrails serve. It was
+added (council 2026-06-07) after repeated sessions produced an
+*audit ledger* — every backend field rendered in its own labelled
+box — instead of an *operator cockpit*: the deciding subset, in the
+operator's language, with everything else one click away.
+
+**A thing earns a place in the always-visible surface (Layer 1)
+only if it changes what the operator does.** Everything else —
+provenance, pipeline internals, traceability fields — is
+**available** in a Diagnostics & Audit drawer (Layer 2), not
+**shown** by default.
+
+Relocating a field into the drawer is **not** pruning it: it stays
+rendered, typed, and traceable, so Guardrail #7 is satisfied. What
+shows where is **deterministic, not per-session taste**. It is
+driven by a `presentation_tier: operator | evidence | audit` axis
+in `asoe2/compliance/audit_bearing_registry.yaml`, projected by the
+`build_analysis` composer. The UI honors the tier; it never
+re-decides it.
+
+`presentation_tier` is **orthogonal** to the registry's existing
+`tier: audit-bearing | conditional | contextual`. That axis answers
+"must this be *populated*?" (audit obligation). `presentation_tier`
+answers "where is this *shown*?" (placement). A field can be
+`audit-bearing` (must always be present) *and* `presentation_tier:
+audit` (lives in the drawer) — e.g. the recipe name. Do not
+conflate the two.
+
+The four tiers of an exception detail surface:
+  1. **Situation** — the business event in plain language +
+     customer + $ impact + SLA + state.
+  2. **Recommendation (L1)** — confidence, plain-language
+     rationale, the RBAC-gated primary action.
+  3. **Evidence (L2, collapsed)** — the deltas / comparisons /
+     source documents / line items that justify the recommendation.
+  4. **Diagnostics & Audit (L2, drawer)** — recipe name, raw
+     intent enum, classification provenance, trace, taxonomy
+     version, timestamps, correlation id. The reconstruction
+     surface; nothing operator-facing by default.
+
+Corollary — **needs-human vs already-done.** The queue must
+separate exceptions awaiting human judgement from auto-resolved /
+completed agent work. "Does this need a human" is a backend
+disposition (Joe Reis ruling, council 2026-06-07): the UI groups by
+a backend-provided `attention` field, never by a UI-side lifecycle
+switch (which Guardrail #1 forbids anyway).
+
 ### 1) No hardcoded enum values in UI code (Guardrail #2)
 
 Intent values, lifecycle states, recipe names, and shadow verdicts must **never** appear as string literals in filter dropdowns, select options, or display labels. These values are fetched from `GET /api/v1/health` at runtime via the `useHealth` hook.
@@ -35,6 +84,22 @@ Forbidden:
 - Switch statements on lifecycle states for filtering or display
 
 **Test:** Adding a new intent or lifecycle state in `asoe2` must require **zero** UI code changes.
+
+**Display discipline (council 2026-06-07).** "No hardcoded enums"
+was never a licence to render the *raw* enum value as the
+operator-facing label. Two rules follow from Guardrail #0:
+
+- **Intent is shown only when it discriminates the decision.** When
+  the intent names the problem (`CREDIT_BLOCK`, `DUPLICATE_PO`,
+  `PRICING_VARIANCE`) it belongs in Layer 1, rendered through the
+  governed `display_labels` authority as plain language. When the
+  intent merely restates the arrival channel (e.g. every
+  customer-inbox order classified `MANUAL_ORDER_INTAKE`) it adds no
+  decision value — keep it out of Layer 1; the raw enum lives in the
+  Diagnostics & Audit drawer.
+- **Recipe / pipeline names are never operator-facing.**
+  `ManualOrderIntakeRecipe`, node names, taxonomy versions are
+  engine internals — `presentation_tier: audit`, drawer only.
 
 ### 2) Design tokens only — no hardcoded visual values
 
@@ -81,7 +146,18 @@ Every exception detail surface must implement the two-layer pattern (Section 11.
 - **Layer 1 (always visible):** Agent recommendation + confidence, 2-3 key data points, action button. Answerable in under 3 seconds: "What do I do?"
 - **Layer 2 (expandable on demand):** Evidence waterfall, structured reasoning trace, precedents, raw signals. Never shown by default (except YELLOW/RED auto-expand).
 
-The `AgentReasoningCard` implements this. Use it — do not reinvent a different pattern.
+Layer 2 is **further split** per Guardrail #0 into the **Evidence**
+tier (the deltas / comparisons / source documents that justify the
+recommendation — `presentation_tier: evidence`) and the
+**Diagnostics & Audit drawer** (engine internals, provenance,
+trace — `presentation_tier: audit`). The drawer is the
+reconstruction surface: it makes everything *available* without
+*showing* it. Auto-resolved records (no human handoff) collapse to
+Situation + a one-line "handled by agent" recommendation; their
+evidence and audit tiers stay in the drawer.
+
+The `AgentReasoningCard` implements Layer 1. Use it — do not
+reinvent a different pattern.
 
 ### 6) No frontend composition of enrichment payloads (Verdict 2026-04-22)
 
@@ -115,6 +191,19 @@ Ad-hoc `"—"` / `"N/A"` / `data.field ?? fallback` patterns violate
 the compliance engineer's veto on partial-truth states. They are
 code-review anti-patterns.
 
+**This guardrail bans composition *in the UI* — not composition as
+such (clarified council 2026-06-07, Hohpe/Chase rulings).**
+Folding several facts into one operator-facing view (e.g. surfacing
+the attached-record summary as a field on the recommendation, or
+blending a classification result with the agent's reasoning) is a
+legitimate and *expected* thing to do — **in the `build_analysis`
+composer**, which is the sole assembler. The composed, curated,
+presentation-tiered payload is what the UI consumes; section
+components stay dumb projectors of `analysis.foo`. So "this screen
+needs facts combined" is never an argument for UI-side logic — it is
+a backend composer change. The UI is a messaging endpoint consuming
+a canonical message; it does not enrich its own context.
+
 ### 7) Rich UI types are a product commitment (Verdict 2026-04-22)
 
 The `*AnalysisData` interfaces in `src/types/exceptions.ts` are the
@@ -131,6 +220,17 @@ populate a field today:
    Compliance (CODEOWNERS gate on
    `asoe2/compliance/audit_bearing_registry.yaml`) — not a
    unilateral UI-side change.
+
+**"Rich" means available, not front-and-center (clarified council
+2026-06-07).** This guardrail forbids *removing* a field; it does
+**not** require every field to be *shown by default*. Moving an
+audit-bearing field into the Diagnostics & Audit drawer
+(`presentation_tier: audit`) keeps it rendered, typed, traceable,
+and exportable — the compliance commitment is fully met, and the
+operator's cockpit is not buried. Pruning (deleting the type/field)
+remains forbidden; demotion to the drawer is the *sanctioned* way to
+declutter Layer 1. Majors' ruling: nothing is removed — the drawer
+*is* the reconstruction surface.
 
 ---
 

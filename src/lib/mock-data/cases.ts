@@ -299,7 +299,7 @@ interface MockSummaryTemplate {
   impact_cents: number | null;
 }
 
-const INTENT_SUMMARY_TEMPLATES: Record<string, MockSummaryTemplate> = {
+export const INTENT_SUMMARY_TEMPLATES: Record<string, MockSummaryTemplate> = {
   CONTRACTUAL_CORRECTION: {
     sku_code: "BEV-COLA-12PK",
     sku_title: "Cola 12-pack",
