@@ -2661,8 +2661,13 @@ export interface components {
              * @default
              */
             autonomy_vocab_version: string;
+            display_labels?: components["schemas"]["TaxonomyDisplayLabels"];
             /** Explain Mode */
             explain_mode: boolean;
+            /** Intents By Supergroup */
+            intents_by_supergroup?: {
+                [key: string]: string[];
+            };
             /** Kill Switch */
             kill_switch: boolean;
             /** Lifecycle States */
@@ -3897,6 +3902,27 @@ export interface components {
              * @default
              */
             source: string;
+        };
+        /**
+         * TaxonomyDisplayLabels
+         * @description Operator-facing display strings for taxonomy codes (ADR-045).
+         *
+         *     Projected from ``db/seeds/case_taxonomy.yaml`` through the generated
+         *     constants — the codes remain the single source of truth for control
+         *     flow, these are the *human* strings. The UI is a pure projector: it
+         *     renders these and never invents its own label for a code (Guardrail
+         *     #2). Adding/renaming a supergroup or intent in the YAML surfaces here
+         *     with zero UI code change. Keys are taxonomy codes (``SG_*`` / ``INT_*``).
+         */
+        TaxonomyDisplayLabels: {
+            /** Intents */
+            intents?: {
+                [key: string]: string;
+            };
+            /** Supergroups */
+            supergroups?: {
+                [key: string]: string;
+            };
         };
         /** TenantConfigDeleteRequest */
         TenantConfigDeleteRequest: {

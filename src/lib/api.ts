@@ -49,6 +49,15 @@ import {
   LEGACY_GLOBAL_REASON_TAGS,
 } from "./__generated__/curated_reason_tags";
 import { ROLE_PERMISSIONS } from "./roles";
+// ADR-045 — the mock `/health` display labels + fan-out map are sourced
+// from the generated taxonomy constants (projected from the same
+// `case_taxonomy.yaml` the backend serves), so the dev/preview mock can't
+// hand-author a label that drifts from the contract.
+import {
+  INTENT_LABELS,
+  INTENTS_BY_SUPERGROUP,
+  SUPERGROUP_LABELS,
+} from "@/generated/taxonomy";
 // ADR-041 P5 — bulky mock fixtures moved out so api.ts stays
 // readable. Same identifier; only the location changed. The
 // `USE_REAL_API` branch on `exceptionsApi.orderAnalysis` doesn't
@@ -1201,6 +1210,16 @@ const MOCK_HEALTH: HealthResponse = {
     Object.entries(ALLOWED_OVERRIDE_REASON_TAGS_BY_INTENT).map(
       ([intent, tags]) => [intent, [...tags]],
     ),
+  ),
+  // ADR-045 — operator display strings + fan-out map, mirroring the real
+  // /health payload. Sourced from the generated taxonomy constants (not
+  // hand-authored) so the mock cannot drift from the contract.
+  display_labels: {
+    supergroups: { ...SUPERGROUP_LABELS },
+    intents: { ...INTENT_LABELS },
+  },
+  intents_by_supergroup: Object.fromEntries(
+    Object.entries(INTENTS_BY_SUPERGROUP).map(([sg, codes]) => [sg, [...codes]]),
   ),
 };
 
