@@ -165,8 +165,10 @@ test("DeliveryDelay detail shows projected_eta + at_risk from sla_contract gatew
   // Delivery Delay pane is collapsed by default; expand it.
   await expandSection(page, /Delivery Delay/i);
 
-  // Recipe-output classification + gateway-fetched at_risk both show.
-  await expect(page.getByText(/CARRIER_DELAY/i).first()).toBeVisible({
+  // Recipe-output classification + gateway-fetched at_risk both show. The
+  // delay_category is humanised for display ("CARRIER_DELAY" → "Carrier
+  // Delay"), so match the rendered label, not the raw enum token.
+  await expect(page.getByText(/Carrier Delay/i).first()).toBeVisible({
     timeout: 15_000,
   });
 });
