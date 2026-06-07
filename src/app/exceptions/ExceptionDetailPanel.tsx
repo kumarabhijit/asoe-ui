@@ -1003,7 +1003,7 @@ export default function ExceptionDetailPanel({
             </CollapsibleSection>
           )}
           {analysis?.email_order_entry_analysis && (
-            <CollapsibleSection title="Email Order Intake">
+            <CollapsibleSection title="Manual Order Intake">
               <EmailOrderEntrySection data={analysis.email_order_entry_analysis} />
             </CollapsibleSection>
           )}

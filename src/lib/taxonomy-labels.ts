@@ -19,6 +19,11 @@
  * renders as a raw machine token; it is not a substitute for the contract.
  */
 import type { HealthResponse } from "@/types/exceptions";
+import {
+  INTENT_LABELS,
+  INTENTS_BY_SUPERGROUP,
+  SUPERGROUP_LABELS,
+} from "@/generated/taxonomy";
 
 /** Title-case an UPPER_SNAKE_CASE code: last-resort fallback only. */
 export function titleCaseCode(code: string): string {
@@ -35,12 +40,26 @@ export function intentCodeFor(code: string): string {
   return code.startsWith("INT_") ? code : `INT_${code}`;
 }
 
+/**
+ * Resolution order for every label: the live `/health` payload is the
+ * runtime authority; the generated taxonomy constants are the SAME YAML
+ * projection, committed and drift-locked, so they are the correct
+ * *synchronous* fallback before `/health` resolves (no label flash, and
+ * acronyms like "Duplicate PO" / "EDI Mismatch" render correctly rather
+ * than as title-cased "Duplicate Po"). Title-case is the last resort, only
+ * for a brand-new code the UI hasn't synced yet.
+ */
+
 /** Human label for a supergroup code (`SG_NEW_ORDER` → "New Order"). */
 export function supergroupLabel(
   health: HealthResponse | null | undefined,
   code: string,
 ): string {
-  return health?.display_labels?.supergroups?.[code] ?? titleCaseCode(code);
+  return (
+    health?.display_labels?.supergroups?.[code]
+    ?? SUPERGROUP_LABELS[code]
+    ?? titleCaseCode(code)
+  );
 }
 
 /** Human label for an intent code, bare or `INT_`-prefixed. */
@@ -49,7 +68,11 @@ export function intentLabel(
   code: string,
 ): string {
   const key = intentCodeFor(code);
-  return health?.display_labels?.intents?.[key] ?? titleCaseCode(key);
+  return (
+    health?.display_labels?.intents?.[key]
+    ?? INTENT_LABELS[key]
+    ?? titleCaseCode(key)
+  );
 }
 
 /**
@@ -60,7 +83,10 @@ export function intentFanout(
   health: HealthResponse | null | undefined,
   supergroupCode: string,
 ): number {
-  return health?.intents_by_supergroup?.[supergroupCode]?.length ?? 0;
+  const fromHealth = health?.intents_by_supergroup?.[supergroupCode]?.length;
+  if (fromHealth !== undefined) return fromHealth;
+  // Synchronous fallback: same YAML projection as /health.
+  return (INTENTS_BY_SUPERGROUP as Record<string, readonly string[]>)[supergroupCode]?.length ?? 0;
 }
 
 /**

@@ -369,6 +369,13 @@ export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen, an
                       <CustomerEmailDraft body={trace.customer_email_draft} />
                     )}
 
+                    {/* ADR-045 zone split: this is the AUDIT zone. Trace
+                        fields render the raw machine tokens verbatim
+                        (intent_selected = "MANUAL_ORDER_INTAKE", recipe_name =
+                        "ManualOrderIntakeRecipe.py") on purpose — they are the
+                        SOX evidence. Humanising them here would destroy
+                        auditability. The operator-facing humanised labels live
+                        in the summary zone (HeaderRibbon, record list). */}
                     <div className="flex flex-col gap-8">
                       <TraceField label="Trace ID" value={trace.trace_id} mono />
                       <TraceField label="Skill" value={trace.skill_name} />

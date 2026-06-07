@@ -8,6 +8,7 @@
 
 import { ChevronRight } from "lucide-react";
 import { Badge, lifecycleVariant, verdictVariant } from "@/components/ui/Badge";
+import { TaxonomyLabel } from "@/components/ui/TaxonomyLabel";
 import { fmtPrice } from "./shared";
 import { fmtSignedPrice } from "@/lib/format";
 import type { ExceptionDetail, EntityProfile } from "@/types/exceptions";
@@ -90,9 +91,19 @@ export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, total
             </Badge>
           </div>
         )}
-        <span className="text-caption text-text-tertiary">
-          {detail.event_type.replace(/_/g, " ")}
-        </span>
+        {/* ADR-045 zone split: the summary shows the governed intent
+            label ("Manual Order Intake"), not the raw event token
+            ("EMAIL_ORDER_ENTRY_REQUEST"). The raw event_type stays in the
+            audit zone (DiagnosticsSection / Source Email), where the
+            machine token is the evidence. */}
+        <div className="flex items-center gap-4">
+          <span className="text-label font-semibold uppercase tracking-wider text-text-quaternary">
+            Type:
+          </span>
+          <span className="text-caption text-text-tertiary">
+            <TaxonomyLabel axis="intent" code={detail.intent} />
+          </span>
+        </div>
         <div className="flex-1" />
         <span className="font-mono font-bold text-body text-text-primary">
           {fmtPrice(totalPo)}
