@@ -78,13 +78,19 @@ interface AgentReasoningCardProps {
   /** When present, overrides verdict display with an execution-error surface. */
   executionError?: ExecutionError;
   intent?: string;
+  /** Council 2026-06-07 — whether to show the intent in Layer 1. Sourced
+   *  from `analysis.presentation.show_intent` (backend-owned): true only
+   *  when the intent DISCRIMINATES the decision (CREDIT_BLOCK, DUPLICATE_PO),
+   *  false when it merely restates the arrival channel (MANUAL_ORDER_INTAKE).
+   *  The card honors this; it never re-decides (Guardrail #0). The raw enum
+   *  is always available in the Diagnostics surface. */
+  showIntent?: boolean;
   confidence?: number;
   /** Backend calibration claim for `confidence` (ADR-032). When omitted /
    *  false, ConfidenceDisplay frames the score as a raw model score rather
    *  than a validated probability. Sourced from
    *  `analysis.confidence_signal.calibrated`. */
   confidenceCalibrated?: boolean;
-  recipeName?: string;
   explanation?: string;
   policyHits?: string[];
   /** Agent's recommended action (from record.resolution_data.recommended_action).
@@ -179,9 +185,9 @@ export function AgentReasoningCard({
   verdict,
   executionError,
   intent,
+  showIntent = false,
   confidence,
   confidenceCalibrated,
-  recipeName,
   explanation,
   policyHits,
   recommendedAction,
@@ -270,21 +276,22 @@ export function AgentReasoningCard({
           </div>
         )}
 
-        {/* Key data points */}
-        <div className="flex gap-16 mb-12 flex-wrap">
-          {intent && (
+        {/* Key data points. Council 2026-06-07: the intent is shown only
+            when it DISCRIMINATES the decision (backend show_intent); a
+            channel-restating intent (MANUAL_ORDER_INTAKE) adds no L1
+            value and stays out. The recipe name is an engine internal —
+            it is never operator-facing L1; it lives in the Diagnostics
+            surface (DiagnosticsSection renders trace.recipe_name). Both
+            remain available there (Guardrail #7), just not front-and-
+            center (Guardrail #0). */}
+        {intent && showIntent && (
+          <div className="flex gap-16 mb-12 flex-wrap">
             <div>
               <span className="text-label text-text-quaternary uppercase tracking-wider font-semibold">Intent</span>
               <div className="text-body font-semibold text-text-primary mt-px">{intentLabel}</div>
             </div>
-          )}
-          {recipeName && (
-            <div>
-              <span className="text-label text-text-quaternary uppercase tracking-wider font-semibold">Recipe</span>
-              <div className="text-body font-medium text-text-primary mt-px">{recipeName.replace(".py", "")}</div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Explanation — suppressed when errored to avoid misleading success text */}
         {!isErrored && explanation && (

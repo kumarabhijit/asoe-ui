@@ -41,6 +41,7 @@ import type {
   LifecycleState,
   LineItem,
   OrderAnalysis,
+  PresentationContract,
   ReanalysisEntry,
 } from "@/types/exceptions";
 import {
@@ -2231,7 +2232,13 @@ export const exceptionsApi = {
       }
     }
     await delay(MOCK_DELAY);
-    return MOCK_ORDER_ANALYSES[id] ?? null;
+    const base = MOCK_ORDER_ANALYSES[id];
+    if (!base) return null;
+    // Mock-mode backend stand-in for `api.presentation_composer`. The
+    // real backend ships `presentation` on the AnalysisResponse; mock
+    // mode derives the SAME deterministic projection from the record's
+    // intent + recipe so the cockpit behaves identically in preview.
+    return { ...base, presentation: mockPresentation(id) };
   },
 
   /**
@@ -2527,6 +2534,27 @@ function mockAttentionState(status: string | null | undefined): AttentionState {
   // Unknown / unmapped → NEEDS_HUMAN: never silently bury a case
   // (parity with the backend `_attention_of` fallback).
   return MOCK_ATTENTION_BY_STATUS[status ?? ""] ?? "NEEDS_HUMAN";
+}
+
+// Mock-mode backend stand-in for `api.presentation_composer`. Mirrors
+// `_NON_DISCRIMINATING_INTENTS` — channel/intake intents that restate
+// the arrival path rather than name a problem, so they don't earn
+// Layer 1 (lock: tests/architectural/attention_state_mapping.test.ts).
+const MOCK_NON_DISCRIMINATING_INTENTS: ReadonlySet<string> = new Set([
+  "MANUAL_ORDER_INTAKE",
+  "UNKNOWN",
+]);
+
+function mockPresentation(id: string): PresentationContract {
+  const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
+  const intent = exc?.intent ?? null;
+  return {
+    show_intent: !!intent && !MOCK_NON_DISCRIMINATING_INTENTS.has(intent),
+    audit: {
+      recipe_name: exc?.selected_recipe ?? null,
+      intent_code: intent,
+    },
+  };
 }
 
 export const casesApi = {

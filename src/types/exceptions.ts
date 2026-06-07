@@ -490,6 +490,30 @@ export interface OrderAnalysis {
    *  discrepancy). Carries no business/compliance semantics — never
    *  gates routing. Mirrors `api/schemas.py::AnalysisResponse.primary_section`. */
   primary_section?: string | null;
+
+  /** Council 2026-06-07 — deterministic placement projection. The UI
+   *  honors this (Guardrail #0); it never re-decides placement. Mirrors
+   *  `api/schemas.py::AnalysisResponse.presentation`. Optional only so a
+   *  pre-3b stored payload deserialises. */
+  presentation?: PresentationContract | null;
+}
+
+/** Engine internals — `presentation_tier: audit`. Always emitted
+ *  (Guardrail #7), shown only in the Diagnostics & Audit surface.
+ *  Mirrors `api/schemas.py::PresentationAudit`. */
+export interface PresentationAudit {
+  recipe_name?: string | null;
+  intent_code?: string | null;
+}
+
+/** Deterministic presentation contract the UI projects onto the detail
+ *  surface. Mirrors `api/schemas.py::PresentationContract`. */
+export interface PresentationContract {
+  /** Does the classified intent discriminate the decision (CREDIT_BLOCK,
+   *  DUPLICATE_PO) or merely restate the arrival channel
+   *  (MANUAL_ORDER_INTAKE)? Only discriminating intents earn Layer 1. */
+  show_intent: boolean;
+  audit: PresentationAudit;
 }
 
 /* ── Order Entry section (ADR-042 Phase 3) — mirrors api/schemas.py ── */

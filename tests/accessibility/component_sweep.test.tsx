@@ -87,7 +87,7 @@ describe("a11y sweep: AgentReasoningCard", () => {
         verdict="GREEN"
         intent="PRICE_MISMATCH"
         confidence={0.92}
-        recipeName="PriceAdjustmentRecipe"
+        showIntent
         explanation="Auto-resolved within tolerance."
         canOverride
       />,
@@ -99,7 +99,7 @@ describe("a11y sweep: AgentReasoningCard", () => {
         verdict="YELLOW"
         intent="DUPLICATE_PO"
         confidence={0.55}
-        recipeName="DuplicateBlockRecipe"
+        showIntent
         explanation="Confidence below auto-resolve threshold."
         canApprove
         canEscalate
@@ -112,7 +112,7 @@ describe("a11y sweep: AgentReasoningCard", () => {
         verdict="RED"
         intent="CREDIT_BLOCK"
         confidence={0.88}
-        recipeName="CreditHoldRecipe"
+        showIntent
         explanation="Blocked by Compliance Shadow — PENALTY_MATRIX_VIOLATION."
         policyHits={["PENALTY_MATRIX"]}
         canOverride

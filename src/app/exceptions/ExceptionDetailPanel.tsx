@@ -804,7 +804,11 @@ export default function ExceptionDetailPanel({
               // partial-truth violation).
               confidence={confidenceValue}
               confidenceCalibrated={confidenceSignal?.calibrated}
-              recipeName={detail.selected_recipe ?? undefined}
+              // Council 2026-06-07 — intent shown in L1 only when it
+              // discriminates the decision (backend show_intent). The
+              // recipe name is an engine internal and is no longer passed
+              // to the card; it lives in the Diagnostics surface.
+              showIntent={analysis?.presentation?.show_intent ?? false}
               // Surfaced as a hover tooltip on the Approve button so the
               // reviewer sees the exact action they're accepting.
               recommendedAction={_recommendedAction() ?? undefined}

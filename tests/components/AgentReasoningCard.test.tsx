@@ -47,7 +47,11 @@ describe("AgentReasoningCard", () => {
     });
 
     it("renders intent when provided", () => {
-      render(<AgentReasoningCard verdict="GREEN" intent="CONTRACTUAL_CORRECTION" />);
+      // Council 2026-06-07: intent shows in L1 only when it discriminates
+      // (backend show_intent). The card honors the flag; it never decides.
+      render(
+        <AgentReasoningCard verdict="GREEN" intent="CONTRACTUAL_CORRECTION" showIntent />,
+      );
       // The card resolves intent labels via useIntentLabel → intentLabelFor
       // which reads NEXT_PUBLIC_ASOE_ERP_VENDOR. Compute the expected
       // label from the same resolver so the test stays green whether the
@@ -56,9 +60,19 @@ describe("AgentReasoningCard", () => {
       expect(screen.getByText(expected)).toBeInTheDocument();
     });
 
-    it("renders recipe name when provided", () => {
-      render(<AgentReasoningCard verdict="GREEN" recipeName="PriceAdjustmentRecipe.py" />);
-      expect(screen.getByText("PriceAdjustmentRecipe")).toBeInTheDocument();
+    it("hides the intent when it does not discriminate (showIntent=false)", () => {
+      // A channel-restating intent (e.g. MANUAL_ORDER_INTAKE) is passed
+      // with showIntent=false; the card must not surface it in L1.
+      render(<AgentReasoningCard verdict="GREEN" intent="CONTRACTUAL_CORRECTION" />);
+      const label = intentLabelFor("CONTRACTUAL_CORRECTION");
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    });
+
+    it("never renders the recipe name in L1 (it lives in Diagnostics)", () => {
+      // The recipe is an engine internal — presentation_tier: audit. The
+      // card has no recipe surface; DiagnosticsSection renders it instead.
+      render(<AgentReasoningCard verdict="GREEN" intent="CONTRACTUAL_CORRECTION" showIntent />);
+      expect(screen.queryByText("Recipe")).not.toBeInTheDocument();
     });
 
     it("renders explanation when provided", () => {
