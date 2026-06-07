@@ -2,12 +2,13 @@
  * Deliverable locks — exception detail-pane information hierarchy
  * (UX optimisation pass 2026-06-07).
  *
- * The reconciled refactor (a) lifts the Priority-1 financial impact to an
- * always-visible ImpactBar at the top, (b) auto-expands the primary
- * comparison section via the backend `primary_section` hint, and (c)
- * isolates System Diagnostics into a dedicated tab (Priority 4) — without
+ * The refactor (a) lifts the Priority-1 financial impact to an
+ * always-visible ImpactBar at the top and (b) auto-expands the primary
+ * comparison section via the backend `primary_section` hint — without
  * reversing the SectionAnchorBar (S1 #10) or jump-to-expand (S1 #4)
- * deliverables, which keep their own locks.
+ * deliverables, which keep their own locks. (A short-lived experiment
+ * that moved Diagnostics into a tab was reverted per PO ruling
+ * 2026-06-07; Diagnostics stays an inline collapsed section.)
  *
  * Pattern A (source-grep canaries) here; Pattern B behavioural coverage
  * lives in tests/components/detail_pane_priority.test.tsx + the Playwright
@@ -82,31 +83,20 @@ describe("Priority-2 — primary comparison auto-expands off the backend hint", 
   });
 });
 
-describe("Priority-4 — Diagnostics isolated into a dedicated tab", () => {
+describe("Diagnostics stays an inline collapsed section (no tab)", () => {
   const panel = read(PANEL);
 
-  it("uses the Tabs primitive via DetailLowerTabs", () => {
-    expect(panel).toContain('import { Tabs } from "@/components/ui/Tabs"');
-    expect(panel).toContain("<DetailLowerTabs");
-    expect(panel).toContain("function DetailLowerTabs");
-  });
-
-  it("declares Evidence + Diagnostics tabs and keeps the diagnostics anchor", () => {
-    expect(panel).toContain('label: "Evidence"');
-    expect(panel).toContain('label: "Diagnostics"');
-    // jump-to-expand target preserved inside the tabbed control.
-    expect(panel).toContain('anchorId="section-diagnostics"');
+  it("renders EvidenceGrid + DiagnosticsSection inline, not behind a Tabs control", () => {
+    // PO ruling (follow-up 2026-06-07): the stacked-collapsible layout is
+    // the operator-preferred surface; the short-lived Diagnostics-tab
+    // experiment was reverted. The Tabs primitive must not return.
+    expect(panel).not.toContain("DetailLowerTabs");
+    expect(panel).not.toContain('@/components/ui/Tabs');
+    expect(panel).toContain("<EvidenceGrid");
+    expect(panel).toContain("<DiagnosticsSection");
+    // jump-to-expand anchors preserved on the inline sections.
     expect(panel).toContain('anchorId="section-evidence"');
-  });
-
-  it("Guardrail #4 — the Agent recommendation is NOT inside the tabs", () => {
-    // AgentReasoningCard must render in the persistent flow, before the
-    // tabbed lower region — never behind a tab.
-    const cardIdx = panel.indexOf("<AgentReasoningCard");
-    const tabsIdx = panel.indexOf("<DetailLowerTabs");
-    expect(cardIdx).toBeGreaterThan(-1);
-    expect(tabsIdx).toBeGreaterThan(-1);
-    expect(cardIdx).toBeLessThan(tabsIdx);
+    expect(panel).toContain('anchorId="section-diagnostics"');
   });
 });
 
