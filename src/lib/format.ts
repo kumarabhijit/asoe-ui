@@ -61,6 +61,52 @@ export function fmtSignedPrice(n: number, locale = "en-US"): string {
 }
 
 /**
+ * Title-case a snake_case pipeline node / graph id for display.
+ * `build_analysis` → "Build Analysis". No closed enum mapping
+ * (Guardrail #2) — purely mechanical. Shared by PipelineDAG and
+ * EventsTimeline (was duplicated verbatim in both).
+ */
+export function humanizeNodeId(id: string): string {
+  return id
+    .split("_")
+    .map((p) => (p.length === 0 ? "" : p[0].toUpperCase() + p.slice(1)))
+    .join(" ");
+}
+
+/**
+ * Canonical duration formatter for the pipeline surfaces (WaterfallStepper,
+ * EventsTimeline, PipelineDAG) the same operator sees side-by-side.
+ *
+ * - `undefined` → `null` (no duration recorded; caller renders nothing).
+ * - sub-second → integer milliseconds, e.g. "0ms", "42ms". A genuine 0ms
+ *   (sub-millisecond, rounded) node renders "0ms", not blank — only an
+ *   absent value is null.
+ * - >= 1s → seconds at 2 dp, e.g. "1.23s" (audit precision; previously the
+ *   three surfaces disagreed at 1 vs 2 dp).
+ */
+export function formatDurationMs(ms?: number): string | null {
+  if (typeof ms !== "number") return null;
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(2)}s`;
+}
+
+/**
+ * Human-readable local timestamp for an ISO-8601 string, e.g.
+ * "Jun 7, 2026, 3:52 PM". Keep the raw ISO value in the element's
+ * `dateTime` attribute for machine/audit fidelity; this is the visible
+ * label only. An unparseable value is returned verbatim rather than
+ * fabricating a date (no partial-truth on an audit surface).
+ */
+export function formatTimestamp(iso: string, locale?: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(d);
+}
+
+/**
  * A11y-spoken form: digits + currency word ("4,147.20 USD"). The
  * "$" glyph pronounces inconsistently across screen readers — NVDA
  * says "dollars", JAWS says "dollar sign", VoiceOver may skip it

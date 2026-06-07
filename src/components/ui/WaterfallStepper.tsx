@@ -21,6 +21,7 @@ import type { PipelineNode } from "@/types/exceptions";
 import { ActivityIndicator } from "./ActivityIndicator";
 import { Button } from "./Button";
 import { cn } from "@/lib/utils";
+import { formatDurationMs } from "@/lib/format";
 
 export interface NodeState {
   node: PipelineNode;
@@ -75,14 +76,6 @@ function NodeIndicator({ status }: { status: NodeState["status"] }) {
     default:
       return <span className={cn(indicatorBase, "bg-transparent border-2 border-border")} />;
   }
-}
-
-function formatDuration(ms?: number): string {
-  // `if (!ms)` treated a genuine 0ms (sub-millisecond, rounded) node as
-  // "no duration" and rendered nothing; only an absent value should be blank.
-  if (ms === undefined) return "";
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 function dataSummary(node: PipelineNode, data?: Record<string, unknown>): string | null {
@@ -256,7 +249,7 @@ export function WaterfallStepper({ nodes, intent, className, allowReplay }: Wate
                 </span>
                 {n.duration_ms !== undefined && n.status === "completed" && (
                   <span className="text-label text-text-quaternary font-mono">
-                    {formatDuration(n.duration_ms)}
+                    {formatDurationMs(n.duration_ms)}
                   </span>
                 )}
                 {n.status === "skipped" && (

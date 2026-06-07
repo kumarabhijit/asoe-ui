@@ -18,6 +18,7 @@ import { useMemo, useState } from "react";
 import dagre from "dagre";
 import type { PipelineTopology, PipelineTopologyEdge, ExecutedNode } from "@/types/api";
 import { cn } from "@/lib/utils";
+import { humanizeNodeId, formatDurationMs } from "@/lib/format";
 
 interface PipelineDAGProps {
   topology: PipelineTopology;
@@ -162,13 +163,6 @@ function buildPath(points: { x: number; y: number }[]): string {
   const last = points[points.length - 1];
   d += ` L ${last.x} ${last.y}`;
   return d;
-}
-
-function humanizeNode(id: string): string {
-  return id
-    .split("_")
-    .map((p) => (p.length === 0 ? "" : p[0].toUpperCase() + p.slice(1)))
-    .join(" ");
 }
 
 export function PipelineDAG({
@@ -398,7 +392,7 @@ export function PipelineDAG({
                 }
                 fontWeight={isExecuted ? 600 : 400}
               >
-                {humanizeNode(node.label)}
+                {humanizeNodeId(node.label)}
               </text>
             </g>
           );
@@ -459,11 +453,11 @@ function EdgeDetailPanel({
       <div className="flex items-baseline justify-between gap-10">
         <div className="flex items-baseline gap-8 flex-wrap text-caption">
           <span className="font-semibold text-text-primary">
-            {humanizeNode(edge.from_node)}
+            {humanizeNodeId(edge.from_node)}
           </span>
           <span className="text-text-quaternary" aria-hidden="true">→</span>
           <span className="font-semibold text-text-primary">
-            {humanizeNode(edge.to_node)}
+            {humanizeNodeId(edge.to_node)}
           </span>
           {edge.verdict_label && (
             <span
@@ -502,7 +496,7 @@ function EdgeDetailPanel({
       {isTaken && !sourceExecutedNode && (
         <div className="text-caption text-text-tertiary">
           This edge is on the taken path, but no executed-node entry
-          was recorded for {humanizeNode(edge.from_node)}. (Trace may
+          was recorded for {humanizeNodeId(edge.from_node)}. (Trace may
           predate Phase B per-node instrumentation.)
         </div>
       )}
@@ -513,13 +507,7 @@ function EdgeDetailPanel({
             <Field label="Status" value={sourceExecutedNode.status} mono />
             <Field
               label="Duration"
-              value={
-                typeof sourceExecutedNode.duration_ms === "number"
-                  ? sourceExecutedNode.duration_ms < 1000
-                    ? `${sourceExecutedNode.duration_ms}ms`
-                    : `${(sourceExecutedNode.duration_ms / 1000).toFixed(2)}s`
-                  : null
-              }
+              value={formatDurationMs(sourceExecutedNode.duration_ms)}
               mono
             />
             <Field
@@ -537,7 +525,7 @@ function EdgeDetailPanel({
           {Object.keys(sourceExecutedNode.decision).length > 0 && (
             <div>
               <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
-                Decision (from {humanizeNode(sourceExecutedNode.node)})
+                Decision (from {humanizeNodeId(sourceExecutedNode.node)})
               </div>
               <pre className="m-0 px-10 py-6 rounded-sm bg-surface-secondary text-label font-mono text-text-secondary overflow-auto">
                 {JSON.stringify(sourceExecutedNode.decision, null, 2)}
@@ -579,9 +567,7 @@ function EdgeDetailPanel({
                     </span>
                     {typeof s.duration_ms === "number" && (
                       <span className="font-mono text-text-tertiary">
-                        {s.duration_ms < 1000
-                          ? `${s.duration_ms}ms`
-                          : `${(s.duration_ms / 1000).toFixed(2)}s`}
+                        {formatDurationMs(s.duration_ms)}
                       </span>
                     )}
                     <span
