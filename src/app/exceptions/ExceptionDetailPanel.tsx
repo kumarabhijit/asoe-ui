@@ -622,6 +622,18 @@ export default function ExceptionDetailPanel({
       <div className="flex-1 overflow-auto p-16">
         <div className="flex flex-col gap-16">
 
+          {/* ━━ Situation (Tier 1) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              The business event in plain language — council 2026-06-07,
+              presentation_tier: operator. Sourced from the backend
+              presentation contract (the governed per-intent one-liner);
+              structurally omitted when the backend has no honest headline
+              (no fabricated text — Guardrail #6). */}
+          {analysis?.presentation?.situation_headline && (
+            <h2 className="text-subhead font-semibold text-text-primary m-0">
+              {analysis.presentation.situation_headline}
+            </h2>
+          )}
+
           {/* Four-eyes cosign banner — shown when a high-value override
               was initiated and is awaiting a second manager+ reviewer.
               Non-initiators with exceptions:override see Approve/Reject

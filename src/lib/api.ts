@@ -69,7 +69,11 @@ import {
   MOCK_EXCEPTIONS,
   persistMockExceptionMutation,
 } from "./mock-data/exceptions";
-import { deriveMockCases, deriveMockCaseSummaries } from "./mock-data/cases";
+import {
+  INTENT_SUMMARY_TEMPLATES,
+  deriveMockCases,
+  deriveMockCaseSummaries,
+} from "./mock-data/cases";
 import { MOCK_LINE_ITEMS } from "./mock-data/line-items";
 import { mockAttachmentBlob } from "./mock-data/attachment-bytes";
 import type { AttentionState, OrderCase } from "@/types/cases";
@@ -2549,6 +2553,12 @@ function mockPresentation(id: string): PresentationContract {
   const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
   const intent = exc?.intent ?? null;
   return {
+    // Mock-mode stand-in for the backend reusing render_template: the
+    // governed per-intent one-liner is the plain-language Situation
+    // headline. Null when the intent has no template (honest omission).
+    situation_headline: intent
+      ? INTENT_SUMMARY_TEMPLATES[intent]?.one_liner ?? null
+      : null,
     show_intent: !!intent && !MOCK_NON_DISCRIMINATING_INTENTS.has(intent),
     audit: {
       recipe_name: exc?.selected_recipe ?? null,

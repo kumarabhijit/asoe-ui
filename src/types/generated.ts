@@ -3397,6 +3397,8 @@ export interface components {
              * @default false
              */
             show_intent: boolean;
+            /** Situation Headline */
+            situation_headline?: string | null;
         };
         /**
          * PriceAnalysisData

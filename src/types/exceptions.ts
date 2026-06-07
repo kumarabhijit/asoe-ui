@@ -509,6 +509,11 @@ export interface PresentationAudit {
 /** Deterministic presentation contract the UI projects onto the detail
  *  surface. Mirrors `api/schemas.py::PresentationContract`. */
 export interface PresentationContract {
+  /** The business event in plain language — the Situation tier headline
+   *  (`presentation_tier: operator`). Reuses the governed per-intent
+   *  one-liner. Null when the intent has no template / sparse output —
+   *  the UI structurally omits it (no fabricated headline). */
+  situation_headline?: string | null;
   /** Does the classified intent discriminate the decision (CREDIT_BLOCK,
    *  DUPLICATE_PO) or merely restate the arrival channel
    *  (MANUAL_ORDER_INTAKE)? Only discriminating intents earn Layer 1. */
