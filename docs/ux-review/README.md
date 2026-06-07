@@ -60,9 +60,18 @@ Usability, Simplicity** — using the standard review template (see
 > **Remediation progress (batches 1–5):** **all 11 Needs-Rework items resolved**
 > and flipped to Pass. Themes T8 (tokens), T9/Guardrail #2 (enum maps), T5
 > (accessibility), T3 (signed money), T1 (fabricated-data) and the Guardrail #6
-> OverMax totals are remediated. Many "Minor" components had their flagged
-> issues fixed too but retain other minor items (Batch 6 sweep), so they stay
-> Minor for now. See `REMEDIATION.md` for the per-item decision log + PR.
+> OverMax totals are remediated. See `REMEDIATION.md` for the per-item decision
+> log + PR.
+>
+> **Batch 6 (PR #223, in progress):** the "Needs Minor Tweaks" sweep — isolated,
+> low-risk items across reports 04–08, each with a parent-failing regression
+> test. Landed so far: shared data-viz dedup (humanize/duration/timestamp
+> helpers) + MetricTile/PipelineDAG/WaterfallStepper/ClassificationHistoryPanel/
+> ConstraintsPipeline (06); PreprodIdentityBanner/CaseViewBanner/StatusAnnouncer/
+> PolicyHitBadge/Logo (07); Toast/Input/MultiSelect/Button/AttachmentPreview
+> (08); ChangeAnalysis severity-inversion + DeliveryDelay/MOQ/PriceHold (05);
+> CollapsibleHeader `aria-controls` + Diagnostics tab semantics (04). Remaining
+> minor items are catalogued in `REMEDIATION.md`.
 
 ### Needs Rework (priority queue)
 
