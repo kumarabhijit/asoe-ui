@@ -23,6 +23,29 @@ describe("CollapsibleSection Layer-2-open signal", () => {
     expect(onFirstOpen).toHaveBeenCalledTimes(1);
   });
 
+  // REGRESSION (report 04): the header had aria-expanded but no aria-controls,
+  // so AT couldn't associate the toggle with the panel it governs. The region
+  // element must exist (so the reference resolves) even while collapsed.
+  it("wires aria-controls from the header to a region that exists when collapsed", () => {
+    render(
+      <CollapsibleSection title="Evidence" id="section-evidence">
+        <div>body</div>
+      </CollapsibleSection>,
+    );
+    const header = screen.getByRole("button", { name: /Evidence/ });
+    const controls = header.getAttribute("aria-controls");
+    expect(controls).toBeTruthy();
+    // Region resolves while collapsed (present but hidden); children are lazy.
+    const region = document.getElementById(controls!);
+    expect(region).not.toBeNull();
+    expect(region).toHaveAttribute("hidden");
+    expect(screen.queryByText("body")).not.toBeInTheDocument();
+    // On open, the region un-hides and the children mount.
+    fireEvent.click(header);
+    expect(region).not.toHaveAttribute("hidden");
+    expect(screen.getByText("body")).toBeInTheDocument();
+  });
+
   it("reports through Layer2OpenContext when no explicit prop is given", () => {
     const report = vi.fn();
     render(

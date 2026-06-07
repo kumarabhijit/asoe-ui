@@ -329,10 +329,15 @@ export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen, an
             />
             {traceOpen && (
               <div className="border-t border-border px-16 py-12">
-                <div className="flex gap-4 border-b border-border mb-10">
+                <div role="tablist" aria-label="Trace evidence views" className="flex gap-4 border-b border-border mb-10">
                   {DETAIL_TABS.map((tab) => (
                     <button
                       key={tab.id}
+                      type="button"
+                      role="tab"
+                      id={`trace-tab-${tab.id}`}
+                      aria-selected={detailTab === tab.id}
+                      aria-controls={`trace-panel-${tab.id}`}
                       onClick={() => setDetailTab(tab.id)}
                       className={cn(
                         "px-12 py-6 bg-transparent border-none cursor-pointer text-caption font-sans",
@@ -347,7 +352,12 @@ export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen, an
                 </div>
 
                 {detailTab === "evidence" && trace && (
-                  <div className="text-caption text-text-secondary flex flex-col gap-16">
+                  <div
+                    role="tabpanel"
+                    id="trace-panel-evidence"
+                    aria-labelledby="trace-tab-evidence"
+                    className="text-caption text-text-secondary flex flex-col gap-16"
+                  >
                     {trace.narrative && <NarrativeBlock text={trace.narrative} />}
                     {trace.resolution_steps && trace.resolution_steps.length > 0 && (
                       <ResolutionSteps steps={trace.resolution_steps} />
@@ -389,12 +399,22 @@ export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen, an
                   </div>
                 )}
                 {showPreview && detailTab === "sap" && (
-                  <div className="p-12 text-text-quaternary text-caption italic bg-surface-secondary rounded-sm">
+                  <div
+                    role="tabpanel"
+                    id="trace-panel-sap"
+                    aria-labelledby="trace-tab-sap"
+                    className="p-12 text-text-quaternary text-caption italic bg-surface-secondary rounded-sm"
+                  >
                     SAP condition records and master data will be available here — integrating with SAP ECC/S4HANA pricing procedures, condition tables, and master data views.
                   </div>
                 )}
                 {showPreview && detailTab === "changes" && (
-                  <div className="p-12 text-text-quaternary text-caption italic bg-surface-secondary rounded-sm">
+                  <div
+                    role="tabpanel"
+                    id="trace-panel-changes"
+                    aria-labelledby="trace-tab-changes"
+                    className="p-12 text-text-quaternary text-caption italic bg-surface-secondary rounded-sm"
+                  >
                     Change analysis and audit diff will surface here — showing field-level before/after comparisons, change initiators, and approval chains.
                   </div>
                 )}

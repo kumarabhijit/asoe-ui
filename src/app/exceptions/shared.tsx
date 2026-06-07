@@ -15,6 +15,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useId,
   useRef,
   useState,
   type ReactNode,
@@ -93,17 +94,21 @@ export function useHashOpen<T extends HTMLElement>(
 }
 
 /** Collapsible section header — matches Evidence Detail card pattern */
-export function CollapsibleHeader({ title, open, onToggle, badge, badgeVariant = "neutral" }: {
+export function CollapsibleHeader({ title, open, onToggle, badge, badgeVariant = "neutral", controlsId }: {
   title: string;
   open: boolean;
   onToggle: () => void;
   badge?: string;
   badgeVariant?: string;
+  /** id of the region this header expands/collapses — wires `aria-controls`
+   *  so AT can associate the toggle with the panel it governs. */
+  controlsId?: string;
 }) {
   return (
     <button
       onClick={onToggle}
       aria-expanded={open}
+      aria-controls={controlsId}
       className="flex w-full items-center justify-between px-16 py-10 bg-transparent border-none cursor-pointer font-sans"
     >
       <div className="flex items-center gap-8">
@@ -169,6 +174,10 @@ export function CollapsibleSection({
   const [open, setOpen] = useState(defaultOpen);
   const firedRef = useRef(false);
   const sectionRef = useRef<HTMLElement>(null);
+  // Stable id for the collapsible region so the header's aria-controls
+  // resolves. Derived from the anchor `id` when present, else a useId.
+  const reactId = useId();
+  const regionId = id ? `${id}-region` : reactId;
   const reportLayer2Open = useContext(Layer2OpenContext);
   // First-open side effects (telemetry) fire exactly once, whether the
   // section is opened by a click or by a hash jump.
@@ -208,8 +217,14 @@ export function CollapsibleSection({
         onToggle={toggle}
         badge={badge}
         badgeVariant={badgeVariant}
+        controlsId={regionId}
       />
-      {open && <div className="border-t border-border">{children}</div>}
+      {/* The region element is always present (so aria-controls resolves even
+          when collapsed) but `hidden` when closed; heavy children still mount
+          lazily on first open to preserve the perf contract. */}
+      <div id={regionId} hidden={!open} className={cn(open && "border-t border-border")}>
+        {open && children}
+      </div>
     </section>
   );
 }
