@@ -48,7 +48,9 @@ describe("WaterfallStepper", () => {
   it("shows ActivityIndicator for in-progress node", () => {
     const nodes = makeNodeStates(4, true);
     render(<WaterfallStepper nodes={nodes} intent="DUPLICATE_PO" />);
-    expect(screen.getByText("Auditing duplicate PO against compliance policies...")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Auditing Duplicate PO against compliance policies/i),
+    ).toBeInTheDocument();
   });
 
   it("shows error message for failed node", () => {
@@ -56,6 +58,16 @@ describe("WaterfallStepper", () => {
     nodes[3] = { node: "validate_circuit_breaker", status: "failed" };
     render(<WaterfallStepper nodes={nodes} />);
     expect(screen.getByText(/Node failed/)).toBeInTheDocument();
+  });
+
+  // REGRESSION (fails on parent): a skipped node used to be icon-only (dashed
+  // ring), indistinguishable from "pending" for SR / low-vision users
+  // (WCAG 1.4.1). It must now carry a visible "Skipped" text cue.
+  it("renders a 'Skipped' text label for skipped nodes (not icon-only)", () => {
+    const nodes = makeNodeStates(2);
+    nodes[5] = { node: "select_recipe", status: "skipped" };
+    render(<WaterfallStepper nodes={nodes} />);
+    expect(screen.getByText("Skipped")).toBeInTheDocument();
   });
 
   it("renders all completed nodes for a resolved exception", () => {

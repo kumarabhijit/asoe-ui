@@ -30,13 +30,13 @@ Classes that name a non-existent token render unstyled at runtime.
 Maps keyed off backend enums must have a `default` fallback (icon+text) and must
 not hardcode enum values.
 
-| ☐ | Finding | Location | Fix | Expert / decision | PR |
+| ☑ | Finding | Location | Fix | Expert / decision | PR |
 |---|---------|----------|-----|-------------------|----|
-| ☐ | Hardcoded intent enum keys (Guardrail #2) | `ActivityIndicator.tsx:20-41` | source from data, not literals | | |
-| ☐ | Map missing `default` → blank on new enum | `EventsTimeline.tsx` `statusIndicator` | add default fallback | | |
-| ☐ | Classifier maps missing default | `ClassificationHistoryPanel.tsx` | add default fallback | | |
-| ☐ | "skipped" state icon-only (no text) | `WaterfallStepper.tsx` | icon + text | | |
-| ☐ | `verdict === "GREEN" ? …` color switch | `dashboard/page.tsx:251-255` | use `verdictVariant()` | | |
+| ☑ | Hardcoded intent enum keys (Guardrail #2) | `ActivityIndicator.tsx:20-41` | Templated copy: intent-specialised nodes inject `intentLabelFor(intent)`; neutral copy when no intent. New intent → zero UI change | Reconciles Guardrail #2 (no literals) + #4 (domain-aware) — no conflict, no expert needed | #222 |
+| ☑ | Map missing `default` → blank on new enum | `EventsTimeline.tsx` `statusIndicator` | added `default` → neutral `Circle` indicator | Mirrors `verdictVariant` default | #222 |
+| ☑ | Classifier maps missing default | `ClassificationHistoryPanel.tsx` | `classifierIcon/Variant()` fallbacks (neutral + `CircleHelp`); **also fixed latent double-icon** by routing through Badge `icon` prop | Found Badge auto-adds `DEFAULT_ICONS` → every badge had 2 icons; `icon` prop is the intended API | #222 |
+| ☑ | "skipped" state icon-only (no text) | `WaterfallStepper.tsx` | added visible "Skipped" text cue (WCAG 1.4.1) | | #222 |
+| ☑ | `verdict === "GREEN" ? …` color switch | `dashboard/page.tsx:251-255` | new `variantColorVar(verdictVariant(verdict))` in `Badge.tsx`; removed enum literals | Colour-mapper colocated with other variant mappers (allowed location) | #222 |
 
 ## Batch 3 — T5: accessibility
 | ☐ | Finding | Location | Fix | Expert / decision | PR |
@@ -102,6 +102,19 @@ _(Append expert decisions here as they're made: date · item · expert · outcom
   (it needs a full rework, not a one-line token swap — touching it twice would
   churn the diff). The new guard derives its valid spacing scale from
   `design-tokens.css`, so it stays in sync if the scale changes.
+
+- **2026-06-07 · Batch 2 (T9/Guardrail #2) · self (frontend-arch)** —
+  `ActivityIndicator` posed a real Guardrail #2 (no hardcoded enum literals) vs
+  Guardrail #4 (domain-aware messages) tension. Resolution: **templated copy** —
+  intent-specialised nodes hold a function of the humanised intent label
+  (`intentLabelFor`), so messages name the specific intent WITHOUT branching on
+  literals. Both guardrails satisfied, so no conflict / no escalation. While
+  fixing `ClassificationHistoryPanel`'s missing fallback I found a latent bug:
+  `Badge` always renders `DEFAULT_ICONS[variant]`, and the panel ALSO passed its
+  icon as children → every classifier badge rendered two icons. Fixed properly
+  by routing the (fallback-aware) icon through Badge's `icon` prop — the API the
+  other six callers already use. No backend (`asoe2`) change: all display-mapping
+  is UI-side; backend enum contracts unchanged.
 
 ## Scorecard sync
 As items move to ☑, update the verdict in the matching `0X-*.md` report and the

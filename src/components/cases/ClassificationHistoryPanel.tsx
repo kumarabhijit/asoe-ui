@@ -15,7 +15,7 @@
  */
 "use client";
 
-import { History, User as UserIcon, Bot, BookCheck } from "lucide-react";
+import { History, User as UserIcon, Bot, BookCheck, CircleHelp } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { formatSupergroupCode } from "@/lib/cases";
@@ -45,6 +45,17 @@ const CLASSIFIER_VARIANT: Record<
   MODEL: "brand",
   RULE: "neutral",
 };
+
+/* Forward-compat fallbacks: a classifier_type the UI enum doesn't yet know
+ * (a new backend actor class) still renders a neutral badge + icon rather
+ * than a blank variant/empty icon — mirrors the verdictVariant default. */
+function classifierIcon(type: ClassifierType): React.ReactNode {
+  return CLASSIFIER_ICON[type] ?? <CircleHelp size={12} aria-hidden />;
+}
+
+function classifierVariant(type: ClassifierType): "info" | "brand" | "neutral" {
+  return CLASSIFIER_VARIANT[type] ?? "neutral";
+}
 
 /**
  * Coarse partner tokens are `internal:human` / `internal:model` /
@@ -117,10 +128,10 @@ export function ClassificationHistoryPanel({
           >
             <div className="flex flex-wrap items-center gap-8">
               <Badge
-                variant={CLASSIFIER_VARIANT[e.classifier_type]}
+                variant={classifierVariant(e.classifier_type)}
                 size="sm"
+                icon={classifierIcon(e.classifier_type)}
               >
-                {CLASSIFIER_ICON[e.classifier_type]}
                 <span className="ml-4">{e.classifier_type}</span>
               </Badge>
               <code

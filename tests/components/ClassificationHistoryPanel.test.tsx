@@ -12,7 +12,10 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import { ClassificationHistoryPanel } from "@/components/cases/ClassificationHistoryPanel";
-import type { ClassificationHistoryEntry } from "@/types/exceptions";
+import type {
+  ClassificationHistoryEntry,
+  ClassifierType,
+} from "@/types/exceptions";
 
 
 function entry(
@@ -99,5 +102,31 @@ describe("ClassificationHistoryPanel", () => {
     expect(codes[1].getAttribute("title")).toBe("SG_BLOCK_PRICING");
     expect(codes[0].textContent).toBe("Needs Triage");
     expect(codes[1].textContent).toBe("Block Pricing");
+  });
+
+  // REGRESSION (fails on parent): the panel put the classifier icon in
+  // Badge *children* while Badge also auto-renders DEFAULT_ICONS[variant] —
+  // so every badge showed TWO icons. Routing the icon through the `icon`
+  // prop (the intended Badge API) renders exactly one.
+  it("renders exactly one icon per classifier badge", () => {
+    const { container } = render(
+      <ClassificationHistoryPanel entries={[entry()]} />,
+    );
+    const badge = container.querySelector("span.inline-flex");
+    expect(badge?.querySelectorAll("svg")).toHaveLength(1);
+  });
+
+  // Forward-compat: a classifier_type the UI enum doesn't know yet still
+  // renders a neutral badge with the raw type text + a fallback icon, not a
+  // blank/undefined variant. Cast is a deliberate future-value probe.
+  it("falls back to a neutral badge for an unknown classifier_type", () => {
+    const { container } = render(
+      <ClassificationHistoryPanel
+        entries={[entry({ classifier_type: "AGENT" as ClassifierType })]}
+      />,
+    );
+    expect(screen.getByText("AGENT")).toBeInTheDocument();
+    const badge = container.querySelector("span.inline-flex");
+    expect(badge?.querySelectorAll("svg")).toHaveLength(1);
   });
 });

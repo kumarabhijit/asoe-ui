@@ -153,6 +153,15 @@ enum value — the inverse of Guardrail #2 (not hardcoded, but silently dropped)
 - Hard Guardrail #2 violation found in pass 2: `ActivityIndicator.tsx:20-41` hardcodes the intent enum as map keys.
 - **Fix theme:** every enum→display map needs a `default` fallback + icon+text, mirroring `verdictVariant()` in `Badge.tsx`.
 
+> ✅ **Resolved — Batch 2** (see `REMEDIATION.md`). `ActivityIndicator` now
+> templates domain-aware copy through `intentLabelFor` (no hardcoded intent
+> literals; new intents need zero UI change); `EventsTimeline.statusIndicator`
+> and `ClassificationHistoryPanel` got neutral default fallbacks;
+> `WaterfallStepper` "skipped" gained a text cue; the dashboard verdict bar
+> routes colour through `variantColorVar(verdictVariant())`. Also fixed a latent
+> double-icon bug in every classifier badge. Six regression tests added (each
+> fails on the parent commit).
+
 ### Reinforced by pass 2
 - **T3 (signed money)** now also covers the shared `PricingWaterfall` (`fmtPrice` `Math.abs`) — fix the helper at the source, once.
 - **T5 (accessibility)** gained: `aria-busy` missing on every async control (Button also loses its accessible name while loading; AttachmentDownloadButton; ErasureCertificateButton); `ActivityIndicator` has no `aria-live`; `Toast` announces errors politely not assertively; `PipelineDAG` `outline:none` with no focus replacement; `AttachmentDownloadButton` swallows download failures (`try/finally`, no `catch`) on a SOX evidence surface.

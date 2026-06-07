@@ -257,6 +257,14 @@ export function WaterfallStepper({ nodes, intent, className, allowReplay }: Wate
                     {formatDuration(n.duration_ms)}
                   </span>
                 )}
+                {n.status === "skipped" && (
+                  // WCAG 1.4.1: the dashed-ring icon is not enough on its own;
+                  // a text cue distinguishes "skipped" from "pending" for SR /
+                  // low-vision users.
+                  <span className="text-label text-text-quaternary font-medium uppercase tracking-wide">
+                    Skipped
+                  </span>
+                )}
               </div>
 
               {n.status === "started" && (

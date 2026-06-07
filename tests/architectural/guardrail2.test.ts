@@ -127,6 +127,23 @@ describe("Guardrail #2: Badge variant functions have default fallback", () => {
   });
 });
 
+describe("Guardrail #2: Dashboard routes verdict→colour through the mapper", () => {
+  it("dashboard/page.tsx does not branch on raw shadow-verdict literals for colour", () => {
+    // REGRESSION (fails on parent): the verdict-distribution bar picked its
+    // colour with `verdict === "GREEN" ? … : verdict === "YELLOW" ? …`,
+    // duplicating verdictVariant() and hardcoding enum literals. Colour must
+    // route through variantColorVar(verdictVariant(verdict)) instead.
+    const rootDir = path.resolve(__dirname, "../../");
+    const content = stripComments(
+      fs.readFileSync(path.join(rootDir, "src/app/dashboard/page.tsx"), "utf-8"),
+    );
+    expect(content).not.toMatch(/verdict\s*===\s*["']GREEN["']/);
+    expect(content).not.toMatch(/verdict\s*===\s*["']YELLOW["']/);
+    expect(content).not.toMatch(/verdict\s*===\s*["']RED["']/);
+    expect(content).toContain("variantColorVar");
+  });
+});
+
 describe("Guardrail #2: Cases workspace filters source from health endpoint", () => {
   it("Cases workspace sources filter values from health endpoint (not hardcoded)", () => {
     // ADR-041 P4 — `/cases/page.tsx` is the canonical queue surface

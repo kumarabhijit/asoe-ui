@@ -24,7 +24,7 @@ import {
 import { NavBar } from "@/components/ui/NavBar";
 import { MetricTile } from "@/components/ui/MetricTile";
 import { Card } from "@/components/ui/Card";
-import { Badge, verdictVariant, lifecycleVariant } from "@/components/ui/Badge";
+import { Badge, verdictVariant, lifecycleVariant, variantColorVar } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
@@ -248,11 +248,11 @@ export default function DashboardPage() {
                     <Badge variant={verdictVariant(verdict)} size="sm" className="min-w-[80px]">
                       {verdict}
                     </Badge>
-                    <BarSegment value={count} max={stats.total_exceptions} color={
-                      verdict === "GREEN" ? "var(--color-success)" :
-                      verdict === "YELLOW" ? "var(--color-warning)" :
-                      "var(--color-error)"
-                    } />
+                    <BarSegment
+                      value={count}
+                      max={stats.total_exceptions}
+                      color={variantColorVar(verdictVariant(verdict))}
+                    />
                     <span className="min-w-[24px] text-right font-mono text-caption font-semibold text-text-primary">
                       {count}
                     </span>
