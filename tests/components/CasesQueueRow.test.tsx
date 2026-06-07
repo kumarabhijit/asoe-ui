@@ -38,6 +38,7 @@ const CASE: CaseListItem = {
   intent: null,
   dollar_impact: null,
   audit_verdict_color: null,
+  attention_state: "NEEDS_HUMAN",
 };
 
 describe("CasesQueueRow (legacy)", () => {

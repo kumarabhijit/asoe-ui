@@ -76,6 +76,7 @@ export function buildOpenActionableScenario(
       intent,
       dollar_impact: null,
       audit_verdict_color: null,
+      attention_state: "NEEDS_HUMAN",
     },
     records: [
       {

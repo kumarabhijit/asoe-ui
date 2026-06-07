@@ -21,7 +21,7 @@
 
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -45,7 +45,7 @@ import {
   isCaseInvalidationEvent,
   useCases,
 } from "@/hooks/useManualOrderCases";
-import { STATUS_LABEL } from "@/lib/cases";
+import { STATUS_LABEL, attentionGroup } from "@/lib/cases";
 import { cn } from "@/lib/utils";
 import type {
   CaseStatus,
@@ -461,6 +461,14 @@ function CasesWorkspace() {
         sla: slaSnapshot(case_, tickNow),
       }))
       .sort((a, b) => {
+        // Council 2026-06-07 — needs-human work scans first. Primary
+        // key is the backend `attention_state` rank (NEEDS_HUMAN ->
+        // IN_FLIGHT -> DONE); SLA urgency breaks ties WITHIN a group.
+        // The grouping is the backend's disposition; the queue only
+        // orders by it (it does not re-derive needs-human from status).
+        const aRank = attentionGroup(a.case_.attention_state).rank;
+        const bRank = attentionGroup(b.case_.attention_state).rank;
+        if (aRank !== bRank) return aRank - bRank;
         const aMs = a.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
         const bMs = b.sla.ms_until_deadline ?? Number.POSITIVE_INFINITY;
         return aMs - bMs;
@@ -625,8 +633,42 @@ function CasesWorkspace() {
             >
               {sorted.map(({ case_, sla, isPinned }, rowIndex) => {
                 const isSelected = case_.case_id === selectedCaseId;
+                // Council 2026-06-07 — section header at each
+                // attention-group boundary. `sorted` is ordered by
+                // group rank, so a change from the previous row's
+                // group is a clean boundary. The header is a
+                // presentational <li> (role="presentation"): it is NOT
+                // an option, so the listbox option set and the
+                // keyboard nav (both driven off the flat `sorted`
+                // array, which has no headers) are unaffected.
+                const group = attentionGroup(case_.attention_state);
+                const prevGroup =
+                  rowIndex > 0
+                    ? attentionGroup(sorted[rowIndex - 1].case_.attention_state)
+                    : null;
+                const showHeader = prevGroup === null || prevGroup.key !== group.key;
+                const groupCount = sorted.filter(
+                  (r) => attentionGroup(r.case_.attention_state).key === group.key,
+                ).length;
                 return (
-                  <li key={case_.case_id} className="border-b border-border-subtle">
+                  <Fragment key={case_.case_id}>
+                    {showHeader && (
+                      <li
+                        role="presentation"
+                        className="flex items-center justify-between px-16 pt-16 pb-6 bg-surface-page"
+                      >
+                        <span className="text-label uppercase tracking-wider font-semibold text-text-tertiary">
+                          {group.label}
+                        </span>
+                        <span
+                          className="text-label font-mono text-text-quaternary"
+                          aria-hidden
+                        >
+                          {groupCount}
+                        </span>
+                      </li>
+                    )}
+                  <li className="border-b border-border-subtle">
                     {CASES_ROW_V2 ? (
                       <CasesQueueRowV2
                         case_={case_}
@@ -647,6 +689,7 @@ function CasesWorkspace() {
                       />
                     )}
                   </li>
+                  </Fragment>
                 );
               })}
             </ul>

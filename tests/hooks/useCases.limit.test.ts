@@ -39,6 +39,7 @@ function makeItem(i: number): CaseListItem {
     intent: null,
     dollar_impact: null,
     audit_verdict_color: null,
+    attention_state: "IN_FLIGHT",
   };
 }
 
