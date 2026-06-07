@@ -21,6 +21,15 @@ describe("PolicyHitBadge", () => {
     expect(screen.queryByText("AI")).not.toBeInTheDocument();
   });
 
+  // REGRESSION (report 07): the rule branch had no aria-label while the LLM
+  // branch did, giving SR users an asymmetric experience. Name the source.
+  it("provides a symmetric accessible label naming the rule source", () => {
+    render(<PolicyHitBadge hit="MK-2026-12" />);
+    expect(
+      screen.getByLabelText(/Policy rule: MK-2026-12/i),
+    ).toBeInTheDocument();
+  });
+
   it("renders an LLM-derived hit with the AI prefix", () => {
     render(<PolicyHitBadge hit="LLM_SHADOW:CUSTOMER_OPT_OUT_VIOLATION" />);
     // Concern name visible without the prefix.

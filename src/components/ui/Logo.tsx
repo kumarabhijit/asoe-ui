@@ -19,7 +19,7 @@ export function Logo({ size = "md", showTagline = false }: LogoProps) {
     <div className="flex flex-col items-center gap-8">
       <div className={cn("flex items-center", s.gap)}>
         <div className={cn(s.box, "rounded-md bg-brand flex items-center justify-center shrink-0")}>
-          <Layers size={s.icon} className="text-text-inverse" strokeWidth={2.5} />
+          <Layers size={s.icon} className="text-text-inverse" strokeWidth={2.5} aria-hidden="true" />
         </div>
         <span className={cn(s.title, "font-bold text-text-primary tracking-tight")}>
           ASOE
