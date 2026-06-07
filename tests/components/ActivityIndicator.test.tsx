@@ -56,6 +56,14 @@ describe("ActivityIndicator", () => {
     expect(screen.queryByText(/^Executing recipe\.\.\.$/)).not.toBeInTheDocument();
   });
 
+  // REGRESSION (fails on parent): the indicator had no live region despite
+  // being the named example in CLAUDE.md, so message changes weren't announced.
+  it("is a polite live region (role=status, aria-live=polite)", () => {
+    render(<ActivityIndicator node="classify" />);
+    const status = screen.getByRole("status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+  });
+
   it("messages are not generic 'Loading...' (Section 11.2 requirement)", () => {
     const nodes: PipelineNode[] = ["ingest", "classify", "shadow_audit", "execute_recipe"];
     for (const node of nodes) {

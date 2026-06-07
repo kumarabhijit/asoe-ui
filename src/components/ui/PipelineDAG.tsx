@@ -282,7 +282,10 @@ export function PipelineDAG({
                         );
                       }
                     },
-                    style: { outline: "none", cursor: "pointer" },
+                    // No `outline: none` — the global :focus-visible ring
+                    // (globals.css) must remain visible on this keyboard-
+                    // focusable edge (focus-ring-required a11y rule).
+                    style: { cursor: "pointer" },
                   }
                 : {})}
             >

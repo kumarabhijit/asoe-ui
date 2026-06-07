@@ -188,7 +188,9 @@ function HomePageInner() {
         </div>
       </div>
 
-      <div id="main-content" />
+      {/* Real <main> landmark + skip-link target (was an empty <div>, so the
+          "Skip to main content" link in layout.tsx landed on nothing). */}
+      <main id="main-content">
 
       {/* ── KPI tiles (operational, case-centric) ── */}
       <div className="max-w-[1440px] mx-auto px-32 py-16">
@@ -307,6 +309,7 @@ function HomePageInner() {
           </ul>
         </section>
       </div>
+      </main>
     </div>
   );
 }

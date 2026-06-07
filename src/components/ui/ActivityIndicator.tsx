@@ -52,8 +52,12 @@ export function ActivityIndicator({ node, intent, className }: ActivityIndicator
   const message = getMessage(node, intent);
 
   return (
-    <span className={cn("inline-flex items-center gap-6 text-caption text-text-tertiary font-medium italic", className)}>
-      <span className="agent-active-dot w-1.5 h-1.5 shrink-0" />
+    <span
+      role="status"
+      aria-live="polite"
+      className={cn("inline-flex items-center gap-6 text-caption text-text-tertiary font-medium italic", className)}
+    >
+      <span className="agent-active-dot w-1.5 h-1.5 shrink-0" aria-hidden />
       {message}
     </span>
   );

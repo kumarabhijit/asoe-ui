@@ -121,10 +121,13 @@ export function NavBar({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                className="w-[32px] h-[32px] rounded-full bg-surface-tertiary flex items-center justify-center text-caption font-semibold text-text-secondary cursor-pointer border-none"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-full bg-transparent border-none cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                 aria-label="User menu"
               >
-                {userInitials}
+                {/* 44px hit target (WCAG 2.5.5) around the 32px visual avatar. */}
+                <span className="w-[32px] h-[32px] rounded-full bg-surface-tertiary flex items-center justify-center text-caption font-semibold text-text-secondary">
+                  {userInitials}
+                </span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={8}>

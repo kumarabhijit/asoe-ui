@@ -119,6 +119,15 @@ with **direction conveyed by color only** (WCAG 1.4.1 risk):
 - Broken skip-link target on `/home` (empty `<div id="main-content" />`, `home/page.tsx:191`; no `<main>` landmark).
 - Undefined `text-h4` token renders headings at body size (`cases/error.tsx:16`, `cases/not-found.tsx:14`).
 
+> ✅ **Resolved — Batch 3** (see `REMEDIATION.md`). `ActivityIndicator` is now a
+> polite live region; `Button`/`AttachmentDownloadButton`/`ErasureCertificateButton`
+> expose `aria-busy` (Button retains its label while loading); the attachment
+> download surfaces failures via `role="alert"`; `Toast` announces errors
+> assertively; `PipelineDAG` keeps its focus ring; `ConfidenceDisplay` dropped the
+> stray `tabIndex`; `/home` has a real `<main>` skip-link target; Sidebar/NavBar
+> icon controls are 44px hit targets. (`text-h4` token fixed in Batch 1.)
+> 11 regression tests added.
+
 ### T6 — Vocabulary & label inconsistency
 Raw enums in one place, humanized labels in another, on the same journey:
 - `RecordListPane` shows raw `lifecycle_state` (`:182`) vs queue rows' `STATUS_LABEL`.

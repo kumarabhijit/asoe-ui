@@ -59,13 +59,15 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         )}
         ref={ref}
         disabled={isDisabled}
+        aria-busy={loading || undefined}
         {...props}
       >
-        {loading ? (
-          <Loader2 size={16} className="animate-spin" />
-        ) : (
-          children
-        )}
+        {/* WCAG 4.1.2: keep the label while loading so the control retains its
+            accessible name; the spinner is decorative (aria-busy carries the
+            "busy" semantics). Skipped for `asChild` — Slot requires a single
+            child, so the spinner can't be a sibling there. */}
+        {loading && !asChild && <Loader2 size={16} className="animate-spin" aria-hidden />}
+        {children}
       </Comp>
     );
   },

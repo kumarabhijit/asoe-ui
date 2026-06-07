@@ -87,6 +87,7 @@ export function ErasureCertificateButton({
         type="button"
         onClick={handleDownload}
         disabled={busy}
+        aria-busy={busy || undefined}
         aria-label={`Download erasure certificate for ${attachmentId}`}
         className="inline-flex items-center gap-4 px-8 py-4 rounded-sm border border-border-subtle text-caption text-text-secondary hover:bg-surface-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring disabled:opacity-50"
       >
@@ -98,11 +99,9 @@ export function ErasureCertificateButton({
         {label}
       </button>
       {error ? (
-        <div
-          role="alert"
-          className="text-caption text-error"
-          aria-live="polite"
-        >
+        // role="alert" already implies an assertive live region; pairing it
+        // with aria-live="polite" is contradictory, so we keep only the role.
+        <div role="alert" className="text-caption text-error">
           {error}
         </div>
       ) : null}

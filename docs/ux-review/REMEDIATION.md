@@ -39,18 +39,18 @@ not hardcode enum values.
 | ☑ | `verdict === "GREEN" ? …` color switch | `dashboard/page.tsx:251-255` | new `variantColorVar(verdictVariant(verdict))` in `Badge.tsx`; removed enum literals | Colour-mapper colocated with other variant mappers (allowed location) | #222 |
 
 ## Batch 3 — T5: accessibility
-| ☐ | Finding | Location | Fix | Expert / decision | PR |
+| ☑ | Finding | Location | Fix | Expert / decision | PR |
 |---|---------|----------|-----|-------------------|----|
-| ☐ | No `aria-live` (named in CLAUDE.md) | `ActivityIndicator.tsx:58-63` | `aria-live="polite"` | | |
-| ☐ | No `aria-busy`; loses accessible name while loading | `Button.tsx:64-68` | `aria-busy` + retain label | | |
-| ☐ | No `aria-busy` on async action | `AttachmentDownloadButton.tsx:62-66`, `ErasureCertificateButton.tsx:93-97` | `aria-busy` | | |
-| ☐ | Swallows download failures (no `catch`) | `AttachmentDownloadButton.tsx:49-52` | catch + user feedback | | |
-| ☐ | Errors announced politely, should be assertive | `Toast.tsx:47-48` | assertive for errors | | |
-| ☐ | Contradictory `role="alert"`+`aria-live="polite"` | `ErasureCertificateButton.tsx:102-105` | one consistent rule | | |
-| ☐ | `outline:none` on focusable SVG, no replacement | `PipelineDAG.tsx:285` | visible focus ring | | |
-| ☐ | Stray `tabIndex={0}` on static text | `ConfidenceDisplay.tsx:156` | remove | | |
-| ☐ | Broken skip-link target (empty div, no `<main>`) | `home/page.tsx:191` | real `<main id>` | | |
-| ☐ | Sub-44px icon-only hit targets | `Sidebar.tsx`, `NavBar.tsx` | enlarge targets | | |
+| ☑ | No `aria-live` (named in CLAUDE.md) | `ActivityIndicator.tsx:58-63` | `role="status"` + `aria-live="polite"`; dot `aria-hidden` | | #222 |
+| ☑ | No `aria-busy`; loses accessible name while loading | `Button.tsx:64-68` | `aria-busy` + **retain label** (spinner alongside children; guarded for `asChild`/Slot single-child) | Updated the test that asserted the bug (children-hidden) | #222 |
+| ☑ | No `aria-busy` on async action | `AttachmentDownloadButton`, `ErasureCertificateButton` | `aria-busy={busy||undefined}` | | #222 |
+| ☑ | Swallows download failures (no `catch`) | `AttachmentDownloadButton.tsx:49-52` | added `catch` → `role="alert"` error surfaced | | #222 |
+| ☑ | Errors announced politely, should be assertive | `Toast.tsx:47-48` | error/warning → `role="alert"`+`assertive`; success/info → `status`+`polite` | | #222 |
+| ☑ | Contradictory `role="alert"`+`aria-live="polite"` | `ErasureCertificateButton.tsx:102-105` | keep `role="alert"` only (implies assertive); same rule applied to the new Attachment error | One consistent rule: role=alert, no aria-live | #222 |
+| ☑ | `outline:none` on focusable SVG, no replacement | `PipelineDAG.tsx:285` | removed inline `outline:none` → global `:focus-visible` ring (globals.css) shows | Reuse global ring, not a bespoke one | #222 |
+| ☑ | Stray `tabIndex={0}` on static text | `ConfidenceDisplay.tsx:156` | removed | | #222 |
+| ☑ | Broken skip-link target (empty div, no `<main>`) | `home/page.tsx:191` | real `<main id="main-content">` wrapping both content blocks | | #222 |
+| ☑ | Sub-44px icon-only hit targets | `Sidebar.tsx`, `NavBar.tsx` | `min-w/h-[44px]` (WCAG 2.5.5); NavBar keeps 32px visual avatar inside a 44px hit box + focus ring | 44px (AAA 2.5.5) over 24px floor (AA 2.5.8) since audit asked | #222 |
 
 ## Batch 4 — T3: signed-money (fix once at the source)
 | ☐ | Finding | Location | Fix | Expert / decision | PR |
@@ -115,6 +115,26 @@ _(Append expert decisions here as they're made: date · item · expert · outcom
   by routing the (fallback-aware) icon through Badge's `icon` prop — the API the
   other six callers already use. No backend (`asoe2`) change: all display-mapping
   is UI-side; backend enum contracts unchanged.
+
+- **2026-06-07 · Batch 3 (T5 a11y) · self (accessibility/WCAG)** — Two judgment
+  calls. (1) Button "retain label while loading": the spinner used to *replace*
+  children, losing the accessible name (WCAG 4.1.2). Fix renders the spinner
+  alongside children + `aria-busy`; guarded with `!asChild` because Radix `Slot`
+  requires a single child. The existing test asserted the buggy behaviour
+  (children hidden) and was corrected to the new contract. (2) Hit targets:
+  WCAG 2.5.8 (AA) only needs 24px and the 32px controls already passed, but the
+  audit explicitly flagged sub-44px, so I took the stronger 2.5.5 (AAA) 44px
+  target, preserving the 32px visual avatar inside a 44px hit box. Erasure/
+  Attachment error rule unified on `role="alert"` (implies assertive) with no
+  `aria-live` (the prior pairing was contradictory). asoe2 backend untouched.
+
+## Review checkpoints
+- **After Batch 2 (3 commits)** — ran `/code-review` (high) over `1fc6faa..HEAD`,
+  typecheck, full vitest (1788 pass), and `npm run build`. No correctness
+  findings. Verified dashboard verdict-colour parity (GREEN/YELLOW/RED unchanged;
+  only unknown verdicts shift red→neutral, which is correct), single-icon badge
+  parity, and no import cycle from `erp-label-map`. asoe2 backend untouched
+  (display-mapping only) → local/preview/pre-prod parity intact.
 
 ## Scorecard sync
 As items move to ☑, update the verdict in the matching `0X-*.md` report and the

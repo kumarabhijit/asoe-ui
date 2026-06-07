@@ -23,11 +23,27 @@ describe("Toast", () => {
     expect(screen.getByText("Exception resolved")).toBeInTheDocument();
   });
 
-  it("has role=status and aria-live=polite for accessibility", async () => {
+  // REGRESSION (fails on parent): every toast was role=status + polite, so an
+  // error a user must act on could sit silently behind other announcements.
+  // Errors/warnings must interrupt (role=alert + assertive).
+  it("announces error toasts assertively (role=alert)", async () => {
     const user = userEvent.setup();
     render(
       <ToastProvider>
         <ToastTrigger variant="error" message="Error occurred" />
+      </ToastProvider>
+    );
+
+    await user.click(screen.getByText("Show Toast"));
+    const toast = screen.getByRole("alert");
+    expect(toast).toHaveAttribute("aria-live", "assertive");
+  });
+
+  it("announces success toasts politely (role=status)", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <ToastTrigger variant="success" message="Resolved" />
       </ToastProvider>
     );
 

@@ -66,7 +66,7 @@ export function Sidebar({ open, onClose, onExpand, title, children, className }:
               {onExpand && (
                 <button
                   onClick={onExpand}
-                  className="bg-transparent border-none cursor-pointer text-text-tertiary p-4 flex rounded-sm transition-colors duration-fast hover:text-text-secondary"
+                  className="bg-transparent border-none cursor-pointer text-text-tertiary flex items-center justify-center min-w-[44px] min-h-[44px] rounded-sm transition-colors duration-fast hover:text-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                   aria-label="Open full page"
                   title="Open full page"
                 >
@@ -75,7 +75,7 @@ export function Sidebar({ open, onClose, onExpand, title, children, className }:
               )}
               <button
                 onClick={onClose}
-                className="bg-transparent border-none cursor-pointer text-text-tertiary p-4 flex rounded-sm transition-colors duration-fast hover:text-text-secondary"
+                className="bg-transparent border-none cursor-pointer text-text-tertiary flex items-center justify-center min-w-[44px] min-h-[44px] rounded-sm transition-colors duration-fast hover:text-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                 aria-label="Close panel"
               >
                 <X size={18} />

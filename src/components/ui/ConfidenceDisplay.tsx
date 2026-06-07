@@ -150,11 +150,11 @@ export function ConfidenceDisplay({
             raw {rawLabel}
           </span>
         </div>
-        {/* Visible, keyboard-reachable calibration honesty note. */}
-        <div
-          className="mt-4 flex items-center gap-6 text-caption text-text-tertiary"
-          tabIndex={0}
-        >
+        {/* Visible calibration honesty note. Not a focus stop — it is static
+            text already covered by the group's composed aria-label, so a
+            tabIndex here would be an empty keyboard stop on non-interactive
+            content. */}
+        <div className="mt-4 flex items-center gap-6 text-caption text-text-tertiary">
           {calibrated === true ? (
             <ShieldCheck size={12} className="text-success shrink-0" aria-hidden />
           ) : (
