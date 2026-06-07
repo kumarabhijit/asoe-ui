@@ -481,6 +481,15 @@ export interface OrderAnalysis {
    *  resolution_data.reply_draft. Absent until a DRAFT_REPLY disposition runs.
    *  Mirrors `api/schemas.py::DraftReply`. */
   draft_reply?: DraftReply;
+  /** Presentation hint — the OrderAnalysis FIELD NAME of this record's
+   *  primary enrichment projection (e.g. "price_hold_analysis"). The
+   *  recipe-authoritative comparison the operator should see first; the
+   *  detail pane auto-expands the matching `*Section` so the Priority-2
+   *  comparison delta is visible without a click. Null for records with
+   *  no primary projection (e.g. an auto-resolved EDI order with no
+   *  discrepancy). Carries no business/compliance semantics — never
+   *  gates routing. Mirrors `api/schemas.py::AnalysisResponse.primary_section`. */
+  primary_section?: string | null;
 }
 
 /* ── Order Entry section (ADR-042 Phase 3) — mirrors api/schemas.py ── */

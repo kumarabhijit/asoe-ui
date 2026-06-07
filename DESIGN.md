@@ -152,6 +152,8 @@ src/
 | `Combobox` | cmdk + Tailwind | S2 follow-up #6 typeahead-filterable single-select dropdown. APG combobox shape (`role="combobox"` trigger + `aria-expanded` + `aria-haspopup="listbox"`), `flushSync` + `onMouseDown` pick path so the popover closes synchronously before the next click. Supports flat `items` or grouped `groups` (cluster heading). Vocabulary still flows through props (Guardrail #2). | `OverrideChooserDialog` (Resolution action + Override reason category); future per-intent recipe picker / case-id search |
 | `HotkeyCheatsheet` | Tailwind + custom dialog | S2 #5 `?` overlay listing every binding in `src/lib/hotkeys.ts` (the single hotkey registry). Self-contained — owns its own `?`/Escape via `useHotkeys`; mounted once on `/cases`. Pairs with `useFocusRestoreOnClose` so focus returns to wherever the operator was before `?`. | `src/app/cases/page.tsx` |
 | `SlaBandAnnouncer` | sr-only `aria-live` | S3 #B announces SLA band TRANSITIONS for the selected case (`comfortable → at_risk → breached`, or recovery back). Silent on per-minute label ticks and on case-switch re-baselines. Mounted once on `CaseDetailPanel`. WCAG 4.1.3. | `CaseDetailPanel` |
+| `Tabs` | Tailwind (in-house) | WAI-ARIA Tabs (`role=tablist/tab/tabpanel`), roving tabindex + Arrow/Home/End nav, automatic activation, controlled or uncontrolled. Only the active panel mounts (lazy). Active tab is weight+border, not colour-only (WCAG 1.4.1). Detail-pane hierarchy refactor 2026-06-07 — isolates System Diagnostics into its own tab. | `ExceptionDetailPanel` (Evidence / Diagnostics) |
+| `ImpactBar` | Tailwind | Priority-1 financial-impact strip (`impact_metrics`) rendered always-visible under `HeaderRibbon`. Dumb projector (Guardrail #6): structural omission for absent metrics, no dash/placeholder fallback; null when no metrics. Owns the impact half of the old two-pane `ContextStrip` so the figure is not rendered twice. | `ExceptionDetailPanel` |
 
 **Styling approach (Phase 8.9):** All components use Tailwind utility classes via the design token mapping in `tailwind.config.ts`. CVA (`class-variance-authority`) is used for multi-variant components (Button, Badge). `cn()` utility (`src/lib/utils.ts`) merges Tailwind classes with conflict resolution. Only 18 inline `style={{}}` objects remain across the entire codebase — all are data-driven dynamic values (avatar colors, bar widths, chart colors).
 
@@ -168,8 +170,15 @@ src/
 ### Inline Exception Detail (`ExceptionDetailPanel`)
 
 `ExceptionDetailPanel` is the per-record HITL surface — `HeaderRibbon`
-→ `ContextStrip` → `AgentReasoningCard` (Layer 1/2) → enrichment
-sections → `EvidenceGrid` → `DiagnosticsSection`. Pre-S15a it had its
+→ `ImpactBar` → `ContextStrip` → `AgentReasoningCard` (Layer 1/2) →
+enrichment sections → tabbed `Evidence` / `Diagnostics`. The
+information hierarchy was tightened in the 2026-06-07 UX pass:
+Priority-1 financial impact (`ImpactBar`) and the Agent recommendation
+sit at the top of the viewport; the recipe-authoritative comparison
+auto-expands via the backend `primary_section` hint (Priority-2); and
+System Diagnostics is isolated into its own tab (Priority-4) instead of
+sharing the primary scroll. The Agent recommendation is **never**
+tabbed (Guardrail #4). Pre-S15a it had its
 own route (`/exceptions/[id]`); post-S15a it mounts **inline** inside
 `CaseDetailPanel` on the `/cases` workspace (see the `/cases` section
 below for the workspace layout). The `/exceptions` queue route was
@@ -211,7 +220,8 @@ ExceptionDetailPanel (mounted inline inside CaseDetailPanel's right pane)
 | Layer | Sub-Component | File | Purpose |
 |---|---|---|---|
 | 1 | `HeaderRibbon` | `HeaderRibbon.tsx` | Breadcrumb context, lifecycle/verdict badges, total value |
-| 2 | `ContextStrip` | `ContextStrip.tsx` | Entity Profile + Impact Metrics (collapsible, **default collapsed** — Phase 8.13). Renders nothing if both `analysis.entity_profile` and `analysis.impact_metrics` are absent. |
+| 1 | `ImpactBar` | `ImpactBar.tsx` | Priority-1 financial/business impact (`impact_metrics`) — always visible under the ribbon (2026-06-07). Owns the impact metrics that used to live in `ContextStrip`'s second column. |
+| 2 | `ContextStrip` | `ContextStrip.tsx` | Entity Profile (customer master data) — collapsible, **default collapsed**. Impact metrics moved up into `ImpactBar` (2026-06-07), so this strip carries the entity profile only and the figure isn't rendered twice. Renders nothing if `analysis.entity_profile` is absent. |
 | 3 | `AgentAnalysisSection` | `AgentAnalysisSection.tsx` | Problem / Root Cause / Recommendation narratives — **collapsible**, collapsed by default; auto-expands when `detail.lifecycle_state` is in `HUMAN_IN_THE_LOOP_STATES` (PENDING_REVIEW / ESCALATED / PENDING_ADMIN_REVIEW / PENDING_COSIGN / BLOCKED). Each prose block (Problem / Root Cause / Recommendation) renders only when the matching `OrderAnalysis` field is present (Guardrail #6 structural omission). |
 | 3+ | `DuplicateDetectionSection` | `DuplicateDetectionSection.tsx` | Data-presence enrichment: original vs duplicate order, detection method, confidence, autonomy |
 | 3+ | `OrderComparisonSection` | `OrderComparisonSection.tsx` | Data-presence enrichment: side-by-side order comparison with matching/differing field badges |
@@ -223,26 +233,26 @@ ExceptionDetailPanel (mounted inline inside CaseDetailPanel's right pane)
 | 3+ | `DeliveryDelaySection` | `DeliveryDelaySection.tsx` | Data-presence enrichment for `DELIVERY_DELAY`: planned vs projected ETA, days-late badge, delay category, ranked alternate options (EXPEDITE / SPLIT_SHIP / RESCHEDULE) with extra-cost / new-ETA metrics |
 | 3+ | `PriceHoldSection` | `PriceHoldSection.tsx` | Data-presence enrichment for `PRICE_HOLD_RELEASE`: PO vs SAP base price cards, signed `variance_pct`, hold_status / tolerance / hard_block thresholds, recipe `action` badge (AUTO_RELEASE / ESCALATE / HARD_BLOCK), reason text |
 | 3+ | `EdiMismatchSection` | `EdiMismatchSection.tsx` | Data-presence enrichment for `EDI_MISMATCH`: `sub_type` rendered verbatim, `expected_value` vs `received_value` (any shape — string / number / object), `classification` badge (HARD_REJECT / REVIEW / ESCALATE), `recommended_action`, `autonomy_level`. PRICE_MISMATCH is routed to `CONTRACTUAL_CORRECTION` at backend classifier time and never mounts this section. |
-| 4 | `EvidenceGrid` | `EvidenceGrid.tsx` | Collapsed by default; line-item table + pricing waterfall |
-| 5 | `DiagnosticsSection` | `DiagnosticsSection.tsx` | Hidden behind "Show Diagnostics" toggle: Pipeline Progress (WaterfallStepper) + Trace Evidence tabs |
+| 4 | `EvidenceGrid` | `EvidenceGrid.tsx` | **"Evidence" tab** (default) of the lower `Tabs` control; line-item table + pricing waterfall (collapsed inside) |
+| 5 | `DiagnosticsSection` | `DiagnosticsSection.tsx` | **"Diagnostics" tab** (2026-06-07) — isolated from the primary scroll: Pipeline Progress (WaterfallStepper) + Trace Evidence tabs. The `DetailLowerTabs` wrapper is hash-aware so the SectionAnchorBar "Jump to → Diagnostics" link selects the tab, then the section's `useHashOpen` expands it. |
 
 **Data-presence enrichment sections** render only when their optional data is present in `OrderAnalysis`. Each is wrapped in a `CollapsibleSection` (collapsed by default — Phase 8.13 PO ruling: "operator scans the Recommendation card first and only drills into evidence panes when they need detail"):
 ```tsx
 {analysis?.price_analysis && (
-  <CollapsibleSection title="Price Analysis">
+  <CollapsibleSection title="Price Analysis" defaultOpen={primarySection === "price_analysis"}>
     <PriceAnalysisSection data={analysis.price_analysis} />
   </CollapsibleSection>
 )}
 {analysis?.duplicate_detection && (
-  <CollapsibleSection title="Duplicate Detection">
+  <CollapsibleSection title="Duplicate Detection" defaultOpen={primarySection === "duplicate_detection"}>
     <DuplicateDetectionSection data={analysis.duplicate_detection} />
   </CollapsibleSection>
 )}
 // …Order Comparison, Back-Order Analysis, Over-Max Analysis,
 // MOQ Analysis, Pallet Configuration, Delivery Delay, Price Hold,
-// EDI Mismatch — same wrapper.
+// EDI Mismatch — same wrapper, each gating defaultOpen on the hint.
 ```
-The wrapper mounts its child only when open, so heavy renders (waterfalls, gateway tables) stay deferred until the operator expands the section.
+The wrapper mounts its child only when open, so heavy renders (waterfalls, gateway tables) stay deferred until the operator expands the section. **Priority-2 auto-expand (2026-06-07):** `primarySection = analysis?.primary_section ?? null` comes from the backend (`AnalysisResponse.primary_section`, set to the field the primary recipe projection lands on). The matching section opens by default so the comparison delta is visible without a click — data-driven, no hardcoded intent dispatch (Guardrail #1). Mock mode stamps the same hint in `src/lib/mock-data/order-analyses.ts`.
 
 Adding a new enrichment section requires only: (1) add the type to `OrderAnalysis`, (2) create the section component, (3) add the wrapped conditional render — zero dispatch logic.
 
