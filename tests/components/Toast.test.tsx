@@ -1,7 +1,7 @@
 /**
  * Toast tests — rendering, auto-dismiss, accessibility.
  */
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 
@@ -70,6 +70,37 @@ describe("Toast", () => {
     // Advance past 4.5s auto-dismiss
     await act(async () => { vi.advanceTimersByTime(5000); });
     expect(screen.queryByText("Auto dismiss test")).not.toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  // REGRESSION (fails on parent): WCAG 2.2.1 (Timing Adjustable) — the
+  // auto-dismiss timer had no pause-on-hover, so a slow reader lost a long
+  // error before reading it. Hovering must pause the timer; leaving resumes.
+  it("pauses the auto-dismiss timer while hovered, resumes on leave", async () => {
+    vi.useFakeTimers();
+
+    render(
+      <ToastProvider>
+        <ToastTrigger variant="error" message="Hover to read me" />
+      </ToastProvider>
+    );
+
+    await act(async () => { screen.getByText("Show Toast").click(); });
+    const toast = screen.getByRole("alert");
+    expect(screen.getByText("Hover to read me")).toBeInTheDocument();
+
+    // Part-way through, the operator hovers — the timer must pause.
+    await act(async () => { vi.advanceTimersByTime(2000); });
+    fireEvent.mouseEnter(toast);
+    // Well past the original 4.5s window — still present because paused.
+    await act(async () => { vi.advanceTimersByTime(5000); });
+    expect(screen.getByText("Hover to read me")).toBeInTheDocument();
+
+    // Leaving resumes with the remaining ~2.5s.
+    fireEvent.mouseLeave(toast);
+    await act(async () => { vi.advanceTimersByTime(2600); });
+    expect(screen.queryByText("Hover to read me")).not.toBeInTheDocument();
 
     vi.useRealTimers();
   });

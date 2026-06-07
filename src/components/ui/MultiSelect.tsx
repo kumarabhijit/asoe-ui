@@ -72,6 +72,19 @@ export function MultiSelect({
     triggerLabel = `${ordered.length} selected`;
   }
 
+  // The aria-label OVERRIDES the visible trigger text for screen readers, so
+  // without the selection here an SR user heard only "Filter by state" and
+  // never learned what (or how many) values were active. Compose the count +
+  // names into the accessible name.
+  const selectionSummary =
+    ordered.length === 0
+      ? "none selected"
+      : `${ordered.length} selected: ${ordered.map(formatLabel).join(", ")}`;
+  const triggerAriaLabel = `${ariaLabel}, ${selectionSummary}`;
+  // Full selection on hover for sighted users when the trigger truncates.
+  const triggerTitle =
+    ordered.length > 0 ? ordered.map(formatLabel).join(", ") : undefined;
+
   function toggle(opt: string) {
     if (value.includes(opt)) {
       onChange(value.filter((v) => v !== opt));
@@ -85,7 +98,8 @@ export function MultiSelect({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={ariaLabel}
+          aria-label={triggerAriaLabel}
+          title={triggerTitle}
           className={cn(
             "flex items-center justify-between gap-6 px-10 py-6 rounded-sm",
             "bg-surface-primary border border-border text-caption text-text-primary",

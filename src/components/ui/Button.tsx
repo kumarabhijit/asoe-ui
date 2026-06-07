@@ -30,14 +30,11 @@ const buttonVariants = cva(
   },
 );
 
-type Variant = "brand" | "neutral" | "success" | "ghost" | "destructive";
-type Size = "sm" | "md" | "lg";
-
 interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
-  variant?: Variant;
-  size?: Size;
+  // `variant` and `size` come from VariantProps<typeof buttonVariants> — the
+  // CVA definition is the single source of truth (was redundantly redeclared).
   loading?: boolean;
   fullWidth?: boolean;
   asChild?: boolean;
