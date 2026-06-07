@@ -65,9 +65,9 @@ not hardcode enum values.
 | ☐ | OverMax partial-truth + UI totals (Guardrail #6) | `OverMaxSection.tsx:28-29,166-183` | EvidenceBlock + backend totals | | |
 | ☐ | GravitationalOrbs motion/tokens/dark-mode/aria | `GravitationalOrbs.tsx` | `prefers-reduced-motion`, tokens, `aria-hidden` | | |
 | ☑ | ChromeBoundary missing `home` tab | `ChromeBoundary.tsx` (`NAV_TABS`) | import canonical `NAV_TABS` from `@/config/nav-tabs` (kills the drifted local copy) | | #222 |
-| ☐ | Dashboard fabricated `RECENT_ACTIVITY` + no fetch-error state | `dashboard/page.tsx:40-47,72-74` | **(a) fix error state + (b) gate+label** per expert | expert: 2a fix, 2b gate behind `NEXT_PUBLIC_USE_REAL_API` + label | |
-| ☐ | Login: hardcoded SSO list, "any password", fake counts | `login/page.tsx:27,46-48,272-280` | gate copy to seed mode; remove fake counts | expert: (a) fix | |
-| ☐ | Auth callback fixed `jane@acme.com` identity | `auth/callback/page.tsx:21-27` | drop fixed identity; branch on auth mode | expert: (a) fix (real IdP wired) | |
+| ☑ | Dashboard fabricated `RECENT_ACTIVITY` + no fetch-error state | `dashboard/page.tsx:40-47,72-74` | **(a)** added `loadError` tri-state → `role="alert"` error+retry, skeletons no longer hang; **(b)** `RECENT_ACTIVITY` gated behind `isMockDataMode()` + `SampleDataTag` ("Sample data — not live"); live mode shows honest "not connected" | expert: 2a fix, 2b gate+label via new `ScaffoldDataBanner` | #222 |
+| ☑ | Login: hardcoded SSO list, "any password", fake counts | `login/page.tsx:27,46-48,272-280` | removed fabricated "12 agents/847 resolved" footer; gated SSO copy → real `signIn("azure-ad")` in entra, honest "preview" copy in seed | expert: (a) fix | #222 |
+| ☑ | Auth callback fixed `jane@acme.com` identity | `auth/callback/page.tsx:21-27` | dropped the hardcoded credentials sign-in; entra → `signIn("azure-ad")`, seed → `/login` (validates MOCK_USERS) | expert: (a) fix (real Azure AD IdP wired) | #222 |
 | ☑ | Cases `[id]` dead 404 path + `agentCount={3}` + missing kbd nav | `cases/[id]/page.tsx:40,94,110` | `notFound()` (revives `not-found.tsx`); `agentCount` from `useHealth`; mounts `HotkeyCheatsheet` | | #222 |
 | ☑ | `error.tsx` leaks raw `error.message` | all five route `error.tsx` | new shared `BoundaryError` (generic copy + `error.digest`, no raw message); all 5 boundaries use it | DRY: one component prevents future drift | #222 |
 

@@ -26,6 +26,7 @@ import { MetricTile } from "@/components/ui/MetricTile";
 import { Card } from "@/components/ui/Card";
 import { Badge, verdictVariant, lifecycleVariant, variantColorVar } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { SampleDataTag, isMockDataMode } from "@/components/ui/ScaffoldDataBanner";
 import { useHealth } from "@/hooks/useHealth";
 import { useAuth } from "@/hooks/useAuth";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -37,6 +38,9 @@ import type { StatsResponse } from "@/types/api";
 import Link from "next/link";
 import { NAV_TABS } from "@/config/nav-tabs";
 
+// preview-only: there is no recent-activity endpoint in the API client yet.
+// Rendered behind `isMockDataMode()` + a SampleDataTag so it is never read as
+// live/audited data. Remove once a real feed lands (tracked in the backlog).
 const RECENT_ACTIVITY = [
   { time: "11:02", orderId: "SO-3100", action: "Resolved — PriceAdjustmentRecipe applied via YK07", status: "RESOLVED", badge: "success", color: "var(--color-success)" },
   { time: "10:31", orderId: "SO-2200", action: "Blocked by Compliance Shadow — PENALTY_MATRIX_VIOLATION", status: "BLOCKED", badge: "error", color: "var(--color-error)" },
@@ -55,6 +59,10 @@ export default function DashboardPage() {
   const erp = useErpProfile();
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  // Tri-state load handling (mirrors the Settings→Autonomy reference pattern):
+  // a fetch failure must surface an error+retry, not silently leave the tiles
+  // blank / skeletons spinning forever.
+  const [loadError, setLoadError] = useState(false);
 
   const userName = user?.name || "User";
   const userInitials = (user as { avatar_initials?: string })?.avatar_initials || userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -70,8 +78,12 @@ export default function DashboardPage() {
     try {
       const data = await exceptionsApi.stats();
       setStats(data);
+      setLoadError(false);
     } catch (err) {
       console.error("Failed to fetch stats:", err);
+      // Keep any previously-loaded stats visible on a silent refresh
+      // failure; only the initial-load failure blanks the surface.
+      setLoadError(true);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -149,6 +161,37 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Initial-load failure — surface an error + retry instead of leaving
+            the tiles blank and the skeletons below spinning forever. Stale
+            stats (a failed silent refresh) keep rendering, so this only shows
+            when there is nothing to show. */}
+        {loadError && !stats && (
+          <div
+            role="alert"
+            className="mb-24 flex flex-col items-start gap-12 rounded-md border border-error-border bg-error-subtle p-20"
+          >
+            <div className="flex items-center gap-8">
+              <AlertTriangle size={16} className="text-error shrink-0" aria-hidden />
+              <span className="text-body font-semibold text-text-primary">
+                Couldn&apos;t load performance metrics
+              </span>
+            </div>
+            <p className="m-0 text-caption text-text-tertiary">
+              The metrics service didn&apos;t respond. Retry, or check back shortly.
+            </p>
+            <Button
+              variant="neutral"
+              size="sm"
+              onClick={() => {
+                setLoading(true);
+                void refetchStats(false);
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        )}
+
         {/* Top KPI Tiles */}
         {stats && (
           <div className="mb-24 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-16">
@@ -208,7 +251,7 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : (
-              <div className="skeleton h-[100px] rounded-sm" />
+              loadError ? <UnavailableNote /> : <div className="skeleton h-[100px] rounded-sm" />
             )}
           </Card>
 
@@ -232,7 +275,7 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : (
-              <div className="skeleton h-[100px] rounded-sm" />
+              loadError ? <UnavailableNote /> : <div className="skeleton h-[100px] rounded-sm" />
             )}
           </Card>
 
@@ -260,7 +303,7 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : (
-              <div className="skeleton h-[80px] rounded-sm" />
+              loadError ? <UnavailableNote /> : <div className="skeleton h-[80px] rounded-sm" />
             )}
           </Card>
 
@@ -287,15 +330,27 @@ export default function DashboardPage() {
                 <InfoRow label="Active Recipes" value={String(health.allowed_recipes.length)} />
               </div>
             ) : (
-              <div className="skeleton h-[80px] rounded-sm" />
+              loadError ? <UnavailableNote /> : <div className="skeleton h-[80px] rounded-sm" />
             )}
           </Card>
 
-          {/* Recent Activity */}
+          {/* Recent Activity — there is no recent-activity endpoint yet, so the
+              feed is preview-only sample data. Gate it behind the mock-data
+              switch and label it non-live (expert decision, batch 5); in live
+              mode show an honest "not connected" state instead of fabricated
+              rows presented as audited activity. */}
           <Card elevated className="col-span-2 p-20">
-            <h3 className="m-0 mb-16 text-subhead font-semibold text-text-primary">
-              Recent Activity
-            </h3>
+            <div className="mb-16 flex items-center gap-8">
+              <h3 className="m-0 text-subhead font-semibold text-text-primary">
+                Recent Activity
+              </h3>
+              <SampleDataTag />
+            </div>
+            {!isMockDataMode() ? (
+              <div role="status" className="py-12 text-caption text-text-tertiary">
+                No recent-activity feed connected yet.
+              </div>
+            ) : (
             <div className="flex flex-col">
               {RECENT_ACTIVITY.map((item, idx) => (
                 <div
@@ -324,9 +379,20 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
+            )}
           </Card>
         </div>
       </main>
+    </div>
+  );
+}
+
+/** Inline "couldn't load" note used in place of a skeleton that would
+ *  otherwise spin forever after a fetch failure. */
+function UnavailableNote() {
+  return (
+    <div role="status" className="py-12 text-caption text-text-tertiary">
+      Unavailable — retry above.
     </div>
   );
 }

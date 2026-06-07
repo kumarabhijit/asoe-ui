@@ -29,6 +29,7 @@ import { StickyActionRibbon } from "@/components/ui/StickyActionRibbon";
 import { VerdictDot } from "@/components/ui/VerdictDot";
 import { BoundaryError } from "@/components/ui/BoundaryError";
 import { GapBar } from "@/components/ui/GapBar";
+import { SampleDataTag } from "@/components/ui/ScaffoldDataBanner";
 import { EventsTimeline } from "@/components/ui/EventsTimeline";
 import { AttachmentPreview } from "@/components/ui/AttachmentPreview";
 import {
@@ -324,6 +325,14 @@ describe("a11y sweep: GapBar", () => {
     expectNoViolations(
       <GapBar primaryQty={150} primaryLabel="Ordered" secondaryQty={100} secondaryLabel="Max" uom="CS" mode="excess" />,
     ));
+});
+
+// ---------------------------------------------------------------------------
+// SampleDataTag — non-live data provenance chip (Batch 5).
+// ---------------------------------------------------------------------------
+describe("a11y sweep: SampleDataTag", () => {
+  it("mock mode", async () =>
+    expectNoViolations(<SampleDataTag mockOverride={true} />));
 });
 
 // ---------------------------------------------------------------------------

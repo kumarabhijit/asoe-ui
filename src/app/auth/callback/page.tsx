@@ -19,12 +19,18 @@ function CallbackContent() {
     }
 
     if (code) {
-      signIn("credentials", {
-        email: "jane@acme.com",
-        password: "password",
-        redirect: true,
-        callbackUrl: "/",
-      });
+      const authMode =
+        (process.env.NEXT_PUBLIC_ASOE_AUTH_MODE ?? "seed").toLowerCase();
+      if (authMode === "entra") {
+        // Real Azure AD flow — let NextAuth exchange the OAuth code via the
+        // azure-ad provider rather than fabricating a fixed identity.
+        signIn("azure-ad", { redirect: true, callbackUrl: "/" });
+      } else {
+        // Seed/preview has no real IdP to exchange a code with. Never
+        // auto-authenticate a hardcoded user — route to the credentials form,
+        // which validates against the seed MOCK_USERS.
+        router.push("/login");
+      }
     } else {
       router.push("/login");
     }
