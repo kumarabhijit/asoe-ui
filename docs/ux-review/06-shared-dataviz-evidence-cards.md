@@ -161,7 +161,7 @@ verdict on each edge · Audience: audit users / compliance reviewers.
 (BASE → CONTRACT → TPR → UOM → RESULT/ERROR) · Goal: show how the final price was
 derived, step by step · Audience: O2C pricing analysts authorizing price corrections.
 
-**Overall Verdict:** Needs Rework
+**Overall Verdict:** ~~Needs Rework~~ → **Pass** ✅ (remediated Batch 4 — signed `fmtSignedPrice`/`fmtMoney`, negative RESULT signed, `step.record` guarded)
 
 **Correctness Issues:**
 - **Signed-money bug (the flagged class).** `fmtPrice` strips the sign with
@@ -484,7 +484,7 @@ classification provenance, including redacted partner views.
 
 ## Slice Summary
 
-**Verdict counts: 3 Pass / 5 Needs Minor Tweaks / 2 Needs Rework.**
+**Verdict counts (post Batch 4): 4 Pass / 5 Needs Minor Tweaks / 1 Needs Rework** (was 3/5/2 — PricingWaterfall flipped to Pass; GapBar remains Rework → Batch 5).
 - Pass (3): ConfidenceDisplay, EvidenceBlock, ConstraintsPipeline
 - Needs Minor Tweaks (5): MetricTile, PipelineDAG, WaterfallStepper, EventsTimeline,
   ClassificationHistoryPanel

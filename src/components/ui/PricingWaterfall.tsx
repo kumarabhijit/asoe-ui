@@ -9,6 +9,7 @@
 
 import { CircleDot, FileText, Clock, Package, Check, X, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { fmtMoney, fmtSignedPrice } from "@/lib/format";
 import type { ReactNode } from "react";
 import type { PricingWaterfallStep, PricingConditionType } from "@/types/exceptions";
 
@@ -35,10 +36,6 @@ function typeColor(type: string): string {
 
 function typeIcon(type: string): ReactNode {
   return TYPE_ICONS[type as PricingConditionType] ?? <CircleDot size={14} />;
-}
-
-function fmtPrice(n: number): string {
-  return `$${Math.abs(n).toFixed(2)}`;
 }
 
 export function PricingWaterfall({ steps, className }: PricingWaterfallProps) {
@@ -89,12 +86,14 @@ export function PricingWaterfall({ steps, className }: PricingWaterfallProps) {
                 <span className={cn("font-bold text-caption", isError ? "text-error" : isResult ? "text-success" : "text-text-primary")}>
                   {step.label}
                 </span>
-                <code className={cn(
-                  "text-label text-text-tertiary px-1.5 py-px rounded-[3px] font-mono",
-                  isError || isResult ? "bg-white/60" : "bg-surface-primary",
-                )}>
-                  {step.record}
-                </code>
+                {step.record && (
+                  <code className={cn(
+                    "text-label text-text-tertiary px-1.5 py-px rounded-[3px] font-mono",
+                    isError || isResult ? "bg-white/60" : "bg-surface-primary",
+                  )}>
+                    {step.record}
+                  </code>
+                )}
                 <div className="flex-1" />
                 {step.value != null && (
                   <span
@@ -106,15 +105,20 @@ export function PricingWaterfall({ steps, className }: PricingWaterfallProps) {
                         : "var(--color-text-primary)",
                     }}
                   >
-                    {step.value > 0 && step.type !== "BASE" && step.type !== "RESULT" ? "+" : ""}
-                    {fmtPrice(step.value)}
+                    {/* BASE/RESULT are magnitudes (no forced "+"), but a
+                        negative RESULT (net credit) still shows its "-".
+                        Adjustment steps are deltas → explicit +/-. The sign is
+                        always textual, never colour-only (WCAG 1.4.1). */}
+                    {isResult || step.type === "BASE"
+                      ? fmtMoney(step.value)
+                      : fmtSignedPrice(step.value)}
                   </span>
                 )}
                 {step.running != null && (
                   <span className="font-mono text-caption text-text-tertiary">
                     ={" "}
                     <strong className={isResult ? "text-success" : "text-text-primary"}>
-                      {fmtPrice(step.running)}
+                      {fmtMoney(step.running)}
                     </strong>
                   </span>
                 )}

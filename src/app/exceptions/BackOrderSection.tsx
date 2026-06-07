@@ -16,6 +16,7 @@ import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { predicateHolds } from "@/hooks/useConditionalField";
 import type { BackOrderAnalysisData, ResolutionOption } from "@/types/exceptions";
 import { fmtPrice } from "./shared";
+import { fmtSignedPrice } from "@/lib/format";
 
 interface BackOrderSectionProps {
   data: BackOrderAnalysisData;
@@ -159,7 +160,10 @@ export function BackOrderSection({ data, resolvedAction = null }: BackOrderSecti
                           "text-label font-mono",
                           wh.freight_delta_per_unit > 0 ? "text-warning" : "text-success",
                         )}>
-                          {wh.freight_delta_per_unit > 0 ? "+" : ""}{fmtPrice(wh.freight_delta_per_unit)}/u
+                          {/* Signed helper carries the +/- textually, so the
+                              warning/success colour is reinforcement, not the
+                              sole direction cue (WCAG 1.4.1). */}
+                          {fmtSignedPrice(wh.freight_delta_per_unit)}/u
                         </span>
                       </div>
                     ))}

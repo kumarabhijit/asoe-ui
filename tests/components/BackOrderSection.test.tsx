@@ -105,6 +105,31 @@ describe("BackOrderSection — registry-conditional rendering", () => {
     });
   });
 
+  describe("signed freight delta (T3 — sign not colour-only)", () => {
+    // REGRESSION (fails on parent): a negative freight delta (a saving) was
+    // formatted with fmtPrice's Math.abs and the manual "+" prefix only fired
+    // on positives, so it rendered "$0.75" — direction was conveyed by the
+    // success colour alone. It must now carry an explicit "-".
+    it("renders a negative freight delta with an explicit minus sign", () => {
+      const saving: BackOrderAnalysisData = {
+        ...baseData,
+        alternate_warehouses: [
+          {
+            plant: "DC-WEST", name: "West DC", region: "US-WEST", qty: 200,
+            eta_days: 4, freight_delta_per_unit: -0.75, freight_delta_total: -37.5,
+          },
+        ],
+      };
+      render(<BackOrderSection data={saving} />);
+      expect(screen.getByText(/-\$0\.75\/u/)).toBeInTheDocument();
+    });
+
+    it("renders a positive freight delta with an explicit plus sign", () => {
+      render(<BackOrderSection data={baseData} />);
+      expect(screen.getByText(/\+\$0\.50\/u/)).toBeInTheDocument();
+    });
+  });
+
   describe("structural omission (no conditional data)", () => {
     it("renders nothing for absent conditional fields pre-disposition (no placeholder)", () => {
       const sparse: BackOrderAnalysisData = {

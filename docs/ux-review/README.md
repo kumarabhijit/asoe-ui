@@ -50,12 +50,19 @@ Usability, Simplicity** — using the standard review template (see
 | 03 Cases workspace | 3 | 6 | 2 | 11 |
 | 04 Exceptions core | 6 | 8 | 0 | 14 |
 | 05 Exceptions enrichment | 7 | 5 | 1 | 13 |
-| 06 Shared data-viz & evidence | 3 | 5 | 2 | 10 |
+| 06 Shared data-viz & evidence | 4 | 5 | 1 | 10 |
 | 07 Shared chrome/status | 9 | 3 | 1 | 13 |
 | 07 Per-route page states | 4 | 4 | 0 | 8 |
-| 08 Shared interactive primitives | 3 | 8 | 2 | 13 |
+| 08 Shared interactive primitives | 5 | 8 | 0 | 13 |
 | AgentReasoningCard (sep.) | — | 1 | — | 1 |
-| **Total** | **42** | **44** | **11** | **97** |
+| **Total** | **45** | **44** | **8** | **97** |
+
+> **Remediation progress (batches 1–4):** 3 of 11 Rework items fully resolved
+> and flipped to Pass — **PricingWaterfall** (06, signed money + record guard),
+> **ActivityIndicator** (08, Guardrail #2 + aria-live), **ErasureCertificateButton**
+> (08, aria-busy + role/aria-live + token). Many "Minor" components had their
+> flagged issues fixed too but retain other minor items (swept in Batch 6), so
+> they stay Minor for now. See `REMEDIATION.md`.
 
 ### Needs Rework (priority queue)
 
@@ -66,10 +73,10 @@ Usability, Simplicity** — using the standard review template (see
 5. **Cases `not-found.tsx`** — never reached (see #4); also uses the undefined `text-h4` token.
 6. **OverMaxSection** (`src/app/exceptions/OverMaxSection.tsx`) — partial-truth `—` fallbacks bypassing EvidenceBlock (Guardrail #6) + client-side `reduce` of audit totals.
 7. **GapBar** (`src/components/ui/GapBar.tsx:47-48`) — both `isExcess` and `isShortfall` require `primaryQty > secondaryQty`, so the back-order/MOQ shortfall case (ordered < available) is **never** rendered as a shortfall; severity also rides on color alone.
-8. **PricingWaterfall** (`src/components/ui/PricingWaterfall.tsx:40-42,104-109`) — signed-money bug: `fmtPrice` `Math.abs` strips the sign on a SOX-relevant figure; direction conveyed by color only.
+8. ~~**PricingWaterfall**~~ — ✅ **Resolved (Batch 4)**: signed via `fmtSignedPrice`/`fmtMoney`; negative RESULT keeps its sign; `step.record` empty-chip guarded.
 9. **GravitationalOrbs** (`src/components/ui/GravitationalOrbs.tsx`) — perpetual `requestAnimationFrame` with no `prefers-reduced-motion` guard (WCAG 2.3.3), hardcoded RGB/hex colors, hardcoded light background breaks dark mode, decorative canvas missing `aria-hidden`.
-10. **ActivityIndicator** (`src/components/ui/ActivityIndicator.tsx:20-41,58-63`) — hardcodes intent enum literals (Guardrail #2) **and** has no `aria-live` despite being the named example in CLAUDE.md.
-11. **ErasureCertificateButton** (`src/components/ui/ErasureCertificateButton.tsx:93-105`) — GDPR/regulator export with no `aria-busy`, contradictory `role="alert"`+`aria-live="polite"`, and an error styled with the nonexistent `text-status-error` class (renders unstyled).
+10. ~~**ActivityIndicator**~~ — ✅ **Resolved (Batch 2+3)**: templated via `intentLabelFor` (no enum literals); `role="status"`+`aria-live="polite"`.
+11. ~~**ErasureCertificateButton**~~ — ✅ **Resolved (Batch 1+3)**: `aria-busy`; single `role="alert"` rule; `text-error` token.
 
 ---
 
@@ -104,6 +111,13 @@ with **direction conveyed by color only** (WCAG 1.4.1 risk):
 - Signed helpers already exist and disagree (`OrderEntrySection.formatUsd`, `formatDelta` in DeliveryDelay/ChangeAnalysis).
 
 **Fix theme:** one canonical signed-currency formatter used everywhere; never rely on color alone for sign.
+
+> ✅ **Resolved — Batch 4** (see `REMEDIATION.md`). Added canonical
+> `fmtSignedPrice` (explicit +/-) and `fmtMoney` (sign-preserving, no forced +)
+> in `@/lib/format`; switched the 6 signed-delta sites (HeaderRibbon, ContextStrip,
+> BackOrderSection freight, PricingWaterfall) to them so the sign is textual.
+> `fmtPrice` stays magnitude-only (defensive) for the 18 always-positive sites
+> per the expert subagent's call. 10 regression tests added.
 
 ### T4 — Partial-truth & client-side composition (Guardrail #6)
 - Hard violation: OverMaxSection `—` fallbacks (`:166-183`) instead of EvidenceBlock.

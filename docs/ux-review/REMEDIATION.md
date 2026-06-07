@@ -53,10 +53,10 @@ not hardcode enum values.
 | ☑ | Sub-44px icon-only hit targets | `Sidebar.tsx`, `NavBar.tsx` | `min-w/h-[44px]` (WCAG 2.5.5); NavBar keeps 32px visual avatar inside a 44px hit box + focus ring | 44px (AAA 2.5.5) over 24px floor (AA 2.5.8) since audit asked | #222 |
 
 ## Batch 4 — T3: signed-money (fix once at the source)
-| ☐ | Finding | Location | Fix | Expert / decision | PR |
+| ☑ | Finding | Location | Fix | Expert / decision | PR |
 |---|---------|----------|-----|-------------------|----|
-| ☐ | `fmtPrice` `Math.abs` strips sign | `shared.tsx:218` | signed formatter; never sign-by-color | | |
-| ☐ | Verify consumers render sign | `HeaderRibbon.tsx:99-103`, `ContextStrip.tsx:80`, `BackOrderSection.tsx:162`, `PricingWaterfall.tsx:40-42,104-109` | adopt signed helper | | |
+| ☑ | `fmtPrice` `Math.abs` strips sign | `shared.tsx:218` | **kept** `fmtPrice` as magnitude-only (defensive; 18 sites stay ≥0); added canonical `fmtSignedPrice` (+/-) and `fmtMoney` (sign, no +) in `@/lib/format` | **Expert subagent** (frontend-arch + compliance): don't blanket-remove `Math.abs` (regresses 18 magnitude sites); add signed helpers, switch only the 6 delta sites | #222 |
+| ☑ | Verify consumers render sign | `HeaderRibbon:101`, `ContextStrip:80`, `BackOrderSection:162`, `PricingWaterfall` | adopted `fmtSignedPrice` (deltas) / `fmtMoney` (BASE/RESULT magnitudes incl. negative RESULT); removed manual `+`/`Math.abs`; colour reinforces a textual sign | PriceAnalysis `variance_amount` left as magnitude (type doc says "Absolute"; direction is in the sentence) — out of scope. PricingWaterfall also got the `step.record` empty-chip guard → flips Rework→Pass | #222 |
 
 ## Batch 5 — remaining "Needs Rework" items (each its own regression test)
 | ☐ | Item | Location | Notes | Expert / decision | PR |
@@ -127,6 +127,18 @@ _(Append expert decisions here as they're made: date · item · expert · outcom
   target, preserving the 32px visual avatar inside a 44px hit box. Erasure/
   Attachment error rule unified on `role="alert"` (implies assertive) with no
   `aria-live` (the prior pairing was contradictory). asoe2 backend untouched.
+
+- **2026-06-07 · Batch 4 (T3 signed money) · expert subagent (frontend-arch +
+  compliance)** — A SOX-relevant change across 24 `fmtPrice` call sites. The
+  subagent inventoried every site, classified 18 as MAGNITUDE (always ≥0, abs is
+  harmless/defensive) and 6 as SIGNED DELTA (the bug), and checked the TS sign
+  conventions. Recommendation followed: do **not** strip `Math.abs` from
+  `fmtPrice` (would regress the 18 magnitude sites); instead add canonical
+  `fmtSignedPrice`/`fmtMoney` (`@/lib/format`, `Intl` `signDisplay`) and switch
+  only the delta sites, keeping colour as reinforcement of a now-textual sign.
+  PricingWaterfall's own `Math.abs` helper was removed and BASE/RESULT use
+  `fmtMoney` so a negative RESULT keeps its minus. `asoe2` untouched (no contract
+  change — the fields already carry the sign; the UI was hiding it).
 
 ## Review checkpoints
 - **After Batch 2 (3 commits)** — ran `/code-review` (high) over `1fc6faa..HEAD`,
