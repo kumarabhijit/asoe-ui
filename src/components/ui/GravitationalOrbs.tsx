@@ -2,12 +2,49 @@
 
 import { useEffect, useRef } from "react";
 
+type Rgb = [number, number, number];
+
+/** Parse a `#RRGGBB` design-token value into an [r,g,b] tuple. */
+function hexToRgb(hex: string): Rgb | null {
+  const m = hex.trim().match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Read a CSS custom property off the document root (so it tracks the active
+ *  light/dark theme) and parse it to RGB; fall back if unset/unsupported. */
+function cssVarRgb(name: string, fallback: Rgb): Rgb {
+  if (typeof window === "undefined") return fallback;
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
+  return hexToRgb(raw) ?? fallback;
+}
+
+function cssVarHex(name: string, fallback: string): string {
+  if (typeof window === "undefined") return fallback;
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return /^#?[0-9a-f]{6}$/i.test(raw) ? raw : fallback;
+}
+
+/** Mix a colour toward white for the gradient end-stop. */
+function lighten([r, g, b]: Rgb, amt: number): Rgb {
+  return [
+    Math.round(r + (255 - r) * amt),
+    Math.round(g + (255 - g) * amt),
+    Math.round(b + (255 - b) * amt),
+  ];
+}
+
 /**
- * ASOE Gravitational Orbs — Light Theme
+ * ASOE Gravitational Orbs — decorative background canvas.
  *
- * Three orbital systems with rotating rings, particle trails,
- * traveling beam pulses, and mouse parallax. Colors use ASOE
- * brand/category palette: brand blue, violet, teal.
+ * Three orbital systems with rotating rings, particle trails, traveling beam
+ * pulses, and mouse parallax. Colours are resolved from the design tokens
+ * (brand + cat-purple + cat-teal) at runtime so the canvas tracks the active
+ * light/dark theme rather than hardcoding RGB/hex. The canvas is decorative
+ * (aria-hidden) and honours `prefers-reduced-motion`: when reduced motion is
+ * requested it paints a single static frame instead of an endless rAF loop
+ * (WCAG 2.2.2 / 2.3.3).
  */
 export function GravitationalOrbs() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -46,12 +83,32 @@ export function GravitationalOrbs() {
     };
     canvas.addEventListener("mousemove", handleMouse);
 
-    // ASOE palette: brand blue, violet (cat-purple), teal (cat-teal)
+    // ASOE palette resolved from design tokens (brand, cat-purple, cat-teal)
+    // so the canvas tracks the active theme. Fallbacks are the light-theme
+    // hex values. `applyPalette` is re-run when the theme class flips.
     const orbs = [
-      { cx: 0.26, cy: 0.42, r: 0.24, color: [0, 122, 255], colorEnd: [50, 173, 230], rings: 5, speed: 0.10, rotSpeed: 0.15 },
-      { cx: 0.74, cy: 0.50, r: 0.19, color: [88, 86, 214], colorEnd: [175, 130, 255], rings: 4, speed: 0.08, rotSpeed: -0.12 },
-      { cx: 0.50, cy: 0.20, r: 0.13, color: [0, 199, 190], colorEnd: [50, 214, 255], rings: 3, speed: 0.14, rotSpeed: 0.18 },
+      { cx: 0.26, cy: 0.42, r: 0.24, color: [90, 75, 214] as Rgb, colorEnd: [90, 75, 214] as Rgb, rings: 5, speed: 0.10, rotSpeed: 0.15, token: "--color-brand", fallback: [90, 75, 214] as Rgb },
+      { cx: 0.74, cy: 0.50, r: 0.19, color: [124, 58, 237] as Rgb, colorEnd: [124, 58, 237] as Rgb, rings: 4, speed: 0.08, rotSpeed: -0.12, token: "--color-cat-purple", fallback: [124, 58, 237] as Rgb },
+      { cx: 0.50, cy: 0.20, r: 0.13, color: [13, 148, 136] as Rgb, colorEnd: [13, 148, 136] as Rgb, rings: 3, speed: 0.14, rotSpeed: 0.18, token: "--color-cat-teal", fallback: [13, 148, 136] as Rgb },
     ];
+
+    let bgFill = cssVarHex("--color-surface-page", "#FAFAFA");
+
+    const applyPalette = () => {
+      bgFill = cssVarHex("--color-surface-page", "#FAFAFA");
+      for (const orb of orbs) {
+        orb.color = cssVarRgb(orb.token, orb.fallback);
+        orb.colorEnd = lighten(orb.color, 0.45);
+      }
+    };
+    applyPalette();
+
+    // Re-resolve colours when next-themes flips the root `class` (light↔dark).
+    const themeObserver = new MutationObserver(applyPalette);
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
 
     const particles = orbs.flatMap((orb, oi) =>
       Array.from({ length: 45 }, () => ({
@@ -71,8 +128,8 @@ export function GravitationalOrbs() {
       const time = t * 0.001;
       ctx.clearRect(0, 0, w, h);
 
-      // Match ASOE surface-page background
-      ctx.fillStyle = "#F8FAFC";
+      // Match the ASOE surface-page background (token-driven, dark-mode aware).
+      ctx.fillStyle = bgFill;
       ctx.fillRect(0, 0, w, h);
 
       const minDim = Math.min(w, h);
@@ -273,18 +330,37 @@ export function GravitationalOrbs() {
 
       animRef.current = requestAnimationFrame(draw);
     };
-    animRef.current = requestAnimationFrame(draw);
+
+    // Honour prefers-reduced-motion: paint a single static frame and skip the
+    // endless animation loop. Re-evaluate if the user toggles the OS setting.
+    const reducedMq = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    const start = () => {
+      cancelAnimationFrame(animRef.current);
+      if (reducedMq.matches) {
+        draw(0); // one static frame, no loop
+        return;
+      }
+      animRef.current = requestAnimationFrame(draw);
+    };
+
+    const onMotionChange = () => start();
+    reducedMq.addEventListener("change", onMotionChange);
+    start();
 
     return () => {
       cancelAnimationFrame(animRef.current);
       window.removeEventListener("resize", resize);
       canvas.removeEventListener("mousemove", handleMouse);
+      reducedMq.removeEventListener("change", onMotionChange);
+      themeObserver.disconnect();
     };
   }, []);
 
   return (
     <canvas
       ref={canvasRef}
+      aria-hidden="true"
       style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
     />
   );

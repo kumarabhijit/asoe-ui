@@ -45,36 +45,38 @@ Usability, Simplicity** — using the standard review template (see
 
 | Slice | Pass | Minor | Rework | Total |
 |-------|:----:|:-----:|:------:|:-----:|
-| 01 Chrome & entry | 4 | 3 | 2 | 9 |
-| 02 Dashboard/Inbox/Settings | 3 | 1 | 1 | 5 |
-| 03 Cases workspace | 3 | 6 | 2 | 11 |
+| 01 Chrome & entry | 6 | 3 | 0 | 9 |
+| 02 Dashboard/Inbox/Settings | 4 | 1 | 0 | 5 |
+| 03 Cases workspace | 5 | 6 | 0 | 11 |
 | 04 Exceptions core | 6 | 8 | 0 | 14 |
-| 05 Exceptions enrichment | 7 | 5 | 1 | 13 |
-| 06 Shared data-viz & evidence | 4 | 5 | 1 | 10 |
-| 07 Shared chrome/status | 9 | 3 | 1 | 13 |
+| 05 Exceptions enrichment | 8 | 5 | 0 | 13 |
+| 06 Shared data-viz & evidence | 5 | 5 | 0 | 10 |
+| 07 Shared chrome/status | 10 | 3 | 0 | 13 |
 | 07 Per-route page states | 4 | 4 | 0 | 8 |
 | 08 Shared interactive primitives | 5 | 8 | 0 | 13 |
 | AgentReasoningCard (sep.) | — | 1 | — | 1 |
-| **Total** | **45** | **44** | **8** | **97** |
+| **Total** | **53** | **44** | **0** | **97** |
 
-> **Remediation progress (batches 1–4):** 3 of 11 Rework items fully resolved
-> and flipped to Pass — **PricingWaterfall** (06, signed money + record guard),
-> **ActivityIndicator** (08, Guardrail #2 + aria-live), **ErasureCertificateButton**
-> (08, aria-busy + role/aria-live + token). Many "Minor" components had their
-> flagged issues fixed too but retain other minor items (swept in Batch 6), so
-> they stay Minor for now. See `REMEDIATION.md`.
+> **Remediation progress (batches 1–5):** **all 11 Needs-Rework items resolved**
+> and flipped to Pass. Themes T8 (tokens), T9/Guardrail #2 (enum maps), T5
+> (accessibility), T3 (signed money), T1 (fabricated-data) and the Guardrail #6
+> OverMax totals are remediated. Many "Minor" components had their flagged
+> issues fixed too but retain other minor items (Batch 6 sweep), so they stay
+> Minor for now. See `REMEDIATION.md` for the per-item decision log + PR.
 
 ### Needs Rework (priority queue)
 
-1. **Login Page** (`src/app/login/page.tsx`) — hardcoded SSO allow-list, "enter any password" demo copy, fabricated agent/exception counts on a public screen.
-2. **Auth Callback** (`src/app/auth/callback/page.tsx:21-27`) — ignores OAuth `code`, signs everyone in as a fixed `jane@acme.com` identity.
-3. **Dashboard** (`src/app/dashboard/page.tsx`) — hardcoded `RECENT_ACTIVITY` rendered as live; fetch failure only `console.error`s (tiles vanish / skeletons hang forever).
-4. **Cases `[id]` route** (`src/app/cases/[id]/page.tsx`) — dead 404 path (`setNotFound(true)` instead of `notFound()`), hardcoded `agentCount={3}`, missing keyboard nav present on the workspace.
-5. **Cases `not-found.tsx`** — never reached (see #4); also uses the undefined `text-h4` token.
-6. **OverMaxSection** (`src/app/exceptions/OverMaxSection.tsx`) — partial-truth `—` fallbacks bypassing EvidenceBlock (Guardrail #6) + client-side `reduce` of audit totals.
-7. **GapBar** (`src/components/ui/GapBar.tsx:47-48`) — both `isExcess` and `isShortfall` require `primaryQty > secondaryQty`, so the back-order/MOQ shortfall case (ordered < available) is **never** rendered as a shortfall; severity also rides on color alone.
+_All 11 resolved across batches 1–5 — see `REMEDIATION.md`. Struck through below._
+
+1. ~~**Login Page**~~ — ✅ B5: removed fabricated counts; gated SSO copy by auth mode (real Azure AD in entra).
+2. ~~**Auth Callback**~~ — ✅ B5: dropped fixed `jane@acme.com`; branches on auth mode.
+3. ~~**Dashboard**~~ — ✅ B5: added fetch-error+retry tri-state; gated `RECENT_ACTIVITY` behind mock-mode + `SampleDataTag`.
+4. ~~**Cases `[id]` route**~~ — ✅ B5: `notFound()`, `agentCount` from health, mounts `HotkeyCheatsheet`.
+5. ~~**Cases `not-found.tsx`**~~ — ✅ B5 (now reached via #4) / B1 (`text-h4`→`text-heading`).
+6. ~~**OverMaxSection**~~ — ✅ B5: server-computed totals (asoe2 `model_validator`) + `EvidenceBlock`, no UI `reduce`/`—`.
+7. ~~**GapBar**~~ — ✅ B5: gate on `hasGap`; icon + "Short by"/"Over by" (not colour-only).
 8. ~~**PricingWaterfall**~~ — ✅ **Resolved (Batch 4)**: signed via `fmtSignedPrice`/`fmtMoney`; negative RESULT keeps its sign; `step.record` empty-chip guarded.
-9. **GravitationalOrbs** (`src/components/ui/GravitationalOrbs.tsx`) — perpetual `requestAnimationFrame` with no `prefers-reduced-motion` guard (WCAG 2.3.3), hardcoded RGB/hex colors, hardcoded light background breaks dark mode, decorative canvas missing `aria-hidden`.
+9. ~~**GravitationalOrbs**~~ — ✅ B5: `prefers-reduced-motion` (static frame), token-resolved colours (dark-mode aware), `aria-hidden`.
 10. ~~**ActivityIndicator**~~ — ✅ **Resolved (Batch 2+3)**: templated via `intentLabelFor` (no enum literals); `role="status"`+`aria-live="polite"`.
 11. ~~**ErasureCertificateButton**~~ — ✅ **Resolved (Batch 1+3)**: `aria-busy`; single `role="alert"` rule; `text-error` token.
 

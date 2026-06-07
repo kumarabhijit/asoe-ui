@@ -59,11 +59,11 @@ not hardcode enum values.
 | ☑ | Verify consumers render sign | `HeaderRibbon:101`, `ContextStrip:80`, `BackOrderSection:162`, `PricingWaterfall` | adopted `fmtSignedPrice` (deltas) / `fmtMoney` (BASE/RESULT magnitudes incl. negative RESULT); removed manual `+`/`Math.abs`; colour reinforces a textual sign | PriceAnalysis `variance_amount` left as magnitude (type doc says "Absolute"; direction is in the sentence) — out of scope. PricingWaterfall also got the `step.record` empty-chip guard → flips Rework→Pass | #222 |
 
 ## Batch 5 — remaining "Needs Rework" items (each its own regression test)
-| ☐ | Item | Location | Notes | Expert / decision | PR |
+| ☑ | Item | Location | Notes | Expert / decision | PR |
 |---|------|----------|-------|-------------------|----|
 | ☑ | GapBar shortfall branch unreachable | `GapBar.tsx:47-48` | gate on `hasGap` (mode + gap), not `primary > secondary`; added icon + "Short by"/"Over by" so direction isn't colour-only | | #222 |
-| ☐ | OverMax partial-truth + UI totals (Guardrail #6) | `OverMaxSection.tsx:28-29,166-183` | EvidenceBlock + backend totals | | |
-| ☐ | GravitationalOrbs motion/tokens/dark-mode/aria | `GravitationalOrbs.tsx` | `prefers-reduced-motion`, tokens, `aria-hidden` | | |
+| ☑ | OverMax partial-truth + UI totals (Guardrail #6) | `OverMaxSection.tsx:28-29,166-183` | **cross-repo**: added server-computed `trimmed_total`/`delta_total` to asoe2 (PR #200) `OverMaxAnalysisData` (`model_validator`) + UI type + mock + openapi regen; section renders backend totals (no `reduce`); `max_line_qty` absence via `EvidenceBlock`, non-EL layer = no badge (no ad-hoc `—`) | Guardrail #6+#7: totals authoritative server-side, types enriched not pruned | #222 |
+| ☑ | GravitationalOrbs motion/tokens/dark-mode/aria | `GravitationalOrbs.tsx` | `aria-hidden`; `prefers-reduced-motion` → single static frame; bg + orb colours resolved from `--color-*` tokens at runtime (dark-mode aware via MutationObserver) | Component is orphaned (unused) — low risk; fixed per checklist | #222 |
 | ☑ | ChromeBoundary missing `home` tab | `ChromeBoundary.tsx` (`NAV_TABS`) | import canonical `NAV_TABS` from `@/config/nav-tabs` (kills the drifted local copy) | | #222 |
 | ☑ | Dashboard fabricated `RECENT_ACTIVITY` + no fetch-error state | `dashboard/page.tsx:40-47,72-74` | **(a)** added `loadError` tri-state → `role="alert"` error+retry, skeletons no longer hang; **(b)** `RECENT_ACTIVITY` gated behind `isMockDataMode()` + `SampleDataTag` ("Sample data — not live"); live mode shows honest "not connected" | expert: 2a fix, 2b gate+label via new `ScaffoldDataBanner` | #222 |
 | ☑ | Login: hardcoded SSO list, "any password", fake counts | `login/page.tsx:27,46-48,272-280` | removed fabricated "12 agents/847 resolved" footer; gated SSO copy → real `signIn("azure-ad")` in entra, honest "preview" copy in seed | expert: (a) fix | #222 |
@@ -154,6 +154,15 @@ _(Append expert decisions here as they're made: date · item · expert · outcom
   new `ScaffoldDataBanner` primitive (modeled on `PreprodIdentityBanner`). No
   new env flag — reuse `NEXT_PUBLIC_USE_REAL_API` (data) / `ASOE_AUTH_MODE`
   (auth).
+
+- **2026-06-07 · Batch 5 OverMax totals · cross-repo (asoe2 + asoe-ui)** — Per
+  Guardrail #6 (no UI-derived audit totals) + #7 (don't prune types), added
+  `trimmed_total`/`delta_total` to `OverMaxAnalysisData` computed authoritatively
+  by an asoe2 `model_validator` (the typed contract is the single source of
+  truth, not a client-side `reduce`). Flowed through: asoe2 schema + pytest +
+  openapi regen → UI `generated.ts` regen + hand-written type + mock fixtures +
+  mock-parity lock mirroring the validator (per CLAUDE.md test strategy). The
+  validator always recomputes, so an injected total can't drift from the lines.
 
 ## Review checkpoints
 - **After Batch 4 (Batches 3–4)** — focused correctness review over

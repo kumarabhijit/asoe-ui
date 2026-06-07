@@ -1165,6 +1165,12 @@ export interface OverMaxAnalysisData {
   order_lines: OverMaxLine[];
   /** AI-generated trim plan — audit-bearing. */
   trim_plan: TrimPlanLine[];
+  /** Sum of `trim_plan[].trimmed_to` — audit-bearing. Computed
+   *  server-side (api/schemas.py model_validator); the section renders this
+   *  rather than a client-side reduce (Guardrail #6). */
+  trimmed_total: number;
+  /** Sum of `trim_plan[].delta` — audit-bearing, server-computed. */
+  delta_total: number;
   /** Contract reference — grandfathered until 2026-07-21 (gateway gap). */
   contract_ref?: string;
   /** SAP block status — grandfathered until 2026-07-21 (gateway gap). */
