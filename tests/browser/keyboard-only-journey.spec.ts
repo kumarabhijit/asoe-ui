@@ -116,16 +116,21 @@ test("operator drives login → cases → action via keyboard only", async ({
   await expect(announcer).toBeAttached();
   const before = (await announcer.textContent()) ?? "";
 
-  // Escalate uses window.prompt() to collect a reason. Playwright
-  // auto-dismisses native dialogs unless a handler is registered;
-  // we accept with a test reason so the flow completes and the
-  // announcer fires. (The native-prompt UX is itself a separate
-  // a11y concern — a non-native dialog would be more accessible
-  // — tracked outside this spec.)
-  page.once("dialog", (dialog) => dialog.accept("Need supervisor review"));
-
+  // ADR-045 CP3 — Escalate now collects its mandatory reason through an
+  // in-panel dialog (the window.prompt path was retired; an in-DOM
+  // dialog is the more accessible surface this keyboard journey asserts).
+  // Enter on the button opens it; the reason textarea autofocuses, so we
+  // type the reason and submit with ⌘↵ — entirely on the keyboard.
   await escalateBtn.focus();
   await page.keyboard.press("Enter");
+
+  const escalationDialog = page.getByRole("dialog", {
+    name: /escalation reason required/i,
+  });
+  await expect(escalationDialog).toBeVisible({ timeout: 5_000 });
+  await escalationDialog.getByRole("textbox").focus();
+  await page.keyboard.type("Need supervisor review");
+  await page.keyboard.press("Meta+Enter");
 
   // After the prompt is accepted, useExceptionActions.handleEscalate
   // calls exceptionsApi.escalate and then announce(). Poll up to 8s
