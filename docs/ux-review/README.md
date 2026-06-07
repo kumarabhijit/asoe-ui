@@ -5,9 +5,15 @@ conducted component-by-component against three dimensions — **Correctness,
 Usability, Simplicity** — using the standard review template (see
 [Method](#method)).
 
-- **Scope:** 53 components — 11 routes, the global chrome (left nav + top bar),
-  the cases master-detail workspace, and all exception detail sections
-  (core scaffolding + 13 intent-specific evidence projectors).
+- **Scope:** 97 components — 11 routes, the global chrome (left nav + top bar),
+  the cases master-detail workspace, all exception detail sections
+  (core scaffolding + 13 intent-specific evidence projectors), the **shared
+  component library** (`src/components/ui/`), and every per-route
+  error/loading state.
+- **Coverage note:** reports 06–08 were added in a second verification pass
+  that found the shared library and bespoke page-states had been missed by the
+  first partition. The first pass's findings were independently spot-checked
+  and held up (no hallucinated line numbers).
 - **Method:** static, code-grounded. Every finding cites `file:line`. Runtime
   contrast and pixel-alignment items are marked "needs visual/manual
   verification" rather than asserted.
@@ -29,6 +35,9 @@ Usability, Simplicity** — using the standard review template (see
 | 03 | [Cases workspace](./03-cases-workspace.md) | Cases page, `[id]` route, **left list pane (RecordListPane)**, queue rows V1/V2, CaseDetailPanel, rails, error/loading/not-found |
 | 04 | [Exceptions — core sections](./04-exceptions-core-sections.md) | ExceptionDetailPanel, ContextStrip, HeaderRibbon, AgentAnalysis, Diagnostics, Entities, EvidenceGrid, DraftReply, Email*, OrderEntry, KnowledgeGraph, OverrideChooserDialog, shared |
 | 05 | [Exceptions — enrichment sections](./05-exceptions-enrichment-sections.md) | 13 intent-specific evidence projectors (PriceHold, EdiMismatch, DuplicateDetection, MOQ, OverMax, …) |
+| 06 | [Shared — data-viz & evidence cards](./06-shared-dataviz-evidence-cards.md) | MetricTile, GapBar, PipelineDAG, PricingWaterfall, WaterfallStepper, ConstraintsPipeline, EventsTimeline, ConfidenceDisplay, EvidenceBlock, ClassificationHistoryPanel |
+| 07 | [Shared — chrome/status/banners + page states](./07-shared-chrome-status-and-page-states.md) | CaseViewBanner, PreprodIdentityBanner, ChromeBoundary, HotkeyCheatsheet, StatusAnnouncer, SlaBandAnnouncer, ThemeToggle, Logo, GravitationalOrbs, VerdictDot, PolicyHitBadge, ComplianceHitCountChip, Badge + 8 per-route error/loading states |
+| 08 | [Shared — interactive primitives](./08-shared-interactive-primitives.md) | Button, Input, Select, Combobox, MultiSelect, Dialog, DropdownMenu, Card, Toast, ActivityIndicator, AttachmentDownloadButton, AttachmentPreview, ErasureCertificateButton |
 
 ---
 
@@ -41,8 +50,12 @@ Usability, Simplicity** — using the standard review template (see
 | 03 Cases workspace | 3 | 6 | 2 | 11 |
 | 04 Exceptions core | 6 | 8 | 0 | 14 |
 | 05 Exceptions enrichment | 7 | 5 | 1 | 13 |
+| 06 Shared data-viz & evidence | 3 | 5 | 2 | 10 |
+| 07 Shared chrome/status | 9 | 3 | 1 | 13 |
+| 07 Per-route page states | 4 | 4 | 0 | 8 |
+| 08 Shared interactive primitives | 3 | 8 | 2 | 13 |
 | AgentReasoningCard (sep.) | — | 1 | — | 1 |
-| **Total** | **23** | **24** | **6** | **53** |
+| **Total** | **42** | **44** | **11** | **97** |
 
 ### Needs Rework (priority queue)
 
@@ -52,6 +65,11 @@ Usability, Simplicity** — using the standard review template (see
 4. **Cases `[id]` route** (`src/app/cases/[id]/page.tsx`) — dead 404 path (`setNotFound(true)` instead of `notFound()`), hardcoded `agentCount={3}`, missing keyboard nav present on the workspace.
 5. **Cases `not-found.tsx`** — never reached (see #4); also uses the undefined `text-h4` token.
 6. **OverMaxSection** (`src/app/exceptions/OverMaxSection.tsx`) — partial-truth `—` fallbacks bypassing EvidenceBlock (Guardrail #6) + client-side `reduce` of audit totals.
+7. **GapBar** (`src/components/ui/GapBar.tsx:47-48`) — both `isExcess` and `isShortfall` require `primaryQty > secondaryQty`, so the back-order/MOQ shortfall case (ordered < available) is **never** rendered as a shortfall; severity also rides on color alone.
+8. **PricingWaterfall** (`src/components/ui/PricingWaterfall.tsx:40-42,104-109`) — signed-money bug: `fmtPrice` `Math.abs` strips the sign on a SOX-relevant figure; direction conveyed by color only.
+9. **GravitationalOrbs** (`src/components/ui/GravitationalOrbs.tsx`) — perpetual `requestAnimationFrame` with no `prefers-reduced-motion` guard (WCAG 2.3.3), hardcoded RGB/hex colors, hardcoded light background breaks dark mode, decorative canvas missing `aria-hidden`.
+10. **ActivityIndicator** (`src/components/ui/ActivityIndicator.tsx:20-41,58-63`) — hardcodes intent enum literals (Guardrail #2) **and** has no `aria-live` despite being the named example in CLAUDE.md.
+11. **ErasureCertificateButton** (`src/components/ui/ErasureCertificateButton.tsx:93-105`) — GDPR/regulator export with no `aria-busy`, contradictory `role="alert"`+`aria-live="polite"`, and an error styled with the nonexistent `text-status-error` class (renders unstyled).
 
 ---
 
@@ -111,6 +129,26 @@ Raw enums in one place, humanized labels in another, on the same journey:
 - `as unknown as` / `as { … }` casts to read `email`/`title`/initials off the auth contract — should be typed.
 - Dead 404 path + workspace/`[id]` route drift (T1/#4 above).
 - V2 + `FAILED` + no `shadow_verdict` may leave a manager with **no action surface** (ribbon suppressed `ExceptionDetailPanel.tsx:633`, card matrix hidden `:856`, error banner action-less `:881`) — verify against intended V2 behavior.
+
+### T8 — Undefined design tokens & typo'd CSS classes (added in pass 2)
+Classes that name a token/utility that doesn't exist, so the element silently
+renders unstyled — invisible in code review, visible only at runtime:
+- `text-h4` — undefined font-size; **all four** route `error.tsx` files (`:16`) plus `cases/error.tsx` / `cases/not-found.tsx`. Correct token: `text-heading`.
+- `text-status-error` — undefined color class (real token: `text-error`); `ErasureCertificateButton.tsx:103`, `OrderEntrySection.tsx:39`, `DraftReplySection.tsx:135,176,214` → compliance/error messages render unstyled.
+- `pl-30` — undefined spacing token (scale jumps 24→32), `EventsTimeline.tsx:250`.
+- Hardcoded numeric `fontSize` / RGB-hex in SVG viz (PipelineDAG, EventsTimeline, GravitationalOrbs).
+- **Fix theme:** a CI lint guard failing on Tailwind classes not resolvable to a token would kill this whole class of bug.
+
+### T9 — Missing default-fallback in enum→display maps (added in pass 2)
+Maps keyed off backend enums with no `default` branch render **blank** for a new
+enum value — the inverse of Guardrail #2 (not hardcoded, but silently dropped):
+- `EventsTimeline` `statusIndicator`, `ClassificationHistoryPanel` classifier maps, `WaterfallStepper` "skipped" (icon-only, no text).
+- Hard Guardrail #2 violation found in pass 2: `ActivityIndicator.tsx:20-41` hardcodes the intent enum as map keys.
+- **Fix theme:** every enum→display map needs a `default` fallback + icon+text, mirroring `verdictVariant()` in `Badge.tsx`.
+
+### Reinforced by pass 2
+- **T3 (signed money)** now also covers the shared `PricingWaterfall` (`fmtPrice` `Math.abs`) — fix the helper at the source, once.
+- **T5 (accessibility)** gained: `aria-busy` missing on every async control (Button also loses its accessible name while loading; AttachmentDownloadButton; ErasureCertificateButton); `ActivityIndicator` has no `aria-live`; `Toast` announces errors politely not assertively; `PipelineDAG` `outline:none` with no focus replacement; `AttachmentDownloadButton` swallows download failures (`try/finally`, no `catch`) on a SOX evidence surface.
 
 ---
 
