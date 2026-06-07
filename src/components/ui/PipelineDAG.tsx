@@ -14,11 +14,12 @@
  */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dagre from "dagre";
 import type { PipelineTopology, PipelineTopologyEdge, ExecutedNode } from "@/types/api";
 import { cn } from "@/lib/utils";
 import { humanizeNodeId, formatDurationMs } from "@/lib/format";
+import { useFocusRestoreOnClose } from "@/hooks/useFocusRestoreOnClose";
 
 interface PipelineDAGProps {
   topology: PipelineTopology;
@@ -201,6 +202,9 @@ export function PipelineDAG({
     if (!taken.has(edgeKey(selectedEdge))) return null;
     return executedNodes.find((n) => n.node === selectedEdge.from_node) ?? null;
   }, [selectedEdge, taken, executedNodes]);
+  // Keyboard users open the panel from a focused edge `<g>`; restore focus
+  // back to that edge when the panel closes so they don't drop to <body>.
+  useFocusRestoreOnClose(!!selectedEdge);
 
   return (
     <div className={cn(className)}>
@@ -303,6 +307,11 @@ export function PipelineDAG({
                     : "var(--color-border)"
                 }
                 strokeWidth={isTaken ? 2 : isSelected ? 1.5 : 1}
+                // Non-colour differentiator (WCAG 1.4.1): the taken path is a
+                // SOLID line, every un-taken edge is DASHED — so "which path
+                // executed" survives grayscale / colour-blindness, not just the
+                // brand-vs-border stroke colour.
+                strokeDasharray={isTaken ? undefined : "4 3"}
                 markerEnd={isTaken ? "url(#dag-arrow-taken)" : "url(#dag-arrow)"}
                 opacity={isTaken ? 1 : isSelected ? 0.85 : 0.5}
                 pointerEvents="none"
@@ -444,8 +453,17 @@ function EdgeDetailPanel({
   const verdictTone = isTaken
     ? "bg-brand-subtle text-brand"
     : "bg-surface-secondary text-text-tertiary";
+  // Move focus into the panel on open so keyboard users land on the new
+  // content (and the global :focus-visible ring anchors it); focus is
+  // restored to the originating edge on close by useFocusRestoreOnClose.
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, []);
   return (
     <div
+      ref={panelRef}
+      tabIndex={-1}
       className="mt-12 rounded-md bg-surface-primary border border-border p-12 flex flex-col gap-10"
       role="region"
       aria-label="Edge details"

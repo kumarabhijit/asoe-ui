@@ -19,6 +19,7 @@ import { History, User as UserIcon, Bot, BookCheck, CircleHelp } from "lucide-re
 
 import { Badge } from "@/components/ui/Badge";
 import { formatSupergroupCode } from "@/lib/cases";
+import { formatTimestamp } from "@/lib/format";
 import type {
   ClassificationHistoryEntry,
   ClassifierType,
@@ -151,7 +152,11 @@ export function ClassificationHistoryPanel({
                 </>
               )}
               <span className="ml-auto text-caption text-text-tertiary">
-                <time dateTime={e.classified_at}>{e.classified_at}</time>
+                {/* Human-readable label; raw ISO kept in `dateTime` for
+                    machine/audit fidelity (was rendering the raw ISO string). */}
+                <time dateTime={e.classified_at}>
+                  {formatTimestamp(e.classified_at)}
+                </time>
               </span>
             </div>
             <div className="text-caption text-text-tertiary">

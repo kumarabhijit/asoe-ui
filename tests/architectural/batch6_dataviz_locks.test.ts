@@ -39,3 +39,36 @@ describe("Batch 6 — humanizeNode / duration formatters are de-duplicated", () 
     expect(stepper).toMatch(/formatDurationMs/);
   });
 });
+
+describe("Batch 6 — PipelineDAG audit-path + focus a11y wiring", () => {
+  const dag = read("src/components/ui/PipelineDAG.tsx");
+
+  it("gives un-taken edges a non-colour (dashed) differentiator", () => {
+    expect(dag).toMatch(/strokeDasharray=\{isTaken \? undefined : /);
+  });
+
+  it("restores focus to the originating edge when the panel closes", () => {
+    expect(dag).toMatch(
+      /from\s+["']@\/hooks\/useFocusRestoreOnClose["']/,
+    );
+    expect(dag).toMatch(/useFocusRestoreOnClose\(!!selectedEdge\)/);
+  });
+});
+
+describe("Batch 6 — WaterfallStepper reduced-motion gate is reactive", () => {
+  const stepper = read("src/components/ui/WaterfallStepper.tsx");
+  it("uses the reactive usePrefersReducedMotion hook, not a one-shot read", () => {
+    expect(stepper).toMatch(/from\s+["']@\/hooks\/usePrefersReducedMotion["']/);
+    expect(stepper).not.toMatch(/function\s+prefersReducedMotion\b/);
+  });
+});
+
+describe("Batch 6 — ClassificationHistoryPanel formats the audit timestamp", () => {
+  const panel = read("src/components/cases/ClassificationHistoryPanel.tsx");
+  it("renders formatTimestamp(classified_at), keeping ISO in dateTime", () => {
+    expect(panel).toMatch(/formatTimestamp\(e\.classified_at\)/);
+    expect(panel).toMatch(/dateTime=\{e\.classified_at\}/);
+    // The raw ISO is no longer the visible label.
+    expect(panel).not.toMatch(/>\{e\.classified_at\}</);
+  });
+});

@@ -93,6 +93,32 @@ describe("PipelineDAG visual hierarchy", () => {
     expect(parentG?.querySelector("rect")).not.toBeNull();
   });
 
+  // REGRESSION (report 06): taken vs un-taken edges differed only by colour
+  // (brand vs border stroke). Add a non-colour cue (WCAG 1.4.1): taken =
+  // SOLID, un-taken = DASHED, so the executed path survives grayscale.
+  it("draws the taken path solid and un-taken edges dashed (non-colour cue)", () => {
+    const { container } = render(
+      <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
+    );
+    const edgePaths = Array.from(
+      container.querySelectorAll("svg path[marker-end]"),
+    );
+    const taken = edgePaths.filter((p) =>
+      (p.getAttribute("marker-end") ?? "").includes("taken"),
+    );
+    const untaken = edgePaths.filter(
+      (p) => !(p.getAttribute("marker-end") ?? "").includes("taken"),
+    );
+    expect(taken.length).toBeGreaterThan(0);
+    expect(untaken.length).toBeGreaterThan(0);
+    taken.forEach((p) =>
+      expect(p.getAttribute("stroke-dasharray")).toBeNull(),
+    );
+    untaken.forEach((p) =>
+      expect(p.getAttribute("stroke-dasharray")).not.toBeNull(),
+    );
+  });
+
   it("renders un-taken verdict labels with low-contrast text only", () => {
     const { container } = render(
       <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
@@ -231,6 +257,23 @@ describe("PipelineDAG click-to-inspect", () => {
     );
     fireEvent.click(redEdgeGroup!);
     expect(getByText(/not traversed in this attempt/i)).toBeDefined();
+  });
+
+  // REGRESSION (report 06): on open, focus was not moved into the panel, so
+  // keyboard users were left on the edge with new content appearing elsewhere.
+  it("moves focus into the detail panel when it opens (a11y)", () => {
+    const { container, queryByRole } = render(
+      <PipelineDAG topology={topology} executedNodes={greenTraversal} />,
+    );
+    const greenEdgeGroup = Array.from(
+      container.querySelectorAll("g[role='button']"),
+    ).find((g) =>
+      (g.getAttribute("aria-label") ?? "").includes("verdict green"),
+    );
+    fireEvent.click(greenEdgeGroup!);
+    const panel = queryByRole("region", { name: /Edge details/i });
+    expect(panel).not.toBeNull();
+    expect(document.activeElement).toBe(panel);
   });
 
   it("opens the detail panel on Enter keyboard activation (a11y)", () => {

@@ -22,7 +22,11 @@
  * Accessibility: the SVG carries `role="img"` plus an `aria-label`
  * summarising the outcome; the textual node list below the SVG is
  * the screen-reader-friendly equivalent (WCAG 1.4.1 — meaning is
- * never colour-only; pass/fail nodes carry icons + status text).
+ * never colour-only). Each node draws a status-text caption
+ * ("Passed" / "Breached" / "N issues") inside the SVG, so pass/fail
+ * is conveyed by the literal word, not by the fill colour alone.
+ * (The ASCII sketch above uses ✓/✗ only as a legend for the
+ * pass/fail states the caption words represent.)
  */
 "use client";
 
@@ -225,7 +229,7 @@ export function ConstraintsPipeline({
                 x={x + NODE_WIDTH / 2}
                 y={y + 20}
                 textAnchor="middle"
-                fontSize={11}
+                style={{ fontSize: "var(--font-size-caption)" }}
                 fontWeight={600}
                 fill="var(--color-text-primary)"
               >
@@ -235,7 +239,7 @@ export function ConstraintsPipeline({
                 x={x + NODE_WIDTH / 2}
                 y={y + 40}
                 textAnchor="middle"
-                fontSize={10}
+                style={{ fontSize: "var(--font-size-label)" }}
                 fontFamily="ui-monospace, monospace"
                 fill={captionColor}
               >
