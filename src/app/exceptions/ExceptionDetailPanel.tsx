@@ -271,11 +271,14 @@ export default function ExceptionDetailPanel({
   const {
     actionInFlight,
     handleApprove, handleReject, handleEscalate,
-    handleOverride, submitOverride, handleCosign, handleReanalyze,
+    handleOverride, submitOverride, handleReanalyze,
+    openCosign, submitCosign,
     overrideOpen, setOverrideOpen,
     overrideAction, setOverrideAction,
     overrideNotes, setOverrideNotes,
     overrideReasonTag, setOverrideReasonTag,
+    cosignPending, setCosignPending,
+    cosignNotes, setCosignNotes,
   } = useExceptionActions({
     exceptionId,
     detail,
@@ -629,14 +632,14 @@ export default function ExceptionDetailPanel({
                     </>
                   )}
                 </div>
-                {canCosign ? (
+                {canCosign && !cosignPending ? (
                   <div className="flex gap-8">
                     <Button
                       variant="brand"
                       size="sm"
                       aria-label="Approve cosign"
                       disabled={actionInFlight === "cosign-approve" || actionInFlight === "cosign-reject"}
-                      onClick={() => handleCosign(true)}
+                      onClick={() => openCosign(true)}
                     >
                       {actionInFlight === "cosign-approve" ? "Approving…" : "Approve cosign"}
                     </Button>
@@ -645,10 +648,57 @@ export default function ExceptionDetailPanel({
                       size="sm"
                       aria-label="Reject cosign"
                       disabled={actionInFlight === "cosign-approve" || actionInFlight === "cosign-reject"}
-                      onClick={() => handleCosign(false)}
+                      onClick={() => openCosign(false)}
                     >
                       {actionInFlight === "cosign-reject" ? "Rejecting…" : "Reject cosign"}
                     </Button>
+                  </div>
+                ) : canCosign && cosignPending ? (
+                  /* ADR-045 CP3 — mandatory SOX notes captured in-panel
+                     (was window.prompt). Same constrained pattern as the
+                     other action dialogs. */
+                  <div
+                    className="flex flex-col gap-8 p-12 bg-surface-primary rounded-sm"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={`Cosign ${cosignPending.approve ? "approval" : "rejection"} notes required`}
+                  >
+                    <label className="flex flex-col gap-4 text-caption font-semibold text-text-secondary">
+                      {cosignPending.approve ? "Cosign approval notes" : "Cosign rejection notes"}
+                      <span aria-hidden className="text-error ml-2">*</span>
+                      <textarea
+                        value={cosignNotes}
+                        onChange={(e) => setCosignNotes(e.target.value)}
+                        placeholder="Required for the SOX audit trail — ⌘↵ to submit"
+                        autoFocus
+                        rows={3}
+                        aria-required="true"
+                        aria-keyshortcuts="Meta+Enter"
+                        className="w-full px-12 py-8 border border-border rounded-sm text-caption font-sans text-text-primary bg-surface-primary resize-y outline-none focus:border-brand"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && e.metaKey) submitCosign();
+                          if (e.key === "Escape") setCosignPending(null);
+                        }}
+                      />
+                    </label>
+                    <div className="flex gap-8 justify-end">
+                      <Button variant="ghost" size="sm" onClick={() => setCosignPending(null)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        variant={cosignPending.approve ? "brand" : "neutral"}
+                        size="sm"
+                        disabled={
+                          !cosignNotes.trim()
+                          || actionInFlight === "cosign-approve"
+                          || actionInFlight === "cosign-reject"
+                        }
+                        onClick={submitCosign}
+                        title={!cosignNotes.trim() ? "Enter notes first." : undefined}
+                      >
+                        {cosignPending.approve ? "Confirm cosign approval" : "Confirm cosign rejection"}
+                      </Button>
+                    </div>
                   </div>
                 ) : isInitiator ? (
                   <div className="text-label text-text-tertiary italic">
