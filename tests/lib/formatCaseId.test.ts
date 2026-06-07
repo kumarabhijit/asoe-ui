@@ -37,18 +37,21 @@ describe("formatCaseId", () => {
 });
 
 describe("formatSupergroupCode", () => {
-  it("strips SG_ and Title-Cases", () => {
+  it("resolves the governed supergroup label", () => {
     expect(formatSupergroupCode("SG_NEW_ORDER")).toBe("New Order");
   });
 
-  it("handles multi-word supergroups", () => {
-    expect(formatSupergroupCode("SG_BLOCK_PRICING")).toBe("Block Pricing");
+  it("uses the governed label, not naive title-casing (ADR-045)", () => {
+    // The governed label diverges from a naive SG_-strip + title-case:
+    // "Pricing Block" not "Block Pricing". This is the cross-surface
+    // consistency fix — the queue chip now matches the detail vocabulary.
+    expect(formatSupergroupCode("SG_BLOCK_PRICING")).toBe("Pricing Block");
     expect(formatSupergroupCode("SG_ORDER_STATUS_INQUIRY")).toBe(
       "Order Status Inquiry",
     );
   });
 
-  it("passes codes without SG_ prefix through Title-Casing only", () => {
+  it("title-cases an unsynced code without an SG_ prefix as a fallback", () => {
     expect(formatSupergroupCode("NEW_ORDER")).toBe("New Order");
   });
 
