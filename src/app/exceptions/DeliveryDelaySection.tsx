@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import type { DeliveryDelayAnalysisData, AlternateDeliveryOption } from "@/types/exceptions";
 import { fmtPrice } from "./shared";
+import { humanizeEnumLabel } from "@/lib/format";
 
 interface DeliveryDelaySectionProps {
   data: DeliveryDelayAnalysisData;
@@ -159,8 +160,8 @@ export function DeliveryDelaySection({ data }: DeliveryDelaySectionProps) {
         <div className="grid grid-cols-2 gap-12 text-label">
           <div>
             <span className="text-text-quaternary uppercase tracking-wider">Category</span>
-            <div className="text-caption font-mono text-text-primary mt-px">
-              {data.delay_category}
+            <div className="text-caption text-text-primary mt-px">
+              {humanizeEnumLabel(data.delay_category)}
             </div>
           </div>
           <EvidenceBlock tier="contextual" value={data.rule_id}>

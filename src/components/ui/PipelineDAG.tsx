@@ -421,6 +421,10 @@ export function PipelineDAG({
       </div>
       {selectedEdge && (
         <EdgeDetailPanel
+          // Key on the edge so selecting a DIFFERENT edge while the panel is
+          // open remounts it — re-running the focus-on-open effect for the
+          // refreshed content (not just the first open).
+          key={selectedEdgeKey}
           edge={selectedEdge}
           isTaken={taken.has(edgeKey(selectedEdge))}
           sourceExecutedNode={selectedSourceNode}

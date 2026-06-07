@@ -272,7 +272,9 @@ function RoundUpRow({ line, uom }: { line: RoundUpPlanLine; uom: string }) {
         <span className="font-mono font-bold text-text-primary">{line.sku}</span>
         <span className="text-text-tertiary ml-4">{line.description}</span>
       </div>
-      <span className="text-right font-mono text-text-primary line-through text-text-tertiary">
+      {/* Struck-through original qty is intentionally de-emphasised — keep a
+          single text-colour utility (was both -primary and -tertiary). */}
+      <span className="text-right font-mono line-through text-text-tertiary">
         {line.ordered.toLocaleString()}
       </span>
       <span className={cn(

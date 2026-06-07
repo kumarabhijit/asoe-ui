@@ -74,6 +74,21 @@ export function humanizeNodeId(id: string): string {
 }
 
 /**
+ * Title-case an UPPER_SNAKE backend enum token for display
+ * ("CARRIER_ISSUE" → "Carrier Issue", "WARNING" → "Warning"). Mechanical
+ * (lower-case then capitalise each word) — NOT a closed enum map, so a new
+ * backend value humanises automatically (Guardrail #2 display-mapping is
+ * allowed; this just avoids per-value literals).
+ */
+export function humanizeEnumLabel(token: string): string {
+  return token
+    .toLowerCase()
+    .split(/[_\s]+/)
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+/**
  * Canonical duration formatter for the pipeline surfaces (WaterfallStepper,
  * EventsTimeline, PipelineDAG) the same operator sees side-by-side.
  *

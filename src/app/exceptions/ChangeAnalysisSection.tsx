@@ -17,6 +17,7 @@ import { GitCompareArrows, CircleCheck, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
+import { humanizeEnumLabel } from "@/lib/format";
 import type {
   ChangeAnalysis,
   ConstraintCheck,
@@ -28,14 +29,20 @@ interface ChangeAnalysisSectionProps {
 }
 
 // Visual mapping (allowed — default fallback, not enum dispatch).
-function statusVariant(status: string): "success" | "warning" | "error" | "neutral" {
+// The status set is PASS | CONDITIONAL | WARNING (no failure state), so the
+// severity order is PASS < CONDITIONAL < WARNING. WARNING is the cautionary
+// peak → amber `warning`; CONDITIONAL (a conditional pass) → informational
+// `info`. (Previously WARNING was mapped to the red `error` treatment —
+// over-escalating a warning to look like a hard failure — and CONDITIONAL
+// took the amber, an inverted severity scale.)
+function statusVariant(status: string): "success" | "warning" | "info" | "neutral" {
   switch (status.toUpperCase()) {
     case "PASS":
       return "success";
     case "CONDITIONAL":
-      return "warning";
+      return "info";
     case "WARNING":
-      return "error";
+      return "warning";
     default:
       return "neutral";
   }
@@ -230,7 +237,7 @@ function ConstraintCard({ check }: { check: ConstraintCheck }) {
           {check.name}
         </span>
         <Badge variant={statusVariant(check.status)} size="sm" className="ml-auto">
-          {check.status}
+          {humanizeEnumLabel(check.status)}
         </Badge>
       </div>
       <p className="m-0 text-caption text-text-tertiary">{check.detail}</p>

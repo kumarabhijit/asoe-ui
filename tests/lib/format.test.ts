@@ -12,6 +12,7 @@ import {
   fmtMoney,
   fmtSignedPrice,
   humanizeNodeId,
+  humanizeEnumLabel,
   formatDurationMs,
   formatTimestamp,
 } from "@/lib/format";
@@ -50,6 +51,18 @@ describe("humanizeNodeId (shared by PipelineDAG + EventsTimeline)", () => {
   });
   it("tolerates empty segments from leading/double underscores", () => {
     expect(humanizeNodeId("_a__b")).toBe(" A  B");
+  });
+});
+
+describe("humanizeEnumLabel (UPPER_SNAKE backend enums)", () => {
+  it("title-cases an upper-snake token", () => {
+    expect(humanizeEnumLabel("CARRIER_ISSUE")).toBe("Carrier Issue");
+  });
+  it("handles a single upper word", () => {
+    expect(humanizeEnumLabel("WARNING")).toBe("Warning");
+  });
+  it("tolerates already-mixed input", () => {
+    expect(humanizeEnumLabel("Weather")).toBe("Weather");
   });
 });
 
