@@ -26,6 +26,8 @@ import { useRef, type KeyboardEvent, type RefObject } from "react";
 import { ChevronRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
+import { intentLabelFor } from "@/config/erp-label-map";
+import { humanizeEnumLabel } from "@/lib/format";
 import type { ExceptionDetailResponse } from "@/types/api";
 
 export interface RecordListPaneProps {
@@ -129,7 +131,7 @@ export function RecordListPane({
         </h2>
         <p className="text-caption text-text-tertiary leading-normal">
           {records.length === 1
-            ? "Single record attached — auto-mounted on the right."
+            ? "Single record attached — auto-mounted below."
             : `${records.length} records attached to `}
           {records.length > 1 && (
             <code className="font-mono">{caseId}</code>
@@ -172,13 +174,16 @@ export function RecordListPane({
                 ].join(" ")}
               >
                 <Badge variant={isSelected ? "info" : "neutral"} size="sm">
-                  {record.intent ?? "UNCLASSIFIED"}
+                  {/* Humanised intent (matches the queue rows' vocabulary,
+                      not a raw enum); clean "Unclassified" when absent. */}
+                  {record.intent ? intentLabelFor(record.intent) : "Unclassified"}
                 </Badge>
                 <span className="font-mono text-body text-text-primary truncate">
                   {record.order_id ?? record.id}
                 </span>
                 <span className="ml-auto text-caption text-text-tertiary">
-                  {record.lifecycle_state}
+                  {/* Humanised lifecycle label (was the raw LifecycleState enum). */}
+                  {humanizeEnumLabel(record.lifecycle_state)}
                 </span>
                 <ChevronRight
                   size={14}

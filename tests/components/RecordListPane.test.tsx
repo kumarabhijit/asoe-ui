@@ -84,9 +84,13 @@ describe("RecordListPane — picker behaviour", () => {
     expect(screen.getAllByRole("radio")).toHaveLength(2);
     expect(screen.getByText("PO-A")).toBeInTheDocument();
     expect(screen.getByText("PO-B")).toBeInTheDocument();
-    expect(screen.getByText("CONTRACTUAL_CORRECTION")).toBeInTheDocument();
-    expect(screen.getByText("DUPLICATE_PO")).toBeInTheDocument();
-    expect(screen.getByText("RESOLVED")).toBeInTheDocument();
+    // REGRESSION (report 04 / T6): intent + lifecycle are humanised to match
+    // the queue rows' vocabulary, not rendered as raw enum tokens.
+    expect(screen.getByText("Contractual Correction")).toBeInTheDocument();
+    expect(screen.getByText("Duplicate PO")).toBeInTheDocument();
+    expect(screen.getByText("Resolved")).toBeInTheDocument();
+    expect(screen.queryByText("CONTRACTUAL_CORRECTION")).not.toBeInTheDocument();
+    expect(screen.queryByText("RESOLVED")).not.toBeInTheDocument();
   });
 
   it("aria-checked reflects selectedRecordId", () => {
