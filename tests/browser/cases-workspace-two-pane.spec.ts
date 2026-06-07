@@ -66,21 +66,22 @@ test("two-pane workspace mounts: case-queue | case-workspace (records on the det
   await expect(page.locator("[aria-label='Case queue']")).toBeVisible();
   await expect(page.locator("[aria-label='Case workspace']")).toBeVisible();
 
-  // (b) The records picker mounts on the detail pane. There is exactly
-  // ONE picker now (no responsive duplicate column), so an unscoped
-  // locator is unambiguous. It must live INSIDE the workspace pane.
-  const picker = page.locator("[aria-label='Attached records']");
-  await expect(
-    picker,
-    "the records picker must mount on the detail pane",
-  ).toBeVisible({ timeout: 15_000 });
+  // (b) The record mounts on the detail pane. Council 2026-06-07
+  // (operator Q2): a single-record case mounts its one record DIRECTLY —
+  // the "Attached records" picker is multi-record only now (there is
+  // nothing to pick when there is one record; the multi-record picker is
+  // covered by RecordListPane's unit test). The deliverable this lock
+  // guards — record content lives on the detail pane, not a 3rd column —
+  // is asserted via the selected-record detail mounting INSIDE the
+  // workspace pane.
   await expect(
     page.locator(
-      "section[aria-label='Case workspace'] [aria-label='Attached records']",
+      "section[aria-label='Case workspace'] [data-testid='case-selected-record-detail']",
     ),
-    "the picker must be stacked inside the Case workspace pane",
-  ).toBeVisible();
-  await expect(picker.locator("[role='radio']").first()).toBeVisible();
+    "the selected record must mount on the Case workspace detail pane",
+  ).toBeVisible({ timeout: 15_000 });
+  // And the single-record case shows no picker (the new IA).
+  await expect(page.locator("[aria-label='Attached records']")).toHaveCount(0);
 
   // (c) The right pane's inline ribbon mounted (auto-mount fired since
   // the seeded case has exactly one record).
