@@ -1,27 +1,20 @@
-// ActionButtonMatrix — shared verdict × permission action surface.
+// ActionButtonMatrix — the verdict × permission action surface.
 //
-// ADR-041 P3e §2.2. Single source of truth for the HITL action
-// buttons (Approve / Reject / Override / Escalate / Re-analyze)
-// and the comment-input swap that gates Approve / Reject /
-// Reanalyze on a typed comment. Two consumers:
+// Single source of truth for the HITL action buttons (Approve /
+// Reject / Override / Escalate / Re-analyze) and the constrained
+// reason dialog that gates Approve / Reject / Reanalyze / Escalate.
 //
-//   1. `AgentReasoningCard` — Layer 1 cognition surface; mounts the
-//      matrix inline (legacy, flag off).
-//   2. `StickyActionRibbon` — sticky-at-top chrome at the top of
-//      the right-pane scroll container (flag on); keeps Approve
-//      above the fold no matter the Analysis-section length.
+// ADR-045 CP3 — the matrix has exactly ONE host: the Agent
+// Recommendation pane (`AgentReasoningCard`). The separate
+// StickyActionRibbon was retired, so there is no longer a
+// dual-mount audit concern (an operator can only act from one
+// surface). The matrix has no caller-supplied JSX overrides; hosts
+// pass data + callbacks only.
 //
-// The verdict × permission matrix MUST stay identical between the
-// two mount points — divergence is a SOX failure mode (an operator
-// approving via one mount sees different buttons than via the
-// other). This component is the lock: both consumers render
-// `<ActionButtonMatrix />`; the matrix has no caller-supplied
-// JSX overrides.
-//
-// State (pendingAction + comment) is local to each mount. In V2
-// mode only StickyActionRibbon mounts the matrix; in legacy mode
-// only AgentReasoningCard does. They never both mount at once, so
-// there is no state-sync concern.
+// Reason capture is uniform (ADR-045 CP3): Approve/Reject use a
+// comment (+ mandatory reason_tag on YELLOW/RED), while Reanalyze
+// and Escalate use a mandatory free-text reason — all through the
+// same in-panel dialog (no window.prompt).
 
 "use client";
 
@@ -56,7 +49,10 @@ export interface ActionButtonMatrixProps {
   // auto-pick (`pickQuickActionReasonTag`) remains the source.
   onApprove?: (comment: string, reasonTagOverride?: string) => void;
   onReject?: (comment: string, reasonTagOverride?: string) => void;
-  onEscalate?: () => void;
+  // ADR-045 CP3 — Escalate now captures its mandatory reason through the
+  // in-panel constrained dialog (was window.prompt). The reason is passed
+  // through here instead of being collected by the handler.
+  onEscalate?: (reason: string) => void;
   onOverride?: () => void;
   onReanalyze?: (reason: string) => void;
   reanalyzeAttempts?: number;
@@ -116,7 +112,7 @@ export function ActionButtonMatrix({
 }: ActionButtonMatrixProps) {
   const isErrored = executionError !== undefined;
   const [pendingAction, setPendingAction] = useState<
-    "approve" | "reject" | "reanalyze" | null
+    "approve" | "reject" | "reanalyze" | "escalate" | null
   >(null);
   const [comment, setComment] = useState("");
   // S2 finding #7 — reason_tag the operator picks before confirming
@@ -164,12 +160,28 @@ export function ActionButtonMatrix({
 
   // Cmd+Enter submit is gated on the same predicate as the Confirm
   // button, so the hotkey cannot bypass the mandatory reason_tag.
+  // Reanalyze and Escalate both require a non-empty free-text reason (SOX).
+  const reasonTextRequired =
+    pendingAction === "reanalyze" || pendingAction === "escalate";
   const canSubmit =
     !actionLoading &&
     actionInFlight === null &&
     pendingAction !== null &&
-    !(pendingAction === "reanalyze" && comment.trim().length === 0) &&
+    !(reasonTextRequired && comment.trim().length === 0) &&
     !(reasonTagRequired && !reasonTag);
+
+  // ADR-045 CP3 — "disabled is never silent": every disabled control
+  // explains why. The only in-matrix disable is an in-flight action; the
+  // Confirm button additionally explains the unmet submit precondition.
+  const inFlightReason = anyActionInFlight
+    ? "Another action is in progress…"
+    : undefined;
+  function submitBlockedReason(): string | undefined {
+    if (anyActionInFlight) return "Another action is in progress…";
+    if (reasonTagRequired && !reasonTag) return "Select a reason category first.";
+    if (reasonTextRequired && comment.trim().length === 0) return "Enter a reason first.";
+    return undefined;
+  }
 
   function confirmAction() {
     if (!canSubmit) return;
@@ -185,6 +197,8 @@ export function ActionButtonMatrix({
       else onReject(comment);
     } else if (pendingAction === "reanalyze" && onReanalyze) {
       onReanalyze(comment);
+    } else if (pendingAction === "escalate" && onEscalate) {
+      onEscalate(comment);
     }
     setPendingAction(null);
     setComment("");
@@ -249,7 +263,7 @@ export function ActionButtonMatrix({
     },
     {
       key: getHotkey("ribbon.escalate")!.key,
-      handler: () => onEscalate?.(),
+      handler: () => setPendingAction("escalate"),
       enabled:
         showEscalateAction &&
         !!onEscalate &&
@@ -311,8 +325,9 @@ export function ActionButtonMatrix({
                 variant="neutral"
                 size="sm"
                 disabled={anyActionInFlight}
-                onClick={onEscalate}
+                onClick={() => setPendingAction("escalate")}
                 aria-label="Send for triage"
+                title={inFlightReason}
               >
                 {visibleLabel("Escalate", "Escalating", "escalate")}
                 <HotkeyHint letter="E" />
@@ -336,7 +351,8 @@ export function ActionButtonMatrix({
                             : "Approve recommendation"
                       }
                       title={
-                        actionCaption
+                        inFlightReason
+                          ?? actionCaption
                           ?? (recommendedAction
                             ? `Approve: ${formatActionLabel(recommendedAction)}`
                             : undefined)
@@ -353,6 +369,7 @@ export function ActionButtonMatrix({
                       disabled={anyActionInFlight}
                       onClick={() => setPendingAction("reject")}
                       aria-label={action ? secondaryLabel : "Reject recommendation"}
+                      title={inFlightReason}
                     >
                       {visibleLabel(secondaryLabel, secondaryInProgress, "reject")}
                       <HotkeyHint letter="R" />
@@ -365,7 +382,7 @@ export function ActionButtonMatrix({
                       disabled={anyActionInFlight}
                       onClick={onOverride}
                       aria-label="Choose different action"
-                      title="Choose different action"
+                      title={inFlightReason ?? "Choose different action"}
                     >
                       {actionInFlight === "override" ? "Overriding…" : "Override…"}
                       <HotkeyHint letter="O" />
@@ -376,8 +393,9 @@ export function ActionButtonMatrix({
                       variant="neutral"
                       size="sm"
                       disabled={anyActionInFlight}
-                      onClick={onEscalate}
+                      onClick={() => setPendingAction("escalate")}
                       aria-label="Send for triage"
+                      title={inFlightReason}
                     >
                       {visibleLabel("Escalate", "Escalating", "escalate")}
                       <HotkeyHint letter="E" />
@@ -394,7 +412,7 @@ export function ActionButtonMatrix({
                       disabled={anyActionInFlight}
                       onClick={onOverride}
                       aria-label="Choose different action"
-                      title="Choose different action"
+                      title={inFlightReason ?? "Choose different action"}
                     >
                       {actionInFlight === "override" ? "Overriding…" : "Override…"}
                       <HotkeyHint letter="O" />
@@ -405,8 +423,9 @@ export function ActionButtonMatrix({
                       variant="neutral"
                       size="sm"
                       disabled={anyActionInFlight}
-                      onClick={onEscalate}
+                      onClick={() => setPendingAction("escalate")}
                       aria-label="Send for triage"
+                      title={inFlightReason}
                     >
                       {visibleLabel("Escalate", "Escalating", "escalate")}
                       <HotkeyHint letter="E" />
@@ -421,7 +440,7 @@ export function ActionButtonMatrix({
                   disabled={anyActionInFlight}
                   onClick={onOverride}
                   aria-label="Choose different action"
-                  title="Choose different action"
+                  title={inFlightReason ?? "Choose different action"}
                 >
                   {actionInFlight === "override" ? "Overriding…" : "Override…"}
                   <HotkeyHint letter="O" />
@@ -436,7 +455,7 @@ export function ActionButtonMatrix({
               disabled={anyActionInFlight}
               onClick={() => setPendingAction("reanalyze")}
               aria-label="Re-analyze exception"
-              title={`Re-run this exception through a fresh Compliance Shadow (attempt ${reanalyzeAttempts + 1} of ${reanalyzeMax})`}
+              title={inFlightReason ?? `Re-run this exception through a fresh Compliance Shadow (attempt ${reanalyzeAttempts + 1} of ${reanalyzeMax})`}
             >
               <RotateCcw size={13} className="mr-1" />
               {actionInFlight === "reanalyze" ? "Re-analyzing…" : "Re-analyze"}
@@ -460,23 +479,19 @@ export function ActionButtonMatrix({
       {pendingAction && (
         <div
           className="flex flex-col gap-8 p-12 bg-surface-secondary rounded-sm"
-          role={
-            pendingAction === "reanalyze" || reasonTagRequired
-              ? "dialog"
-              : undefined
-          }
-          aria-modal={
-            pendingAction === "reanalyze" || reasonTagRequired ? true : undefined
-          }
+          role={reasonTextRequired || reasonTagRequired ? "dialog" : undefined}
+          aria-modal={reasonTextRequired || reasonTagRequired ? true : undefined}
           aria-live="polite"
           aria-label={
             pendingAction === "reanalyze"
               ? "Reanalyze reason required"
-              : reasonTagRequired
-                ? `${pendingAction === "approve" ? "Approval" : "Rejection"} reason required`
-                : pendingAction === "approve"
-                  ? "Approval comment — optional"
-                  : "Rejection comment — optional"
+              : pendingAction === "escalate"
+                ? "Escalation reason required"
+                : reasonTagRequired
+                  ? `${pendingAction === "approve" ? "Approval" : "Rejection"} reason required`
+                  : pendingAction === "approve"
+                    ? "Approval comment — optional"
+                    : "Rejection comment — optional"
           }
         >
           <div className="flex items-center gap-6 text-caption font-semibold text-text-secondary">
@@ -489,7 +504,9 @@ export function ActionButtonMatrix({
                 ? reasonTagRequired
                   ? "Rejection Reason (required)"
                   : "Rejection Comment"
-                : "Reanalyze Reason (required)"}
+                : pendingAction === "escalate"
+                  ? "Escalation Reason (required)"
+                  : "Reanalyze Reason (required)"}
           </div>
           {reasonTagRequired && availableReasonTags && (
             <label className="flex flex-col gap-4 text-caption text-text-secondary">
@@ -536,7 +553,9 @@ export function ActionButtonMatrix({
                   ? reasonTagRequired
                     ? "Add rejection notes (optional) — ⌘↵ to submit"
                     : "Provide rejection reason — ⌘↵ to submit"
-                  : "Why should this be re-run? (e.g., new contract uploaded, gateway was down) — ⌘↵ to submit"
+                  : pendingAction === "escalate"
+                    ? "Reason for escalation (required) — ⌘↵ to submit"
+                    : "Why should this be re-run? (e.g., new contract uploaded, gateway was down) — ⌘↵ to submit"
             }
             // When the reason-tag Select is shown it owns autoFocus
             // so the operator's eye lands on the mandatory choice
@@ -550,7 +569,7 @@ export function ActionButtonMatrix({
               if (e.key === "Enter" && e.metaKey) confirmAction();
               if (e.key === "Escape") cancelAction();
             }}
-            required={pendingAction === "reanalyze"}
+            required={reasonTextRequired}
           />
           <div className="flex gap-8 justify-end">
             <Button variant="ghost" size="sm" onClick={cancelAction}>
@@ -562,6 +581,9 @@ export function ActionButtonMatrix({
               disabled={!canSubmit}
               onClick={confirmAction}
               aria-keyshortcuts="Meta+Enter"
+              // ADR-045 CP3 — disabled is never silent: explain the unmet
+              // precondition (missing reason category / empty reason).
+              title={submitBlockedReason()}
             >
               {actionLoading
                 ? "Processing..."
@@ -569,7 +591,9 @@ export function ActionButtonMatrix({
                   ? "Confirm Approval"
                   : pendingAction === "reject"
                     ? "Confirm Rejection"
-                    : "Confirm Re-analyze"}
+                    : pendingAction === "escalate"
+                      ? "Confirm Escalate"
+                      : "Confirm Re-analyze"}
             </Button>
           </div>
         </div>

@@ -52,10 +52,10 @@ describe("ClassificationHistoryPanel", () => {
     expect(
       screen.getByRole("region", { name: /classification history/i }),
     ).toBeInTheDocument();
-    // PO 2026-05-28 — supergroup_code displays via
-    // `formatSupergroupCode` which strips the SG_ prefix and
-    // humanises snake_case. Full code remains on the hover title.
-    expect(screen.getByText("Block Pricing")).toBeInTheDocument();
+    // supergroup_code displays via `formatSupergroupCode`, which now
+    // resolves the governed label (ADR-045: "Pricing Block", not naive
+    // "Block Pricing"). Full code remains on the hover title.
+    expect(screen.getByText("Pricing Block")).toBeInTheDocument();
     expect(screen.getByTitle("SG_BLOCK_PRICING")).toBeInTheDocument();
     expect(screen.getByText("INT_PRICE_MISMATCH")).toBeInTheDocument();
     expect(
@@ -106,15 +106,14 @@ describe("ClassificationHistoryPanel", () => {
         ]}
       />,
     );
-    // PO 2026-05-28 — supergroup codes display via
-    // `formatSupergroupCode`; the SG_ prefix is stripped and
-    // snake_case → Title Case. The full code is preserved on
-    // the hover title so audit hover still surfaces it.
+    // supergroup codes display via `formatSupergroupCode`, now resolving
+    // governed labels (ADR-045). The full code is preserved on the hover
+    // title so audit hover still surfaces it.
     const codes = screen.getAllByTitle(/^SG_/);
     expect(codes[0].getAttribute("title")).toBe("SG_NEEDS_TRIAGE");
     expect(codes[1].getAttribute("title")).toBe("SG_BLOCK_PRICING");
     expect(codes[0].textContent).toBe("Needs Triage");
-    expect(codes[1].textContent).toBe("Block Pricing");
+    expect(codes[1].textContent).toBe("Pricing Block");
   });
 
   // REGRESSION (fails on parent): the panel put the classifier icon in

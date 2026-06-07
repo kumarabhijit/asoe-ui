@@ -13,6 +13,7 @@
  * and the SOX-mandatory reanalyze-reason gate.
  */
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { ActionButtonMatrix } from "@/components/ui/ActionButtonMatrix";
 
@@ -275,7 +276,10 @@ describe("ActionButtonMatrix — S2 #3 ribbon hotkeys", () => {
     expect(onOverride).toHaveBeenCalledOnce();
   });
 
-  it("E fires onEscalate on YELLOW + canEscalate", () => {
+  it("E opens the Escalate reason dialog on YELLOW + canEscalate (ADR-045 CP3)", () => {
+    // Escalate no longer fires immediately via window.prompt — it opens the
+    // constrained in-panel dialog and only fires onEscalate(reason) on
+    // confirm, matching the Reanalyze pattern.
     render(
       <ActionButtonMatrix
         verdict="YELLOW"
@@ -287,7 +291,46 @@ describe("ActionButtonMatrix — S2 #3 ribbon hotkeys", () => {
       />,
     );
     press("e");
-    expect(onEscalate).toHaveBeenCalledOnce();
+    expect(screen.getByText(/escalation reason/i)).toBeInTheDocument();
+    expect(onEscalate).not.toHaveBeenCalled();
+  });
+
+  it("Escalate fires onEscalate(reason) only after a reason is confirmed", async () => {
+    const user = userEvent.setup();
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        onEscalate={onEscalate}
+        canApprove
+        canEscalate
+      />,
+    );
+    press("e");
+    // Confirm is blocked until a reason is entered (disabled-is-never-silent).
+    const confirm = screen.getByRole("button", { name: /confirm escalate/i });
+    expect(confirm).toBeDisabled();
+    await user.type(screen.getByRole("textbox"), "Needs senior credit sign-off");
+    await user.click(screen.getByRole("button", { name: /confirm escalate/i }));
+    expect(onEscalate).toHaveBeenCalledWith("Needs senior credit sign-off");
+  });
+
+  it("disabled Confirm explains why (ADR-045 CP3 — disabled is never silent)", () => {
+    render(
+      <ActionButtonMatrix
+        verdict="YELLOW"
+        recommendedAction="BLOCK_AND_NOTIFY"
+        onApprove={onApprove}
+        onEscalate={onEscalate}
+        canApprove
+        canEscalate
+      />,
+    );
+    press("e");
+    const confirm = screen.getByRole("button", { name: /confirm escalate/i });
+    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute("title", "Enter a reason first.");
   });
 
   it("Y opens the Reanalyze comment dialog when allowed", () => {

@@ -262,8 +262,8 @@ describe("CasesQueueRowV2 — multi-intent visibility (PO round-2 #2)", () => {
         onSelect={() => {}}
       />,
     );
-    // Primary classification (formatted supergroup).
-    expect(screen.getByText("Block Pricing")).toBeInTheDocument();
+    // Primary classification (governed supergroup label, ADR-045).
+    expect(screen.getByText("Pricing Block")).toBeInTheDocument();
     // Secondary intent-count badge.
     expect(screen.getByText("+3 intents")).toBeInTheDocument();
   });
@@ -308,7 +308,7 @@ describe("CasesQueueRowV2 — multi-intent visibility (PO round-2 #2)", () => {
     );
     const row = screen.getByRole("option");
     expect(row.getAttribute("aria-label") ?? "").toMatch(
-      /Block Availability, 2 underlying intents/,
+      /Availability \/ Allocation, 2 underlying intents/,
     );
   });
 

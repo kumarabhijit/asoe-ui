@@ -26,7 +26,7 @@ import { useRef, type KeyboardEvent, type RefObject } from "react";
 import { ChevronRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
-import { intentLabelFor } from "@/config/erp-label-map";
+import { TaxonomyLabel } from "@/components/ui/TaxonomyLabel";
 import { humanizeEnumLabel } from "@/lib/format";
 import type { ExceptionDetailResponse } from "@/types/api";
 
@@ -174,9 +174,9 @@ export function RecordListPane({
                 ].join(" ")}
               >
                 <Badge variant={isSelected ? "info" : "neutral"} size="sm">
-                  {/* Humanised intent (matches the queue rows' vocabulary,
-                      not a raw enum); clean "Unclassified" when absent. */}
-                  {record.intent ? intentLabelFor(record.intent) : "Unclassified"}
+                  {/* Governed intent label from /health (ADR-045), not a
+                      hand-authored map; clean "Unclassified" when absent. */}
+                  <TaxonomyLabel axis="intent" code={record.intent} />
                 </Badge>
                 <span className="font-mono text-body text-text-primary truncate">
                   {record.order_id ?? record.id}

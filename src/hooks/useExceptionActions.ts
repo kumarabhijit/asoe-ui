@@ -81,6 +81,12 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
   const [overrideNotes, setOverrideNotes] = useState("");
   const [overrideReasonTag, setOverrideReasonTag] = useState<string>("");
 
+  // ADR-045 CP3 — cosign notes dialog state (replaces window.prompt).
+  // `cosignPending` carries the approve/reject intent while the operator
+  // types the mandatory SOX notes; null when the dialog is closed.
+  const [cosignPending, setCosignPending] = useState<{ approve: boolean } | null>(null);
+  const [cosignNotes, setCosignNotes] = useState("");
+
   /** Resolve the recipe-recommended action from the exception detail. */
   const recommendedAction = useCallback((): string | null => {
     const rd = (detail?.resolution_data ?? {}) as Record<string, unknown>;
@@ -165,18 +171,16 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
 
   /**
    * Escalate is a routing action — its own endpoint with its own
-   * permission (`exceptions:escalate`). Reason is mandatory per SOX;
-   * fall back to window.prompt for Phase 1 (richer dialog tracked
-   * separately).
+   * permission (`exceptions:escalate`). Reason is mandatory per SOX and is
+   * now captured by the constrained in-panel dialog in ActionButtonMatrix
+   * (ADR-045 CP3 — replaced window.prompt for a consistent, accessible,
+   * keyboard-navigable reason-capture pattern shared with Reanalyze).
    */
-  const handleEscalate = useCallback(async () => {
+  const handleEscalate = useCallback(async (reason: string) => {
     if (!hasPermission("exceptions:escalate")) {
       addToast("warning", "Permission denied: your role cannot escalate exceptions.");
       return;
     }
-    const reason = typeof window !== "undefined"
-      ? window.prompt("Reason for escalation (required):")
-      : null;
     if (!reason || !reason.trim()) {
       addToast("warning", "A reason is required to escalate.");
       return;
@@ -248,28 +252,33 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
   }, [exceptionId, overrideAction, overrideNotes, overrideReasonTag, addToast, announce, setDetail, onActionComplete]);
 
   /**
-   * Four-eyes cosign (Phase 2 #5). Reason via window.prompt for Phase
-   * 1 parity — the backend enforces SoD (caller must not be the
-   * initiator) and non-empty notes.
+   * Four-eyes cosign (Phase 2 #5). ADR-045 CP3 — the mandatory SOX notes
+   * are captured by an in-panel constrained dialog (was window.prompt),
+   * consistent with the other reason-capture flows. `openCosign` arms the
+   * dialog for an approve/reject; `submitCosign` performs the API call.
+   * The backend still enforces SoD (caller must not be the initiator).
    */
-  const handleCosign = useCallback(async (approve: boolean) => {
+  const openCosign = useCallback((approve: boolean) => {
     if (!hasPermission("exceptions:override")) {
       addToast("warning", "Permission denied: your role cannot cosign overrides.");
       return;
     }
-    const promptLabel = approve
-      ? "Cosign approval — notes (required, SOX):"
-      : "Cosign rejection — reason (required, SOX):";
-    const notes = typeof window !== "undefined" ? window.prompt(promptLabel) : "";
-    if (notes === null) return;  // user cancelled
-    if (!notes.trim()) {
+    setCosignNotes("");
+    setCosignPending({ approve });
+  }, [hasPermission, addToast]);
+
+  const submitCosign = useCallback(async () => {
+    if (!cosignPending) return;
+    const { approve } = cosignPending;
+    if (!cosignNotes.trim()) {
       addToast("warning", "Notes are required (SOX audit trail).");
       return;
     }
     setActionInFlight(approve ? "cosign-approve" : "cosign-reject");
     try {
-      const updated = await exceptionsApi.cosign(exceptionId, { approve, notes: notes.trim() });
+      const updated = await exceptionsApi.cosign(exceptionId, { approve, notes: cosignNotes.trim() });
       setDetail(updated);
+      setCosignPending(null);
       addToast(
         "success",
         approve
@@ -286,7 +295,7 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
       console.error("Cosign failed:", err);
       addToast("error", err instanceof Error ? err.message : "Cosign failed.");
     } finally { setActionInFlight(null); }
-  }, [exceptionId, hasPermission, addToast, announce, setDetail, onActionComplete]);
+  }, [exceptionId, cosignPending, cosignNotes, addToast, announce, setDetail, onActionComplete]);
 
   /**
    * Re-run the graph. Same permission as override (manager+) — expert
@@ -330,7 +339,8 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
     handleEscalate,
     handleOverride,
     submitOverride,
-    handleCosign,
+    openCosign,
+    submitCosign,
     handleReanalyze,
     // Override dialog state — the panel reads these in its dialog JSX.
     overrideOpen,
@@ -341,5 +351,10 @@ export function useExceptionActions(opts: UseExceptionActionsOptions) {
     setOverrideNotes,
     overrideReasonTag,
     setOverrideReasonTag,
+    // Cosign dialog state — the panel reads these in its banner JSX.
+    cosignPending,
+    setCosignPending,
+    cosignNotes,
+    setCosignNotes,
   } as const;
 }

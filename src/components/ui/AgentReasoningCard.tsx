@@ -99,7 +99,8 @@ interface AgentReasoningCardProps {
   // picker on YELLOW/RED.
   onApprove?: (comment: string, reasonTagOverride?: string) => void;
   onReject?: (comment: string, reasonTagOverride?: string) => void;
-  onEscalate?: () => void;
+  // ADR-045 CP3 — Escalate reason captured by the matrix dialog.
+  onEscalate?: (reason: string) => void;
   onOverride?: () => void;
   /** Fires when the user confirms a Re-analyze request with a mandatory reason.
    *  Parent is responsible for calling exceptionsApi.reanalyze and refreshing. */
@@ -126,16 +127,6 @@ interface AgentReasoningCardProps {
   /** @deprecated Use `canOverride` instead. Retained for migration safety —
    *  treated as a fallback when `canOverride` is not provided. */
   isAdmin?: boolean;
-  /**
-   * ADR-041 P3e §2.2 — suppress the inline action-button matrix.
-   * Default `false` keeps today's behaviour. When `true`, the card
-   * renders the verdict / confidence / explanation surface only;
-   * the verdict × permission button matrix moves to an external
-   * `<StickyActionRibbon>` mounted at the top of the right-pane
-   * scroll container. Both consumers share `<ActionButtonMatrix>`
-   * so the verdict × permission logic stays in one place.
-   */
-  hideActionMatrix?: boolean;
   /**
    * S2 finding #7 — reason-tag vocabulary for the mandatory tag
    * Select shown by `ActionButtonMatrix` on YELLOW/RED Approve/
@@ -208,7 +199,6 @@ export function AgentReasoningCard({
   canEscalate,
   canReanalyze,
   isAdmin = false,
-  hideActionMatrix = false,
   availableReasonTags,
   className,
 }: AgentReasoningCardProps) {
@@ -318,33 +308,31 @@ export function AgentReasoningCard({
           </div>
         )}
 
-        {/* Action surface — verdict × permission matrix. Single source
-            of truth in `<ActionButtonMatrix>` so this card and
-            `<StickyActionRibbon>` (ADR-041 P3e §2.2) render identical
-            buttons. `hideActionMatrix` suppresses the inline mount when
-            the sticky ribbon takes over. */}
-        {!hideActionMatrix && (
-          <ActionButtonMatrix
-            verdict={verdict}
-            executionError={executionError}
-            recommendedAction={recommendedAction}
-            onApprove={onApprove}
-            onReject={onReject}
-            onEscalate={onEscalate}
-            onOverride={onOverride}
-            onReanalyze={onReanalyze}
-            reanalyzeAttempts={reanalyzeAttempts}
-            reanalyzeMax={reanalyzeMax}
-            actionLoading={actionLoading}
-            actionInFlight={actionInFlight}
-            canApprove={canApprove}
-            canOverride={canOverride}
-            canEscalate={canEscalate}
-            canReanalyze={canReanalyze}
-            isAdmin={isAdmin}
-            availableReasonTags={availableReasonTags}
-          />
-        )}
+        {/* Action surface — verdict × permission matrix. ADR-045 CP3:
+            this card is the SOLE action host (the separate
+            StickyActionRibbon is retired), so the matrix always renders
+            inline here. `<ActionButtonMatrix>` remains the single source
+            of truth for the verdict × permission logic. */}
+        <ActionButtonMatrix
+          verdict={verdict}
+          executionError={executionError}
+          recommendedAction={recommendedAction}
+          onApprove={onApprove}
+          onReject={onReject}
+          onEscalate={onEscalate}
+          onOverride={onOverride}
+          onReanalyze={onReanalyze}
+          reanalyzeAttempts={reanalyzeAttempts}
+          reanalyzeMax={reanalyzeMax}
+          actionLoading={actionLoading}
+          actionInFlight={actionInFlight}
+          canApprove={canApprove}
+          canOverride={canOverride}
+          canEscalate={canEscalate}
+          canReanalyze={canReanalyze}
+          isAdmin={isAdmin}
+          availableReasonTags={availableReasonTags}
+        />
       </div>
     </div>
   );

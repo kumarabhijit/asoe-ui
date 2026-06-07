@@ -65,14 +65,16 @@ export function EmailOrderEntrySection({ data }: EmailOrderEntrySectionProps) {
 
   return (
     <section
-      aria-label="Email order intake analysis"
+      aria-label="Manual order intake analysis"
       className="bg-surface-primary rounded-md shadow-sm p-16"
     >
-      {/* Section header */}
+      {/* Section header. ADR-045: "Manual Order Intake" is the canonical
+          term (the intake channel may be EDI/fax/phone, not only email),
+          matching the governed /health intent label. */}
       <div className="flex items-center gap-8 mb-12">
         <Mail size={14} className="text-text-tertiary" />
         <span className="text-subhead font-semibold text-text-primary">
-          Email Order Intake
+          Manual Order Intake
         </span>
         <Badge variant={classification.variant} size="sm">
           {classification.label}

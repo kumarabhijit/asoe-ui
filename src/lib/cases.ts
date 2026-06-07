@@ -16,6 +16,7 @@
  */
 import type { CaseStatus } from "@/types/cases";
 import type { AutonomyLevelInfo, HealthResponse } from "@/types/exceptions";
+import { supergroupLabel } from "@/lib/taxonomy-labels";
 
 /**
  * The seven case statuses grouped into three operator-meaningful
@@ -401,33 +402,24 @@ export function formatCaseId(id: string | null | undefined): string {
 
 
 /**
- * Strip the `SG_` taxonomy prefix from a supergroup code and
- * humanise the remaining snake_case into Title Case. Display-only;
- * the underlying code stays as the closed taxonomy key.
+ * Resolve a supergroup code to its governed operator label (ADR-045).
  *
  * `SG_NEW_ORDER`        → `New Order`
- * `SG_BLOCK_PRICING`    → `Block Pricing`
- * `SG_ORDER_CHANGE`     → `Order Change`
+ * `SG_BLOCK_PRICING`    → `Pricing Block`     (NOT naive "Block Pricing")
+ * `SG_BLOCK_CREDIT`     → `Credit Hold`
  *
- * Per PO 2026-05-28: the `SG_` prefix is internal taxonomy
- * vocabulary; operators don't need to see the namespacing. The
- * humanised label still uniquely identifies the supergroup
- * because the trailing payload is a closed vocabulary
- * (case_supergroup table; ADR-041 §2.1).
+ * Before ADR-045 this naively stripped `SG_` and title-cased, which
+ * disagreed with the governed labels the detail surfaces show (e.g.
+ * "Credit Hold" vs "Block Credit") — the queue chip and the detail view
+ * used different words for the same thing. It now delegates to the single
+ * label authority (`supergroupLabel`): the live `/health` payload, then
+ * the generated taxonomy constants (same YAML projection — synchronous, no
+ * per-row health fetch), then a title-case last resort for an unsynced
+ * code. The `SG_` prefix stays internal; operators never see it.
  *
  * Null-safe: returns "" on null / undefined / empty input.
  */
 export function formatSupergroupCode(code: string | null | undefined): string {
   if (!code) return "";
-  const stripped = code.startsWith("SG_") ? code.slice("SG_".length) : code;
-  // Snake-case → Title Case. Unknown chars (digits, hyphens) pass
-  // through unchanged.
-  return stripped
-    .split("_")
-    .map((part) =>
-      part.length === 0
-        ? ""
-        : part[0].toUpperCase() + part.slice(1).toLowerCase(),
-    )
-    .join(" ");
+  return supergroupLabel(null, code);
 }

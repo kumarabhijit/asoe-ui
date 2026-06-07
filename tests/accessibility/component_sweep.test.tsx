@@ -25,7 +25,6 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { ActionButtonMatrix } from "@/components/ui/ActionButtonMatrix";
 import { ComplianceHitCountChip } from "@/components/ui/ComplianceHitCountChip";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
-import { StickyActionRibbon } from "@/components/ui/StickyActionRibbon";
 import { VerdictDot } from "@/components/ui/VerdictDot";
 import { BoundaryError } from "@/components/ui/BoundaryError";
 import { GapBar } from "@/components/ui/GapBar";
@@ -350,7 +349,7 @@ describe("a11y sweep: ComplianceHitCountChip", () => {
 
 // ---------------------------------------------------------------------------
 // ActionButtonMatrix — ADR-041 P3e §2.2. Shared verdict × permission
-// surface used by AgentReasoningCard and StickyActionRibbon. Each
+// surface used by AgentReasoningCard (the single action host). Each
 // verdict × permission branch must be axe-clean.
 // ---------------------------------------------------------------------------
 describe("a11y sweep: ActionButtonMatrix", () => {
@@ -383,24 +382,6 @@ describe("a11y sweep: ActionButtonMatrix", () => {
         verdict="YELLOW"
         executionError={{ message: "Recipe timed out" }}
         onEscalate={() => {}}
-        canEscalate
-      />,
-    ));
-});
-
-// ---------------------------------------------------------------------------
-// StickyActionRibbon — ADR-041 P3e §2.2. Sticky chrome over the
-// shared matrix; the region label + anchor id are the SR contract.
-// ---------------------------------------------------------------------------
-describe("a11y sweep: StickyActionRibbon", () => {
-  it("YELLOW analyst", async () =>
-    expectNoViolations(
-      <StickyActionRibbon
-        verdict="YELLOW"
-        onApprove={() => {}}
-        onReject={() => {}}
-        onEscalate={() => {}}
-        canApprove
         canEscalate
       />,
     ));

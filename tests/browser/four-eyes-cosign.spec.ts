@@ -96,10 +96,14 @@ test("high-value override stages PENDING_COSIGN; different manager cosigns → R
   const approveCosign = page.getByRole("button", { name: /^approve cosign$/i });
   await expect(approveCosign).toBeVisible({ timeout: 15_000 });
 
-  // handleCosign() uses window.prompt() for required notes. Arm the
-  // dialog handler before clicking.
-  page.once("dialog", (d) => d.accept("verified — applying approved override"));
+  // ADR-045 CP3 — cosign notes are captured by an in-panel constrained
+  // dialog (was window.prompt). Click to open it, fill the mandatory
+  // notes, then confirm.
   await approveCosign.click();
+  const cosignDialog = page.getByRole("dialog", { name: /cosign approval notes required/i });
+  await expect(cosignDialog).toBeVisible({ timeout: 5_000 });
+  await cosignDialog.getByRole("textbox").fill("verified — applying approved override");
+  await cosignDialog.getByRole("button", { name: /confirm cosign approval/i }).click();
 
   // Backend resolves.
   await expect
