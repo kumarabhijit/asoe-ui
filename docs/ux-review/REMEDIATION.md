@@ -20,11 +20,11 @@ Classes that name a non-existent token render unstyled at runtime.
 
 | ☑ | Finding | Location | Fix | Expert / decision | PR |
 |---|---------|----------|-----|-------------------|----|
-| ☑ | `text-h4` undefined font-size | `cases/error.tsx:16`, `cases/not-found.tsx:14`, `home/dashboard/inbox/settings/error.tsx:16` | → `text-heading` | Mechanical token-map; no expert needed | #batch1 |
-| ☑ | `text-status-error` undefined color class | `ErasureCertificateButton.tsx:103`, `OrderEntrySection.tsx:39,41`, `DraftReplySection.tsx:135,176,214` | → `text-error` (+ `text-status-warning`→`text-warning` found alongside) | Mechanical token-map | #batch1 |
-| ☑ | `pl-30` undefined spacing token | `EventsTimeline.tsx:250` | → `pl-32` (nearest scale step) | Mechanical token-map | #batch1 |
-| ☑ | Hardcoded numeric `fontSize` / RGB-hex in SVG | `PipelineDAG.tsx` (3 `fontSize`) | → `style={{fontSize:"var(--font-size-label/caption)"}}` | EventsTimeline had none; GravitationalOrbs colour/motion deferred to **Batch 5** (full rework) to avoid double-touch | #batch1 |
-| ☑ | **Guard:** CI lint that fails on Tailwind classes not resolvable to a token | `tests/architectural/token_class_resolution.test.ts` | spacing steps derived from `--space-*`; font-alias + `-status-` namespace denylists. Caught 4 latent extras (`gap-14`,`px-14`,`py-14`,`text-h2`) → fixed | Guard scans raw text (catches cn()/cva()) | #batch1 |
+| ☑ | `text-h4` undefined font-size | `cases/error.tsx:16`, `cases/not-found.tsx:14`, `home/dashboard/inbox/settings/error.tsx:16` | → `text-heading` | Mechanical token-map; no expert needed | #222 |
+| ☑ | `text-status-error` undefined color class | `ErasureCertificateButton.tsx:103`, `OrderEntrySection.tsx:39,41`, `DraftReplySection.tsx:135,176,214` | → `text-error` (+ `text-status-warning`→`text-warning` found alongside) | Mechanical token-map | #222 |
+| ☑ | `pl-30` undefined spacing token | `EventsTimeline.tsx:250` | → `pl-32` (nearest scale step) | Mechanical token-map | #222 |
+| ☑ | Hardcoded numeric `fontSize` / RGB-hex in SVG | `PipelineDAG.tsx` (3 `fontSize`) | → `style={{fontSize:"var(--font-size-label/caption)"}}` | EventsTimeline had none; GravitationalOrbs colour/motion deferred to **Batch 5** (full rework) to avoid double-touch | #222 |
+| ☑ | **Guard:** CI lint that fails on Tailwind classes not resolvable to a token | `tests/architectural/token_class_resolution.test.ts` | spacing steps derived from `--space-*`; font-alias + `-status-` namespace denylists. Caught 4 latent extras (`gap-14`,`px-14`,`py-14`,`text-h2`) → fixed | Guard scans raw text (catches cn()/cva()) | #222 |
 
 ## Batch 2 — T9 + Guardrail #2: enum→display maps
 Maps keyed off backend enums must have a `default` fallback (icon+text) and must
