@@ -74,6 +74,7 @@ src/
 │   ├── PolicyHitBadge.tsx        # L1 rule names render plain; L2 LLM-derived concerns carry the AI badge
 │   ├── PricingWaterfall.tsx      # Vertical pricing condition chain timeline
 │   ├── Sidebar.tsx               # 480px slide-right intervention panel
+│   ├── TaxonomyLabel.tsx         # ADR-045 — single render path for supergroup/intent codes; governed /health label, with a `raw` audit-zone escape hatch
 │   ├── Toast.tsx                 # 4.5s auto-dismiss, status-colored, solid-fill
 │   ├── UserSwitcher.tsx          # Sandbox-only user switcher (signIn credentials flow, server round-trip)
 │   └── WaterfallStepper.tsx      # 11-node pipeline progress visualization (post-ADR-025)
@@ -82,6 +83,7 @@ src/
 │   ├── useErpProfile.ts          # ERP-vendor-aware label resolver (useIntentLabel, useSubTypeLabel)
 │   ├── useEvidenceSelection.tsx  # ADR-043 field↔source linking — shared evidence selection (provider + hook) keyed on a backend-authoritative supports_ref / evidence_ref
 │   ├── useExceptionActions.ts    # HITL handlers (approve / reject / escalate / override / cosign / reanalyze)
+│   ├── useDisplayLabel.ts        # ADR-045 — governed taxonomy labels (supergroup/intent) from /health; binds src/lib/taxonomy-labels.ts to useHealth
 │   ├── useHealth.ts              # Fetches runtime enums from /api/v1/health
 │   ├── useKeyboardListNav.ts     # ArrowUp/Down + j/k + Home/End on a sorted single-select listbox. Consumed by /cases workspace queue (ADR-041 P3c).
 │   ├── useManualOrderCases.ts    # `useCases` + `useManualOrderCases` — fetch /api/v1/cases with WS-driven invalidation; exposes refetch() and isCaseInvalidationEvent helper
@@ -90,12 +92,13 @@ src/
 │   ├── useSlaTicker.ts           # 1-minute interval for live SLA-band recalculation without re-fetch
 │   └── useWebSocket.ts           # Section 8 protocol with reconnection backoff + Section 8.4 polling fallback
 ├── config/
-│   ├── erp-label-map.ts          # Per-vendor (SAP / Oracle / Salesforce / GENERIC) display-label maps for intents + EDI sub_types
+│   ├── erp-label-map.ts          # ADR-045: demoted to a vendor-synonym overlay (SAP / Oracle / Salesforce / GENERIC) for intents + EDI sub_types; the label authority is /health display_labels
 │   └── nav-tabs.ts               # Single source of truth for NavBar tabs (ADR-041 P2 dropped "Exception Queue"; Home / Cases / Performance / Settings remain)
 ├── lib/
 │   ├── api.ts                    # API client — handler surface for auth + health + exceptions + line items + cases + pipeline + workflow + policy. Bulk mock fixtures live in mock-data/ (ADR-041 P5; api.ts shrunk 3894 → 2146 lines).
 │   ├── auth.ts                   # NextAuth options (credentials provider, JWT callbacks)
-│   ├── cases.ts                  # STATUS_LABEL + CASE_STATUS_CLUSTERS + isAwaitingHuman / clusterFor / sourceChannelLabel / lastActivityLabel helpers
+│   ├── cases.ts                  # STATUS_LABEL + CASE_STATUS_CLUSTERS + isAwaitingHuman / clusterFor / sourceChannelLabel / lastActivityLabel helpers; formatSupergroupCode now resolves governed labels via taxonomy-labels (ADR-045)
+│   ├── taxonomy-labels.ts        # ADR-045 — pure label resolvers (supergroupLabel, intentLabel) + the qualifier rule (showsIntentQualifier); /health → generated taxonomy constants → title-case fallback
 │   ├── mock-data/                # ADR-041 P5 — bulk mock fixtures extracted from api.ts
 │   │   ├── order-analyses.ts     # MOCK_ORDER_ANALYSES (~1750 lines) — keyed by ExceptionSummary.id
 │   │   ├── exceptions.ts         # MOCK_EXCEPTIONS + the S15a parent_case_id forEach wiring in module scope. Includes 3 multi-issue clusters (7 records sharing a parent_case_id) for the records-picker workflow.
@@ -411,7 +414,8 @@ Page Content (max-width 1800px) — CSS grid:
 | `ExceptionSummary` | `ExceptionSummary` schema (+ `account_id`, `account_name`, `parent_case_id?`, **`sap_block_code?` — raw SAP block reason code on BLOCK-parented records, ADR-041 P1**) | exceptions.ts |
 | `ExceptionDetail` | `ExceptionDetailResponse` schema | exceptions.ts |
 | `TraceRecord` | `TraceResponse` schema | exceptions.ts |
-| `HealthResponse` | Health endpoint response — extended with `allowed_resolution_actions`, `allowed_override_reason_tags`, and `allowed_override_reason_tags_by_intent` | exceptions.ts |
+| `HealthResponse` | Health endpoint response — extended with `allowed_resolution_actions`, `allowed_override_reason_tags`, `allowed_override_reason_tags_by_intent`, and (ADR-045) `display_labels` + `intents_by_supergroup` | exceptions.ts |
+| `TaxonomyDisplayLabels` | ADR-045 — governed operator labels for taxonomy codes (`{ supergroups, intents }`, keyed `SG_*` / `INT_*`); mirrors `asoe2/api/schemas.py::TaxonomyDisplayLabels` | exceptions.ts |
 | `DispositionRequest` | `DispositionRequest` (schemas.py) — `{ action, notes, reason_tag }`; single unified disposition DTO (replaces OverrideRequest / ApproveRequest / RejectRequest, all deleted in Phase 3) | contracts.ts (re-exported via api.ts) |
 | `EscalateRequest` | `EscalateRequest` (schemas.py) — `{ reason, to_role? }` | contracts.ts |
 | `CosignRequest` | `CosignRequest` (schemas.py) — `{ approve, notes }`; notes mandatory (SOX) | contracts.ts |
@@ -572,8 +576,22 @@ Per Guardrail #2, the `useHealth` hook fetches `GET /api/v1/health` which return
 - `lifecycle_states[]` — drives state filter dropdown
 - `allowed_recipes[]` — available for display
 - `kill_switch`, `explain_mode` — platform status
+- `display_labels` (ADR-045) — governed operator labels for taxonomy codes (`{ supergroups, intents }`); the label authority consumed via `useDisplayLabel` / `<TaxonomyLabel>`
+- `intents_by_supergroup` (ADR-045) — supergroup→intent fan-out; drives the summary qualifier rule (intent chip shown only when a supergroup fans out to >1 intent)
 
-Used in: Exception Queue filters, Dashboard platform health card.
+Used in: Exception Queue filters, Dashboard platform health card, and (via `useDisplayLabel`) every supergroup/intent label across the cases workspace and exception detail surfaces.
+
+### 8.0.1 Taxonomy label authority (ADR-045)
+
+`src/lib/taxonomy-labels.ts` is the single projection layer for taxonomy
+display strings. Resolution order for every label: **live `/health`
+`display_labels` → generated taxonomy constants (`src/generated/taxonomy.ts`,
+the same YAML projection — synchronous, no flash) → title-case fallback**
+for an unsynced code. `useDisplayLabel` binds these to `useHealth`;
+`<TaxonomyLabel axis="supergroup|intent" code raw?>` is the render path
+(`raw` keeps the machine token for the audit/Diagnostics zone). This
+replaced the drifted `erp-label-map` intent path that mislabelled
+`MANUAL_ORDER_INTAKE` as "Email Order Intake" on EDI-channel orders.
 
 ---
 
@@ -587,11 +605,19 @@ Release", Oracle says "Price Hold Release", Salesforce says "Order Hold
 Release". This config layer maps canonical codes to vendor-specific
 display strings without forking the backend vocabulary.
 
+> **ADR-045 demotion:** this map is no longer the label authority — it is
+> a *vendor-synonym overlay*. The authority for operator-facing taxonomy
+> strings is `/health` `display_labels` (§8.0.1). erp-label-map carries
+> only intents with a genuine cross-ERP synonym (Credit Block vs Credit
+> Hold); ASOE-native intents (e.g. `MANUAL_ORDER_INTAKE`) are resolved
+> from `/health` and are deliberately absent here. Enforced by
+> `tests/architectural/erp_label_map_overlay_guard.test.ts`.
+
 **`src/config/erp-label-map.ts`** — pure data + two resolvers:
 - `ErpVendor` type union: `SAP | ORACLE | SALESFORCE | GENERIC`.
-- `ERP_LABEL_MAPS` — per-vendor `{ intents, sub_types }` table. Every
-  vendor map has an entry for every canonical intent + EDI sub_type;
-  GENERIC is the always-populated fallback.
+- `ERP_LABEL_MAPS` — per-vendor `{ intents, sub_types }` overlay table.
+  Keys are a subset of the contract intents (lint-locked ⊆
+  `allowed_intents`); GENERIC is the synonym fallback.
 - `intentLabelFor(intent, vendor)` and `subTypeLabelFor(subType, vendor)`
   — two-tier fallback (vendor → GENERIC → title-cased code) so the UI
   never renders a raw machine string.
