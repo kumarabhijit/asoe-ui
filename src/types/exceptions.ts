@@ -1492,6 +1492,35 @@ export interface HealthResponse {
    * transition map in `src/lib/cases.ts` in that window.
    */
   allowed_autonomy_levels?: AutonomyLevelInfo[];
+  /**
+   * ADR-045 — operator-facing display strings for taxonomy codes, projected
+   * from `db/seeds/case_taxonomy.yaml` (mirrors
+   * `asoe2/api/schemas.py::TaxonomyDisplayLabels`). The UI is a pure
+   * projector: it renders these strings and never hand-authors a label for a
+   * code (Guardrail #2). This replaces the drifted intent label map that
+   * mislabelled `MANUAL_ORDER_INTAKE` as "Email Order Intake". Defaults to
+   * empty maps until the backend ships the field; the UI title-cases the raw
+   * code as a last-resort fallback in that window.
+   */
+  display_labels?: TaxonomyDisplayLabels;
+  /**
+   * ADR-045 — the supergroup→intent fan-out map (mirrors
+   * `asoe2/contracts/_generated/taxonomy_constants.py::INTENTS_BY_SUPERGROUP`).
+   * Drives the summary qualifier rule: the intent chip is shown only when its
+   * supergroup fans out to more than one intent, so a 1:1 bucket like
+   * `SG_NEW_ORDER` reads as just "New Order".
+   */
+  intents_by_supergroup?: Record<string, string[]>;
+}
+
+/**
+ * ADR-045 — operator display strings for taxonomy codes (mirrors
+ * `asoe2/api/schemas.py::TaxonomyDisplayLabels`). Keys are taxonomy codes
+ * (`SG_*` / `INT_*`); the codes remain the source of truth for control flow.
+ */
+export interface TaxonomyDisplayLabels {
+  supergroups: Record<string, string>;
+  intents: Record<string, string>;
 }
 
 /**

@@ -27,6 +27,19 @@
  *   the backend never sees these strings.
  * - NOT a complete i18n system. Pure English labels only; a future i18n
  *   pass would layer locale on top of ERP vendor.
+ *
+ * ## ADR-045 demotion
+ *
+ * This map is a *vendor-synonym overlay*, not the label authority. The
+ * authority for operator-facing taxonomy strings is the governed
+ * `/health` `display_labels` map (consumed via `useDisplayLabel` /
+ * `<TaxonomyLabel>`). Only intents with a genuine cross-ERP synonym
+ * (Credit Block vs Credit Hold) belong here; ASOE-native intents
+ * (e.g. MANUAL_ORDER_INTAKE) are resolved from `/health` and must NOT
+ * be listed. A lint lock
+ * (`tests/architectural/erp_label_map_overlay_guard.test.ts`) enforces
+ * that every key here is a real contract intent and that the
+ * "Email Order Intake" misnomer never returns.
  */
 
 /**
@@ -152,7 +165,11 @@ export const ERP_LABEL_MAPS: Record<ErpVendor, ErpLabelMap> = {
       MIN_ORDER_QTY:          "Min Order Qty",
       PALLET_CONFIG:          "Pallet Config",
       DELIVERY_DELAY:         "Delivery Delay",
-      MANUAL_ORDER_INTAKE:      "Email Order Intake",
+      // ADR-045: MANUAL_ORDER_INTAKE is ASOE-native (no cross-ERP synonym)
+      // and is NOT listed here. Its operator label comes from the governed
+      // /health display_labels ("Manual Order Intake") via TaxonomyLabel /
+      // useDisplayLabel. The old entry mislabelled it "Email Order Intake",
+      // which was wrong for orders arriving over EDI/fax/phone.
     },
     sub_types: {
       SKU_MISMATCH:     "SKU Mismatch",

@@ -98,18 +98,25 @@ describe("EmailOrderEntrySection — data-presence dispatch lock (ADR-034 §6)",
   it("the only allowed places that name the literal are the config layer + section import wiring", () => {
     // The intent literal is allowed to appear at the configuration
     // boundary — `src/lib/api.ts` MOCK_HEALTH (the Guardrail #2 source
-    // of runtime values), `src/config/erp-label-map.ts`, and the
-    // section/component import wiring in ExceptionDetailPanel. Confirm
-    // the locations the lock test EXPECTS to find it actually do —
-    // catches accidental deletion of the intent from the config surface.
+    // of runtime values) and the governed taxonomy constants
+    // (`src/generated/taxonomy.ts`), which now carry the operator label
+    // ("Manual Order Intake") per ADR-045. Confirm the locations the lock
+    // EXPECTS to find it actually do — catches accidental deletion of the
+    // intent from the config surface.
+    //
+    // NOTE (ADR-045): `src/config/erp-label-map.ts` deliberately no longer
+    // names this intent. erp-label-map is a vendor-synonym overlay; the
+    // ASOE-native MANUAL_ORDER_INTAKE label comes from /health
+    // display_labels. The overlay's exclusion of it is enforced by
+    // tests/architectural/erp_label_map_overlay_guard.test.ts.
     const apiPath = path.join(ROOT, "src/lib/api.ts");
-    const labelMapPath = path.join(ROOT, "src/config/erp-label-map.ts");
+    const taxonomyPath = path.join(ROOT, "src/generated/taxonomy.ts");
 
     const apiContent = fs.readFileSync(apiPath, "utf-8");
-    const labelMapContent = fs.readFileSync(labelMapPath, "utf-8");
+    const taxonomyContent = fs.readFileSync(taxonomyPath, "utf-8");
 
     expect(apiContent).toContain('"MANUAL_ORDER_INTAKE"');
-    expect(labelMapContent).toContain("MANUAL_ORDER_INTAKE:");
+    expect(taxonomyContent).toContain('"INT_MANUAL_ORDER_INTAKE": "Manual Order Intake"');
   });
 
   it("the section import is wired in ExceptionDetailPanel exactly once", () => {

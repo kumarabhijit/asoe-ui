@@ -1,42 +1,43 @@
 /**
- * ERP label-map coverage test.
+ * ERP label-map coverage test — ADR-045 revision.
  *
- * Every intent that asoe-ui's mock health serves must have a label
- * entry in `ERP_LABEL_MAPS.GENERIC.intents`. The resolver has a
- * title-case fallback so missing entries don't break runtime — but
- * a missing GENERIC entry means the intent renders machine-ish
- * ("Back_order" instead of "Back Order") until someone notices.
- * Cheaper to catch here.
+ * Before ADR-045 this file required `ERP_LABEL_MAPS.GENERIC.intents` to
+ * carry an entry for every intent. ADR-045 reverses that: the operator-
+ * facing label authority is the governed `/health` `display_labels` map,
+ * and `erp-label-map.ts` is demoted to a *vendor-synonym overlay* that
+ * deliberately does NOT cover ASOE-native intents (e.g.
+ * MANUAL_ORDER_INTAKE — whose old GENERIC entry was the "Email Order
+ * Intake" misnomer).
  *
- * Why iterate `MOCK_HEALTH.allowed_intents` rather than a hand-
- * written set: the mock vocabulary is the single source of truth for
- * what the UI will encounter in demos. Real-backend parity is
- * enforced in `tests/architectural/type_contracts.test.ts`.
+ * So the coverage invariant moves to the new authority: every intent the
+ * mock serves must resolve to a human (non-machine) label via
+ * `display_labels`. The overlay only has to stay a valid subset (enforced
+ * in tests/architectural/erp_label_map_overlay_guard.test.ts).
  */
 
 import { MOCK_HEALTH } from "../fixtures";
 import { ERP_LABEL_MAPS, SUPPORTED_ERP_VENDORS } from "@/config/erp-label-map";
+import { intentLabel, intentCodeFor } from "@/lib/taxonomy-labels";
 
-describe("ERP label-map coverage", () => {
-  it("every canonical intent has a GENERIC label", () => {
-    const genericIntents = ERP_LABEL_MAPS.GENERIC.intents;
+describe("intent label coverage (ADR-045)", () => {
+  it("every canonical intent resolves to a human label via /health", () => {
     for (const intent of MOCK_HEALTH.allowed_intents) {
-      expect(genericIntents[intent]).toBeTruthy();
+      const label = intentLabel(MOCK_HEALTH, intent);
+      // Non-empty, and not the raw machine token.
+      expect(label).toBeTruthy();
+      expect(label).not.toBe(intent);
+      expect(label).not.toBe(intentCodeFor(intent));
     }
   });
 
-  it("GENERIC acts as the fallback for every other vendor", () => {
-    // Any intent absent from a specific vendor map must still resolve
-    // because `intentLabelFor` cascades vendor → GENERIC → title-case.
-    // This test asserts the middle tier is always populated — the
-    // cascade's correctness is separately tested in erp-label-map.test.ts.
-    const genericKeys = new Set(Object.keys(ERP_LABEL_MAPS.GENERIC.intents));
-    expect(genericKeys.size).toBeGreaterThanOrEqual(
-      MOCK_HEALTH.allowed_intents.length,
-    );
+  it("display_labels (the authority) covers every served intent", () => {
+    const intents = MOCK_HEALTH.display_labels!.intents;
+    for (const intent of MOCK_HEALTH.allowed_intents) {
+      expect(intents[intentCodeFor(intent)]).toBeTruthy();
+    }
   });
 
-  it("every supported vendor has at least one intent entry", () => {
+  it("every supported vendor still has at least one synonym entry", () => {
     for (const vendor of SUPPORTED_ERP_VENDORS) {
       const size = Object.keys(ERP_LABEL_MAPS[vendor].intents).length;
       expect(size).toBeGreaterThan(0);
