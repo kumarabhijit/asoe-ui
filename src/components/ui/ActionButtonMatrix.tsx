@@ -1,27 +1,20 @@
-// ActionButtonMatrix — shared verdict × permission action surface.
+// ActionButtonMatrix — the verdict × permission action surface.
 //
-// ADR-041 P3e §2.2. Single source of truth for the HITL action
-// buttons (Approve / Reject / Override / Escalate / Re-analyze)
-// and the comment-input swap that gates Approve / Reject /
-// Reanalyze on a typed comment. Two consumers:
+// Single source of truth for the HITL action buttons (Approve /
+// Reject / Override / Escalate / Re-analyze) and the constrained
+// reason dialog that gates Approve / Reject / Reanalyze / Escalate.
 //
-//   1. `AgentReasoningCard` — Layer 1 cognition surface; mounts the
-//      matrix inline (legacy, flag off).
-//   2. `StickyActionRibbon` — sticky-at-top chrome at the top of
-//      the right-pane scroll container (flag on); keeps Approve
-//      above the fold no matter the Analysis-section length.
+// ADR-045 CP3 — the matrix has exactly ONE host: the Agent
+// Recommendation pane (`AgentReasoningCard`). The separate
+// StickyActionRibbon was retired, so there is no longer a
+// dual-mount audit concern (an operator can only act from one
+// surface). The matrix has no caller-supplied JSX overrides; hosts
+// pass data + callbacks only.
 //
-// The verdict × permission matrix MUST stay identical between the
-// two mount points — divergence is a SOX failure mode (an operator
-// approving via one mount sees different buttons than via the
-// other). This component is the lock: both consumers render
-// `<ActionButtonMatrix />`; the matrix has no caller-supplied
-// JSX overrides.
-//
-// State (pendingAction + comment) is local to each mount. In V2
-// mode only StickyActionRibbon mounts the matrix; in legacy mode
-// only AgentReasoningCard does. They never both mount at once, so
-// there is no state-sync concern.
+// Reason capture is uniform (ADR-045 CP3): Approve/Reject use a
+// comment (+ mandatory reason_tag on YELLOW/RED), while Reanalyze
+// and Escalate use a mandatory free-text reason — all through the
+// same in-panel dialog (no window.prompt).
 
 "use client";
 

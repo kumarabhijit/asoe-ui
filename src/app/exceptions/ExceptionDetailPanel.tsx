@@ -26,7 +26,6 @@ import {
   AgentReasoningCard,
   type ExecutionError,
 } from "@/components/ui/AgentReasoningCard";
-import { StickyActionRibbon } from "@/components/ui/StickyActionRibbon";
 import { useToast } from "@/components/ui/Toast";
 import { useCaseTelemetry } from "@/hooks/useCaseTelemetry";
 import { casesRowV2Enabled } from "@/lib/flags";
@@ -83,13 +82,14 @@ function isHumanInTheLoopState(state: string): boolean {
 }
 
 // ADR-041 P3e §2.2 — gates the Analysis-above-Recommendation
-// reorder + the sticky `<StickyActionRibbon>` mount. Rollout
-// policy in `src/lib/flags.ts` (production stays OFF; Vercel
-// preview deploys default ON). When ON, the ribbon takes over
-// the action surface, the card hides its matrix, and
-// `<AgentAnalysisSection>` renders above the card. Today's HITL
-// auto-expand predicate is preserved (CSA + Compliance panel
-// agreement).
+// reorder. Rollout policy in `src/lib/flags.ts` (production stays
+// OFF; Vercel preview deploys default ON). When ON,
+// `<AgentAnalysisSection>` renders above the Recommendation card.
+// ADR-045 CP3 — the flag no longer gates an action host: actions
+// live in the Recommendation card in both modes (the separate
+// ribbon is retired). Agent Analysis is collapsed by default and
+// auto-expands only for HITL states, keeping the card's actions
+// above the fold.
 const CASES_ROW_V2 = casesRowV2Enabled();
 
 interface ExceptionDetailPanelProps {
@@ -287,10 +287,10 @@ export default function ExceptionDetailPanel({
   // ADR-041 P3e Phase 3 sign-off gate #5 — telemetry for the V2
   // surfaces. Hook always mounts (Rules of Hooks); passing
   // undefined for the case id makes `markFirstAction` a no-op so
-  // legacy (flag-off) mode is byte-for-byte identical at the wire
-  // level. The wrapped handlers below are passed ONLY to
-  // StickyActionRibbon; the legacy AgentReasoningCard mount keeps
-  // the raw handlers.
+  // flag-off mode is byte-for-byte identical at the wire level.
+  // ADR-045 CP3 — the wrapped handlers now feed the single
+  // AgentReasoningCard action host (the StickyActionRibbon is
+  // retired); telemetry stays preview-gated via telemetryCaseId.
   const telemetryCaseId = CASES_ROW_V2
     ? (detail?.parent_case_id ?? undefined)
     : undefined;
@@ -593,94 +593,6 @@ export default function ExceptionDetailPanel({
         hasDraftReply={!!analysis?.draft_reply}
       />
 
-      {/* ━━ 2b. Sticky action ribbon (ADR-041 P3e §2.2) ━━━━━━━━━━━━━━
-          The ribbon must stay visible regardless of which scroll
-          surface the operator drives. Two scroll surfaces in play:
-
-            A. Right pane (`/cases/page.tsx`'s
-               `<section aria-label="Case workspace" lg:overflow-y-auto>`)
-               scrolls slim header, classification history,
-               records picker, and this entire panel.
-            B. The inner `flex-1 overflow-auto` div below scrolls
-               Analysis / Recommendation / enrichment sections.
-
-          The first iteration only addressed (B) — the ribbon sat
-          inside the inner scroll, so its sticky reference was the
-          same surface that scrolled. Fixed in commit c8d226d by
-          lifting it OUT of (B). But that left (A) unaddressed:
-          when the operator scrolled the right pane, the ribbon
-          scrolled away with the slim header / classification /
-          records picker.
-
-          This commit adds genuine `position: sticky` on the
-          wrapper so the ribbon pins to the top of the nearest
-          scrolling ancestor — which at lg+ is the right-pane
-          workspace section (the (A) scroll), and below lg is the
-          document. The `top` value differs by breakpoint:
-
-            * lg+: `top: 0` — anchors to the top of the right
-              pane's viewport, which already sits below the nav
-              (the workspace section is inside `<main>` which is
-              `h-[calc(100vh-var(--nav-height))]`).
-            * `< lg`: `top: var(--nav-height)` — the document is
-              the scrolling ancestor, and the NavBar is also
-              sticky `top: 0`. Anchoring the ribbon to the
-              nav-height avoids overlap.
-
-          z-10 keeps the ribbon over the cards that scroll under
-          it. Wrapper has its own background so the scroll content
-          doesn't bleed through. */}
-      {CASES_ROW_V2 && detail?.shadow_verdict && (
-        // PO 2026-05-28 round-3: the previous wrapper carried
-        // `bg-surface-secondary` + `border-b border-border-subtle`
-        // + `px-16 pt-16` as visual scaffolding. With the ribbon's
-        // own opaque card chrome (`bg-surface-primary border
-        // shadow-sm` from StickyActionRibbon.tsx) under it, the
-        // wrapper's chrome read as a heavy grey box around the
-        // ribbon. Pass the sticky positioning straight through to
-        // the ribbon's section via `className` — the ribbon's own
-        // bg/border/shadow is the only visual chrome the operator
-        // needs. The trailing `mt-12 mb-8` keeps the ribbon from
-        // touching the ContextStrip above and the scroll body
-        // below.
-        <StickyActionRibbon
-          className={cn(
-            "sticky top-[var(--nav-height)] lg:top-0 z-10",
-            "mx-16 mt-12 mb-8",
-          )}
-          verdict={detail.shadow_verdict as ShadowVerdict}
-          executionError={executionError}
-          recommendedAction={_recommendedAction() ?? undefined}
-          onApprove={handleApproveWithTelemetry}
-          onReject={handleRejectWithTelemetry}
-          onEscalate={handleEscalateWithTelemetry}
-          onOverride={handleOverrideWithTelemetry}
-          canApprove={hasPermission("exceptions:approve")}
-          canOverride={hasPermission("exceptions:override")}
-          canEscalate={hasPermission("exceptions:escalate")}
-          canReanalyze={hasPermission("exceptions:override")}
-          onReanalyze={
-            hasPermission("exceptions:override")
-              ? handleReanalyzeWithTelemetry
-              : undefined
-          }
-          reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
-          actionInFlight={actionInFlight}
-          // S2 finding #7 — reason-tag vocabulary for the mandatory
-          // tag Select on YELLOW/RED Approve/Reject. Per-intent
-          // when available, falling back to the global list. Both
-          // shapes come from `useHealth` so the picker is Guardrail
-          // #2-clean (no hardcoded enums).
-          availableReasonTags={
-            detail.intent
-              ? (health?.allowed_override_reason_tags_by_intent?.[detail.intent]
-                  ?? health?.allowed_override_reason_tags
-                  ?? [])
-              : (health?.allowed_override_reason_tags ?? [])
-          }
-        />
-      )}
-
       {/* ━━ 3. Scrollable Body ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="flex-1 overflow-auto p-16">
         <div className="flex flex-col gap-16">
@@ -801,8 +713,11 @@ export default function ExceptionDetailPanel({
               "Recommendation" pane (PO request #4: pane 2 after Entity
               Profile). Always rendered expanded; this is the primary
               decision surface the operator must always see.
-              When V2 is on, `hideActionMatrix` suppresses the inline
-              button matrix — the sticky ribbon above carries it. */}
+              ADR-045 CP3 — this card is the SOLE action host (the
+              separate StickyActionRibbon is retired); the verdict ×
+              permission matrix always renders inline here. Actions stay
+              above the fold because Agent Analysis is collapsed by
+              default (expanded only for HITL states). */}
           {detail.shadow_verdict ? (
             <AgentReasoningCard
               verdict={detail.shadow_verdict as ShadowVerdict}
@@ -838,10 +753,15 @@ export default function ExceptionDetailPanel({
                 executionError ? undefined : trace?.explanation
               }
               policyHits={trace?.shadow_policy_hits}
-              onApprove={handleApprove}
-              onReject={handleReject}
-              onEscalate={handleEscalate}
-              onOverride={handleOverride}
+              // ADR-045 CP3 — the Agent Recommendation pane is now the
+              // SOLE action host (the separate StickyActionRibbon is
+              // retired). It uses the telemetry-wrapped handlers so the
+              // automation-bias metrics that previously fired only from
+              // the ribbon are preserved on the single surviving surface.
+              onApprove={handleApproveWithTelemetry}
+              onReject={handleRejectWithTelemetry}
+              onEscalate={handleEscalateWithTelemetry}
+              onOverride={handleOverrideWithTelemetry}
               canApprove={hasPermission("exceptions:approve")}
               canOverride={hasPermission("exceptions:override")}
               canEscalate={hasPermission("exceptions:escalate")}
@@ -849,16 +769,14 @@ export default function ExceptionDetailPanel({
               // Only expose Re-analyze when the user is authorized — the
               // card itself additionally gates on verdict/error state.
               onReanalyze={
-                hasPermission("exceptions:override") ? handleReanalyze : undefined
+                hasPermission("exceptions:override") ? handleReanalyzeWithTelemetry : undefined
               }
               reanalyzeAttempts={detail.reanalysis_history?.length ?? 0}
               actionInFlight={actionInFlight}
-              hideActionMatrix={CASES_ROW_V2}
-              // S2 finding #7 — same per-intent fallback shape used
-              // by the StickyActionRibbon mount above. The legacy
-              // inline matrix surfaces the same mandatory tag picker
-              // so the two mount points stay byte-for-byte identical
-              // (SOX-grade audit invariant).
+              // S2 finding #7 — per-intent reason-tag vocabulary for the
+              // mandatory tag picker on YELLOW/RED Approve/Reject, falling
+              // back to the global list. Both shapes come from useHealth
+              // (Guardrail #2 — no hardcoded enums).
               availableReasonTags={
                 detail.intent
                   ? (health?.allowed_override_reason_tags_by_intent?.[detail.intent]

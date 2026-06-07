@@ -613,9 +613,11 @@ describe("ExceptionDetailPanel escalate contract (source-level)", () => {
   });
 
   it("wires onOverride to a handler that opens the chooser", () => {
-    // Panel wires onOverride={handleOverride}; the handler itself lives
-    // in useExceptionActions and flips overrideOpen via setOverrideOpen(true).
-    expect(panel).toMatch(/onOverride=\{handleOverride\}/);
+    // ADR-045 CP3 — the single Agent Recommendation host wires the
+    // telemetry-wrapped handler, which delegates to the hook's
+    // handleOverride (flips overrideOpen via setOverrideOpen(true)).
+    expect(panel).toMatch(/onOverride=\{handleOverrideWithTelemetry\}/);
+    expect(panel).toMatch(/handleOverrideWithTelemetry\s*=[\s\S]{0,120}?handleOverride\(\)/);
     expect(hook).toMatch(/handleOverride\s*=\s*useCallback/);
     expect(hook).toMatch(/setOverrideOpen\(true\)/);
   });

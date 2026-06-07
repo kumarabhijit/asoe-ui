@@ -6,8 +6,9 @@
 //   * time-to-first-action — `markFirstAction(action)` fires the
 //     metric with the dwell since hook mount. Idempotent: only
 //     the FIRST call per case_id fires (subsequent calls are
-//     no-ops). The hook caller — `StickyActionRibbon` — invokes
-//     this on every action click; the hook guards.
+//     no-ops). The caller — the Agent Recommendation pane's action
+//     handlers (ADR-045 CP3) — invokes this on every action click;
+//     the hook guards.
 //
 //   * analysis-scroll-depth — `trackAnalysisScroll(pct)` accumulates
 //     the maximum scroll depth observed during the case-open cycle.
