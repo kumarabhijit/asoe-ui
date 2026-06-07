@@ -76,6 +76,11 @@ Pick up remaining "Needs Minor Tweaks" items per slice (see reports `01`–`08`)
 where the fix is isolated. Skip anything that grows beyond a small diff and log
 it here as ⊘ Deferred with a reason.
 
+| status | Item | Location | Notes | PR |
+|--------|------|----------|-------|----|
+| ☑ | `formatDuration(0)` returned `""` (0ms node showed no duration) | `WaterfallStepper.tsx:80-84` | `if (!ms)` → `if (ms === undefined)` so a real 0ms renders "0ms" | #222 |
+| ⊘ | Remaining ~44 "Needs Minor Tweaks" across reports 01–08 | various | **Deferred** — out of scope for this remediation pass, which targeted the 11 Needs-Rework items + the cross-cutting themes (T1/T3/T5/T8/T9 + Guardrail #6). The minor items are non-blocking polish (e.g. MetricTile `--font-size-mono-metric`, raw-timestamp formatting, `humanizeNode` dedup, SVG font-size token discipline). Each still needs its own regression test per the per-bug rule, so they belong in a dedicated follow-up sweep rather than being rushed at the tail of this PR. They remain catalogued in reports 01–08. |
+
 ---
 
 ## ⚠️ Scaffolding judgment calls
@@ -165,6 +170,14 @@ _(Append expert decisions here as they're made: date · item · expert · outcom
   validator always recomputes, so an injected total can't drift from the lines.
 
 ## Review checkpoints
+- **After Batch 5 (5a/5b/5c, cross-repo)** — correctness review over the asoe-ui
+  `fce744a..HEAD` and asoe2 `e7c61bb..HEAD` source diffs (dashboard tri-state +
+  RECENT_ACTIVITY gate JSX balance, GravitationalOrbs observer/reduced-motion +
+  listener cleanup, cases/[id] `notFound()` no-loop + state rename, OverMax
+  EvidenceBlock falsy-zero, auth-mode control flow, pydantic validator
+  mutation). **No correctness bugs.** UI build + full vitest (1855) + asoe2
+  pytest green. All required gates (validator unit test, mock-parity lock,
+  section regression) confirmed shipped.
 - **After Batch 4 (Batches 3–4)** — focused correctness review over
   `98af8a3..HEAD` (Button label-retention, Attachment span wrapper, Toast roles,
   home `<main>` balance, Intl formatters, PricingWaterfall null/ERROR handling,

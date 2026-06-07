@@ -78,7 +78,9 @@ function NodeIndicator({ status }: { status: NodeState["status"] }) {
 }
 
 function formatDuration(ms?: number): string {
-  if (!ms) return "";
+  // `if (!ms)` treated a genuine 0ms (sub-millisecond, rounded) node as
+  // "no duration" and rendered nothing; only an absent value should be blank.
+  if (ms === undefined) return "";
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
 }

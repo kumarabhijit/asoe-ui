@@ -60,6 +60,15 @@ describe("WaterfallStepper", () => {
     expect(screen.getByText(/Node failed/)).toBeInTheDocument();
   });
 
+  // REGRESSION (fails on parent): formatDuration used `if (!ms) return ""`, so a
+  // genuine 0ms (sub-millisecond, rounded) completed node showed no duration.
+  it("renders '0ms' for a 0-duration completed node (not blank)", () => {
+    const nodes = makeNodeStates(1);
+    nodes[0] = { node: "ingest", status: "completed", duration_ms: 0 };
+    render(<WaterfallStepper nodes={nodes} />);
+    expect(screen.getByText("0ms")).toBeInTheDocument();
+  });
+
   // REGRESSION (fails on parent): a skipped node used to be icon-only (dashed
   // ring), indistinguishable from "pending" for SR / low-vision users
   // (WCAG 1.4.1). It must now carry a visible "Skipped" text cue.
