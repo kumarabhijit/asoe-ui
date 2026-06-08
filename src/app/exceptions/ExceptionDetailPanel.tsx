@@ -15,14 +15,14 @@
  *   3b. AgentAnalysis    — problem / root cause / recommendation prose
  *      + data-presence enrichment sections; the section named by the
  *        backend `primary_section` hint auto-expands               (Priority 2)
- *   4+5. Evidence / Diagnostics — tabbed; Diagnostics isolated     (Priority 4)
+ *   4. EvidenceGrid     — collapsed line items + pricing waterfall
+ *   5. DiagnosticsSection — inline collapsed "Show Diagnostics" pane (Priority 4)
  *
- * The Agent recommendation is never tabbed (Guardrail #4).
  * Governance: Human = Review Authority (Approve/Reject/Escalate only).
  */
 "use client";
 
-import { useState, useEffect, useRef, useCallback, type ComponentProps, type MutableRefObject, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, type MutableRefObject } from "react";
 import { signIn } from "next-auth/react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import {
@@ -52,7 +52,6 @@ import { COSIGN_LIFECYCLE_STATE, CollapsibleSection, HITL_LIFECYCLE_STATES, Laye
 import { HeaderRibbon } from "./HeaderRibbon";
 import { ContextStrip } from "./ContextStrip";
 import { ImpactBar } from "./ImpactBar";
-import { Tabs } from "@/components/ui/Tabs";
 import { AgentAnalysisSection } from "./AgentAnalysisSection";
 import { DuplicateDetectionSection } from "./DuplicateDetectionSection";
 import { OrderComparisonSection } from "./OrderComparisonSection";
@@ -1048,32 +1047,38 @@ export default function ExceptionDetailPanel({
               dumb data-presence projectors; only their placement moved. */}
           {operatorSections}
 
-          {/* ━━ 4+5. Evidence / Diagnostics — tabbed ━━━━━━━━━━━━━━━━━━
-              System Diagnostics (raw trace, executed-node timeline, LLM
-              metrics) is isolated into its own tab (Priority 4) so it no
-              longer sits in the primary scroll under Evidence. Evidence is
-              the default tab. The Agent recommendation is NOT tabbed (it
-              stays in the persistent header above) — Guardrail #4 forbids
-              hiding the AI behind a tab. The "Jump to → Evidence /
-              Diagnostics" anchor links still work: DetailLowerTabs selects
-              the matching tab on hash, then the inner section's
-              useHashOpen expands + scrolls it (jump-to-expand preserved). */}
-          <DetailLowerTabs
-            detail={detail}
-            trace={trace}
-            analysis={analysis}
-            lineItems={lineItems}
-            selectedLine={selectedLine}
-            onSelectLine={setSelectedLine}
-            selectedAnalysis={selectedAnalysis}
-            totalErp={totalErp}
-            totalPo={totalPo}
-            showPreview={showPreview}
-            onEvidenceFirstOpen={ensureLineItemsLoaded}
-            onDiagnosticsFirstOpen={ensureTraceLoaded}
-            evidenceExtras={evidenceSections}
-            auditExtras={auditSections}
-          />
+          {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              The anchor id lives on EvidenceGrid's own root (so the
+              "Jump to → Evidence" link expands + scrolls it, #4); the
+              wrapper keeps data-section-anchor for the pane-focus cycle. */}
+          <div data-section-anchor="evidence">
+            <EvidenceGrid
+              lineItems={lineItems}
+              analysis={analysis}
+              selectedLine={selectedLine}
+              onSelectLine={setSelectedLine}
+              selectedAnalysis={selectedAnalysis}
+              totalErp={totalErp}
+              totalPo={totalPo}
+              onFirstOpen={ensureLineItemsLoaded}
+              anchorId="section-evidence"
+            />
+          </div>
+
+          {/* ━━ 5. Diagnostics ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Inline collapsed "Show Diagnostics" section (default
+              collapsed, lazy-loads trace on first open). Kept inline
+              rather than behind a tab — the stacked-collapsible layout
+              is the operator-preferred surface. */}
+          <div data-section-anchor="diagnostics">
+            <DiagnosticsSection
+              detail={detail}
+              trace={trace}
+              showPreview={showPreview}
+              onFirstOpen={ensureTraceLoaded}
+              anchorId="section-diagnostics"
+            />
+          </div>
 
           {/* ── Metadata ──────────────────────────────────────────────── */}
           <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-8 text-caption">
@@ -1189,104 +1194,3 @@ function SectionAnchorBar() {
   );
 }
 
-/* ── Lower-detail tabs: Evidence / Diagnostics ──────────────────────
- * Isolates the System Diagnostics surface (raw trace, executed-node
- * timeline, LLM token/cost metrics) into a dedicated tab so it no
- * longer shares the primary scroll with Evidence (Priority 4). Evidence
- * is the default tab.
- *
- * The Agent recommendation is deliberately NOT tabbed — it lives in the
- * persistent header above this control (Guardrail #4: the AI is never
- * hidden behind a tab).
- *
- * Hash-aware: the SectionAnchorBar's "Jump to → Evidence / Diagnostics"
- * links still resolve. On a matching hash this selects the right tab,
- * which mounts the section; the section's own `useHashOpen(anchorId, …)`
- * then expands + scrolls it (the jump-to-expand mechanism, finding #4,
- * is preserved unchanged). Prop types are picked straight off the child
- * components so this passthrough can't drift from their contracts.
- */
-function DetailLowerTabs({
-  showPreview,
-  onEvidenceFirstOpen,
-  onDiagnosticsFirstOpen,
-  evidenceExtras,
-  auditExtras,
-  ...rest
-}: {
-  showPreview: boolean;
-  onEvidenceFirstOpen: () => void;
-  onDiagnosticsFirstOpen: () => void;
-  // Tier-routed enrichment sections (council 2026-06-07): evidence-tier
-  // sections render atop the Evidence tab, audit-tier atop Diagnostics.
-  // Placement is decided by the backend `section_tiers` authority; this
-  // component is a dumb host.
-  evidenceExtras?: ReactNode;
-  auditExtras?: ReactNode;
-} & Pick<
-  ComponentProps<typeof EvidenceGrid>,
-  | "lineItems"
-  | "analysis"
-  | "selectedLine"
-  | "onSelectLine"
-  | "selectedAnalysis"
-  | "totalErp"
-  | "totalPo"
-> &
-  Pick<ComponentProps<typeof DiagnosticsSection>, "detail" | "trace">) {
-  const [active, setActive] = useState<"evidence" | "diagnostics">("evidence");
-
-  // Select the tab named by the URL hash so the anchor-bar jump links
-  // reveal the right surface (then the inner useHashOpen expands it).
-  useEffect(() => {
-    const sync = () => {
-      const h = typeof window !== "undefined" ? window.location.hash : "";
-      if (h === "#section-diagnostics") setActive("diagnostics");
-      else if (h === "#section-evidence") setActive("evidence");
-    };
-    sync();
-    window.addEventListener("hashchange", sync);
-    return () => window.removeEventListener("hashchange", sync);
-  }, []);
-
-  return (
-    <Tabs
-      ariaLabel="Evidence and diagnostics"
-      value={active}
-      onValueChange={(id) => setActive(id as "evidence" | "diagnostics")}
-      tabs={[
-        { id: "evidence", label: "Evidence" },
-        { id: "diagnostics", label: "Diagnostics" },
-      ]}
-      renderPanel={(id) =>
-        id === "evidence" ? (
-          <div data-section-anchor="evidence" className="pt-12 flex flex-col gap-16">
-            {evidenceExtras}
-            <EvidenceGrid
-              lineItems={rest.lineItems}
-              analysis={rest.analysis}
-              selectedLine={rest.selectedLine}
-              onSelectLine={rest.onSelectLine}
-              selectedAnalysis={rest.selectedAnalysis}
-              totalErp={rest.totalErp}
-              totalPo={rest.totalPo}
-              onFirstOpen={onEvidenceFirstOpen}
-              anchorId="section-evidence"
-            />
-          </div>
-        ) : (
-          <div data-section-anchor="diagnostics" className="pt-12 flex flex-col gap-16">
-            {auditExtras}
-            <DiagnosticsSection
-              detail={rest.detail}
-              trace={rest.trace}
-              showPreview={showPreview}
-              onFirstOpen={onDiagnosticsFirstOpen}
-              anchorId="section-diagnostics"
-            />
-          </div>
-        )
-      }
-    />
-  );
-}

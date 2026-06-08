@@ -31,7 +31,6 @@ import { GapBar } from "@/components/ui/GapBar";
 import { SampleDataTag } from "@/components/ui/ScaffoldDataBanner";
 import { EventsTimeline } from "@/components/ui/EventsTimeline";
 import { AttachmentPreview } from "@/components/ui/AttachmentPreview";
-import { Tabs } from "@/components/ui/Tabs";
 import {
   Dialog,
   DialogContent,
@@ -459,36 +458,6 @@ describe("a11y sweep: AttachmentPreview", () => {
             source_sha256: "a".repeat(64),
           },
         ]}
-      />,
-    ));
-});
-
-// ---------------------------------------------------------------------------
-// Tabs — WAI-ARIA tablist used by the exception detail pane to isolate
-// the Diagnostics surface. tablist/tab/tabpanel wiring + roving tabindex
-// must be axe-clean; only the active panel is mounted.
-// ---------------------------------------------------------------------------
-describe("a11y sweep: Tabs", () => {
-  const tabs = [
-    { id: "evidence", label: "Evidence" },
-    { id: "diagnostics", label: "Diagnostics" },
-  ];
-  it("default (first tab active)", async () =>
-    expectNoViolations(
-      <Tabs
-        ariaLabel="Evidence and diagnostics"
-        tabs={tabs}
-        renderPanel={(id) => <div>{id} panel</div>}
-      />,
-    ));
-  it("controlled (second tab active)", async () =>
-    expectNoViolations(
-      <Tabs
-        ariaLabel="Evidence and diagnostics"
-        tabs={tabs}
-        value="diagnostics"
-        onValueChange={() => {}}
-        renderPanel={(id) => <div>{id} panel</div>}
       />,
     ));
 });
