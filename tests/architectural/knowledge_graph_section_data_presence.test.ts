@@ -31,6 +31,6 @@ describe("KnowledgeGraphSection deliverable", () => {
   });
 
   it("mounts behind the knowledge_graph data-presence guard", () => {
-    expect(PANEL).toContain("analysis?.knowledge_graph &&");
+    expect(PANEL).toContain("if (analysis.knowledge_graph)");
   });
 });

@@ -60,7 +60,7 @@ describe("EmailOrderEntrySection — data-presence dispatch lock (ADR-034 §6)",
     // The mount line uses the data-presence guard, identical to the
     // other enrichment sections. We require both: the conditional
     // mount AND the JSX usage of <EmailOrderEntrySection ... />.
-    expect(content).toMatch(/analysis\??\.email_order_entry_analysis\s*&&/);
+    expect(content).toMatch(/if \(analysis\.email_order_entry_analysis\)/);
     expect(content).toMatch(/<EmailOrderEntrySection\b/);
 
     // Exclude any intent-keyed dispatch for the EmailOrderEntry intent.

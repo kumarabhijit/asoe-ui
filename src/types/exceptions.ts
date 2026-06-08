@@ -518,6 +518,11 @@ export interface PresentationContract {
    *  DUPLICATE_PO) or merely restate the arrival channel
    *  (MANUAL_ORDER_INTAKE)? Only discriminating intents earn Layer 1. */
   show_intent: boolean;
+  /** Per-section placement authority (council 2026-06-07): maps each
+   *  analysis section key to where the UI shows it. The UI honors this
+   *  and never re-decides placement (Guardrail #0/#1). Unknown keys
+   *  fail-open to "evidence". */
+  section_tiers?: Record<string, "operator" | "evidence" | "audit">;
   audit: PresentationAudit;
 }
 

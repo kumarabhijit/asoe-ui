@@ -29,6 +29,6 @@ describe("OrderEntrySection deliverable", () => {
   });
 
   it("mounts behind the order_entry_extraction data-presence guard", () => {
-    expect(PANEL).toContain("analysis?.order_entry_extraction &&");
+    expect(PANEL).toContain("if (analysis.order_entry_extraction)");
   });
 });

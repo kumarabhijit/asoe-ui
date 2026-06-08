@@ -27,6 +27,6 @@ describe("Edi850Section deliverable", () => {
   });
 
   it("mounts behind the edi_850_audit data-presence guard", () => {
-    expect(PANEL).toContain("analysis?.edi_850_audit &&");
+    expect(PANEL).toContain("if (analysis.edi_850_audit)");
   });
 });

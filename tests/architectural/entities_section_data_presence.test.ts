@@ -28,6 +28,6 @@ describe("EntitiesSection deliverable", () => {
   });
 
   it("mounts behind the entities_analysis data-presence guard (no intent dispatch)", () => {
-    expect(PANEL).toContain("analysis?.entities_analysis &&");
+    expect(PANEL).toContain("if (analysis.entities_analysis)");
   });
 });
