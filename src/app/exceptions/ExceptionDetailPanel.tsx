@@ -22,7 +22,7 @@
  */
 "use client";
 
-import { useState, useEffect, useRef, useCallback, type MutableRefObject } from "react";
+import { useState, useEffect, useRef, useCallback, type MutableRefObject, type ReactNode } from "react";
 import { signIn } from "next-auth/react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import {
@@ -570,7 +570,7 @@ export default function ExceptionDetailPanel({
   /* ── Enrichment-section placement (council 2026-06-07) ───────────────
      Each data-present enrichment section is built once here, then routed
      by the backend `presentation.section_tiers` authority:
-       operator -> Layer 1 · evidence -> Evidence tab · audit -> Diagnostics tab.
+       operator -> Layer 1 · evidence -> Evidence tier · audit -> Diagnostics tier.
      The UI HONORS the tier and never re-decides placement (Guardrail
      #0/#1). Unknown keys fail-open to "evidence" (shown, not buried).
      Sections are the SAME dumb projectors as before (Guardrail #6) —
@@ -1040,18 +1040,23 @@ export default function ExceptionDetailPanel({
 
           {/* Enrichment sections are routed by presentation.section_tiers
               (assembled in the component body): operator-tier renders
-              here on Layer 1; evidence-tier and audit-tier are handed to
-              DetailLowerTabs below (Evidence / Diagnostics tabs). This
-              retires the flat Layer-1 stack — the audit ledger the
-              cockpit (Guardrail #0) was created to replace. Sections stay
-              dumb data-presence projectors; only their placement moved. */}
+              here on Layer 1; evidence-tier and audit-tier render inline
+              in the Evidence / Diagnostics tiers below (stacked
+              collapsible layout). This retires the flat Layer-1 stack —
+              the audit ledger the cockpit (Guardrail #0) was created to
+              replace. Sections stay dumb data-presence projectors; only
+              their placement moved. */}
           {operatorSections}
 
-          {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              The anchor id lives on EvidenceGrid's own root (so the
-              "Jump to → Evidence" link expands + scrolls it, #4); the
-              wrapper keeps data-section-anchor for the pane-focus cycle. */}
-          <div data-section-anchor="evidence">
+          {/* ━━ 4. Evidence tier ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Evidence-tier enrichment sections (routed by the backend
+              section_tiers authority) stack above the line-item grid —
+              together they ARE the Evidence tier in the stacked-
+              collapsible layout (main 2026-06-08: tabs retired). The
+              anchor id lives on EvidenceGrid's own root (so the "Jump
+              to → Evidence" link expands + scrolls it, #4). */}
+          <div data-section-anchor="evidence" className="flex flex-col gap-16">
+            {evidenceSections}
             <EvidenceGrid
               lineItems={lineItems}
               analysis={analysis}
@@ -1065,12 +1070,15 @@ export default function ExceptionDetailPanel({
             />
           </div>
 
-          {/* ━━ 5. Diagnostics ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Inline collapsed "Show Diagnostics" section (default
-              collapsed, lazy-loads trace on first open). Kept inline
-              rather than behind a tab — the stacked-collapsible layout
-              is the operator-preferred surface. */}
-          <div data-section-anchor="diagnostics">
+          {/* ━━ 5. Diagnostics & Audit tier ━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Audit-tier engine artifacts (EDI 850 Audit, Knowledge
+              Graph — routed by section_tiers) stack above the inline
+              "Show Diagnostics" pane (raw trace, default collapsed,
+              lazy trace load). Kept inline rather than behind a tab —
+              the stacked-collapsible layout is the operator-preferred
+              surface. */}
+          <div data-section-anchor="diagnostics" className="flex flex-col gap-16">
+            {auditSections}
             <DiagnosticsSection
               detail={detail}
               trace={trace}
@@ -1164,10 +1172,10 @@ export default function ExceptionDetailPanel({
 function SectionAnchorBar() {
   // The three always-present major surfaces. Council 2026-06-07: the
   // enrichment sections moved off the flat Layer-1 stack into the
-  // Evidence / Diagnostics tabs (routed by section_tiers), so the jump
-  // bar no longer enumerates per-section anchors — the two tabs ARE the
-  // reach targets. Targeting #section-evidence / #section-diagnostics
-  // selects the matching tab (DetailLowerTabs hash sync).
+  // Evidence / Diagnostics tiers (routed by section_tiers), so the jump
+  // bar no longer enumerates per-section anchors — the two tier surfaces
+  // ARE the reach targets. Targeting #section-evidence /
+  // #section-diagnostics scrolls to (and reveals) the matching surface.
   const links: { href: string; label: string }[] = [
     { href: "#section-recommendation", label: "Recommendation" },
     { href: "#section-evidence", label: "Evidence" },

@@ -33,11 +33,18 @@ describe("section_tier routing", () => {
     expect(PANEL).toContain("auditSections");
   });
 
-  it("hands the evidence + audit tiers to the Evidence / Diagnostics tabs", () => {
-    expect(PANEL).toContain("evidenceExtras={evidenceSections}");
-    expect(PANEL).toContain("auditExtras={auditSections}");
-    // DetailLowerTabs renders them atop the matching tab.
-    expect(PANEL).toContain("{evidenceExtras}");
-    expect(PANEL).toContain("{auditExtras}");
+  it("renders the evidence + audit tiers inline in their stacked surfaces", () => {
+    // Stacked-collapsible layout (main 2026-06-08, tabs retired):
+    // evidence-tier sections stack above EvidenceGrid inside the
+    // evidence anchor; audit-tier above DiagnosticsSection inside the
+    // diagnostics anchor.
+    const evidenceIdx = PANEL.indexOf("{evidenceSections}");
+    const gridIdx = PANEL.indexOf("<EvidenceGrid");
+    const auditIdx = PANEL.indexOf("{auditSections}");
+    const diagIdx = PANEL.indexOf("<DiagnosticsSection");
+    expect(evidenceIdx).toBeGreaterThan(-1);
+    expect(auditIdx).toBeGreaterThan(-1);
+    expect(evidenceIdx).toBeLessThan(gridIdx);
+    expect(auditIdx).toBeLessThan(diagIdx);
   });
 });
