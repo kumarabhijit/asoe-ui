@@ -2549,10 +2549,18 @@ const MOCK_NON_DISCRIMINATING_INTENTS: ReadonlySet<string> = new Set([
   "UNKNOWN",
 ]);
 
+// Mock-mode mirror of asoe2 api/presentation_tiers.SECTION_TIERS. Engine
+// artifacts -> audit (Diagnostics drawer); everything else -> evidence.
+const MOCK_SECTION_TIERS: Record<string, "operator" | "evidence" | "audit"> = {
+  edi_850_audit: "audit",
+  knowledge_graph: "audit",
+};
+
 function mockPresentation(id: string): PresentationContract {
   const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
   const intent = exc?.intent ?? null;
   return {
+    section_tiers: MOCK_SECTION_TIERS,
     // Mock-mode stand-in for the backend reusing render_template: the
     // governed per-intent one-liner is the plain-language Situation
     // headline. Null when the intent has no template (honest omission).

@@ -27,6 +27,6 @@ describe("SapDataSection deliverable", () => {
   });
 
   it("mounts behind the sap_data_analysis data-presence guard", () => {
-    expect(PANEL).toContain("analysis?.sap_data_analysis &&");
+    expect(PANEL).toContain("if (analysis.sap_data_analysis)");
   });
 });

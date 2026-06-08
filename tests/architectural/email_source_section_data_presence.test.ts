@@ -36,7 +36,7 @@ describe("EmailSourceSection — data-presence dispatch lock (ADR-034 Phase G)",
 
   it("ExceptionDetailPanel mounts the source section via analysis.email_source &&", () => {
     const content = stripComments(fs.readFileSync(detailPanelPath, "utf-8"));
-    expect(content).toMatch(/analysis\??\.email_source\s*&&/);
+    expect(content).toMatch(/if \(analysis\.email_source\)/);
     expect(content).toMatch(/<EmailSourceSection\b/);
   });
 

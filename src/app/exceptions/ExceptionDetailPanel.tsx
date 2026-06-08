@@ -22,7 +22,7 @@
  */
 "use client";
 
-import { useState, useEffect, useRef, useCallback, type MutableRefObject } from "react";
+import { useState, useEffect, useRef, useCallback, type MutableRefObject, type ReactNode } from "react";
 import { signIn } from "next-auth/react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import {
@@ -567,6 +567,119 @@ export default function ExceptionDetailPanel({
       ? `${lineItems[0].sku} — ${lineItems[0].description}`
       : `${lineItems.length} Lines Affected`;
 
+  /* ── Enrichment-section placement (council 2026-06-07) ───────────────
+     Each data-present enrichment section is built once here, then routed
+     by the backend `presentation.section_tiers` authority:
+       operator -> Layer 1 · evidence -> Evidence tier · audit -> Diagnostics tier.
+     The UI HONORS the tier and never re-decides placement (Guardrail
+     #0/#1). Unknown keys fail-open to "evidence" (shown, not buried).
+     Sections are the SAME dumb projectors as before (Guardrail #6) —
+     only their placement moved off the flat Layer-1 stack. */
+  const enrichmentSections: { key: string; node: ReactNode }[] = [];
+  if (analysis) {
+    if (analysis.price_analysis) enrichmentSections.push({ key: "price_analysis", node: (
+      <CollapsibleSection key="price_analysis" title="Price Analysis" defaultOpen={primarySection === "price_analysis"}>
+        <PriceAnalysisSection data={analysis.price_analysis} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.duplicate_detection) enrichmentSections.push({ key: "duplicate_detection", node: (
+      <CollapsibleSection key="duplicate_detection" title="Duplicate Detection" defaultOpen={primarySection === "duplicate_detection"}>
+        <DuplicateDetectionSection data={analysis.duplicate_detection} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.order_comparison) enrichmentSections.push({ key: "order_comparison", node: (
+      <CollapsibleSection key="order_comparison" title="Order Comparison" defaultOpen={primarySection === "order_comparison"}>
+        <OrderComparisonSection data={analysis.order_comparison} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.backorder_analysis) enrichmentSections.push({ key: "backorder_analysis", node: (
+      <CollapsibleSection key="backorder_analysis" title="Back-Order Analysis" defaultOpen={primarySection === "backorder_analysis"}>
+        <BackOrderSection data={analysis.backorder_analysis} resolvedAction={detail.resolved_action} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.overmax_analysis) enrichmentSections.push({ key: "overmax_analysis", node: (
+      <CollapsibleSection key="overmax_analysis" title="Over-Max Analysis" defaultOpen={primarySection === "overmax_analysis"}>
+        <OverMaxSection data={analysis.overmax_analysis} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.moq_analysis) enrichmentSections.push({ key: "moq_analysis", node: (
+      <CollapsibleSection key="moq_analysis" title="MOQ Analysis" defaultOpen={primarySection === "moq_analysis"}>
+        <MOQSection data={analysis.moq_analysis} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.pallet_analysis) enrichmentSections.push({ key: "pallet_analysis", node: (
+      <CollapsibleSection key="pallet_analysis" title="Pallet Configuration" defaultOpen={primarySection === "pallet_analysis"}>
+        <PalletConfigSection data={analysis.pallet_analysis} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.delivery_delay_analysis) enrichmentSections.push({ key: "delivery_delay_analysis", node: (
+      <CollapsibleSection key="delivery_delay_analysis" title="Delivery Delay" defaultOpen={primarySection === "delivery_delay_analysis"}>
+        <DeliveryDelaySection data={analysis.delivery_delay_analysis} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.price_hold_analysis) enrichmentSections.push({ key: "price_hold_analysis", node: (
+      <CollapsibleSection key="price_hold_analysis" title="Price Hold" defaultOpen={primarySection === "price_hold_analysis"}>
+        <PriceHoldSection data={analysis.price_hold_analysis} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.edi_mismatch_analysis) enrichmentSections.push({ key: "edi_mismatch_analysis", node: (
+      <CollapsibleSection key="edi_mismatch_analysis" title="EDI Mismatch" defaultOpen={primarySection === "edi_mismatch_analysis"}>
+        <EdiMismatchSection data={analysis.edi_mismatch_analysis} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.email_source) enrichmentSections.push({ key: "email_source", node: (
+      <CollapsibleSection key="email_source" title="Source Email" id="section-source-email">
+        <EmailSourceSection data={analysis.email_source} caseId={detail.parent_case_id ?? undefined} onHighlightShown={markHighlightShown} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.email_order_entry_analysis) enrichmentSections.push({ key: "email_order_entry_analysis", node: (
+      <CollapsibleSection key="email_order_entry_analysis" title="Manual Order Intake">
+        <EmailOrderEntrySection data={analysis.email_order_entry_analysis} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.entities_analysis) enrichmentSections.push({ key: "entities_analysis", node: (
+      <CollapsibleSection key="entities_analysis" title="Entities">
+        <EntitiesSection data={analysis.entities_analysis} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.sap_data_analysis) enrichmentSections.push({ key: "sap_data_analysis", node: (
+      <CollapsibleSection key="sap_data_analysis" title="SAP Data">
+        <SapDataSection data={analysis.sap_data_analysis} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.order_entry_extraction) enrichmentSections.push({ key: "order_entry_extraction", node: (
+      <CollapsibleSection key="order_entry_extraction" title="Order Entry">
+        <OrderEntrySection data={analysis.order_entry_extraction} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.edi_850_audit) enrichmentSections.push({ key: "edi_850_audit", node: (
+      <CollapsibleSection key="edi_850_audit" title="EDI 850 Audit">
+        <Edi850Section data={analysis.edi_850_audit} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.change_analysis) enrichmentSections.push({ key: "change_analysis", node: (
+      <CollapsibleSection key="change_analysis" title="Change Analysis">
+        <ChangeAnalysisSection data={analysis.change_analysis} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.knowledge_graph) enrichmentSections.push({ key: "knowledge_graph", node: (
+      <CollapsibleSection key="knowledge_graph" title="Knowledge Graph" id="section-knowledge-graph">
+        <KnowledgeGraphSection data={analysis.knowledge_graph} />
+      </CollapsibleSection>
+    ) });
+    if (analysis.draft_reply) enrichmentSections.push({ key: "draft_reply", node: (
+      <CollapsibleSection key="draft_reply" title="AI Draft Reply" id="section-draft-reply" defaultOpen>
+        <DraftReplySection data={analysis.draft_reply} sourceSectionId={analysis.email_source ? "section-source-email" : undefined} onSubmitEdit={handleEditDraftReply} canEdit={hasPermission("exceptions:approve")} />
+      </CollapsibleSection>
+    ) });
+  }
+  /* Placement authority — the UI honors `section_tiers`, never re-decides. */
+  const sectionTierOf = (k: string): "operator" | "evidence" | "audit" =>
+    analysis?.presentation?.section_tiers?.[k] ?? "evidence";
+  const operatorSections = enrichmentSections.filter((s) => sectionTierOf(s.key) === "operator").map((s) => s.node);
+  const evidenceSections = enrichmentSections.filter((s) => sectionTierOf(s.key) === "evidence").map((s) => s.node);
+  const auditSections = enrichmentSections.filter((s) => sectionTierOf(s.key) === "audit").map((s) => s.node);
+
   /* ── Render ──────────────────────────────────────────────────────── */
 
   return (
@@ -611,11 +724,7 @@ export default function ExceptionDetailPanel({
           below. The bar itself is a single Tab stop; arrow-key nav
           inside an `<a>` list is conventional and the focus ring on
           each link is design-token driven. */}
-      <SectionAnchorBar
-        hasSourceEmail={!!analysis?.email_source}
-        hasKnowledgeGraph={!!analysis?.knowledge_graph}
-        hasDraftReply={!!analysis?.draft_reply}
-      />
+      <SectionAnchorBar />
 
       {/* ━━ 3. Scrollable Body ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="flex-1 overflow-auto p-16">
@@ -929,161 +1038,25 @@ export default function ExceptionDetailPanel({
             />
           )}
 
-          {/* ── Data-presence-driven enrichment sections ─────────────── */}
-          {/* These render ONLY when their data is present in the analysis.
-              A new intent that populates these fields automatically gets
-              their sections rendered — zero UI code changes needed.
-              Each is wrapped in CollapsibleSection (always collapsed —
-              PO clarification 2026-05-03): the operator scans the
-              Recommendation card first and only drills into the
-              evidence sections when they need to assess in detail.
-              The wrapper mounts the child only when open so heavy
-              renders stay deferred. Section titles match the spec
-              expectations exactly so playwright tests can click them
-              by name to expand. */}
-          {/* Comparison-bearing enrichment sections. The one named by
-              `primary_section` auto-expands (Priority-2 delta visible on
-              open); the rest stay collapsed. `defaultOpen` is data-driven
-              off the backend hint — no hardcoded intent dispatch. */}
-          {analysis?.price_analysis && (
-            <CollapsibleSection title="Price Analysis" defaultOpen={primarySection === "price_analysis"}>
-              <PriceAnalysisSection data={analysis.price_analysis} />
-            </CollapsibleSection>
-          )}
-          {analysis?.duplicate_detection && (
-            <CollapsibleSection title="Duplicate Detection" defaultOpen={primarySection === "duplicate_detection"}>
-              <DuplicateDetectionSection data={analysis.duplicate_detection} />
-            </CollapsibleSection>
-          )}
-          {analysis?.order_comparison && (
-            <CollapsibleSection title="Order Comparison" defaultOpen={primarySection === "order_comparison"}>
-              <OrderComparisonSection data={analysis.order_comparison} />
-            </CollapsibleSection>
-          )}
-          {analysis?.backorder_analysis && (
-            <CollapsibleSection title="Back-Order Analysis" defaultOpen={primarySection === "backorder_analysis"}>
-              <BackOrderSection
-                data={analysis.backorder_analysis}
-                resolvedAction={detail.resolved_action}
-              />
-            </CollapsibleSection>
-          )}
-          {analysis?.overmax_analysis && (
-            <CollapsibleSection title="Over-Max Analysis" defaultOpen={primarySection === "overmax_analysis"}>
-              <OverMaxSection data={analysis.overmax_analysis} />
-            </CollapsibleSection>
-          )}
-          {analysis?.moq_analysis && (
-            <CollapsibleSection title="MOQ Analysis" defaultOpen={primarySection === "moq_analysis"}>
-              <MOQSection data={analysis.moq_analysis} />
-            </CollapsibleSection>
-          )}
-          {analysis?.pallet_analysis && (
-            <CollapsibleSection title="Pallet Configuration" defaultOpen={primarySection === "pallet_analysis"}>
-              <PalletConfigSection data={analysis.pallet_analysis} />
-            </CollapsibleSection>
-          )}
-          {analysis?.delivery_delay_analysis && (
-            <CollapsibleSection title="Delivery Delay" defaultOpen={primarySection === "delivery_delay_analysis"}>
-              <DeliveryDelaySection data={analysis.delivery_delay_analysis} />
-            </CollapsibleSection>
-          )}
-          {analysis?.price_hold_analysis && (
-            <CollapsibleSection title="Price Hold" defaultOpen={primarySection === "price_hold_analysis"}>
-              <PriceHoldSection data={analysis.price_hold_analysis} />
-            </CollapsibleSection>
-          )}
-          {analysis?.edi_mismatch_analysis && (
-            <CollapsibleSection title="EDI Mismatch" defaultOpen={primarySection === "edi_mismatch_analysis"}>
-              <EdiMismatchSection data={analysis.edi_mismatch_analysis} />
-            </CollapsibleSection>
-          )}
-          {/* ADR-034 Phase G — EmailSourceSection mounts ABOVE the
-              recipe-recommendation section so the CSA sees the source
-              email substrate first, then the agent's recommendation.
-              Both gated by data-presence; no per-intent dispatch. */}
-          {analysis?.email_source && (
-            <CollapsibleSection title="Source Email" id="section-source-email">
-              <EmailSourceSection
-                data={analysis.email_source}
-                caseId={detail.parent_case_id ?? undefined}
-                onHighlightShown={markHighlightShown}
-              />
-            </CollapsibleSection>
-          )}
-          {analysis?.email_order_entry_analysis && (
-            <CollapsibleSection title="Manual Order Intake">
-              <EmailOrderEntrySection data={analysis.email_order_entry_analysis} />
-            </CollapsibleSection>
-          )}
-          {/* ADR-042 Phase 2 — Customer Inbox Entities tab. Data-presence
-              gated; preview-only until the composer adapter lands. */}
-          {analysis?.entities_analysis && (
-            <CollapsibleSection title="Entities">
-              <EntitiesSection data={analysis.entities_analysis} />
-            </CollapsibleSection>
-          )}
-          {/* ADR-042 Phase 2 — Customer Inbox SAP Data tab. Data-presence
-              gated; preview-only until the SAP-gateway adapter lands. */}
-          {analysis?.sap_data_analysis && (
-            <CollapsibleSection title="SAP Data">
-              <SapDataSection data={analysis.sap_data_analysis} />
-            </CollapsibleSection>
-          )}
-          {/* ADR-042 Phase 3 — Customer Inbox Order Entry tab (extracted order
-              form). Data-presence gated; preview-only until the extraction
-              gateway lands. */}
-          {analysis?.order_entry_extraction && (
-            <CollapsibleSection title="Order Entry">
-              <OrderEntrySection data={analysis.order_entry_extraction} />
-            </CollapsibleSection>
-          )}
-          {/* ADR-042 Phase 5 — Customer Inbox EDI 850 Audit tab (deterministic
-              X12 850 reconstruction). Data-presence gated; preview-only until
-              the edi_850 builder producer lands. */}
-          {analysis?.edi_850_audit && (
-            <CollapsibleSection title="EDI 850 Audit">
-              <Edi850Section data={analysis.edi_850_audit} />
-            </CollapsibleSection>
-          )}
-          {/* ADR-042 Phase 6 — Customer Inbox Change Analysis tab (deterministic
-              constraint evaluation + scenarios + decision). Data-presence gated;
-              preview-only until the change_analysis producer lands. */}
-          {analysis?.change_analysis && (
-            <CollapsibleSection title="Change Analysis">
-              <ChangeAnalysisSection data={analysis.change_analysis} />
-            </CollapsibleSection>
-          )}
-          {/* ADR-042 Phase 7 — Knowledge Graph tab (derived entity projection).
-              Data-presence gated; preview-only / deferrable until the
-              knowledge_graph producer lands. */}
-          {analysis?.knowledge_graph && (
-            <CollapsibleSection title="Knowledge Graph" id="section-knowledge-graph">
-              <KnowledgeGraphSection data={analysis.knowledge_graph} />
-            </CollapsibleSection>
-          )}
-          {/* ADR-042 Phase 7 — AI Draft Reply evidence (projected from
-              resolution_data.reply_draft). Data-presence gated; absent until a
-              DRAFT_REPLY disposition runs. The CSA can edit the draft in place
-              (RBAC-gated) — the edit appends an OPERATOR_EDIT revision; the
-              "Jump to source email" link expands the Source Email section
-              above when that section is present. */}
-          {analysis?.draft_reply && (
-            <CollapsibleSection title="AI Draft Reply" id="section-draft-reply" defaultOpen>
-              <DraftReplySection
-                data={analysis.draft_reply}
-                sourceSectionId={analysis.email_source ? "section-source-email" : undefined}
-                onSubmitEdit={handleEditDraftReply}
-                canEdit={hasPermission("exceptions:approve")}
-              />
-            </CollapsibleSection>
-          )}
+          {/* Enrichment sections are routed by presentation.section_tiers
+              (assembled in the component body): operator-tier renders
+              here on Layer 1; evidence-tier and audit-tier render inline
+              in the Evidence / Diagnostics tiers below (stacked
+              collapsible layout). This retires the flat Layer-1 stack —
+              the audit ledger the cockpit (Guardrail #0) was created to
+              replace. Sections stay dumb data-presence projectors; only
+              their placement moved. */}
+          {operatorSections}
 
-          {/* ━━ 4. Evidence Grid ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              The anchor id lives on EvidenceGrid's own root (so the
-              "Jump to → Evidence" link expands + scrolls it, #4); the
-              wrapper keeps data-section-anchor for the pane-focus cycle. */}
-          <div data-section-anchor="evidence">
+          {/* ━━ 4. Evidence tier ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Evidence-tier enrichment sections (routed by the backend
+              section_tiers authority) stack above the line-item grid —
+              together they ARE the Evidence tier in the stacked-
+              collapsible layout (main 2026-06-08: tabs retired). The
+              anchor id lives on EvidenceGrid's own root (so the "Jump
+              to → Evidence" link expands + scrolls it, #4). */}
+          <div data-section-anchor="evidence" className="flex flex-col gap-16">
+            {evidenceSections}
             <EvidenceGrid
               lineItems={lineItems}
               analysis={analysis}
@@ -1097,12 +1070,15 @@ export default function ExceptionDetailPanel({
             />
           </div>
 
-          {/* ━━ 5. Diagnostics ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Inline collapsed "Show Diagnostics" section (default
-              collapsed, lazy-loads trace on first open). Kept inline
-              rather than behind a tab — the stacked-collapsible layout
-              is the operator-preferred surface. */}
-          <div data-section-anchor="diagnostics">
+          {/* ━━ 5. Diagnostics & Audit tier ━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Audit-tier engine artifacts (EDI 850 Audit, Knowledge
+              Graph — routed by section_tiers) stack above the inline
+              "Show Diagnostics" pane (raw trace, default collapsed,
+              lazy trace load). Kept inline rather than behind a tab —
+              the stacked-collapsible layout is the operator-preferred
+              surface. */}
+          <div data-section-anchor="diagnostics" className="flex flex-col gap-16">
+            {auditSections}
             <DiagnosticsSection
               detail={detail}
               trace={trace}
@@ -1193,25 +1169,15 @@ export default function ExceptionDetailPanel({
  * design tokens). The bar is mounted once between ContextStrip and
  * the StickyActionRibbon so it sits above the scroll body.
  */
-function SectionAnchorBar({
-  hasSourceEmail = false,
-  hasKnowledgeGraph = false,
-  hasDraftReply = false,
-}: {
-  hasSourceEmail?: boolean;
-  hasKnowledgeGraph?: boolean;
-  hasDraftReply?: boolean;
-}) {
-  // Data-presence-driven (Guardrail #1): the three always-present majors plus
-  // any optional enrichment section that actually rendered for this record.
-  // Targeting a collapsed section's id makes CollapsibleSection open + scroll
-  // (shared.tsx), so every link reveals its section rather than scrolling to a
-  // collapsed shell. Order follows the on-page vertical order.
+function SectionAnchorBar() {
+  // The three always-present major surfaces. Council 2026-06-07: the
+  // enrichment sections moved off the flat Layer-1 stack into the
+  // Evidence / Diagnostics tiers (routed by section_tiers), so the jump
+  // bar no longer enumerates per-section anchors — the two tier surfaces
+  // ARE the reach targets. Targeting #section-evidence /
+  // #section-diagnostics scrolls to (and reveals) the matching surface.
   const links: { href: string; label: string }[] = [
     { href: "#section-recommendation", label: "Recommendation" },
-    ...(hasSourceEmail ? [{ href: "#section-source-email", label: "Source Email" }] : []),
-    ...(hasKnowledgeGraph ? [{ href: "#section-knowledge-graph", label: "Knowledge Graph" }] : []),
-    ...(hasDraftReply ? [{ href: "#section-draft-reply", label: "AI Draft Reply" }] : []),
     { href: "#section-evidence", label: "Evidence" },
     { href: "#section-diagnostics", label: "Diagnostics" },
   ];

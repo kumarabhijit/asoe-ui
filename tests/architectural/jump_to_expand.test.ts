@@ -30,11 +30,16 @@ describe("Jump-to expand mechanism", () => {
     expect(read("DiagnosticsSection.tsx")).toContain("useHashOpen(anchorId");
   });
 
-  it("anchor bar is data-presence-driven and includes Knowledge Graph + Source Email", () => {
+  it("anchor bar targets the three major surfaces (Recommendation / Evidence / Diagnostics)", () => {
+    // Council 2026-06-07: enrichment sections moved off the flat Layer-1
+    // stack into the Evidence / Diagnostics tabs (routed by section_tiers),
+    // so the jump bar no longer enumerates per-section anchors — the two
+    // tabs ARE the reach targets. The sections keep stable ids (next test)
+    // for useHashOpen reveal-on-jump within their tab.
     const src = read("ExceptionDetailPanel.tsx");
-    expect(src).toContain("hasKnowledgeGraph");
-    expect(src).toContain("#section-knowledge-graph");
-    expect(src).toContain("#section-source-email");
+    expect(src).toContain("#section-recommendation");
+    expect(src).toContain("#section-evidence");
+    expect(src).toContain("#section-diagnostics");
   });
 
   it("CollapsibleSection gives Source Email + Knowledge Graph stable anchor ids", () => {

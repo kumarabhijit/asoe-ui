@@ -31,6 +31,6 @@ describe("ChangeAnalysisSection deliverable", () => {
   });
 
   it("mounts behind the change_analysis data-presence guard", () => {
-    expect(PANEL).toContain("analysis?.change_analysis &&");
+    expect(PANEL).toContain("if (analysis.change_analysis)");
   });
 });

@@ -3392,6 +3392,10 @@ export interface components {
          */
         PresentationContract: {
             audit?: components["schemas"]["PresentationAudit"];
+            /** Section Tiers */
+            section_tiers?: {
+                [key: string]: "operator" | "evidence" | "audit";
+            };
             /**
              * Show Intent
              * @default false

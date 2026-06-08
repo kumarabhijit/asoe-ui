@@ -30,6 +30,6 @@ describe("DraftReplySection deliverable", () => {
   });
 
   it("mounts behind the draft_reply data-presence guard", () => {
-    expect(PANEL).toContain("analysis?.draft_reply &&");
+    expect(PANEL).toContain("if (analysis.draft_reply)");
   });
 });
