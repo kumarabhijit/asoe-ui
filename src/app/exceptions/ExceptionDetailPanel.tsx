@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/AgentReasoningCard";
 import { useToast } from "@/components/ui/Toast";
 import { useCaseTelemetry } from "@/hooks/useCaseTelemetry";
-import { casesRowV2Enabled } from "@/lib/flags";
+import { casesRowV2Enabled, cockpitEnabled } from "@/lib/flags";
 import { cn } from "@/lib/utils";
 import { toCanonicalConfidence } from "@/lib/confidence";
 import { useAuth } from "@/hooks/useAuth";
@@ -102,6 +102,9 @@ function isHumanInTheLoopState(state: string): boolean {
 // auto-expands only for HITL states, keeping the card's actions
 // above the fold.
 const CASES_ROW_V2 = casesRowV2Enabled();
+// Cockpit redesign (cockpit-refactor) — presentational opt-in. OFF by
+// default, so the classic layout and its locks are unchanged.
+const COCKPIT = cockpitEnabled();
 
 interface ExceptionDetailPanelProps {
   exceptionId: string;
@@ -958,6 +961,9 @@ export default function ExceptionDetailPanel({
               // partial-truth violation).
               confidence={confidenceValue}
               confidenceCalibrated={confidenceSignal?.calibrated}
+              // Cockpit hero gauge when the redesign flag is on; the
+              // classic Layer-1 bar otherwise. Same value + calibration.
+              confidenceVariant={COCKPIT ? "ring" : "bar"}
               // Council 2026-06-07 — intent shown in L1 only when it
               // discriminates the decision (backend show_intent). The
               // recipe name is an engine internal and is no longer passed
