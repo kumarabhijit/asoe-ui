@@ -43,10 +43,11 @@ export function AgentActivityRail({
   const [trace, setTrace] = useState<TraceResponse | null>(null);
 
   useEffect(() => {
-    if (!selectedRecordId) {
-      setTrace(null);
-      return;
-    }
+    // Clear the prior record's trace immediately on switch so we never
+    // flash a different record's activity in the rail while the new fetch
+    // is in flight (an audit surface must never show the wrong record).
+    setTrace(null);
+    if (!selectedRecordId) return;
     let cancelled = false;
     exceptionsApi
       .trace(selectedRecordId)
