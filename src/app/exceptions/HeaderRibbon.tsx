@@ -10,7 +10,7 @@ import { ChevronRight } from "lucide-react";
 import { Badge, lifecycleVariant, verdictVariant } from "@/components/ui/Badge";
 import { TaxonomyLabel } from "@/components/ui/TaxonomyLabel";
 import { fmtPrice } from "./shared";
-import { fmtSignedPrice } from "@/lib/format";
+import { fmtSignedPrice, humanizeEnumLabel } from "@/lib/format";
 import type { ExceptionDetail, EntityProfile } from "@/types/exceptions";
 
 interface HeaderRibbonProps {
@@ -80,7 +80,13 @@ export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, total
             Current State:
           </span>
           <Badge variant={lifecycleVariant(detail.lifecycle_state)} size="sm">
-            {detail.lifecycle_state.replace(/_/g, " ")}
+            {/* Governed plain-language label (same humanizer the
+                RecordListPane uses for lifecycle), not the raw enum. On
+                a single-record case this is the ONLY state surface — the
+                case header drops its duplicate status (CaseDetailPanel
+                S2) — so it must read in the operator's language, e.g.
+                "Pending Review" rather than "PENDING REVIEW". */}
+            {humanizeEnumLabel(detail.lifecycle_state)}
           </Badge>
         </div>
         {/* S1 finding #5 — when embedded inside `CaseDetailPanel`, the
