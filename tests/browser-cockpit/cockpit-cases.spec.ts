@@ -16,6 +16,7 @@
  * carries executed_nodes, so the Agent Activity rail has content.
  */
 import { test, expect, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 import { loginAs, USERS } from "../browser/_helpers";
 
@@ -58,5 +59,23 @@ test.describe("cockpit (flag on) — /cases", () => {
     await expect(
       page.getByRole("button", { name: /choose different action/i }).first(),
     ).toBeVisible({ timeout: 20_000 });
+  });
+
+  test("the cockpit-new surfaces (ring + activity rail) are axe-clean", async ({ page }) => {
+    await openCockpitRecord(page);
+    await expect(page.locator('[data-variant="ring"]').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("region", { name: /agent activity/i })).toBeVisible({ timeout: 20_000 });
+    // Scope axe to the NEW cockpit surfaces so the check is about what this
+    // PR introduces, not pre-existing whole-page contrast debt tracked by
+    // the route-level sweep. No serious/critical violations allowed.
+    const results = await new AxeBuilder({ page })
+      .include('[data-variant="ring"]')
+      .include('[aria-label="Agent activity"]')
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    const gating = results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(gating, JSON.stringify(gating, null, 2)).toEqual([]);
   });
 });
