@@ -98,6 +98,7 @@ export function ConfidenceDisplay({
         className={cn("flex flex-col gap-4", className)}
         role="group"
         aria-label={ariaLabel}
+        data-variant="bar"
       >
         <div className="flex items-center gap-8">
           <div
@@ -140,7 +141,7 @@ export function ConfidenceDisplay({
     // producers show the integer they emitted.
     const rawLabel = scale === "percent" ? String(Math.round(value)) : value.toFixed(2);
     return (
-      <div className={className} aria-label={ariaLabel} role="group">
+      <div className={className} aria-label={ariaLabel} role="group" data-variant="prominent">
         <div className="flex items-baseline gap-8">
           <span className={cn("text-display font-bold leading-tight", meta.textClass)} aria-hidden>
             {pct}%
@@ -180,6 +181,7 @@ export function ConfidenceDisplay({
         className={cn("flex items-center gap-16", className)}
         role="group"
         aria-label={ariaLabel}
+        data-variant="ring"
       >
         <div className="relative shrink-0 h-[104px] w-[104px]">
           <div className="h-full w-full rounded-full" style={ringStyle} aria-hidden />
@@ -204,6 +206,7 @@ export function ConfidenceDisplay({
       className={cn("inline-flex items-center gap-6", className)}
       role="img"
       aria-label={ariaLabel}
+      data-variant="inline"
     >
       <span className={cn("font-mono font-semibold", meta.textClass)} aria-hidden>
         {pct}%
