@@ -156,6 +156,7 @@ export function CollapsibleSection({
   badgeVariant,
   children,
   onFirstOpen,
+  extraAnchorIds,
 }: {
   title: string;
   /** Stable anchor id (S1 finding #10 follow-on). When set, the section
@@ -170,6 +171,13 @@ export function CollapsibleSection({
   /** Fired the first time the operator expands this section (DoR #11 —
    *  Layer-2-open signal). Optional + idempotent; never fires on collapse. */
   onFirstOpen?: () => void;
+  /** Anchor ids of nested descendants (stacked-group layout 2026-06-09).
+   *  When this section groups child sections under one disclosure, a deep
+   *  link to a child's anchor (e.g. `#section-source-email`) would target an
+   *  unmounted node while the group is collapsed. Listing the descendants'
+   *  ids here makes the GROUP open on their hash too; the child's own
+   *  `useHashOpen` then scrolls within once it mounts. */
+  extraAnchorIds?: string[];
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const firedRef = useRef(false);
@@ -204,6 +212,28 @@ export function CollapsibleSection({
       return true;
     });
   });
+
+  // Descendant-anchor reveal (stacked-group layout 2026-06-09). A jump to a
+  // child section's anchor must first open this group so the child mounts;
+  // the child's own useHashOpen then handles the in-group scroll. Runs on
+  // mount and every hashchange, mirroring useHashOpen's contract.
+  const extraKey = extraAnchorIds?.join(",") ?? "";
+  useEffect(() => {
+    if (!extraAnchorIds?.length || typeof window === "undefined") return;
+    const handle = () => {
+      const target = window.location.hash.replace(/^#/, "");
+      if (!target || !extraAnchorIds.includes(target)) return;
+      setOpen((v) => {
+        if (!v) fireFirstOpen();
+        return true;
+      });
+    };
+    handle();
+    window.addEventListener("hashchange", handle);
+    return () => window.removeEventListener("hashchange", handle);
+    // `extraKey` captures membership; `fireFirstOpen` is stable for our purpose.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extraKey]);
 
   return (
     <section

@@ -83,10 +83,10 @@ describe("Priority-2 — primary comparison auto-expands off the backend hint", 
   });
 });
 
-describe("Diagnostics stays an inline collapsed section (no tab)", () => {
+describe("Evidence + Diagnostics are single grouped disclosures (no flat stack, no tab)", () => {
   const panel = read(PANEL);
 
-  it("renders EvidenceGrid + DiagnosticsSection inline, not behind a Tabs control", () => {
+  it("renders EvidenceGrid + DiagnosticsSection, not behind a Tabs control", () => {
     // PO ruling (follow-up 2026-06-07): the stacked-collapsible layout is
     // the operator-preferred surface; the short-lived Diagnostics-tab
     // experiment was reverted. The Tabs primitive must not return.
@@ -94,9 +94,35 @@ describe("Diagnostics stays an inline collapsed section (no tab)", () => {
     expect(panel).not.toContain('@/components/ui/Tabs');
     expect(panel).toContain("<EvidenceGrid");
     expect(panel).toContain("<DiagnosticsSection");
-    // jump-to-expand anchors preserved on the inline sections.
-    expect(panel).toContain('anchorId="section-evidence"');
-    expect(panel).toContain('anchorId="section-diagnostics"');
+  });
+
+  it("gathers each tier under ONE CollapsibleSection, not a flat sibling stack", () => {
+    // Stacked-GROUP layout (council 2026-06-07 / Guardrail #0): the
+    // evidence-tier + audit-tier sections each live inside a single
+    // disclosure — the audit ledger (every section its own always-visible
+    // header) the cockpit was created to replace. Reverting to the flat
+    // stack (`{evidenceSections}` as a bare sibling list) must fail here.
+    expect(panel).toMatch(/<CollapsibleSection\s+title="Evidence"\s+id="section-evidence"/);
+    expect(panel).toMatch(/<CollapsibleSection\s+title="Diagnostics & Audit"\s+id="section-diagnostics"/);
+  });
+
+  it("auto-opens Evidence for needs-human, never for Diagnostics (Guardrail #5)", () => {
+    // Evidence auto-expands for HITL states so the justifying delta is
+    // visible without a click; Diagnostics & Audit is always collapsed.
+    expect(panel).toMatch(
+      /title="Evidence"[\s\S]*?defaultOpen=\{isHumanInTheLoopState\(detail\.lifecycle_state\)\}/,
+    );
+    expect(panel).toMatch(/title="Diagnostics & Audit"[\s\S]*?defaultOpen=\{false\}/);
+  });
+
+  it("inner grid/trace carry their own jump anchors so cross-links still reveal", () => {
+    // The group owns #section-evidence / #section-diagnostics; the grid and
+    // trace keep distinct inner anchors, reached via the group's
+    // extraAnchorIds (jump-to-expand #4).
+    expect(panel).toContain('anchorId="section-line-items"');
+    expect(panel).toContain('anchorId="section-trace"');
+    expect(panel).toContain("extraAnchorIds={evidenceAnchorIds}");
+    expect(panel).toContain("extraAnchorIds={auditAnchorIds}");
   });
 });
 

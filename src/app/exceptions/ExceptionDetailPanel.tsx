@@ -13,10 +13,17 @@
  *   2. ContextStrip      — entity profile (impact moved to ImpactBar)
  *   3. AgentReasoningCard — Layer 1/2 recommendation + actions     (Priority 1)
  *   3b. AgentAnalysis    — problem / root cause / recommendation prose
- *      + data-presence enrichment sections; the section named by the
+ *      + operator-tier enrichment sections; the section named by the
  *        backend `primary_section` hint auto-expands               (Priority 2)
- *   4. EvidenceGrid     — collapsed line items + pricing waterfall
- *   5. DiagnosticsSection — inline collapsed "Show Diagnostics" pane (Priority 4)
+ *   4. Evidence group   — ONE collapsed disclosure gathering the
+ *        evidence-tier sections + line-item grid (auto-opens for
+ *        needs-human states; collapsed for auto-resolved)          (Layer 2)
+ *   5. Diagnostics & Audit group — ONE collapsed disclosure gathering
+ *        the audit-tier sections + raw-trace pane (always collapsed) (Layer 2)
+ *
+ * Tier placement is backend-driven (presentation.section_tiers); the UI
+ * groups each tier into a single disclosure and never re-decides
+ * placement (Guardrail #0/#1). Stacked-group layout — council 2026-06-07.
  *
  * Governance: Human = Review Authority (Approve/Reject/Escalate only).
  */
@@ -575,7 +582,7 @@ export default function ExceptionDetailPanel({
      #0/#1). Unknown keys fail-open to "evidence" (shown, not buried).
      Sections are the SAME dumb projectors as before (Guardrail #6) —
      only their placement moved off the flat Layer-1 stack. */
-  const enrichmentSections: { key: string; node: ReactNode }[] = [];
+  const enrichmentSections: { key: string; node: ReactNode; anchorId?: string }[] = [];
   if (analysis) {
     if (analysis.price_analysis) enrichmentSections.push({ key: "price_analysis", node: (
       <CollapsibleSection key="price_analysis" title="Price Analysis" defaultOpen={primarySection === "price_analysis"}>
@@ -627,7 +634,7 @@ export default function ExceptionDetailPanel({
         <EdiMismatchSection data={analysis.edi_mismatch_analysis} />
       </CollapsibleSection>
     ) });
-    if (analysis.email_source) enrichmentSections.push({ key: "email_source", node: (
+    if (analysis.email_source) enrichmentSections.push({ key: "email_source", anchorId: "section-source-email", node: (
       <CollapsibleSection key="email_source" title="Source Email" id="section-source-email">
         <EmailSourceSection data={analysis.email_source} caseId={detail.parent_case_id ?? undefined} onHighlightShown={markHighlightShown} />
       </CollapsibleSection>
@@ -662,12 +669,12 @@ export default function ExceptionDetailPanel({
         <ChangeAnalysisSection data={analysis.change_analysis} />
       </CollapsibleSection>
     ) });
-    if (analysis.knowledge_graph) enrichmentSections.push({ key: "knowledge_graph", node: (
+    if (analysis.knowledge_graph) enrichmentSections.push({ key: "knowledge_graph", anchorId: "section-knowledge-graph", node: (
       <CollapsibleSection key="knowledge_graph" title="Knowledge Graph" id="section-knowledge-graph">
         <KnowledgeGraphSection data={analysis.knowledge_graph} />
       </CollapsibleSection>
     ) });
-    if (analysis.draft_reply) enrichmentSections.push({ key: "draft_reply", node: (
+    if (analysis.draft_reply) enrichmentSections.push({ key: "draft_reply", anchorId: "section-draft-reply", node: (
       <CollapsibleSection key="draft_reply" title="AI Draft Reply" id="section-draft-reply" defaultOpen>
         <DraftReplySection data={analysis.draft_reply} sourceSectionId={analysis.email_source ? "section-source-email" : undefined} onSubmitEdit={handleEditDraftReply} canEdit={hasPermission("exceptions:approve")} />
       </CollapsibleSection>
@@ -676,9 +683,17 @@ export default function ExceptionDetailPanel({
   /* Placement authority — the UI honors `section_tiers`, never re-decides. */
   const sectionTierOf = (k: string): "operator" | "evidence" | "audit" =>
     analysis?.presentation?.section_tiers?.[k] ?? "evidence";
-  const operatorSections = enrichmentSections.filter((s) => sectionTierOf(s.key) === "operator").map((s) => s.node);
-  const evidenceSections = enrichmentSections.filter((s) => sectionTierOf(s.key) === "evidence").map((s) => s.node);
-  const auditSections = enrichmentSections.filter((s) => sectionTierOf(s.key) === "audit").map((s) => s.node);
+  const operatorMembers = enrichmentSections.filter((s) => sectionTierOf(s.key) === "operator");
+  const evidenceMembers = enrichmentSections.filter((s) => sectionTierOf(s.key) === "evidence");
+  const auditMembers = enrichmentSections.filter((s) => sectionTierOf(s.key) === "audit");
+  const operatorSections = operatorMembers.map((s) => s.node);
+  const evidenceSections = evidenceMembers.map((s) => s.node);
+  const auditSections = auditMembers.map((s) => s.node);
+  // Descendant anchor ids per group (stacked-group layout 2026-06-09) — so a
+  // deep link to a child's anchor opens the enclosing group (Refinement 2).
+  // The grid/trace anchors live on EvidenceGrid / DiagnosticsSection.
+  const evidenceAnchorIds = ["section-line-items", ...evidenceMembers.map((s) => s.anchorId).filter((a): a is string => !!a)];
+  const auditAnchorIds = ["section-trace", ...auditMembers.map((s) => s.anchorId).filter((a): a is string => !!a)];
 
   /* ── Render ──────────────────────────────────────────────────────── */
 
@@ -1048,45 +1063,70 @@ export default function ExceptionDetailPanel({
               their placement moved. */}
           {operatorSections}
 
-          {/* ━━ 4. Evidence tier ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Evidence-tier enrichment sections (routed by the backend
-              section_tiers authority) stack above the line-item grid —
-              together they ARE the Evidence tier in the stacked-
-              collapsible layout (main 2026-06-08: tabs retired). The
-              anchor id lives on EvidenceGrid's own root (so the "Jump
-              to → Evidence" link expands + scrolls it, #4). */}
-          <div data-section-anchor="evidence" className="flex flex-col gap-16">
-            {evidenceSections}
-            <EvidenceGrid
-              lineItems={lineItems}
-              analysis={analysis}
-              selectedLine={selectedLine}
-              onSelectLine={setSelectedLine}
-              selectedAnalysis={selectedAnalysis}
-              totalErp={totalErp}
-              totalPo={totalPo}
-              onFirstOpen={ensureLineItemsLoaded}
-              anchorId="section-evidence"
-            />
-          </div>
+          {/* ━━ 4. Evidence tier — ONE grouped disclosure ━━━━━━━━━━━━━
+              Council 2026-06-07 / Guardrail #0: the evidence-tier sections
+              (routed by the backend section_tiers authority) + the
+              line-item grid are gathered under a SINGLE "Evidence"
+              disclosure instead of a flat sibling stack — the audit ledger
+              the cockpit was created to replace. Placement stays
+              backend-driven (section_tiers); only the visual container
+              changed (no UI-side re-deciding — Guardrail #0/#1).
 
-          {/* ━━ 5. Diagnostics & Audit tier ━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Audit-tier engine artifacts (EDI 850 Audit, Knowledge
-              Graph — routed by section_tiers) stack above the inline
-              "Show Diagnostics" pane (raw trace, default collapsed,
-              lazy trace load). Kept inline rather than behind a tab —
-              the stacked-collapsible layout is the operator-preferred
-              surface. */}
-          <div data-section-anchor="diagnostics" className="flex flex-col gap-16">
-            {auditSections}
-            <DiagnosticsSection
-              detail={detail}
-              trace={trace}
-              showPreview={showPreview}
-              onFirstOpen={ensureTraceLoaded}
-              anchorId="section-diagnostics"
-            />
-          </div>
+              defaultOpen = needs-human (Guardrail #5: YELLOW/RED auto-
+              expand so the justifying delta is visible without a click);
+              collapsed for auto-resolved/GREEN records so they reduce to
+              Situation + Recommendation. The group owns the
+              #section-evidence jump anchor; descendant anchors (Source
+              Email, line items) open the group via extraAnchorIds (#4). */}
+          <CollapsibleSection
+            title="Evidence"
+            id="section-evidence"
+            badge={evidenceMembers.length > 0 ? String(evidenceMembers.length) : undefined}
+            defaultOpen={isHumanInTheLoopState(detail.lifecycle_state)}
+            extraAnchorIds={evidenceAnchorIds}
+          >
+            <div className="flex flex-col gap-16">
+              {evidenceSections}
+              <EvidenceGrid
+                lineItems={lineItems}
+                analysis={analysis}
+                selectedLine={selectedLine}
+                onSelectLine={setSelectedLine}
+                selectedAnalysis={selectedAnalysis}
+                totalErp={totalErp}
+                totalPo={totalPo}
+                onFirstOpen={ensureLineItemsLoaded}
+                anchorId="section-line-items"
+              />
+            </div>
+          </CollapsibleSection>
+
+          {/* ━━ 5. Diagnostics & Audit tier — ONE grouped disclosure ━━
+              Audit-tier engine artifacts (EDI 850 Audit, Knowledge Graph —
+              routed by section_tiers) + the raw-trace Diagnostics pane,
+              gathered under a single "Diagnostics & Audit" disclosure.
+              Always collapsed by default — pure engine/provenance internals,
+              never operator-facing without an explicit open (Guardrail #0).
+              Owns #section-diagnostics; descendant anchors (trace, KG) open
+              the group via extraAnchorIds. */}
+          <CollapsibleSection
+            title="Diagnostics & Audit"
+            id="section-diagnostics"
+            badge={auditMembers.length > 0 ? String(auditMembers.length) : undefined}
+            defaultOpen={false}
+            extraAnchorIds={auditAnchorIds}
+          >
+            <div className="flex flex-col gap-16">
+              {auditSections}
+              <DiagnosticsSection
+                detail={detail}
+                trace={trace}
+                showPreview={showPreview}
+                onFirstOpen={ensureTraceLoaded}
+                anchorId="section-trace"
+              />
+            </div>
+          </CollapsibleSection>
 
           {/* ── Metadata ──────────────────────────────────────────────── */}
           <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-8 text-caption">
