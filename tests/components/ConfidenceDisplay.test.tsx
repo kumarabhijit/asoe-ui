@@ -43,3 +43,29 @@ describe("ConfidenceDisplay — visible calibration cue", () => {
     expect(container.querySelectorAll('[tabindex="0"]')).toHaveLength(0);
   });
 });
+
+// Cockpit redesign (cockpit-refactor) — the ring gauge is the Layer-1
+// hero confidence renderer. It must stay honest (visible calibration cue,
+// never colour-only) and carry the same composed aria-label as the other
+// variants so screen-reader output is identical.
+describe("ConfidenceDisplay — ring variant (cockpit)", () => {
+  it("renders the percentage, band label, and a visible calibration cue", () => {
+    render(<ConfidenceDisplay value={0.88} variant="ring" />);
+    expect(screen.getByText("88%")).toBeInTheDocument();
+    expect(screen.getByText(/^High$/)).toBeInTheDocument();
+    expect(screen.getByText(/not a calibrated probability/i)).toBeInTheDocument();
+  });
+
+  it("exposes a single composed aria-label stating value, band, and posture", () => {
+    render(<ConfidenceDisplay value={0.88} variant="ring" label="Confidence" />);
+    const group = screen.getByRole("group", {
+      name: /Confidence: 88 percent, High band\. Model score/i,
+    });
+    expect(group).toBeInTheDocument();
+  });
+
+  it("shows the calibrated cue when the backend reports calibration", () => {
+    render(<ConfidenceDisplay value={0.62} variant="ring" calibrated />);
+    expect(screen.getByText(/^calibrated$/i)).toBeInTheDocument();
+  });
+});

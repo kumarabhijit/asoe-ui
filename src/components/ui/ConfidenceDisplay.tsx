@@ -42,14 +42,14 @@ import { cn } from "@/lib/utils";
  *  `confidenceBand` only ever returns one of these three keys. */
 const BAND_META: Record<
   ConfidenceBand,
-  { label: string; barClass: string; textClass: string }
+  { label: string; barClass: string; textClass: string; ringVar: string }
 > = {
-  high: { label: "High", barClass: "bg-success", textClass: "text-success" },
-  review: { label: "Needs check", barClass: "bg-warning", textClass: "text-warning" },
-  low: { label: "Low", barClass: "bg-error", textClass: "text-error" },
+  high: { label: "High", barClass: "bg-success", textClass: "text-success", ringVar: "var(--color-success)" },
+  review: { label: "Needs check", barClass: "bg-warning", textClass: "text-warning", ringVar: "var(--color-warning)" },
+  low: { label: "Low", barClass: "bg-error", textClass: "text-error", ringVar: "var(--color-error)" },
 };
 
-export type ConfidenceVariant = "bar" | "inline" | "prominent";
+export type ConfidenceVariant = "bar" | "inline" | "prominent" | "ring";
 
 export interface ConfidenceDisplayProps {
   /** Raw score from the producer. */
@@ -162,6 +162,38 @@ export function ConfidenceDisplay({
           )}
           <span aria-hidden>{note}</span>
         </div>
+      </div>
+    );
+  }
+
+  if (variant === "ring") {
+    // Cockpit Layer-1 hero (cockpit-refactor). A radial gauge reads the
+    // band at a glance; the percentage + band label + calibration cue keep
+    // it honest and never colour-only (WCAG 1.4.1). Conic-gradient colours
+    // are design-token vars (Guardrail #2), not hardcoded hex. The arc fills
+    // to `pct`; the remainder is the neutral track.
+    const ringStyle = {
+      background: `conic-gradient(${meta.ringVar} ${pct}%, var(--color-surface-tertiary) ${pct}% 100%)`,
+    };
+    return (
+      <div
+        className={cn("flex items-center gap-16", className)}
+        role="group"
+        aria-label={ariaLabel}
+      >
+        <div className="relative shrink-0 h-[104px] w-[104px]">
+          <div className="h-full w-full rounded-full" style={ringStyle} aria-hidden />
+          <div className="absolute inset-[10px] rounded-full bg-surface-primary flex flex-col items-center justify-center">
+            <span className={cn("text-title font-bold leading-none", meta.textClass)} aria-hidden>
+              {pct}%
+            </span>
+            <span className="text-label font-semibold uppercase tracking-wider text-text-tertiary mt-2" aria-hidden>
+              {meta.label}
+            </span>
+          </div>
+        </div>
+        {/* Visible calibration honesty cue beside the gauge (not aria-only). */}
+        <CalibrationMark calibrated={calibrated} />
       </div>
     );
   }
