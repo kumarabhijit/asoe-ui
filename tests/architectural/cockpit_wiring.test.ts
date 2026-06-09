@@ -8,11 +8,12 @@
  * the classic layout — and every lock/e2e pinning it — is untouched when
  * the flag is off. Removing any wiring below must fail the build.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 
-const SRC = join(__dirname, "..", "..", "src");
+const ROOT = join(__dirname, "..", "..");
+const SRC = join(ROOT, "src");
 const read = (rel: string) => readFileSync(join(SRC, rel), "utf-8");
 
 describe("cockpit flag", () => {
@@ -56,5 +57,24 @@ describe("AgentActivityRail tenant", () => {
     expect(page).toContain("const COCKPIT = cockpitEnabled();");
     // Gated render — the rail must not appear when the flag is off.
     expect(page).toMatch(/COCKPIT && \(\s*<AgentActivityRail/);
+  });
+});
+
+describe("cockpit flag-on browser e2e deliverable (Phase 4)", () => {
+  it("ships a dedicated flag-on config, spec, npm script, and CI workflow", () => {
+    // A flag-on journey needs its OWN server (the shared mock server can't
+    // flip the flag without breaking classic specs), so the deliverable is
+    // the whole quartet. Removing any piece must fail.
+    expect(existsSync(join(ROOT, "playwright.cockpit.config.ts"))).toBe(true);
+    expect(existsSync(join(ROOT, "tests/browser-cockpit/cockpit-cases.spec.ts"))).toBe(true);
+    expect(existsSync(join(ROOT, ".github/workflows/browser-e2e-cockpit.yml"))).toBe(true);
+    expect(readFileSync(join(ROOT, "package.json"), "utf-8")).toContain("test:browser:cockpit");
+  });
+
+  it("the dedicated server actually turns the flag ON (else it tests classic)", () => {
+    const cfg = readFileSync(join(ROOT, "playwright.cockpit.config.ts"), "utf-8");
+    expect(cfg).toContain('NEXT_PUBLIC_COCKPIT: "1"');
+    // Distinct port from mock mode (3101) so the servers can coexist.
+    expect(cfg).toContain("--port 3102");
   });
 });
