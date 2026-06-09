@@ -78,3 +78,31 @@ describe("cockpit flag-on browser e2e deliverable (Phase 4)", () => {
     expect(cfg).toContain("--port 3102");
   });
 });
+
+describe("cockpit parity — it ADDS, it never hides (Guardrail #7)", () => {
+  const panel = read("app/exceptions/ExceptionDetailPanel.tsx");
+
+  it("has no cockpit-exclusive gate that hides a classic surface", () => {
+    // The cockpit is additive: it swaps the confidence renderer (ring vs
+    // bar), elevates the situation, and adds the rail at the page level.
+    // It must never wrap a classic surface in a `!COCKPIT &&` gate — that
+    // would hide something the classic layout shows (a Guardrail #7
+    // partial-truth regression).
+    expect(panel).not.toContain("!COCKPIT");
+  });
+
+  it("keeps every classic detail surface mounted regardless of the flag", () => {
+    // These render on the single (flag-independent) path, so the operator
+    // sees the same evidence whether the cockpit is on or off.
+    for (const mount of [
+      "<HeaderRibbon",
+      "<ImpactBar",
+      "<ContextStrip",
+      "<AgentReasoningCard",
+      "<EvidenceGrid",
+      "<DiagnosticsSection",
+    ]) {
+      expect(panel.includes(mount), `${mount} must stay mounted under the cockpit`).toBe(true);
+    }
+  });
+});
