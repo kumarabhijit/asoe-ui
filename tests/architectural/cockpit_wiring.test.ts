@@ -30,6 +30,14 @@ describe("confidence ring is flag-gated on the recommendation", () => {
     expect(panel).toContain("cockpitEnabled");
     expect(panel).toMatch(/confidenceVariant=\{COCKPIT \? "ring" : "bar"\}/);
   });
+
+  it("gives the situation a hero treatment only under the cockpit flag", () => {
+    // Same governed situation_headline; the classic compact subhead is
+    // preserved for flag-off, so no lock on the classic markup breaks.
+    expect(panel).toMatch(/COCKPIT \? \(/);
+    expect(panel).toContain("situation_headline");
+    expect(panel).toContain("text-subhead font-semibold text-text-primary m-0");
+  });
 });
 
 describe("AgentActivityRail tenant", () => {

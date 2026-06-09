@@ -772,11 +772,25 @@ export default function ExceptionDetailPanel({
               presentation_tier: operator. Sourced from the backend
               presentation contract (the governed per-intent one-liner);
               structurally omitted when the backend has no honest headline
-              (no fabricated text — Guardrail #6). */}
+              (no fabricated text — Guardrail #6).
+
+              Cockpit (cockpit-refactor): the situation is the operator's
+              entry point, so it gets a hero treatment — larger type + a
+              brand accent rule — instead of the compact classic subhead.
+              Same governed text, flag-gated, additive. */}
           {analysis?.presentation?.situation_headline && (
-            <h2 className="text-subhead font-semibold text-text-primary m-0">
-              {analysis.presentation.situation_headline}
-            </h2>
+            COCKPIT ? (
+              <div className="flex items-start gap-12">
+                <span aria-hidden className="mt-1 h-[26px] w-[3px] rounded-full bg-brand shrink-0" />
+                <h2 className="text-title font-bold text-text-primary m-0 leading-tight">
+                  {analysis.presentation.situation_headline}
+                </h2>
+              </div>
+            ) : (
+              <h2 className="text-subhead font-semibold text-text-primary m-0">
+                {analysis.presentation.situation_headline}
+              </h2>
+            )
           )}
 
           {/* Four-eyes cosign banner — shown when a high-value override
