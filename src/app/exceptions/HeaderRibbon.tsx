@@ -27,9 +27,16 @@ interface HeaderRibbonProps {
    * two parallel headers above the same action ribbon and surfaces
    * compliance state four times across the screen.
    *
-   * `embedded` suppresses the breadcrumb row and the Audit Result
-   * badge. Per-record facts that have no case-level analog (lifecycle
-   * "Current State", event type, totalPo, delta) stay visible.
+   * `embedded` suppresses the breadcrumb row, the Audit Result
+   * badge, the Type label, and the order-total/delta figure — all of
+   * which either duplicate the case-level chrome (id, customer,
+   * verdict) or, in the case of the order total, present a SECOND
+   * dollar number that competes with the ImpactBar's at-risk figure
+   * (the canonical blast radius). What survives is the per-record
+   * lifecycle "Current State" — decision-relevant and with no clean
+   * case-level analog on a multi-record case (council follow-up
+   * 2026-06-09). Standalone `/exceptions/[id]` (no left queue pane)
+   * keeps the full chrome.
    */
   embedded?: boolean;
 }
@@ -95,23 +102,33 @@ export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, total
             label ("Manual Order Intake"), not the raw event token
             ("EMAIL_ORDER_ENTRY_REQUEST"). The raw event_type stays in the
             audit zone (DiagnosticsSection / Source Email), where the
-            machine token is the evidence. */}
-        <div className="flex items-center gap-4">
-          <span className="text-label font-semibold uppercase tracking-wider text-text-quaternary">
-            Type:
-          </span>
-          <span className="text-caption text-text-tertiary">
-            <TaxonomyLabel axis="intent" code={detail.intent} />
-          </span>
-        </div>
-        <div className="flex-1" />
-        <span className="font-mono font-bold text-body text-text-primary">
-          {fmtPrice(totalPo)}
-        </span>
-        {delta !== 0 && (
-          <span className="font-mono font-semibold text-caption text-error">
-            {"\u0394"} {fmtSignedPrice(delta)}
-          </span>
+            machine token is the evidence.
+
+            Embedded (workspace) mode drops the Type and the
+            order-total/delta: Type is channel jargon that doesn't
+            discriminate the decision here (Guardrail #0/#1), and the
+            order total is a SECOND dollar figure competing with the
+            ImpactBar's at-risk number (council follow-up 2026-06-09). */}
+        {!embedded && (
+          <>
+            <div className="flex items-center gap-4">
+              <span className="text-label font-semibold uppercase tracking-wider text-text-quaternary">
+                Type:
+              </span>
+              <span className="text-caption text-text-tertiary">
+                <TaxonomyLabel axis="intent" code={detail.intent} />
+              </span>
+            </div>
+            <div className="flex-1" />
+            <span className="font-mono font-bold text-body text-text-primary">
+              {fmtPrice(totalPo)}
+            </span>
+            {delta !== 0 && (
+              <span className="font-mono font-semibold text-caption text-error">
+                {"\u0394"} {fmtSignedPrice(delta)}
+              </span>
+            )}
+          </>
         )}
       </div>
     </div>

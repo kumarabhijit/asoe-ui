@@ -49,3 +49,29 @@ describe("exc-046 summary terminology (ADR-045)", () => {
     expect(container.textContent).not.toContain("Email Order Intake");
   });
 });
+
+// Council follow-up 2026-06-09 — in the /cases workspace the left queue row
+// already carries id / customer / state / $, so the embedded HeaderRibbon
+// must NOT re-surface the Type (channel jargon) or the order total (a second
+// $ figure competing with the ImpactBar's at-risk number). It keeps only the
+// per-record lifecycle "Current State". Standalone keeps the full chrome.
+describe("HeaderRibbon embedded slimming (workspace de-duplication)", () => {
+  it("drops Type and the order total when embedded", () => {
+    const { container } = render(
+      <HeaderRibbon detail={exc046} primarySkuLabel="SKU-1" totalPo={1000} delta={250} embedded />,
+    );
+    expect(screen.queryByText("Manual Order Intake")).not.toBeInTheDocument();
+    expect(container.textContent).not.toContain("Type:");
+    expect(container.textContent).not.toContain("$1,000");
+    // The per-record lifecycle state survives (decision-relevant).
+    expect(container.textContent).toContain("RESOLVED");
+  });
+
+  it("keeps Type and the order total when standalone (no left pane)", () => {
+    const { container } = render(
+      <HeaderRibbon detail={exc046} primarySkuLabel="SKU-1" totalPo={1000} delta={0} />,
+    );
+    expect(screen.getByText("Manual Order Intake")).toBeInTheDocument();
+    expect(container.textContent).toContain("$1,000");
+  });
+});
