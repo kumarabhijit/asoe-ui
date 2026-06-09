@@ -32,3 +32,20 @@ export function casesRowV2Enabled(): boolean {
   if (process.env.NEXT_PUBLIC_CASES_ROW_V2 === "0") return false;
   return true;
 }
+
+// ── Cockpit redesign (cockpit-refactor) ─────────────────────────────
+//
+// Gates the agent-first "decision cockpit" composition: a confidence
+// ring on the Recommendation, the persistent Agent Activity rail, and
+// the cockpit center layout. OPT-IN — default OFF in every tier so the
+// existing layout (and every architecture lock + e2e that pins it) is
+// byte-for-byte unchanged until the surface is reviewed. Flip
+// `NEXT_PUBLIC_COCKPIT=1` (Vercel preview env var) to demo it; no code
+// change is needed to roll forward or back.
+//
+// Design principle: nothing about the cockpit touches data fetching,
+// action handlers, RBAC, or backend contracts — it is a presentational
+// recomposition of the same data the classic layout consumes.
+export function cockpitEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_COCKPIT === "1";
+}
