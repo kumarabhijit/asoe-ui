@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASOE · Control Tower</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+
+<div class="topbar">
+  <div class="brand"><span class="logo">A</span> ASOE</div>
+  <nav class="nav">
+    <a href="#">Cockpit</a>
+    <a href="#">Queue</a>
+    <a class="active" href="#">Insights</a>
+    <a href="#">Settings</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="search">⌕&nbsp; Search orders, customers, POs…</div>
+  <div class="live"><span class="pulse"></span> 14 agents live</div>
+  <div class="avatar">JD</div>
+</div>
+
+<div class="dash">
+  <h1>Control Tower</h1>
+  <div class="sub">Order-to-cash exceptions · last 24 hours · all regions</div>
+
+  <div class="kpis">
+    <div class="card kpi"><div class="l">Auto-resolved</div><div class="v">86%</div><div class="t up">▲ 4.2 pts vs last week</div></div>
+    <div class="card kpi"><div class="l">Open · needs human</div><div class="v">23</div><div class="t down">▲ 6 since 9am</div></div>
+    <div class="card kpi"><div class="l">Avg time to resolve</div><div class="v">3.1<span style="font-size:16px;color:var(--tx-3)">m</span></div><div class="t up">▼ 38% vs manual</div></div>
+    <div class="card kpi"><div class="l">$ at risk now</div><div class="v" style="color:var(--warn)">$214k</div><div class="t">across 23 exceptions</div></div>
+  </div>
+
+  <div class="grid2">
+    <!-- throughput -->
+    <div class="card panel">
+      <div class="ph"><span class="t">Resolution throughput</span><span class="more">agents vs humans · per hour</span></div>
+      <div class="bars">
+        <div class="bar"><div class="col2" style="height:42%"><div class="seg-auto" style="height:78%"></div><div class="seg-human" style="height:22%"></div></div><span class="x">08</span></div>
+        <div class="bar"><div class="col2" style="height:55%"><div class="seg-auto" style="height:82%"></div><div class="seg-human" style="height:18%"></div></div><span class="x">09</span></div>
+        <div class="bar"><div class="col2" style="height:70%"><div class="seg-auto" style="height:85%"></div><div class="seg-human" style="height:15%"></div></div><span class="x">10</span></div>
+        <div class="bar"><div class="col2" style="height:64%"><div class="seg-auto" style="height:80%"></div><div class="seg-human" style="height:20%"></div></div><span class="x">11</span></div>
+        <div class="bar"><div class="col2" style="height:88%"><div class="seg-auto" style="height:88%"></div><div class="seg-human" style="height:12%"></div></div><span class="x">12</span></div>
+        <div class="bar"><div class="col2" style="height:76%"><div class="seg-auto" style="height:86%"></div><div class="seg-human" style="height:14%"></div></div><span class="x">13</span></div>
+        <div class="bar"><div class="col2" style="height:92%"><div class="seg-auto" style="height:90%"></div><div class="seg-human" style="height:10%"></div></div><span class="x">14</span></div>
+        <div class="bar"><div class="col2" style="height:68%"><div class="seg-auto" style="height:84%"></div><div class="seg-human" style="height:16%"></div></div><span class="x">15</span></div>
+      </div>
+      <div class="legend"><span><i style="background:var(--brand)"></i>Resolved by agents</span><span><i style="background:var(--surface-3)"></i>Routed to humans</span></div>
+    </div>
+
+    <!-- exception mix -->
+    <div class="card panel">
+      <div class="ph"><span class="t">Exception mix</span><span class="more">by $ at risk</span></div>
+      <div class="cat">
+        <div class="row"><div class="top"><span>Pricing variance</span><span class="amt">$86k</span></div><div class="track"><div class="fill" style="width:80%;background:var(--brand)"></div></div></div>
+        <div class="row"><div class="top"><span>Credit block</span><span class="amt">$61k</span></div><div class="track"><div class="fill" style="width:57%;background:var(--bad)"></div></div></div>
+        <div class="row"><div class="top"><span>Duplicate PO</span><span class="amt">$34k</span></div><div class="track"><div class="fill" style="width:32%;background:var(--warn)"></div></div></div>
+        <div class="row"><div class="top"><span>Manual order intake</span><span class="amt">$22k</span></div><div class="track"><div class="fill" style="width:21%;background:var(--info)"></div></div></div>
+        <div class="row"><div class="top"><span>Back-order / OOS</span><span class="amt">$11k</span></div><div class="track"><div class="fill" style="width:11%;background:var(--ok)"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2" style="grid-template-columns:1fr 1.5fr;">
+    <!-- agent roster -->
+    <div class="card panel">
+      <div class="ph"><span class="t">Agent roster</span><span class="more">live</span></div>
+      <div class="roster">
+        <div class="agent"><div class="ai">⚡</div><div><div class="an">Pricing agent</div><div class="as">Resolving 3 · 1,204 today</div></div><div class="stat2"><span class="pulse"></span>working</div></div>
+        <div class="agent"><div class="ai">✉</div><div><div class="an">Intake agent</div><div class="as">Resolving 5 · 880 today</div></div><div class="stat2"><span class="pulse"></span>working</div></div>
+        <div class="agent"><div class="ai">⛃</div><div><div class="an">Credit agent</div><div class="as">Resolving 2 · 410 today</div></div><div class="stat2"><span class="pulse"></span>working</div></div>
+        <div class="agent"><div class="ai">⧉</div><div><div class="an">Dedup agent</div><div class="as">Resolving 1 · 318 today</div></div><div class="stat2"><span class="pulse"></span>working</div></div>
+        <div class="agent"><div class="ai">⛟</div><div><div class="an">Fulfilment agent</div><div class="as">Idle · 256 today</div></div><div class="stat2" style="color:var(--tx-4)">idle</div></div>
+      </div>
+    </div>
+
+    <!-- SLA risk -->
+    <div class="card panel">
+      <div class="ph"><span class="t">SLA risk — next 8 hours</span><span class="more">needs human</span></div>
+      <table class="li" style="margin-top:0">
+        <tr><th>Customer</th><th>Type</th><th>Due in</th><th>$ at risk</th></tr>
+        <tr><td>Kroger</td><td>Credit block</td><td style="color:var(--bad)" class="mono">1h 03m</td><td class="mono">$12,100</td></tr>
+        <tr><td>Southeast Beverage</td><td>Manual intake</td><td style="color:var(--warn)" class="mono">4h 12m</td><td class="mono">$18,400</td></tr>
+        <tr><td>Sysco</td><td>Pricing variance</td><td style="color:var(--warn)" class="mono">5h 40m</td><td class="mono">$9,250</td></tr>
+        <tr><td>US Foods</td><td>Duplicate PO</td><td class="mono">7h 18m</td><td class="mono">$4,800</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASOE · Decision Cockpit</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+
+<div class="topbar">
+  <div class="brand"><span class="logo">A</span> ASOE</div>
+  <nav class="nav">
+    <a class="active" href="#">Cockpit</a>
+    <a href="#">Queue</a>
+    <a href="#">Insights</a>
+    <a href="#">Settings</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="search">⌕&nbsp; Search orders, customers, POs…</div>
+  <div class="live"><span class="pulse"></span> 14 agents live</div>
+  <div class="avatar">JD</div>
+</div>
+
+<div class="app">
+
+  <!-- ── Queue ── -->
+  <div class="col queue">
+    <div class="col-head">
+      <h1 class="title">Exceptions</h1>
+      <div class="kicker">Sorted by SLA · 23 open</div>
+      <div class="qfilters">
+        <span class="chip on">All</span>
+        <span class="chip">Inbox</span>
+        <span class="chip">API</span>
+      </div>
+    </div>
+    <div class="col-body">
+      <div class="qgroup">Needs you <span class="n">9</span></div>
+
+      <div class="qrow sel">
+        <span class="dot warn"></span>
+        <div><div class="who">Southeast Beverage Distributors</div>
+          <div class="sub">New email order · ship-to ambiguous</div></div>
+        <div class="meta"><div class="amt">$18,400</div><div class="sla">SLA 4h 12m</div></div>
+      </div>
+      <div class="qrow">
+        <span class="dot bad"></span>
+        <div><div class="who">Walmart</div>
+          <div class="sub">Contract price $9.80 vs PO $11.20</div></div>
+        <div class="meta"><div class="amt">$850</div><div class="sla">Breached 2d</div></div>
+      </div>
+      <div class="qrow">
+        <span class="dot warn"></span>
+        <div><div class="who">Kroger</div>
+          <div class="sub">Credit limit breached · $48.2k exposure</div></div>
+        <div class="meta"><div class="amt">$12,100</div><div class="sla">SLA 1h 03m</div></div>
+      </div>
+      <div class="qrow">
+        <span class="dot bad"></span>
+        <div><div class="who">Albertsons</div>
+          <div class="sub">Duplicate PO suspected (0.94)</div></div>
+        <div class="meta"><div class="amt">$6,300</div><div class="sla">Breached 9h</div></div>
+      </div>
+
+      <div class="qgroup">Agents working <span class="n">7</span></div>
+      <div class="qrow">
+        <span class="dot info"></span>
+        <div><div class="who">Target</div>
+          <div class="sub">Resolving back-order substitution…</div></div>
+        <div class="meta"><div class="amt">$3,900</div></div>
+      </div>
+      <div class="qrow">
+        <span class="dot info"></span>
+        <div><div class="who">Costco</div>
+          <div class="sub">Checking MOQ against contract…</div></div>
+        <div class="meta"><div class="amt">$2,250</div></div>
+      </div>
+
+      <div class="qgroup">Resolved by agents <span class="n">142</span></div>
+      <div class="qrow">
+        <span class="dot ok"></span>
+        <div><div class="who">Publix</div>
+          <div class="sub">Auto-approved · price within floor</div></div>
+        <div class="meta"><div class="amt">$1,100</div></div>
+      </div>
+      <div class="qrow">
+        <span class="dot ok"></span>
+        <div><div class="who">H-E-B</div>
+          <div class="sub">Pallet rounding applied</div></div>
+        <div class="meta"><div class="amt">$980</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Center cockpit ── -->
+  <div class="col center">
+    <div class="center-inner">
+      <div class="crumbs">
+        <span class="pill mono">EML-PO-2026-0042</span>
+        <span>·</span><span>Customer inbox</span>
+        <span>·</span><span style="color:var(--warn)">SLA 4h 12m</span>
+        <span>·</span><span>Awaiting your review</span>
+      </div>
+
+      <div class="sit">Southeast Beverage emailed a new order — but the
+        <span class="hl">ship-to is ambiguous</span>, so it can’t ship yet.</div>
+      <div class="sit-row">
+        <span class="tag">🏢 Southeast Beverage Distributors</span>
+        <span class="tag warn">⏱ SLA 4h 12m</span>
+        <span class="tag bad">$18,400 at risk</span>
+      </div>
+
+      <!-- recommendation hero -->
+      <div class="card reco">
+        <div class="reco-head">
+          <span class="bolt">⚡</span>
+          <span class="t">Agent recommendation</span>
+          <span class="verdict">REVIEW REQUIRED</span>
+        </div>
+        <div class="reco-grid">
+          <div class="ring"><div class="v"><b>88%</b><small>confidence</small></div></div>
+          <div class="reco-body">
+            <div class="lead">Send the buyer a clarification email to confirm the ship-to,
+              then release 600 CS once confirmed.</div>
+            <ul>
+              <li><span class="ic">✓</span> All pricing &amp; credit floor checks passed — nothing blocks the order itself.</li>
+              <li><span class="ic">⚠</span> “Atlanta DC” resolves to <b>two</b> warehouses (Atlanta-North, Atlanta-South) → confidence dropped to 0.62 on that field.</li>
+            </ul>
+            <div class="calib">◔ Model score — not a calibrated probability. Reviewed by 1 agent.</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn primary">Send clarification draft <span class="k">A</span></button>
+          <button class="btn">Override…</button>
+          <button class="btn ghost">Escalate</button>
+          <button class="btn ghost">Re-analyze</button>
+        </div>
+      </div>
+
+      <!-- key facts -->
+      <div class="stats">
+        <div class="card stat"><div class="l">At risk</div><div class="v bad">$18,400</div><div class="d">600 CS BEV-COLA-12PK</div></div>
+        <div class="card stat"><div class="l">Price variance</div><div class="v">$0.00</div><div class="d">Matches contract $9.80</div></div>
+        <div class="card stat"><div class="l">Blocking field</div><div class="v warn" style="font-size:15px">Ship-to</div><div class="d">2 matching warehouses</div></div>
+      </div>
+
+      <!-- evidence -->
+      <div class="section-h"><span class="t">Evidence — what the agent checked</span><span class="ln"></span><span class="toggle">Collapse ▾</span></div>
+      <div class="flow">
+        <div class="step"><div class="mk">✓</div><div><div class="st">Extracted 4 line items from the PDF</div><div class="sd">Composite extraction confidence 0.88 · 600 CS BEV-COLA-12PK, 240 CS BEV-LEMON-6PK +2</div></div></div>
+        <div class="step"><div class="mk">✓</div><div><div class="st">Price vs contract — within floor</div><div class="sd">Buyer’s $9.80 matches the active contract price. No variance.</div></div></div>
+        <div class="step"><div class="mk">✓</div><div><div class="st">Credit &amp; MOQ checks passed</div><div class="sd">Customer credit available · order exceeds minimum order qty.</div></div></div>
+        <div class="step block"><div class="mk">⚠</div><div><div class="st">Ship-to could not be resolved automatically</div><div class="sd">The PDF cover letter says “Atlanta DC”, which matches DC #6094 (Atlanta-North) and DC #6095 (Atlanta-South). Confidence 0.62 — below the 0.95 auto-release threshold.</div></div></div>
+      </div>
+
+      <div class="section-h"><span class="t">Order lines</span><span class="ln"></span></div>
+      <table class="li">
+        <tr><th>SKU</th><th>Description</th><th>Qty</th><th>Price</th><th>Ext.</th></tr>
+        <tr><td class="mono">BEV-COLA-12PK</td><td>Cola 12-pack</td><td class="mono">600 CS</td><td class="mono">$9.80</td><td class="mono">$5,880</td></tr>
+        <tr><td class="mono">BEV-LEMON-6PK</td><td>Lemon-lime 6-pack</td><td class="mono">240 CS</td><td class="mono">$11.40</td><td class="mono">$2,736</td></tr>
+        <tr><td class="mono">BEV-ORNG-6PK</td><td>Orange 6-pack</td><td class="mono">180 CS</td><td class="mono">$11.40</td><td class="mono">$2,052</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Right rail: copilot ── -->
+  <div class="col rail">
+    <div class="rail-h">✦ Agent activity</div>
+    <div class="rail-body">
+      <div class="stream">
+        <div class="ev"><div class="ed">✓</div><div><div class="et"><b>Classifier</b> tagged this as a new manual order</div><div class="ets">12:42:03 · 0.88</div></div></div>
+        <div class="ev"><div class="ed">⤓</div><div><div class="et"><b>Extractor</b> pulled 4 lines from the attachment</div><div class="ets">12:42:05</div></div></div>
+        <div class="ev"><div class="ed">$</div><div><div class="et"><b>Pricing agent</b> confirmed contract price</div><div class="ets">12:42:07 · pass</div></div></div>
+        <div class="ev"><div class="ed">⚠</div><div><div class="et"><b>Fulfilment agent</b> flagged ambiguous ship-to</div><div class="ets">12:42:08 · 0.62</div></div></div>
+        <div class="ev"><div class="ed">✦</div><div><div class="et"><b>Resolver</b> recommended REQUEST_CLARIFICATION</div><div class="ets">12:42:09</div></div></div>
+      </div>
+
+      <div class="draft">
+        <div class="dh">✉ Draft reply <span class="badge">DRAFTED</span></div>
+        <div class="subj">Re: PO EML-PO-2026-0042 — please confirm ship-to</div>
+        <div class="body">Hi — thanks for your order. Before we release it we need to confirm one detail:
+          <br><br>• Ship-to: you wrote <span class="q">“Atlanta DC”</span> — please confirm whether this is
+          <span class="q">DC&nbsp;#6094 (North)</span> or <span class="q">#6095 (South)</span>.<br><br>
+          Once confirmed we’ll process 600 CS BEV-COLA-12PK + 240 CS BEV-LEMON-6PK for delivery by 2026-05-24.</div>
+      </div>
+
+      <div class="ask">✦&nbsp; Ask the agent about this case…</div>
+    </div>
+  </div>
+
+</div>
+</body></html>

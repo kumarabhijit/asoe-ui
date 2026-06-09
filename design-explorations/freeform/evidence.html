@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASOE · Reasoning & Evidence</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .ev-wrap { max-width: 1080px; margin: 0 auto; padding: 28px 36px 60px; display:grid; grid-template-columns: 1.3fr 1fr; gap: 22px; }
+  .doc { padding: 0; overflow:hidden; }
+  .doc .dh { padding: 14px 16px; border-bottom:1px solid var(--line-soft); font-size:12.5px; color:var(--tx-3); display:flex; align-items:center; gap:8px;}
+  .doc .page { padding: 22px; font-size: 13px; line-height: 1.7; color: var(--tx-2); background: var(--surface-1); }
+  .doc .page .mark { background: rgba(247,185,85,.22); border-bottom:2px solid var(--warn); color: var(--tx-1); padding:0 3px; border-radius:3px; }
+  .doc .page h4 { color: var(--tx-1); font-size: 13px; margin-bottom: 8px; }
+  .prov { font-size: 11.5px; color: var(--tx-4); margin-top: 6px; }
+  .conf-chip { font-family: var(--mono); font-size: 11px; padding: 2px 7px; border-radius: 6px; background: var(--surface-3); color: var(--tx-2); margin-left:auto; }
+  .conf-chip.low { color: var(--warn); background: var(--warn-bg); }
+  .prec { display:flex; gap:12px; padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+  .prec .pc { width: 38px; height: 38px; border-radius: 10px; background: var(--surface-3); display:grid; place-items:center; font-size:13px; color: var(--tx-2); }
+  .prec .pt { font-size: 13px; font-weight: 600; } .prec .ps { font-size: 12px; color: var(--tx-3); margin-top:2px; }
+  .prec .pr { margin-left:auto; font-size: 12px; color: var(--ok); }
+</style>
+</head><body>
+
+<div class="topbar">
+  <div class="brand"><span class="logo">A</span> ASOE</div>
+  <nav class="nav"><a href="#">Cockpit</a><a class="active" href="#">Queue</a><a href="#">Insights</a><a href="#">Settings</a></nav>
+  <div class="spacer"></div>
+  <div class="search">⌕&nbsp; Search…</div>
+  <div class="live"><span class="pulse"></span> 14 agents live</div>
+  <div class="avatar">JD</div>
+</div>
+
+<div style="padding:24px 36px 0; max-width:1080px; margin:0 auto;">
+  <div class="crumbs"><span class="pill mono">EML-PO-2026-0042</span><span>·</span><span>Reasoning &amp; evidence</span><span>·</span><span class="muted">how the agent reached its recommendation</span></div>
+  <div class="sit" style="font-size:21px">Agent reasoning trace</div>
+</div>
+
+<div class="ev-wrap">
+  <!-- left: reasoning timeline -->
+  <div>
+    <div class="card panel">
+      <div class="ph"><span class="t">Decision path</span><span class="more">5 steps · 6.1s</span></div>
+      <div class="flow">
+        <div class="step"><div class="mk">1</div><div><div class="st">Classify intent <span class="conf-chip">0.88</span></div><div class="sd">Routed to <b>Manual order intake</b>. Top alternative: EDI order (0.07).</div></div></div>
+        <div class="step"><div class="mk">2</div><div><div class="st">Extract line items <span class="conf-chip">0.88</span></div><div class="sd">4 lines parsed from PDF attachment. Quantities &amp; SKUs matched master data.</div></div></div>
+        <div class="step"><div class="mk">3</div><div><div class="st">Price &amp; credit floors <span class="conf-chip">1.00</span></div><div class="sd">$9.80 equals active contract. Credit available. MOQ satisfied. All floors pass.</div></div></div>
+        <div class="step block"><div class="mk">4</div><div class="flex" style="flex-direction:column;width:100%"><div class="st flex ac" style="width:100%">Resolve ship-to <span class="conf-chip low" style="margin-left:auto">0.62</span></div><div class="sd">“Atlanta DC” matched two physical warehouses. Single-field confidence fell below the 0.95 auto-release gate → pulled the composite below threshold.</div></div></div>
+        <div class="step"><div class="mk">5</div><div><div class="st">Recommend action</div><div class="sd">Deterministic recipe selected <b>REQUEST_CLARIFICATION</b> — block release, draft buyer email, hold order for human confirmation.</div></div></div>
+      </div>
+      <div class="prov mono">recipe ManualOrderIntakeRecipe@v3 · taxonomy 2026.4 · trace 0c9f…f828</div>
+    </div>
+
+    <div class="card panel mt24">
+      <div class="ph"><span class="t">Similar past cases</span><span class="more">precedent</span></div>
+      <div class="prec"><div class="pc">↺</div><div><div class="pt">Southeast Beverage · Mar 2026</div><div class="ps">Same “Atlanta DC” ambiguity → buyer confirmed North</div></div><div class="pr">resolved 1 reply</div></div>
+      <div class="prec"><div class="pc">↺</div><div><div class="pt">Coca-Cola Bottlers · Feb 2026</div><div class="ps">Ambiguous ship-to → clarification sent</div></div><div class="pr">resolved 1 reply</div></div>
+      <div class="prec" style="border:none"><div class="pc">↺</div><div><div class="pt">Sysco ATL · Jan 2026</div><div class="ps">Resolved to default DC after 24h no-reply</div></div><div class="pr">auto-defaulted</div></div>
+    </div>
+  </div>
+
+  <!-- right: source document -->
+  <div>
+    <div class="card doc">
+      <div class="dh">✉ Source — buyer email + PDF cover letter <span class="conf-chip" style="margin-left:auto">extract 0.88</span></div>
+      <div class="page">
+        <h4>Purchase Order — EML-PO-2026-0042</h4>
+        From: buyer@southeast-distrib.example<br>
+        To: orders@acme-beverages.example<br><br>
+        Please process the following order for delivery by <b>2026-05-24</b>:<br><br>
+        • 600 CS BEV-COLA-12PK @ $9.80<br>
+        • 240 CS BEV-LEMON-6PK @ $11.40<br>
+        • 180 CS BEV-ORNG-6PK @ $11.40<br><br>
+        Ship to: <span class="mark">Atlanta DC</span> — receiving hours 7am–3pm.<br><br>
+        Thanks,<br>Acme Beverages Order Desk
+        <div class="prov">⚠ “Atlanta DC” → matches DC #6094 (Atlanta-North) and DC #6095 (Atlanta-South). Needs buyer confirmation.</div>
+      </div>
+    </div>
+
+    <div class="card panel mt24">
+      <div class="ph"><span class="t">Diagnostics &amp; audit</span><span class="more">reconstruction</span></div>
+      <table class="li" style="margin-top:0">
+        <tr><td>Recipe</td><td class="mono">ManualOrderIntakeRecipe@v3</td></tr>
+        <tr><td>Raw intent</td><td class="mono">MANUAL_ORDER_INTAKE</td></tr>
+        <tr><td>Event type</td><td class="mono">EMAIL_ORDER_ENTRY_REQUEST</td></tr>
+        <tr><td>Shadow verdict</td><td><span class="tag warn" style="padding:2px 8px">YELLOW</span></td></tr>
+        <tr><td>Taxonomy</td><td class="mono">2026.4</td></tr>
+        <tr><td>Correlation</td><td class="mono">0c9f…f828</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+</body></html>
