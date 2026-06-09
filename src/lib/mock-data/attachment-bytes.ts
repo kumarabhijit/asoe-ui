@@ -4,25 +4,23 @@
  * (`NEXT_PUBLIC_USE_REAL_API` unset); the real backend streams genuine bytes.
  */
 
-/** Build a minimal, single-page, openable PDF as an ASCII string (so it is a
- *  valid Blob string part). Each line is rendered as its own text run so a PDF
- *  text-layer extractor (PDF.js) reads each back contiguously — which lets the
- *  preview verifier LOCATE embedded evidence text. xref offsets are byte
- *  offsets; computed via TextEncoder so a stray multibyte char stays correct. */
-function makeMinimalPdf(lines: string[]): string {
+import { isPo8842, PO_8842_SPATIAL_FIELDS } from "./po8842-spatial";
+
+// US-Letter page box the mock renders on (PDF user-space, origin BOTTOM-left).
+const PAGE_W = 612;
+const PAGE_H = 792;
+
+const _escapePdf = (s: string): string => s.replace(/[\\()]/g, "\\$&");
+
+/** Assemble a single-page PDF around a ready-built content stream. xref offsets
+ *  are byte offsets computed via TextEncoder so a stray multibyte char stays
+ *  correct. Shared by the simple and positioned builders. */
+function _assemblePdf(content: string): string {
   const enc = new TextEncoder();
-  const safe = (lines.length ? lines : ["Mock attachment"]).map((l) =>
-    l.replace(/[\\()]/g, "\\$&"),
-  );
-  let content = "BT /F1 12 Tf 64 720 Td";
-  safe.forEach((l, i) => {
-    content += i === 0 ? ` (${l}) Tj` : ` 0 -18 Td (${l}) Tj`;
-  });
-  content += " ET";
   const objects = [
     "<</Type /Catalog /Pages 2 0 R>>",
     "<</Type /Pages /Kids [3 0 R] /Count 1>>",
-    "<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <</Font <</F1 5 0 R>>>> /Contents 4 0 R>>",
+    `<</Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources <</Font <</F1 5 0 R>>>> /Contents 4 0 R>>`,
     `<</Length ${enc.encode(content).length}>>\nstream\n${content}\nendstream`,
     "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>",
   ];
@@ -39,6 +37,74 @@ function makeMinimalPdf(lines: string[]): string {
   });
   body += `trailer\n<</Size ${objects.length + 1} /Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`;
   return body;
+}
+
+/** Build a minimal, single-page, openable PDF as an ASCII string (so it is a
+ *  valid Blob string part). Each line is rendered as its own text run so a PDF
+ *  text-layer extractor (PDF.js) reads each back contiguously — which lets the
+ *  preview verifier LOCATE embedded evidence text. */
+function makeMinimalPdf(lines: string[]): string {
+  const safe = (lines.length ? lines : ["Mock attachment"]).map(_escapePdf);
+  let content = "BT /F1 12 Tf 64 720 Td";
+  safe.forEach((l, i) => {
+    content += i === 0 ? ` (${l}) Tj` : ` 0 -18 Td (${l}) Tj`;
+  });
+  content += " ET";
+  return _assemblePdf(content);
+}
+
+interface PositionedRun {
+  text: string;
+  /** PDF user-space (origin bottom-left). */
+  x: number;
+  y: number;
+  size?: number;
+}
+
+/** Build a PDF that places each run at an absolute position (text matrix `Tm`),
+ *  so the rendered glyphs land where a caller wants them — used to put each
+ *  PO_8842 evidence span under its recorded bbox so the spatial overlay aligns. */
+function makePositionedPdf(runs: PositionedRun[]): string {
+  let content = "";
+  for (const r of runs) {
+    const size = r.size ?? 12;
+    content +=
+      `BT /F1 ${size} Tf 1 0 0 1 ${r.x.toFixed(2)} ${r.y.toFixed(2)} Tm ` +
+      `(${_escapePdf(r.text)}) Tj ET\n`;
+  }
+  return _assemblePdf(content);
+}
+
+/** Render the PO_8842 document with each recorded evidence span placed UNDER
+ *  its bbox, so the backend-authoritative spatial overlays (ADR-045) sit on the
+ *  real text. A normalised top-left bbox `[x0,y0,x1,y1]` maps to a PDF baseline
+ *  near the box bottom: `x = x0·W`, `y = H·(1−y1) + pad`. Each evidence span is
+ *  emitted EXACTLY ONCE (a duplicate would make the safety bar read AMBIGUOUS).
+ *  Non-geometry evidence (e.g. the From: header) stacks in a footer band. */
+function makePo8842Pdf(evidenceText: string[]): string {
+  const runs: PositionedRun[] = [
+    // Title carries no evidence span (avoids a duplicate match).
+    { text: "PURCHASE ORDER", x: 64, y: PAGE_H - 56, size: 16 },
+  ];
+  const placed = new Set<string>();
+  for (const f of PO_8842_SPATIAL_FIELDS) {
+    runs.push({
+      text: f.text,
+      x: f.bbox[0] * PAGE_W + 2,
+      y: PAGE_H * (1 - f.bbox[3]) + 6,
+      size: 13,
+    });
+    placed.add(f.text);
+  }
+  // Evidence without recorded geometry (e.g. the From: header) — keep it in the
+  // text layer so its text-derived anchor still LOCATES, below the box band.
+  let fy = PAGE_H * (1 - 0.52);
+  for (const t of evidenceText) {
+    if (placed.has(t)) continue;
+    runs.push({ text: t, x: 64, y: fy, size: 11 });
+    fy -= 18;
+  }
+  return makePositionedPdf(runs);
 }
 
 // 1x1 transparent PNG.
@@ -73,9 +139,13 @@ export function mockAttachmentBlob(opts: {
   const isCsv = mime === "text/csv" || /\.csv$/i.test(name);
 
   if (isPdf) {
-    return new Blob([makeMinimalPdf([`Mock attachment - ${name}`, ...evidence])], {
-      type: "application/pdf",
-    });
+    // The PO_8842 demo document places each evidence span under its recorded
+    // bbox so the ADR-045 spatial overlays land on the real text; every other
+    // mock PDF uses the simple top-down layout.
+    const body = isPo8842(name)
+      ? makePo8842Pdf(evidence)
+      : makeMinimalPdf([`Mock attachment - ${name}`, ...evidence]);
+    return new Blob([body], { type: "application/pdf" });
   }
   if (isImage) {
     // Images have no text layer; evidence can't be embedded.
