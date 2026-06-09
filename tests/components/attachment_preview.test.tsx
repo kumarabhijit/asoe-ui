@@ -17,7 +17,32 @@ vi.mock("@/lib/api", () => ({
 }));
 import { attachmentsApi } from "@/lib/api";
 
+// Stub PDF.js so the page "paints" deterministically in jsdom — the spatial
+// overlays only draw once the page render succeeds (pageRendered gate), so the
+// overlay tests need a working render path. getContext is stubbed per-test
+// (truthy by default; null in the failure regression test).
+vi.mock("pdfjs-dist", () => ({
+  GlobalWorkerOptions: { workerSrc: "" },
+  getDocument: () => ({
+    promise: Promise.resolve({
+      numPages: 1,
+      getPage: () =>
+        Promise.resolve({
+          getViewport: () => ({ width: 612, height: 792 }),
+          render: () => ({ promise: Promise.resolve() }),
+          getTextContent: () =>
+            Promise.resolve({ items: [{ str: "PO-2026-0042 ship to Atlanta DC" }] }),
+        }),
+    }),
+  }),
+}));
+
 const getBlob = vi.mocked(attachmentsApi.getBlob);
+
+type GetContext = typeof HTMLCanvasElement.prototype.getContext;
+const setCanvasContext = (value: unknown) => {
+  HTMLCanvasElement.prototype.getContext = vi.fn(() => value) as unknown as GetContext;
+};
 
 function attachment(): EmailAttachmentManifestEntry {
   return {
@@ -46,6 +71,9 @@ const textBlob = (s: string) => new Blob([s], { type: "text/plain" });
 
 beforeEach(() => {
   getBlob.mockReset();
+  // jsdom has no real 2D context; give the canvas a truthy one so the deferred
+  // PDF paint succeeds and the page-rendered gate opens for the overlay tests.
+  setCanvasContext({});
 });
 
 describe("AttachmentPreview", () => {
@@ -112,6 +140,28 @@ describe("AttachmentPreview", () => {
     expect(overlay.style.width).toBe("40%");
     // The safety bar stays the authoritative surface alongside the overlay.
     expect(screen.getByTestId("evidence-safety-bar")).toBeInTheDocument();
+  });
+
+  it("suppresses spatial overlays when the PDF page fails to paint (no boxes over a blank canvas)", async () => {
+    // Regression (Source-Email PDF render bug): the page is painted in a
+    // post-mount effect; when the canvas can't get a 2D context (PDF.js
+    // unavailable) the page stays blank, so the overlays MUST NOT draw — else
+    // they float over a blank canvas as garbled bars (the reported symptom).
+    // The text-derived safety bar stays the authoritative surface.
+    setCanvasContext(null);
+    getBlob.mockResolvedValue(new Blob(["%PDF-1.4\nmock"], { type: "application/pdf" }));
+    const spatial: EvidenceAnchor = {
+      ...poAnchor(),
+      anchor_source: "spatial_extracted",
+      page: 1,
+      bbox: [0.1, 0.2, 0.5, 0.3],
+      confidence: 0.97,
+      rendition_hash: "rh-1",
+    };
+    render(<AttachmentPreview caseId="case-1" attachment={attachment()} anchors={[spatial]} />);
+    await screen.findByTestId("pdf-canvas-layer");
+    expect(screen.getByTestId("evidence-safety-bar")).toBeInTheDocument();
+    expect(screen.queryByTestId("spatial-overlay")).toBeNull();
   });
 
   it("draws no overlay for a text-derived anchor (safety bar only)", async () => {

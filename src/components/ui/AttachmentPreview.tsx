@@ -17,8 +17,10 @@
  *
  * NOTE: precise pixel overlays on the PDF canvas are ADR-045 (spatial) territory;
  * Phase-1 PDF highlighting verifies anchors against the extracted text layer and
- * reports status via the safety bar. PDF.js rendering is browser-only and
- * degrades to "position unconfirmed" if extraction fails.
+ * reports status via the safety bar. PDF.js rendering is browser-only: the page
+ * is painted in a dedicated effect once the canvas has mounted, and the spatial
+ * overlays draw ONLY when that paint succeeded — if PDF.js can't render, the
+ * canvas (and its boxes) are suppressed and the safety bar remains authoritative.
  */
 "use client";
 
@@ -70,7 +72,7 @@ const STATUS_META: Record<
 async function renderPdfAndExtractText(
   bytes: Uint8Array,
   canvas: HTMLCanvasElement | null,
-): Promise<string | null> {
+): Promise<{ text: string | null; rendered: boolean }> {
   try {
     const pdfjs = await import("pdfjs-dist");
     // Bundled worker, no CDN (ADR-043 §2.1).
@@ -84,6 +86,7 @@ async function renderPdfAndExtractText(
     const doc = await pdfjs.getDocument({ data: bytes }).promise;
 
     const page = await doc.getPage(1);
+    let rendered = false;
     if (canvas) {
       const viewport = page.getViewport({ scale: 1.25 });
       const ctx = canvas.getContext("2d");
@@ -91,6 +94,7 @@ async function renderPdfAndExtractText(
       canvas.height = viewport.height;
       if (ctx) {
         await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+        rendered = true;
       }
     }
 
@@ -100,10 +104,10 @@ async function renderPdfAndExtractText(
       const content = await pg.getTextContent();
       text += content.items.map((it) => ("str" in it ? it.str : "")).join(" ") + " ";
     }
-    return text;
+    return { text, rendered };
   } catch {
     // Browser/bundler-specific failure — degrade to position-unconfirmed.
-    return null;
+    return { text: null, rendered: false };
   }
 }
 
@@ -118,6 +122,11 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
   const [docText, setDocText] = useState<string | null>(null);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // PDF bytes are held until the canvas mounts (see the render effect below);
+  // `pageRendered` gates the spatial overlays so they only draw over a page
+  // that actually painted — never as floating boxes over a blank canvas.
+  const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
+  const [pageRendered, setPageRendered] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const attachmentId = attachment.attachment_id ?? null;
@@ -137,6 +146,8 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
     setDocText(null);
     setObjectUrl(null);
     setFormat(undefined);
+    setPdfBytes(null);
+    setPageRendered(false);
 
     (async () => {
       try {
@@ -162,9 +173,12 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
         } else if (fmt === "text") {
           setDocText(new TextDecoder("utf-8").decode(bytes));
         } else if (fmt === "pdf") {
-          const text = await renderPdfAndExtractText(bytes, canvasRef.current);
+          // The <canvas> is gated on loadState==="ready", so it is NOT mounted
+          // yet (we're still "loading") — rendering here would target a null
+          // ref and silently never paint the page. Stash the bytes; the render
+          // effect below paints once the canvas exists.
           if (cancelled) return;
-          setDocText(text);
+          setPdfBytes(bytes);
         }
         if (!cancelled) setLoadState("ready");
       } catch (e) {
@@ -179,6 +193,27 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
       if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
   }, [caseId, attachmentId]);
+
+  // Paint the PDF page once the canvas is actually mounted. This MUST be a
+  // separate effect from the loader: while loadState is "loading" the <canvas>
+  // (gated on ready+pdf) isn't mounted, so canvasRef.current is null and a
+  // render attempted in the loader silently never draws the page — leaving a
+  // blank canvas under the spatial overlays. By the time this runs, the
+  // ready+pdf commit has mounted the canvas, so the page paints; `rendered`
+  // tells us whether it did, which gates the overlays.
+  useEffect(() => {
+    if (format !== "pdf" || !pdfBytes) return;
+    let cancelled = false;
+    (async () => {
+      const { text, rendered } = await renderPdfAndExtractText(pdfBytes, canvasRef.current);
+      if (cancelled) return;
+      setDocText(text);
+      setPageRendered(rendered);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [format, pdfBytes]);
 
   // Decision-quality cohort (ADR-043 §2.7): record that a highlight safety bar
   // was actually presented to the operator for this case.
@@ -280,9 +315,13 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
           <div className="relative inline-block max-w-full" data-testid="pdf-canvas-layer">
             <canvas ref={canvasRef} aria-label={`PDF preview of ${attachment.name}`} className="max-w-full" />
             {/* Spatial bbox overlays (ADR-045) — best-effort, drawn only for
-                VERIFIED spatial anchors on this page. The safety bar above stays
-                the authoritative surface; a degraded/text anchor has no box. */}
-            {spatialOverlays(anchors, PREVIEW_PAGE).map((o) => {
+                VERIFIED spatial anchors on this page AND only once the page has
+                actually painted (`pageRendered`). Without that guard the boxes
+                would float over a blank canvas when PDF.js can't render, which
+                reads as garbled bars rather than highlights. The safety bar
+                above stays the authoritative surface; a degraded/text anchor
+                has no box. */}
+            {pageRendered && spatialOverlays(anchors, PREVIEW_PAGE).map((o) => {
               const isSelected = selectedRef === o.supportsRef;
               return (
                 <div
