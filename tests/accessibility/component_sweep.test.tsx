@@ -154,6 +154,10 @@ describe("a11y sweep: ConfidenceDisplay", () => {
     ));
   it("prominent variant (calibration not reported)", async () =>
     expectNoViolations(<ConfidenceDisplay value={0.42} variant="prominent" />));
+  it("ring variant — cockpit hero (uncalibrated)", async () =>
+    expectNoViolations(<ConfidenceDisplay value={0.88} variant="ring" />));
+  it("ring variant — cockpit hero (calibrated)", async () =>
+    expectNoViolations(<ConfidenceDisplay value={0.62} variant="ring" calibrated />));
 });
 
 describe("a11y sweep: ReviewQualityPanel", () => {

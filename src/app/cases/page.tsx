@@ -63,7 +63,8 @@ import { ComplianceHitsRail } from "./ComplianceHitsRail";
 import { RecordPreviewRail } from "./RecordPreviewRail";
 import { NAV_TABS } from "@/config/nav-tabs";
 import { useRowDensity, type RowDensity } from "@/hooks/useRowDensity";
-import { casesRowV2Enabled } from "@/lib/flags";
+import { casesRowV2Enabled, cockpitEnabled } from "@/lib/flags";
+import { AgentActivityRail } from "./AgentActivityRail";
 import { HotkeyCheatsheet } from "@/components/ui/HotkeyCheatsheet";
 
 // ADR-041 P3e §2.1 — gates the four-line queue row + density
@@ -72,6 +73,10 @@ import { HotkeyCheatsheet } from "@/components/ui/HotkeyCheatsheet";
 // flip ON so gate reviewers see the V2 surface. Resolved at
 // module load so the value is stable across renders.
 const CASES_ROW_V2 = casesRowV2Enabled();
+// Cockpit redesign (cockpit-refactor) — adds the Agent Activity rail
+// tenant to the xl column. OFF by default, so the grid/aside logic and
+// its e2e locks are unchanged unless NEXT_PUBLIC_COCKPIT=1.
+const COCKPIT = cockpitEnabled();
 
 
 /* ── Visual mappings (vendor-neutral; per-source / per-status badge style) ── */
@@ -250,8 +255,11 @@ function CasesWorkspace() {
   // 3-column grid override and the aside visibility — when
   // neither tenant has content the layout reverts to 2 columns.
   const [previewHasContent, setPreviewHasContent] = useState(false);
+  // Cockpit Agent Activity rail tenant contentful state (cockpit-refactor).
+  // Always false when the flag is off, so railHasContent is unchanged.
+  const [activityHasContent, setActivityHasContent] = useState(false);
   const hitsHaveContent = (policyHits ?? []).length > 0;
-  const railHasContent = hitsHaveContent || previewHasContent;
+  const railHasContent = hitsHaveContent || previewHasContent || activityHasContent;
 
   /* ── Queue — silent live refresh via useCases + useWebSocket ── */
   // P3b restored the WS-driven silent refresh that landed on the
@@ -810,6 +818,15 @@ function CasesWorkspace() {
                 selected record carries one; absent → no second
                 section. No tabs — Compliance vetoed swap
                 patterns that would hide hits off-screen. */}
+            {/* Cockpit: the Agent Activity stream leads the rail (the
+                system is the primary actor — Guardrail #4). Gated by the
+                flag; self-contained tenant, fetches its own trace. */}
+            {COCKPIT && (
+              <AgentActivityRail
+                selectedRecordId={selectedRecordId}
+                onContentfulChange={setActivityHasContent}
+              />
+            )}
             <ComplianceHitsRail hits={policyHits ?? []} variant="rail" />
             <RecordPreviewRail
               selectedRecordId={selectedRecordId}

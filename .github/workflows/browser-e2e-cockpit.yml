@@ -1,0 +1,83 @@
+# Cockpit-mode browser-driven e2e (Playwright) — cockpit-refactor.
+#
+# Companion to browser-e2e-mock.yml. Same self-contained mock data path
+# (no backend, no Python), but the dev server runs with
+# NEXT_PUBLIC_COCKPIT=1 so the flag-on cockpit composition is exercised
+# end-to-end. A dedicated server/config is required because flipping the
+# flag on the shared mock server would break the classic-layout specs.
+name: Browser E2E (cockpit flag)
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/browser-cockpit/**'
+      - 'tests/browser/_helpers.ts'
+      - 'package*.json'
+      - 'playwright.cockpit.config.ts'
+      - '.github/workflows/browser-e2e-cockpit.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: browser-e2e-cockpit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-e2e-cockpit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout asoe-ui
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Resolve Playwright version (cache key)
+        id: pw
+        run: |
+          PW_VERSION=$(node -e 'console.log(require("@playwright/test/package.json").version)')
+          echo "version=$PW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.pw.outputs.version }}
+
+      - name: Install Playwright browser (cache miss → download + OS deps)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright OS deps (cache hit → no download)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Run cockpit-flag browser e2e
+        env:
+          CI: '1'
+        run: npm run test:browser:cockpit
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-cockpit
+          path: playwright-report-cockpit/
+          retention-days: 14
+
+      - name: Upload test-results (traces, videos, screenshots)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results-cockpit
+          path: test-results/
+          retention-days: 7

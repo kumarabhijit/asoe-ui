@@ -79,6 +79,32 @@ describe("AgentReasoningCard", () => {
       render(<AgentReasoningCard verdict="GREEN" explanation="Test explanation" />);
       expect(screen.getByText("Test explanation")).toBeInTheDocument();
     });
+
+    // Cockpit recommendation hero (cockpit-refactor) — the Layer-1 journey:
+    // the confidence RING and the RBAC-gated primary action are shown
+    // together, and the action still fires. Same handlers/gating as the
+    // classic bar (presentational only).
+    it("renders the confidence ring alongside the gated action, and the action fires", async () => {
+      const onOverride = vi.fn();
+      render(
+        <AgentReasoningCard
+          verdict="GREEN"
+          confidence={0.88}
+          confidenceVariant="ring"
+          canOverride
+          onOverride={onOverride}
+        />,
+      );
+      // Ring gauge present (cockpit hero) with the honest model-score framing.
+      expect(screen.getByText("88%")).toBeInTheDocument();
+      expect(
+        screen.getByRole("group", { name: /88 percent.*model score/i }),
+      ).toBeInTheDocument();
+      // The action coexists with the confidence and is wired to the handler.
+      const action = screen.getByRole("button", { name: "Choose different action" });
+      await userEvent.click(action);
+      expect(onOverride).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("GREEN verdict — Option A matrix", () => {

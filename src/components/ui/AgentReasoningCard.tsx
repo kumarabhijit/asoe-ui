@@ -33,7 +33,7 @@
 import { type ReactNode } from "react";
 import { Zap, Check, AlertTriangle, ShieldX, XCircle } from "lucide-react";
 import { Badge, verdictVariant } from "./Badge";
-import { ConfidenceDisplay } from "./ConfidenceDisplay";
+import { ConfidenceDisplay, type ConfidenceVariant } from "./ConfidenceDisplay";
 import { ActionButtonMatrix } from "./ActionButtonMatrix";
 import { PolicyHitBadge } from "./PolicyHitBadge";
 import { cn } from "@/lib/utils";
@@ -91,6 +91,10 @@ interface AgentReasoningCardProps {
    *  than a validated probability. Sourced from
    *  `analysis.confidence_signal.calibrated`. */
   confidenceCalibrated?: boolean;
+  /** Confidence renderer (cockpit-refactor). Defaults to the Layer-1 `bar`;
+   *  the cockpit composition passes `ring` for the hero gauge. Purely
+   *  presentational — same value, scale, and calibration posture. */
+  confidenceVariant?: ConfidenceVariant;
   explanation?: string;
   policyHits?: string[];
   /** Agent's recommended action (from record.resolution_data.recommended_action).
@@ -188,6 +192,7 @@ export function AgentReasoningCard({
   showIntent = false,
   confidence,
   confidenceCalibrated,
+  confidenceVariant = "bar",
   explanation,
   policyHits,
   recommendedAction,
@@ -270,7 +275,7 @@ export function AgentReasoningCard({
             <ConfidenceDisplay
               value={confidence}
               scale="unit"
-              variant="bar"
+              variant={confidenceVariant}
               calibrated={confidenceCalibrated}
             />
           </div>
