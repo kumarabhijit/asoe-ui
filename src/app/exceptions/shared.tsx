@@ -93,8 +93,24 @@ export function useHashOpen<T extends HTMLElement>(
   }, [id]);
 }
 
+/**
+ * Visual heading level for a collapsible header. Establishes the
+ * shown-hierarchy the operator asked for (council follow-up 2026-06-09):
+ * a `group` disclosure (Evidence, Diagnostics & Audit) outranks the
+ * `nested` sub-sections stacked inside it, instead of every header
+ * sitting at one flat level. `section` is the standalone default used
+ * outside the grouped tiers (Agent Analysis, Entity Profile) — unchanged.
+ */
+export type CollapsibleLevel = "group" | "section" | "nested";
+
+const HEADER_TITLE_CLASS: Record<CollapsibleLevel, string> = {
+  group: "text-title font-semibold text-text-primary",
+  section: "text-subhead font-semibold text-text-primary",
+  nested: "text-body font-semibold text-text-secondary",
+};
+
 /** Collapsible section header — matches Evidence Detail card pattern */
-export function CollapsibleHeader({ title, open, onToggle, badge, badgeVariant = "neutral", controlsId }: {
+export function CollapsibleHeader({ title, open, onToggle, badge, badgeVariant = "neutral", controlsId, level = "section" }: {
   title: string;
   open: boolean;
   onToggle: () => void;
@@ -103,13 +119,19 @@ export function CollapsibleHeader({ title, open, onToggle, badge, badgeVariant =
   /** id of the region this header expands/collapses — wires `aria-controls`
    *  so AT can associate the toggle with the panel it governs. */
   controlsId?: string;
+  /** Visual heading level — see CollapsibleLevel. Default `section`. */
+  level?: CollapsibleLevel;
 }) {
   return (
     <button
       onClick={onToggle}
       aria-expanded={open}
       aria-controls={controlsId}
-      className="flex w-full items-center justify-between px-16 py-10 bg-transparent border-none cursor-pointer font-sans"
+      className={cn(
+        "flex w-full items-center justify-between bg-transparent border-none cursor-pointer font-sans",
+        // Nested headers sit tighter so they read as children of the group.
+        level === "nested" ? "px-12 py-8" : "px-16 py-10",
+      )}
     >
       <div className="flex items-center gap-8">
         <ChevronDown
@@ -119,7 +141,7 @@ export function CollapsibleHeader({ title, open, onToggle, badge, badgeVariant =
             !open && "-rotate-90",
           )}
         />
-        <span className="text-subhead font-semibold text-text-primary">
+        <span className={HEADER_TITLE_CLASS[level]}>
           {title}
         </span>
         {badge && (
@@ -157,6 +179,7 @@ export function CollapsibleSection({
   children,
   onFirstOpen,
   extraAnchorIds,
+  level = "section",
 }: {
   title: string;
   /** Stable anchor id (S1 finding #10 follow-on). When set, the section
@@ -178,6 +201,10 @@ export function CollapsibleSection({
    *  ids here makes the GROUP open on their hash too; the child's own
    *  `useHashOpen` then scrolls within once it mounts. */
   extraAnchorIds?: string[];
+  /** Visual heading level (council follow-up 2026-06-09). `group` for the
+   *  Evidence / Diagnostics tier wrappers; `nested` for the sub-sections
+   *  stacked inside them; `section` (default) for standalone disclosures. */
+  level?: CollapsibleLevel;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const firedRef = useRef(false);
@@ -239,7 +266,14 @@ export function CollapsibleSection({
     <section
       ref={sectionRef}
       id={id}
-      className="scroll-mt-[var(--nav-height)] bg-surface-primary rounded-md shadow-sm overflow-hidden"
+      className={cn(
+        "scroll-mt-[var(--nav-height)] rounded-md overflow-hidden",
+        // Nested sub-sections drop the card chrome (no shadow, subtle surface
+        // + hairline) so they read as children of the group, not peers of it.
+        level === "nested"
+          ? "bg-surface-secondary border border-border-subtle"
+          : "bg-surface-primary shadow-sm",
+      )}
     >
       <CollapsibleHeader
         title={title}
@@ -248,6 +282,7 @@ export function CollapsibleSection({
         badge={badge}
         badgeVariant={badgeVariant}
         controlsId={regionId}
+        level={level}
       />
       {/* The region element is always present (so aria-controls resolves even
           when collapsed) but `hidden` when closed; heavy children still mount

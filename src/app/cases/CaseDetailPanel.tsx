@@ -191,6 +191,19 @@ export function CaseDetailPanel({
   // unmounting the selected-record panel.
   const renderSlimHeader = selectedRecord !== null && !showFullCaseHeader;
 
+  // Case-level classification provenance, built once so it can render either
+  // as the standalone Diagnostics & Audit drawer (no record mounted) or be
+  // injected into the embedded panel's single Diagnostics & Audit group
+  // (record mounted) — never both (council follow-up 2026-06-09).
+  const classificationProvenance =
+    classificationHistoryLoading || classificationHistory.length > 0 ? (
+      <ClassificationHistoryPanel
+        entries={classificationHistory}
+        loading={classificationHistoryLoading}
+        error={classificationHistoryError}
+      />
+    ) : null;
+
   return (
     <div className="space-y-24">
       {/* S3 finding #B — announce SLA band transitions for the
@@ -454,6 +467,12 @@ export function CaseDetailPanel({
             exceptionId={selectedRecord.id}
             onActionComplete={onRecordActionComplete}
             embedded
+            // Single Diagnostics & Audit surface (council follow-up
+            // 2026-06-09): inject the case-level classification provenance
+            // INTO the panel's drawer instead of rendering a second,
+            // identically-titled drawer below it (the duplicate the
+            // operator flagged). Only passed when there's provenance to show.
+            auditExtras={classificationProvenance}
           />
         </section>
       )}
@@ -461,12 +480,16 @@ export function CaseDetailPanel({
       {/* ── Diagnostics & Audit drawer (council 2026-06-07) ──────────
           Classification provenance — how/when this case was classified
           and under which taxonomy — is what an AUDITOR reconstructs, not
-          what the operator needs to make the decision. Relocated here
-          from a prominent top-of-page panel into a collapsed drawer
-          (Guardrail #0: available, not shown). Nothing is removed — the
-          full ClassificationHistoryPanel renders inside, so the
-          compliance commitment is intact (Guardrail #7). */}
-      {(classificationHistoryLoading || classificationHistory.length > 0) && (
+          what the operator needs to make the decision. Available in a
+          collapsed drawer (Guardrail #0: available, not shown), never
+          pruned (Guardrail #7).
+
+          Rendered standalone ONLY when no record is mounted. When a record
+          IS selected, the full ExceptionDetailPanel owns the single
+          "Diagnostics & Audit" group and this provenance is injected there
+          via `auditExtras` — so the operator never sees two drawers with
+          the same title (council follow-up 2026-06-09). */}
+      {!selectedRecord && classificationProvenance && (
         <details className="group bg-surface-secondary border border-border-subtle rounded-md">
           <summary className="flex items-center gap-8 px-16 py-10 cursor-pointer list-none text-caption font-semibold text-text-secondary rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring">
             <ChevronRight
@@ -479,13 +502,7 @@ export function CaseDetailPanel({
               Classification provenance
             </span>
           </summary>
-          <div className="px-16 pb-16 pt-4">
-            <ClassificationHistoryPanel
-              entries={classificationHistory}
-              loading={classificationHistoryLoading}
-              error={classificationHistoryError}
-            />
-          </div>
+          <div className="px-16 pb-16 pt-4">{classificationProvenance}</div>
         </details>
       )}
     </div>

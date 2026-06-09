@@ -71,3 +71,39 @@ describe("CollapsibleSection Layer-2-open signal", () => {
     expect(report).not.toHaveBeenCalled();
   });
 });
+
+// Council follow-up 2026-06-09 — the operator asked that a group disclosure
+// visibly OUTRANK the sub-sections stacked inside it, instead of every header
+// sitting at one flat size. `level` drives a real heading-size step.
+describe("CollapsibleSection heading levels (shown hierarchy)", () => {
+  const titleClass = (title: string) =>
+    screen.getByRole("button", { name: new RegExp(title) }).querySelector("span")
+      ?.className ?? "";
+
+  it("group level renders a larger heading than nested level", () => {
+    render(
+      <>
+        <CollapsibleSection title="GroupHdr" level="group">
+          <div>g</div>
+        </CollapsibleSection>
+        <CollapsibleSection title="NestedHdr" level="nested">
+          <div>n</div>
+        </CollapsibleSection>
+      </>,
+    );
+    // The two levels MUST resolve to different type tokens — a regression
+    // (everything `text-subhead`) is exactly the flat look that was reported.
+    expect(titleClass("GroupHdr")).toContain("text-title");
+    expect(titleClass("NestedHdr")).toContain("text-body");
+    expect(titleClass("GroupHdr")).not.toEqual(titleClass("NestedHdr"));
+  });
+
+  it("defaults to the standalone section level when unspecified", () => {
+    render(
+      <CollapsibleSection title="PlainHdr">
+        <div>p</div>
+      </CollapsibleSection>,
+    );
+    expect(titleClass("PlainHdr")).toContain("text-subhead");
+  });
+});

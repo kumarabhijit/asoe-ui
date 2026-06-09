@@ -62,16 +62,18 @@ export function EvidenceGrid({
     <section
       ref={rootRef}
       id={anchorId}
-      className="scroll-mt-[var(--nav-height)] bg-surface-primary rounded-md shadow-sm overflow-hidden"
+      className="scroll-mt-[var(--nav-height)] bg-surface-secondary border border-border-subtle rounded-md overflow-hidden"
     >
-      {/* Toggle header */}
+      {/* Toggle header — nested level: this card sits inside the Evidence
+          group, so it reads as a child (lighter chrome + smaller heading)
+          rather than a peer of the group (council follow-up 2026-06-09). */}
       <button
         onClick={() => {
           const next = !expanded;
           setExpanded(next);
           if (next && onFirstOpen) onFirstOpen();
         }}
-        className="flex w-full items-center justify-between px-16 py-10 bg-transparent border-none cursor-pointer font-sans"
+        className="flex w-full items-center justify-between px-12 py-8 bg-transparent border-none cursor-pointer font-sans"
       >
         <div className="flex items-center gap-8">
           <ChevronDown
@@ -81,7 +83,7 @@ export function EvidenceGrid({
               !expanded && "-rotate-90",
             )}
           />
-          <span className="text-subhead font-semibold text-text-primary">
+          <span className="text-body font-semibold text-text-secondary">
             Evidence Detail
           </span>
           <span className="text-label font-semibold text-text-tertiary bg-surface-secondary px-2 py-px rounded-full">

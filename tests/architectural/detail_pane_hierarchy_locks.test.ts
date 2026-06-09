@@ -24,6 +24,7 @@ const SRC = path.resolve(__dirname, "../../src");
 const read = (rel: string) => readFileSync(path.join(SRC, rel), "utf-8");
 
 const PANEL = "app/exceptions/ExceptionDetailPanel.tsx";
+const CASE_PANEL = "app/cases/CaseDetailPanel.tsx";
 
 // Field names that carry a comparison delta the operator weighs. Mirrors
 // the precedence list in the mock layer and the backend adapter targets.
@@ -123,6 +124,35 @@ describe("Evidence + Diagnostics are single grouped disclosures (no flat stack, 
     expect(panel).toContain('anchorId="section-trace"');
     expect(panel).toContain("extraAnchorIds={evidenceAnchorIds}");
     expect(panel).toContain("extraAnchorIds={auditAnchorIds}");
+  });
+
+  it("group headers outrank their nested sub-sections (council 2026-06-09)", () => {
+    // The two tier groups render at the prominent `group` level; the
+    // evidence/audit sub-sections are demoted to `nested` so the hierarchy
+    // is visible. Regression = every header flat at one size.
+    expect(panel).toMatch(/title="Evidence"\s+id="section-evidence"\s+level="group"/);
+    expect(panel).toMatch(/title="Diagnostics & Audit"\s+id="section-diagnostics"\s+level="group"/);
+    expect(panel).toContain('cloneElement(node as ReactElement<{ level?: CollapsibleLevel }>, { level: "nested" })');
+  });
+});
+
+describe("Single Diagnostics & Audit surface — no duplicate drawer (council 2026-06-09)", () => {
+  const panel = read(PANEL);
+  const casePanel = read(CASE_PANEL);
+
+  it("ExceptionDetailPanel exposes auditExtras and renders it inside the Diagnostics group", () => {
+    expect(panel).toContain("auditExtras?: ReactNode");
+    // Rendered inside the Diagnostics & Audit group, after the trace pane.
+    expect(panel).toMatch(/<DiagnosticsSection[\s\S]*?\/>\s*\{\/\*[\s\S]*?\*\/\}\s*\{auditExtras\}/);
+  });
+
+  it("/cases workspace injects provenance into the panel and gates its own drawer on !selectedRecord", () => {
+    // When a record is mounted, the panel owns the single drawer; the
+    // standalone classification drawer renders ONLY when no record is
+    // selected. Reverting to an unconditional standalone drawer (the
+    // duplicate the operator flagged) must fail here.
+    expect(casePanel).toContain("auditExtras={classificationProvenance}");
+    expect(casePanel).toMatch(/\{!selectedRecord && classificationProvenance && \(/);
   });
 });
 

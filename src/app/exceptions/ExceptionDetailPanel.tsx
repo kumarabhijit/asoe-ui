@@ -29,7 +29,7 @@
  */
 "use client";
 
-import { useState, useEffect, useRef, useCallback, type MutableRefObject, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, cloneElement, type MutableRefObject, type ReactNode, type ReactElement } from "react";
 import { signIn } from "next-auth/react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import {
@@ -55,7 +55,7 @@ import type {
   OrderAnalysis,
 } from "@/types/exceptions";
 import type { TraceResponse } from "@/types/api";
-import { COSIGN_LIFECYCLE_STATE, CollapsibleSection, HITL_LIFECYCLE_STATES, Layer2OpenContext } from "./shared";
+import { COSIGN_LIFECYCLE_STATE, CollapsibleSection, HITL_LIFECYCLE_STATES, Layer2OpenContext, type CollapsibleLevel } from "./shared";
 import { HeaderRibbon } from "./HeaderRibbon";
 import { ContextStrip } from "./ContextStrip";
 import { ImpactBar } from "./ImpactBar";
@@ -127,6 +127,16 @@ interface ExceptionDetailPanelProps {
    * three times before reaching the action ribbon.
    */
   embedded?: boolean;
+  /**
+   * Extra content to render inside the single "Diagnostics & Audit" group
+   * (council follow-up 2026-06-09). The `/cases` workspace owns case-level
+   * classification provenance; rather than render its OWN second
+   * "Diagnostics & Audit" drawer below this panel (the duplicate the
+   * operator flagged), it injects that provenance here so there is exactly
+   * ONE Diagnostics & Audit surface. A passed-in node, not UI composition
+   * (Guardrail #6) — the panel just renders the slot.
+   */
+  auditExtras?: ReactNode;
 }
 
 /* ── Component ───────────────────────────────────────────────────────── */
@@ -137,6 +147,7 @@ export default function ExceptionDetailPanel({
   onRefreshRef,
   reanalyzing,
   embedded = false,
+  auditExtras,
 }: ExceptionDetailPanelProps) {
   const { hasPermission, user } = useAuth();
   const { health } = useHealth();
@@ -686,9 +697,17 @@ export default function ExceptionDetailPanel({
   const operatorMembers = enrichmentSections.filter((s) => sectionTierOf(s.key) === "operator");
   const evidenceMembers = enrichmentSections.filter((s) => sectionTierOf(s.key) === "evidence");
   const auditMembers = enrichmentSections.filter((s) => sectionTierOf(s.key) === "audit");
+  // Operator-tier sections render at Layer 1 (peers of the Recommendation) so
+  // keep their default heading level. Evidence/audit-tier sections render
+  // INSIDE a group disclosure, so demote them to the `nested` level (council
+  // follow-up 2026-06-09 — the group header must visibly outrank its children
+  // instead of every header sitting flat). cloneElement injects the level in
+  // one place rather than threading it through all ~19 section builders.
+  const asNested = (node: ReactNode) =>
+    cloneElement(node as ReactElement<{ level?: CollapsibleLevel }>, { level: "nested" });
   const operatorSections = operatorMembers.map((s) => s.node);
-  const evidenceSections = evidenceMembers.map((s) => s.node);
-  const auditSections = auditMembers.map((s) => s.node);
+  const evidenceSections = evidenceMembers.map((s) => asNested(s.node));
+  const auditSections = auditMembers.map((s) => asNested(s.node));
   // Descendant anchor ids per group (stacked-group layout 2026-06-09) — so a
   // deep link to a child's anchor opens the enclosing group (Refinement 2).
   // The grid/trace anchors live on EvidenceGrid / DiagnosticsSection.
@@ -1081,6 +1100,7 @@ export default function ExceptionDetailPanel({
           <CollapsibleSection
             title="Evidence"
             id="section-evidence"
+            level="group"
             badge={evidenceMembers.length > 0 ? String(evidenceMembers.length) : undefined}
             defaultOpen={isHumanInTheLoopState(detail.lifecycle_state)}
             extraAnchorIds={evidenceAnchorIds}
@@ -1112,6 +1132,7 @@ export default function ExceptionDetailPanel({
           <CollapsibleSection
             title="Diagnostics & Audit"
             id="section-diagnostics"
+            level="group"
             badge={auditMembers.length > 0 ? String(auditMembers.length) : undefined}
             defaultOpen={false}
             extraAnchorIds={auditAnchorIds}
@@ -1125,6 +1146,10 @@ export default function ExceptionDetailPanel({
                 onFirstOpen={ensureTraceLoaded}
                 anchorId="section-trace"
               />
+              {/* Single Diagnostics & Audit surface — case-level provenance
+                  injected by the /cases workspace lands here, not in a second
+                  drawer below the panel (the duplicate the operator flagged). */}
+              {auditExtras}
             </div>
           </CollapsibleSection>
 
