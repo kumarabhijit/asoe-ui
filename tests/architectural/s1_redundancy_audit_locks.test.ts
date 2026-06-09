@@ -146,12 +146,13 @@ describe("S1 audit — SectionAnchorBar deliverable (finding #10)", () => {
   it("the three always-present anchor targets resolve to real elements", () => {
     const src = readFileSync(EXCEPTION_PANEL_PATH, "utf-8");
     // Recommendation lives on a span id in the panel; Evidence + Diagnostics
-    // now carry the id on their own section root via `anchorId` (so the jump
-    // both scrolls AND expands the collapsed section — #4). Either form is a
+    // now carry the id on their grouping CollapsibleSection root via `id`
+    // (stacked-group layout 2026-06-09 — the group owns the jump anchor so
+    // the link both scrolls AND expands the collapsed group, #4). Each is a
     // real target the bar's href resolves to.
     expect(src.includes('id="section-recommendation"')).toBe(true);
-    expect(src.includes('anchorId="section-evidence"')).toBe(true);
-    expect(src.includes('anchorId="section-diagnostics"')).toBe(true);
+    expect(src.includes('id="section-evidence"')).toBe(true);
+    expect(src.includes('id="section-diagnostics"')).toBe(true);
   });
 
   it("SectionAnchorBar declares the three matching hrefs", () => {

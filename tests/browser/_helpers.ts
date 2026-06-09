@@ -238,6 +238,25 @@ export async function expandSection(
   const header = page.getByRole("button", {
     name: title instanceof RegExp ? title : new RegExp(title, "i"),
   });
+  // Stacked-group layout (2026-06-09): evidence/audit sections live inside a
+  // single "Evidence" / "Diagnostics & Audit" disclosure, so an inner header
+  // isn't mounted until its group is open. If the target isn't visible yet,
+  // open any collapsed group first, then retry. Idempotent — a group that
+  // already auto-expanded (needs-human Evidence) is left untouched. The
+  // negative lookahead avoids matching EvidenceGrid's inner "Evidence Detail".
+  const visible = await header
+    .first()
+    .isVisible()
+    .catch(() => false);
+  if (!visible) {
+    for (const group of [/^Evidence(?! Detail)/i, /Diagnostics & Audit/i]) {
+      const g = page.getByRole("button", { name: group }).first();
+      const gVisible = await g.isVisible().catch(() => false);
+      if (!gVisible) continue;
+      const gExpanded = await g.getAttribute("aria-expanded");
+      if (gExpanded !== "true") await g.click();
+    }
+  }
   await expect(header.first()).toBeVisible({ timeout: 15_000 });
   // Idempotent: a section may already be open — the primary comparison
   // section auto-expands off the backend `primary_section` hint (detail-
