@@ -110,7 +110,7 @@ UI action → API request (X-Trace-ID header) → Backend → Worker → GraphSt
 UI ← WebSocket event (WSEvent.trace_id) ← Redis pub/sub ← Worker
 ```
 
-- The `trace_id` and TraceRecord fields (skill_name, intent_selected, shadow_verdict, recipe_name, gateway_calls) are displayed in the **Trace Evidence** collapsible section within ExceptionDetailPanel, accessible via the "Show Diagnostics" toggle
+- The `trace_id` and TraceRecord fields (skill_name, intent_selected, shadow_verdict, recipe_name, gateway_calls) are displayed in the **Trace Evidence** collapsible section within ExceptionDetailPanel — a direct sub-section of the **Diagnostics & Audit** group (open that group to reveal it; the former inner "Show Diagnostics" toggle was removed 2026-06-09)
 - Resolution Data (JSON) is also nested within Trace Evidence for audit review
 - **Verdict Pillar 2.3 audit-gap surface (Phase 8.12):** when the
   `build_analysis` graph node flags a record `AUDIT_CONTEXT_MISSING`,

@@ -233,7 +233,7 @@ ExceptionDetailPanel (mounted inline inside CaseDetailPanel's right pane)
 | 3+ | `PriceHoldSection` | `PriceHoldSection.tsx` | Data-presence enrichment for `PRICE_HOLD_RELEASE`: PO vs SAP base price cards, signed `variance_pct`, hold_status / tolerance / hard_block thresholds, recipe `action` badge (AUTO_RELEASE / ESCALATE / HARD_BLOCK), reason text |
 | 3+ | `EdiMismatchSection` | `EdiMismatchSection.tsx` | Data-presence enrichment for `EDI_MISMATCH`: `sub_type` rendered verbatim, `expected_value` vs `received_value` (any shape — string / number / object), `classification` badge (HARD_REJECT / REVIEW / ESCALATE), `recommended_action`, `autonomy_level`. PRICE_MISMATCH is routed to `CONTRACTUAL_CORRECTION` at backend classifier time and never mounts this section. |
 | 4 | `EvidenceGrid` | `EvidenceGrid.tsx` | Collapsed by default; line-item table + pricing waterfall |
-| 5 | `DiagnosticsSection` | `DiagnosticsSection.tsx` | Inline collapsed "Show Diagnostics" pane: Pipeline Progress (WaterfallStepper) + Trace Evidence tabs |
+| 5 | `DiagnosticsSection` | `DiagnosticsSection.tsx` | Direct nested sub-sections of the Diagnostics & Audit group (no inner toggle): Pipeline (timeline / DAG) + Reanalysis History + Trace Evidence tabs |
 
 **Data-presence enrichment sections** render only when their optional data is present in `OrderAnalysis`. Each is wrapped in a `CollapsibleSection` (collapsed by default — Phase 8.13 PO ruling: "operator scans the Recommendation card first and only drills into evidence panes when they need detail"):
 ```tsx

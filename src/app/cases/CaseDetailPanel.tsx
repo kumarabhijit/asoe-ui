@@ -214,13 +214,38 @@ export function CaseDetailPanel({
   // as the standalone Diagnostics & Audit drawer (no record mounted) or be
   // injected into the embedded panel's single Diagnostics & Audit group
   // (record mounted) — never both (council follow-up 2026-06-09).
+  // Case-level provenance for the Diagnostics & Audit drawer (Guardrail #0:
+  // available, not shown). Carries the audit-bearing Customer PO — demoted
+  // from the slim header (council 2026-06-09): it is a customer-facing
+  // correlation identifier, not a decision driver, so it belongs in the
+  // drawer rather than Layer 1. It is NOT pipeline Trace Evidence (that is
+  // the record's trace_id / recipe / gateway calls), so it lives here with
+  // the case provenance, not inside the trace pane. Plus the classification
+  // history. Built once so it renders identically whether injected into the
+  // embedded record panel (auditExtras) or the standalone case drawer.
+  const hasClassificationHistory =
+    classificationHistoryLoading || classificationHistory.length > 0;
   const classificationProvenance =
-    classificationHistoryLoading || classificationHistory.length > 0 ? (
-      <ClassificationHistoryPanel
-        entries={classificationHistory}
-        loading={classificationHistoryLoading}
-        error={classificationHistoryError}
-      />
+    orderCase.customer_po_number || hasClassificationHistory ? (
+      <div className="flex flex-col gap-12">
+        <EvidenceBlock tier="audit-bearing" value={orderCase.customer_po_number}>
+          {(v) => (
+            <div>
+              <div className="text-label uppercase tracking-wider text-text-quaternary mb-2">
+                Customer PO
+              </div>
+              <div className="font-mono text-text-primary">{String(v)}</div>
+            </div>
+          )}
+        </EvidenceBlock>
+        {hasClassificationHistory && (
+          <ClassificationHistoryPanel
+            entries={classificationHistory}
+            loading={classificationHistoryLoading}
+            error={classificationHistoryError}
+          />
+        )}
+      </div>
     ) : null;
 
   return (
@@ -268,16 +293,12 @@ export function CaseDetailPanel({
               </Badge>
             </>
           )}
-          <EvidenceBlock tier="audit-bearing" value={orderCase.customer_po_number}>
-            {(v) => (
-              <>
-                <span aria-hidden className="text-text-quaternary">·</span>
-                <span>
-                  PO <code className="font-mono text-text-primary">{String(v)}</code>
-                </span>
-              </>
-            )}
-          </EvidenceBlock>
+          {/* Customer PO demoted to the Diagnostics & Audit drawer
+              (council 2026-06-09) — it is a correlation identifier, not a
+              decision driver, so it no longer rides in the Layer-1 slim
+              strip. It is rendered (typed, traceable) in the case
+              provenance injected via `auditExtras` / the standalone case
+              drawer below — relocation, not removal (Guardrail #7). */}
           {/* ADR-041 P3e §2.3 — Compliance reversal condition #3.
               Non-dismissible count chip stays on the slim header so
               the operator always sees Compliance presence even when

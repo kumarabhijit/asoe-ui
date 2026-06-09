@@ -156,6 +156,40 @@ describe("Single Diagnostics & Audit surface — no duplicate drawer (council 20
   });
 });
 
+describe("Diagnostics: no nested Show-Diagnostics toggle (council 2026-06-09)", () => {
+  const diag = read("app/exceptions/DiagnosticsSection.tsx");
+  const panel = read(PANEL);
+
+  it("DiagnosticsSection drops the redundant inner Show/Hide Diagnostics toggle", () => {
+    // The toggle was a SECOND disclosure inside the already-collapsed
+    // Diagnostics & Audit group — open the group, then click again to see
+    // anything. Removed: Pipeline / Trace Evidence render directly. Canary
+    // on the toggle MECHANICS (state + label expression), not the prose —
+    // this file's comment legitimately names the removed toggle.
+    expect(diag).not.toContain("diagnosticsOpen");
+    expect(diag).not.toMatch(/"Hide Diagnostics"\s*:\s*"Show Diagnostics"/);
+  });
+
+  it("Pipeline and Trace Evidence render as direct nested sub-sections", () => {
+    // Peers of EDI 850 Audit / Knowledge Graph inside the group.
+    expect(diag).toMatch(/title="Pipeline"\s+level="nested"/);
+    expect(diag).toMatch(/title="Trace Evidence"\s+level="nested"/);
+  });
+
+  it("trace lazy-load moves to the Diagnostics & Audit group's onFirstOpen", () => {
+    // With the inner toggle gone, opening the GROUP is what defers/triggers
+    // the trace fetch — so the panel must wire ensureTraceLoaded there.
+    expect(panel).toMatch(
+      /title="Diagnostics & Audit"[\s\S]*?onFirstOpen=\{ensureTraceLoaded\}/,
+    );
+  });
+
+  it("Trace Evidence keeps its useHashOpen(anchorId) reveal-on-jump", () => {
+    // The #section-trace deep link must still expand + scroll the section.
+    expect(diag).toContain("useHashOpen(anchorId");
+  });
+});
+
 describe("Mock-data lock — primary_section stamped on comparison records", () => {
   it("every mock analysis with a comparison field carries a valid primary_section", () => {
     const entries = Object.entries(MOCK_ORDER_ANALYSES);
