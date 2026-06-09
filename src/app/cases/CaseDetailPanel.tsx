@@ -191,6 +191,25 @@ export function CaseDetailPanel({
   // unmounting the selected-record panel.
   const renderSlimHeader = selectedRecord !== null && !showFullCaseHeader;
 
+  // S2 (council 2026-06-09) — duplicate-status suppression.
+  //
+  // On a SINGLE-record case the case-level `status` is just that one
+  // record's lifecycle rolled up, and the mounted record ribbon already
+  // carries it as "Current State". Rendering it again in the case header
+  // is the duplicate the operator flagged ("status is already here"). So
+  // when a single record is mounted, drop the case-header status and let
+  // the record's "Current State" be the single state surface.
+  //
+  // Multi-record cases KEEP the case status — it is an AGGREGATE of N
+  // diverging record states with no clean per-record analog (the same
+  // reason the per-record "Current State" survives `embedded` mode). The
+  // no-record path keeps it too: the header is then the only state
+  // surface. The SLA band is untouched in every path — it is a
+  // case-level fact with no record analog and is the header's
+  // load-bearing value.
+  const isSingleRecord = records.length === 1;
+  const statusRedundant = isSingleRecord && selectedRecord !== null;
+
   // Case-level classification provenance, built once so it can render either
   // as the standalone Diagnostics & Audit drawer (no record mounted) or be
   // injected into the embedded panel's single Diagnostics & Audit group
@@ -289,9 +308,15 @@ export function CaseDetailPanel({
               </span>
             ) : null;
           })()}
-          <span className="ml-auto text-text-tertiary">
-            {STATUS_LABEL[orderCase.status] ?? orderCase.status}
-          </span>
+          {/* S2 — status suppressed on single-record cases (the mounted
+              record's "Current State" carries it). When suppressed, the
+              disclosure button inherits the `ml-auto` so the right edge
+              of the strip is unchanged. */}
+          {!statusRedundant && (
+            <span className="ml-auto text-text-tertiary">
+              {STATUS_LABEL[orderCase.status] ?? orderCase.status}
+            </span>
+          )}
           {/* S1 finding #14 — aria-expanded was hardcoded `false`,
               violating the ARIA contract on the disclosure button
               once the full header was open. Bind to actual state. */}
@@ -300,7 +325,7 @@ export function CaseDetailPanel({
             aria-expanded={showFullCaseHeader}
             aria-controls="case-full-header"
             onClick={() => setShowFullCaseHeader(true)}
-            className="flex items-center gap-4 text-text-tertiary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm px-4"
+            className={`flex items-center gap-4 text-text-tertiary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring rounded-sm px-4${statusRedundant ? " ml-auto" : ""}`}
           >
             <ChevronDown size={12} aria-hidden />
             Case details
@@ -362,9 +387,13 @@ export function CaseDetailPanel({
               </span>
             ) : null;
           })()}
-          <span className="ml-auto text-caption text-text-tertiary">
-            {STATUS_LABEL[orderCase.status] ?? orderCase.status}
-          </span>
+          {/* S2 — same duplicate-status suppression as the slim strip,
+              for the expanded full header on a single-record case. */}
+          {!statusRedundant && (
+            <span className="ml-auto text-caption text-text-tertiary">
+              {STATUS_LABEL[orderCase.status] ?? orderCase.status}
+            </span>
+          )}
         </div>
 
         {/* S1 finding #2 — h1 was rendered at `text-display`, the

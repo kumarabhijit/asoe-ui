@@ -459,3 +459,69 @@ describe("CaseDetailPanel — S1 redundancy audit locks", () => {
     ).toBeInTheDocument();
   });
 });
+
+
+/* ── S2 (council 2026-06-09) duplicate-status suppression ──────────
+ *
+ * On a single-record case the case-level `status` is just that record's
+ * lifecycle rolled up, and the mounted record ribbon already shows it as
+ * "Current State". The case header drops its status in that path so the
+ * operator does not read the same state twice. Multi-record cases (status
+ * is an aggregate) and the no-record path (header is the only state
+ * surface) keep it. `mockCase().status` is "OPEN_AWAITING_HUMAN", which
+ * `STATUS_LABEL` renders as "Awaiting review".
+ */
+describe("CaseDetailPanel — S2 duplicate-status suppression", () => {
+  function mockRec(over: Partial<{ id: string }> = {}): ExceptionDetail {
+    return {
+      id: over.id ?? "exc-S2",
+      tenant_id: "acme-corp",
+      order_id: "PO-S2",
+      event_type: "EDI_850_PRICE_MISMATCH",
+      intent: "CONTRACTUAL_CORRECTION",
+      lifecycle_state: "PENDING_REVIEW",
+      shadow_verdict: "GREEN",
+      selected_recipe: "PriceAdjustmentRecipe",
+      resolution_data: {},
+      reanalysis_history: [],
+      created_at: "2026-05-10T08:00:00Z",
+      updated_at: "2026-05-10T08:00:00Z",
+    };
+  }
+
+  it("suppresses the case-header status when a SINGLE record is mounted", () => {
+    // The mounted record's "Current State" is the single state surface;
+    // the case header must not repeat it.
+    render(
+      <CaseDetailPanel
+        orderCase={mockCase()}
+        attachedRecords={[mockRec({ id: "exc-only" })]}
+        selectedRecordId="exc-only"
+      />,
+    );
+    expect(screen.queryByText("Awaiting review")).not.toBeInTheDocument();
+  });
+
+  it("keeps the case-header status on a MULTI-record case (aggregate, no record analog)", () => {
+    // Two diverging record states roll up to one case status with no
+    // clean per-record analog — the case header stays its home.
+    render(
+      <CaseDetailPanel
+        orderCase={mockCase()}
+        attachedRecords={[
+          mockRec({ id: "exc-1" }),
+          mockRec({ id: "exc-2" }),
+        ]}
+        selectedRecordId="exc-1"
+      />,
+    );
+    expect(screen.getByText("Awaiting review")).toBeInTheDocument();
+  });
+
+  it("keeps the case-header status on the no-record path (only state surface)", () => {
+    // No inline ribbon → the full header IS the state surface, so the
+    // status must remain.
+    render(<CaseDetailPanel orderCase={mockCase()} />);
+    expect(screen.getByText("Awaiting review")).toBeInTheDocument();
+  });
+});

@@ -63,8 +63,12 @@ describe("HeaderRibbon embedded slimming (workspace de-duplication)", () => {
     expect(screen.queryByText("Manual Order Intake")).not.toBeInTheDocument();
     expect(container.textContent).not.toContain("Type:");
     expect(container.textContent).not.toContain("$1,000");
-    // The per-record lifecycle state survives (decision-relevant).
-    expect(container.textContent).toContain("RESOLVED");
+    // The per-record lifecycle state survives (decision-relevant),
+    // now rendered through the governed humanizer ("Resolved") rather
+    // than the raw enum, so it reads in the operator's language — it is
+    // the single state surface once the case header drops its duplicate
+    // status on a single-record case (CaseDetailPanel S2).
+    expect(container.textContent).toContain("Resolved");
   });
 
   it("keeps Type and the order total when standalone (no left pane)", () => {

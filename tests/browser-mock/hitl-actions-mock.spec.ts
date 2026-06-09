@@ -79,9 +79,13 @@ test.describe("mock-mode HITL actions", () => {
     await loginAs(page, USERS.MANAGER);
     await openCase(page, APPROVE_CASE, APPROVE_RECORD);
 
+    // On a single-record case the case header drops its duplicate
+    // status (CaseDetailPanel S2); the record ribbon's "Current State"
+    // is the state surface. The seeded record is PENDING_REVIEW,
+    // humanized to "Pending Review".
     await expect(
-      workspace(page).getByText(/awaiting review/i).first(),
-      "case header projects PENDING_REVIEW pre-action",
+      workspace(page).getByText(/pending review/i).first(),
+      "record ribbon projects PENDING_REVIEW as 'Current State' pre-action",
     ).toBeVisible();
 
     // The primary action button carries the recipe's recommendation as

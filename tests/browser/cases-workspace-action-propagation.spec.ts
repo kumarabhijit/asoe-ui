@@ -112,14 +112,17 @@ test("disposition on the selected record re-projects status in BOTH the queue ro
   await page.waitForURL(/case=[^&]+.*record=/, { timeout: 15_000 });
   expect(urlCaseId(page)).toBe(caseId);
 
-  // The case workspace mounted — assert via the case-context status
-  // label, which is the right-pane partner of the queue row's status.
-  // (The HITL ribbon varies by verdict — Re-analyze isn't always
-  // rendered on GREEN records; the case-context label is.)
+  // The case workspace mounted — assert via the record ribbon's
+  // "Current State" label. On a single-record case the case header
+  // drops its duplicate status (CaseDetailPanel S2), so the record
+  // ribbon's lifecycle is the right-pane state surface. The seeded
+  // record is PENDING_REVIEW, rendered through the governed humanizer
+  // as "Pending Review". (The HITL ribbon varies by verdict — the
+  // Current State label is always present.)
   const caseWorkspace = page.getByRole("region", { name: /case workspace/i });
   await expect(
-    caseWorkspace.getByText(/awaiting review/i).first(),
-    "case header must show OPEN_AWAITING_HUMAN as 'Awaiting review' pre-action",
+    caseWorkspace.getByText(/pending review/i).first(),
+    "record ribbon must show the PENDING_REVIEW lifecycle as 'Current State' pre-action",
   ).toBeVisible({ timeout: 15_000 });
 
   // ── Disposition: Override → RESOLVED ────────────────────────────
