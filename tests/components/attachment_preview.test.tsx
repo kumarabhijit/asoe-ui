@@ -17,10 +17,12 @@ vi.mock("@/lib/api", () => ({
 }));
 import { attachmentsApi } from "@/lib/api";
 
-// Stub PDF.js so the page "paints" deterministically in jsdom — the spatial
-// overlays only draw once the page render succeeds (pageRendered gate), so the
-// overlay tests need a working render path. getContext is stubbed per-test
-// (truthy by default; null in the failure regression test).
+// Stub PDF.js so the page "paints" deterministically in jsdom. Two paths are
+// independent and both must be exercised: text extraction (getTextContent —
+// the safety bar's authoritative input) and the canvas paint (page.render —
+// cosmetic, gated to the spatial overlays). `pdf.renderShouldReject` lets a
+// test fail ONLY the paint, to prove extraction/location survives it.
+const pdf = vi.hoisted(() => ({ renderShouldReject: false }));
 vi.mock("pdfjs-dist", () => ({
   GlobalWorkerOptions: { workerSrc: "" },
   getDocument: () => ({
@@ -29,7 +31,11 @@ vi.mock("pdfjs-dist", () => ({
       getPage: () =>
         Promise.resolve({
           getViewport: () => ({ width: 612, height: 792 }),
-          render: () => ({ promise: Promise.resolve() }),
+          render: () => ({
+            promise: pdf.renderShouldReject
+              ? Promise.reject(new Error("paint failed"))
+              : Promise.resolve(),
+          }),
           getTextContent: () =>
             Promise.resolve({ items: [{ str: "PO-2026-0042 ship to Atlanta DC" }] }),
         }),
@@ -71,6 +77,7 @@ const textBlob = (s: string) => new Blob([s], { type: "text/plain" });
 
 beforeEach(() => {
   getBlob.mockReset();
+  pdf.renderShouldReject = false;
   // jsdom has no real 2D context; give the canvas a truthy one so the deferred
   // PDF paint succeeds and the page-rendered gate opens for the overlay tests.
   setCanvasContext({});
@@ -140,6 +147,35 @@ describe("AttachmentPreview", () => {
     expect(overlay.style.width).toBe("40%");
     // The safety bar stays the authoritative surface alongside the overlay.
     expect(screen.getByTestId("evidence-safety-bar")).toBeInTheDocument();
+  });
+
+  it("keeps evidence LOCATED when the canvas paint fails (extraction is decoupled)", async () => {
+    // Regression (live browser-e2e failure on PR #237): the page paint and the
+    // text-layer extraction share one PDF.js pass. Painting first meant a
+    // page.render() throw (worker/renderer issue in the real browser) aborted
+    // before extraction, so docText was null and EVERY anchor read "unlocated"
+    // — the safety bar lost its authoritative status. Extraction must run
+    // first and independently. Here the paint rejects but location must hold.
+    pdf.renderShouldReject = true;
+    getBlob.mockResolvedValue(new Blob(["%PDF-1.4\nmock"], { type: "application/pdf" }));
+    const spatial: EvidenceAnchor = {
+      ...poAnchor(),
+      anchor_source: "spatial_extracted",
+      page: 1,
+      bbox: [0.1, 0.2, 0.5, 0.3],
+      confidence: 0.97,
+      rendition_hash: "rh-1",
+    };
+    const { container } = render(
+      <AttachmentPreview caseId="case-1" attachment={attachment()} anchors={[spatial]} />,
+    );
+    // Text extraction succeeded → the PO anchor resolves LOCATED in the doc text.
+    await waitFor(() => {
+      const li = container.querySelector('[data-testid="evidence-safety-bar"] li');
+      expect(li?.getAttribute("data-status")).toBe("located");
+    });
+    // …but the paint failed, so no box is drawn over the (unpainted) canvas.
+    expect(screen.queryByTestId("spatial-overlay")).toBeNull();
   });
 
   it("suppresses spatial overlays when the PDF page fails to paint (no boxes over a blank canvas)", async () => {

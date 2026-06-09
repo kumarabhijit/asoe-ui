@@ -73,6 +73,8 @@ async function renderPdfAndExtractText(
   bytes: Uint8Array,
   canvas: HTMLCanvasElement | null,
 ): Promise<{ text: string | null; rendered: boolean }> {
+  let text: string | null = null;
+  let rendered = false;
   try {
     const pdfjs = await import("pdfjs-dist");
     // Bundled worker, no CDN (ADR-043 §2.1).
@@ -84,30 +86,45 @@ async function renderPdfAndExtractText(
     // (enableScripting defaults false) and we never enable the annotation
     // script layer — that is the XSS mitigation for untrusted PDFs.
     const doc = await pdfjs.getDocument({ data: bytes }).promise;
-
     const page = await doc.getPage(1);
-    let rendered = false;
-    if (canvas) {
-      const viewport = page.getViewport({ scale: 1.25 });
-      const ctx = canvas.getContext("2d");
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      if (ctx) {
-        await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-        rendered = true;
-      }
-    }
 
-    let text = "";
+    // Extract the text layer FIRST. It is the safety bar's authoritative input
+    // (resolveAnchorStatus → located/unlocated) and MUST NOT be coupled to the
+    // canvas paint: a paint failure (worker/bundler/renderer-API issue) must
+    // still leave the operator with verified evidence status, never a blanket
+    // "unlocated". (Regression: doing the paint first meant a render throw
+    // skipped extraction and every anchor read unlocated.)
+    let acc = "";
     for (let p = 1; p <= doc.numPages; p++) {
       const pg = p === 1 ? page : await doc.getPage(p);
       const content = await pg.getTextContent();
-      text += content.items.map((it) => ("str" in it ? it.str : "")).join(" ") + " ";
+      acc += content.items.map((it) => ("str" in it ? it.str : "")).join(" ") + " ";
+    }
+    text = acc;
+
+    // Best-effort canvas paint — isolated so a failure here can't wipe `text`.
+    if (canvas) {
+      try {
+        const viewport = page.getViewport({ scale: 1.25 });
+        const ctx = canvas.getContext("2d");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        if (ctx) {
+          await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+          rendered = true;
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("[AttachmentPreview] PDF canvas paint failed:", e);
+      }
     }
     return { text, rendered };
-  } catch {
-    // Browser/bundler-specific failure — degrade to position-unconfirmed.
-    return { text: null, rendered: false };
+  } catch (e) {
+    // Document open / text extraction failed — degrade to position-unconfirmed
+    // but surface the reason for debugging the live deployment.
+    // eslint-disable-next-line no-console
+    console.error("[AttachmentPreview] PDF open/extract failed:", e);
+    return { text, rendered };
   }
 }
 
@@ -205,7 +222,15 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
     if (format !== "pdf" || !pdfBytes) return;
     let cancelled = false;
     (async () => {
-      const { text, rendered } = await renderPdfAndExtractText(pdfBytes, canvasRef.current);
+      // getDocument takes OWNERSHIP of the typed array and detaches its buffer
+      // (worker handoff). The bytes live in state and this effect may run again
+      // (re-render / dev double-invoke), so hand PDF.js a fresh copy each time;
+      // the state copy stays intact and re-extraction never hits a detached
+      // buffer.
+      const { text, rendered } = await renderPdfAndExtractText(
+        new Uint8Array(pdfBytes),
+        canvasRef.current,
+      );
       if (cancelled) return;
       setDocText(text);
       setPageRendered(rendered);
