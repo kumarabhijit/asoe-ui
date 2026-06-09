@@ -12,7 +12,7 @@
  *     the screen.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // Stub the inline ExceptionDetailPanel — it pulls NextAuth + WebSocket
@@ -363,14 +363,20 @@ describe("CaseDetailPanel — S1 redundancy audit locks", () => {
     ).not.toBeNull();
   });
 
-  it("S1 #6 — drops `Customer PO` from the full-header grid", () => {
-    // Slim header surfaces the PO already (audit-bearing short field).
-    // The grid duplicate is removed — operators saw the PO twice on
-    // every full-header re-expand.
+  it("S1 #6 — keeps `Customer PO` out of the case header (now in the audit drawer)", () => {
+    // S1 dropped the PO from the full-header grid (operators saw it twice).
+    // Council 2026-06-09 went further: the PO is a correlation identifier,
+    // not a decision driver, so it is demoted OUT of Layer 1 entirely into
+    // the Diagnostics & Audit drawer. It must NOT appear in the case header
+    // — but, per Guardrail #7, it must remain AVAILABLE in the drawer
+    // (relocation, not removal).
     render(<CaseDetailPanel orderCase={mockCase()} />);
-    // The slim header doesn't render in the no-record path, so the
-    // only PO surface here would be the grid — confirm it's gone.
-    expect(screen.queryByText(/^Customer PO$/i)).not.toBeInTheDocument();
+    const header = screen.getByRole("banner", { name: /^case header$/i });
+    expect(within(header).queryByText(/^Customer PO$/i)).not.toBeInTheDocument();
+    expect(within(header).queryByText("PO-PHB-1")).not.toBeInTheDocument();
+    // Demoted, not removed: the labelled PO is present in the drawer.
+    expect(screen.getByText(/^Customer PO$/i)).toBeInTheDocument();
+    expect(screen.getByText("PO-PHB-1")).toBeInTheDocument();
   });
 
   it("S1 #7 — drops the `Customer` field from the full-header grid", () => {
@@ -523,5 +529,55 @@ describe("CaseDetailPanel — S2 duplicate-status suppression", () => {
     // status must remain.
     render(<CaseDetailPanel orderCase={mockCase()} />);
     expect(screen.getByText("Awaiting review")).toBeInTheDocument();
+  });
+});
+
+
+/* ── Customer PO demotion to the Diagnostics & Audit drawer ─────────
+ *
+ * Council 2026-06-09: the customer PO is a correlation identifier, not a
+ * decision driver, so it is demoted out of the Layer-1 slim strip into the
+ * case provenance shown in the Diagnostics & Audit drawer. Relocation, not
+ * removal (Guardrail #7) — it stays rendered, typed, and traceable.
+ */
+describe("CaseDetailPanel — Customer PO demoted to the audit drawer", () => {
+  function mockRec(over: Partial<{ id: string }> = {}): ExceptionDetail {
+    return {
+      id: over.id ?? "exc-po",
+      tenant_id: "acme-corp",
+      order_id: "ORD-1",
+      event_type: "EDI_850_PRICE_MISMATCH",
+      intent: "CONTRACTUAL_CORRECTION",
+      lifecycle_state: "PENDING_REVIEW",
+      shadow_verdict: "GREEN",
+      selected_recipe: "PriceAdjustmentRecipe",
+      resolution_data: {},
+      reanalysis_history: [],
+      created_at: "2026-05-10T08:00:00Z",
+      updated_at: "2026-05-10T08:00:00Z",
+    };
+  }
+
+  it("renders the PO in the standalone case drawer (no record mounted)", () => {
+    render(<CaseDetailPanel orderCase={mockCase()} />);
+    // The Diagnostics & Audit drawer carries the labelled PO.
+    expect(screen.getByText(/^Customer PO$/i)).toBeInTheDocument();
+    expect(screen.getByText("PO-PHB-1")).toBeInTheDocument();
+  });
+
+  it("drops the PO from the slim context strip when a record is mounted", () => {
+    // With a single record mounted the case header is the slim strip; the
+    // PO no longer rides there. (The embedded panel is stubbed in this
+    // suite, so the drawer it injects via auditExtras is exercised by the
+    // ExceptionDetailPanel suite + the no-record path above.)
+    render(
+      <CaseDetailPanel
+        orderCase={mockCase()}
+        attachedRecords={[mockRec()]}
+        selectedRecordId="exc-po"
+      />,
+    );
+    const slim = screen.getByRole("banner", { name: /case context/i });
+    expect(within(slim).queryByText("PO-PHB-1")).not.toBeInTheDocument();
   });
 });

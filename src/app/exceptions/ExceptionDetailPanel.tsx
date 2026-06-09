@@ -1136,6 +1136,7 @@ export default function ExceptionDetailPanel({
             badge={auditMembers.length > 0 ? String(auditMembers.length) : undefined}
             defaultOpen={false}
             extraAnchorIds={auditAnchorIds}
+            onFirstOpen={ensureTraceLoaded}
           >
             <div className="flex flex-col gap-16">
               {auditSections}
@@ -1143,7 +1144,6 @@ export default function ExceptionDetailPanel({
                 detail={detail}
                 trace={trace}
                 showPreview={showPreview}
-                onFirstOpen={ensureTraceLoaded}
                 anchorId="section-trace"
               />
               {/* Single Diagnostics & Audit surface — case-level provenance

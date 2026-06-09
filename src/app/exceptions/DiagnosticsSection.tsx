@@ -1,12 +1,19 @@
 /**
  * DiagnosticsSection — Layer 5 of the Exception Detail Panel.
  *
- * Hidden behind a "Show Diagnostics" toggle. Contains:
+ * Renders as direct nested sub-sections of the enclosing "Diagnostics &
+ * Audit" group (council 2026-06-09 — the old inner toggle that gated these
+ * behind a second click was removed). Each sub-section is independently
+ * collapsible, a peer of EDI 850 Audit / Knowledge Graph:
  *   - Pipeline (EventsTimeline default, PipelineDAG behind disclosure;
  *     audit/admin roles get DAG default — ADR-027 Phase E)
  *   - Attempt selector (latest + every reanalysis_history entry —
  *     ADR-027 rev. 3 attempt-scoping)
  *   - Trace Evidence (evidence tabs, SAP data, change analysis, resolution data)
+ *
+ * The trace fetch is lazy: the parent wires `ensureTraceLoaded` to the
+ * Diagnostics & Audit group's `onFirstOpen`, so opening the group is what
+ * defers/triggers it.
  *
  * Replaces the legacy WaterfallStepper + PIPELINE_NODES rendering. The
  * UI no longer mirrors the topology — both surfaces consume
@@ -16,7 +23,7 @@
 "use client";
 
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
-import { ChevronDown, Terminal, ClipboardCopy, CheckCircle2, GitBranch, ListOrdered } from "lucide-react";
+import { ClipboardCopy, CheckCircle2, GitBranch, ListOrdered } from "lucide-react";
 import { CollapsibleHeader, useHashOpen } from "./shared";
 import { EventsTimeline } from "@/components/ui/EventsTimeline";
 import { useTopology } from "@/hooks/useTopology";
@@ -36,12 +43,9 @@ interface DiagnosticsSectionProps {
   detail: ExceptionDetail;
   trace: TraceResponse | null;
   showPreview: boolean;
-  /** Optional lazy-load callback fired the first time the Diagnostics
-   *  pane opens. Lets the parent defer the trace fetch until the
-   *  operator asks to see it (PO request #4). */
-  onFirstOpen?: () => void;
-  /** Anchor id for the "Jump to" bar (#4). When the hash targets it, the
-   *  pane expands (firing onFirstOpen) and scrolls into view. */
+  /** Anchor id for the Trace Evidence sub-section (#4 jump-to). When the
+   *  hash targets it, the enclosing Diagnostics & Audit group opens (via
+   *  the group's extraAnchorIds) and this section expands + scrolls in. */
   anchorId?: string;
 }
 
@@ -86,9 +90,8 @@ function buildAttemptOptions(
   return options;
 }
 
-export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen, anchorId }: DiagnosticsSectionProps) {
-  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
-  const toggleRef = useRef<HTMLButtonElement>(null);
+export function DiagnosticsSection({ detail, trace, showPreview, anchorId }: DiagnosticsSectionProps) {
+  const traceSectionRef = useRef<HTMLElement>(null);
   const [pipelineOpen, setPipelineOpen] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -136,45 +139,26 @@ export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen, an
     selectedAttempt.executedNodes,
   );
 
-  // Expand + scroll when the "Jump to → Diagnostics" link targets this pane.
-  useHashOpen(anchorId, toggleRef, () =>
-    setDiagnosticsOpen((v) => {
-      if (!v && onFirstOpen) onFirstOpen();
-      return true;
-    }),
-  );
+  // Expand + scroll the Trace Evidence section when a deep link targets it.
+  // The enclosing Diagnostics & Audit group opens via its extraAnchorIds
+  // (which include this anchor) and fires the trace lazy-load; this hook
+  // then expands the Trace Evidence sub-section and scrolls it into view.
+  useHashOpen(anchorId, traceSectionRef, () => setTraceOpen(true));
 
   return (
-    <>
-      {/* Diagnostics toggle */}
-      <button
-        ref={toggleRef}
-        id={anchorId}
-        onClick={() => {
-          const next = !diagnosticsOpen;
-          setDiagnosticsOpen(next);
-          if (next && onFirstOpen) onFirstOpen();
-        }}
-        className="scroll-mt-[var(--nav-height)] flex items-center justify-center gap-6 w-full py-8 bg-transparent border-none cursor-pointer font-sans text-caption font-semibold text-text-tertiary transition-colors duration-fast"
-        aria-expanded={diagnosticsOpen}
-      >
-        <Terminal size={12} />
-        {diagnosticsOpen ? "Hide Diagnostics" : "Show Diagnostics"}
-        <ChevronDown
-          size={12}
-          className={cn(
-            "transition-transform duration-fast",
-            !diagnosticsOpen && "-rotate-90",
-          )}
-        />
-      </button>
-
-      {diagnosticsOpen && (
-        <div className="flex flex-col gap-12">
+    // Council 2026-06-09 — the "Show Diagnostics" toggle was a SECOND
+    // disclosure nested inside the already-collapsed "Diagnostics & Audit"
+    // group: the operator opened the group, then had to click again to reach
+    // Pipeline / Trace Evidence. The toggle is removed; these now render as
+    // direct nested sub-sections of the group (peers of EDI 850 Audit /
+    // Knowledge Graph), each independently collapsible. The trace lazy-load
+    // the toggle used to fire now rides on the group's onFirstOpen.
+    <div className="flex flex-col gap-12">
           {/* Pipeline */}
-          <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
+          <section className="bg-surface-secondary border border-border-subtle rounded-md overflow-hidden">
             <CollapsibleHeader
               title="Pipeline"
+              level="nested"
               open={pipelineOpen}
               onToggle={() => setPipelineOpen((v) => !v)}
               badge={pipelineStatus.label}
@@ -266,9 +250,10 @@ export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen, an
           {/* Reanalysis History — preserved for audit detail; the
               attempt selector above is the operator-facing view. */}
           {history.length > 0 && (
-            <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
+            <section className="bg-surface-secondary border border-border-subtle rounded-md overflow-hidden">
               <CollapsibleHeader
                 title="Reanalysis History"
+                level="nested"
                 open={historyOpen}
                 onToggle={() => setHistoryOpen((v) => !v)}
                 badge={`${history.length} attempt${history.length === 1 ? "" : "s"}`}
@@ -321,9 +306,14 @@ export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen, an
           )}
 
           {/* Trace Evidence */}
-          <section className="bg-surface-primary rounded-md shadow-sm overflow-hidden">
+          <section
+            ref={traceSectionRef}
+            id={anchorId}
+            className="scroll-mt-[var(--nav-height)] bg-surface-secondary border border-border-subtle rounded-md overflow-hidden"
+          >
             <CollapsibleHeader
               title="Trace Evidence"
+              level="nested"
               open={traceOpen}
               onToggle={() => setTraceOpen((v) => !v)}
             />
@@ -439,8 +429,6 @@ export function DiagnosticsSection({ detail, trace, showPreview, onFirstOpen, an
             )}
           </section>
         </div>
-      )}
-    </>
   );
 }
 
