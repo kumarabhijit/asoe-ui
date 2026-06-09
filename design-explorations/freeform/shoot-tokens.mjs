@@ -1,0 +1,11 @@
+import { chromium } from "playwright";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+const here = dirname(fileURLToPath(import.meta.url));
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1480, height: 940 }, deviceScaleFactor: 2 });
+await page.goto("file://" + join(here, "cockpit-tokens.html"), { waitUntil: "networkidle" });
+await page.waitForTimeout(300);
+await page.screenshot({ path: join(here, "04-cockpit-production-tokens.png") });
+console.log("shot done");
+await browser.close();
