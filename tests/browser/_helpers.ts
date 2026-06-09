@@ -240,17 +240,28 @@ export async function expandSection(
   });
   // Stacked-group layout (2026-06-09): evidence/audit sections live inside a
   // single "Evidence" / "Diagnostics & Audit" disclosure, so an inner header
-  // isn't mounted until its group is open. If the target isn't visible yet,
-  // open any collapsed group first, then retry. Idempotent — a group that
-  // already auto-expanded (needs-human Evidence) is left untouched. The
-  // negative lookahead avoids matching EvidenceGrid's inner "Evidence Detail".
-  const visible = await header
+  // isn't mounted until its group is open. The detail pane always renders the
+  // Evidence group, so use it as a "pane loaded" gate (avoids a race where we
+  // probe group visibility before the detail has rendered, skip the click,
+  // then wait forever on a header inside a still-collapsed group). Open any
+  // collapsed group, then reach the inner header. Idempotent — an
+  // auto-expanded group (needs-human Evidence) is left as-is. The negative
+  // lookahead avoids matching EvidenceGrid's inner "Evidence Detail".
+  const targetVisible = await header
     .first()
     .isVisible()
     .catch(() => false);
-  if (!visible) {
-    for (const group of [/^Evidence(?! Detail)/i, /Diagnostics & Audit/i]) {
-      const g = page.getByRole("button", { name: group }).first();
+  if (!targetVisible) {
+    const evidenceGroup = page
+      .getByRole("button", { name: /^Evidence(?! Detail)/i })
+      .first();
+    // Detail-pane-loaded gate: the Evidence group is rendered unconditionally.
+    await expect(evidenceGroup).toBeVisible({ timeout: 15_000 });
+    const groups = [
+      evidenceGroup,
+      page.getByRole("button", { name: /Diagnostics & Audit/i }).first(),
+    ];
+    for (const g of groups) {
       const gVisible = await g.isVisible().catch(() => false);
       if (!gVisible) continue;
       const gExpanded = await g.getAttribute("aria-expanded");
