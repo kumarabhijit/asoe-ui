@@ -51,8 +51,8 @@ describe("field↔source linking deliverable", () => {
 
   it("mock entity evidence_ref stays in lockstep with the derived anchor ref", () => {
     const src = read("src", "lib", "mock-data", "inbox-sections.ts");
-    // The anchor ref the mock derives.
-    expect(src).toContain("supports_ref: `order_entry.${e.key}`");
+    // The anchor ref the mock derives (shared by text-derived + spatial anchors).
+    expect(src).toContain("const supports_ref = `order_entry.${e.key}`");
     // Every keyed mock entity that declares evidence_ref must use the same
     // order_entry.${key} shape (no divergent vocabulary).
     const refs = [...src.matchAll(/evidence_ref:\s*"([^"]+)"/g)].map((m) => m[1]);

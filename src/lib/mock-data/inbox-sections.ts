@@ -23,6 +23,7 @@ import type {
   OrderEntryExtraction,
   SapDataAnalysisData,
 } from "@/types/exceptions";
+import { isPo8842, po8842FieldByRef, PO_8842_RENDITION_HASH } from "./po8842-spatial";
 
 // ── Email source-of-truth (ADR-034 Phase G) + evidence anchors (ADR-043) ─────
 //
@@ -86,22 +87,41 @@ function emailSourceFor(opts: {
   let evidence_anchors: EvidenceAnchor[] = [];
   const primary = manifest[0];
   if (primary && opts.anchorsFrom) {
+    // When the primary attachment is the PO_8842 document, mirror the
+    // backend's recorded spatial extraction (ADR-045) so the preview draws
+    // the SAME bbox highlights the live `DocumentExtractionGateway` would —
+    // a verified spatial anchor per field it located, text-derived for the
+    // rest (e.g. the From: header, which isn't on the PDF). Other documents
+    // have no recorded geometry, so they stay text-derived (Phase 1).
+    const spatialDoc = isPo8842(primary.name);
     const seen: Record<string, number> = {};
     evidence_anchors = opts.anchorsFrom.extracted.map((e) => {
       const text = e.source_span && e.source_span.trim() ? e.source_span : e.value;
       const norm = _normalizeAnchorText(text);
       const occurrence_index = seen[norm] ?? 0;
       seen[norm] = occurrence_index + 1;
-      return {
+      const supports_ref = `order_entry.${e.key}`;
+      const geom = spatialDoc ? po8842FieldByRef(supports_ref) : undefined;
+      const base = {
         attachment_id: primary.attachment_id,
-        anchor_source: "text_derived" as const,
         text,
         match_key: { normalized_text: norm, occurrence_index },
         supports_kind: "extracted_field" as EvidenceSupportsKind,
-        supports_ref: `order_entry.${e.key}`,
-        label: _anchorLabel(e.key),
+        supports_ref,
+        label: geom?.label ?? _anchorLabel(e.key),
         source_sha256: primary.sha256,
       };
+      if (geom) {
+        return {
+          ...base,
+          anchor_source: "spatial_extracted" as const,
+          page: geom.page,
+          bbox: [...geom.bbox],
+          confidence: geom.confidence,
+          rendition_hash: PO_8842_RENDITION_HASH,
+        };
+      }
+      return { ...base, anchor_source: "text_derived" as const };
     });
   }
 

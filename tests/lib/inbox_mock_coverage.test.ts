@@ -47,7 +47,21 @@ describe("customer-inbox mock coverage", () => {
       for (const anchor of src.evidence_anchors ?? []) {
         expect(manifestIds.has(anchor.attachment_id), `${id}: anchor not bound to a manifest attachment`).toBe(true);
         expect(anchor.source_sha256).toHaveLength(64);
-        expect(anchor.anchor_source).toBe("text_derived");
+        // Phase-1 text anchors carry no geometry; Phase-2 spatial anchors
+        // (ADR-045 — e.g. PO_8842, mirrored from the backend recorded
+        // extraction) carry a verified page + a normalised bbox.
+        expect(["text_derived", "spatial_extracted"]).toContain(anchor.anchor_source);
+        if (anchor.anchor_source === "spatial_extracted") {
+          expect(typeof anchor.page).toBe("number");
+          expect(anchor.bbox).toHaveLength(4);
+          for (const n of anchor.bbox ?? []) {
+            expect(n).toBeGreaterThanOrEqual(0);
+            expect(n).toBeLessThanOrEqual(1);
+          }
+        } else {
+          expect(anchor.page ?? null).toBeNull();
+          expect(anchor.bbox ?? null).toBeNull();
+        }
       }
     }
   });
