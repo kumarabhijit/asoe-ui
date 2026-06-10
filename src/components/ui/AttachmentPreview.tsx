@@ -372,7 +372,10 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
                       : "2px solid var(--color-brand)",
                     boxShadow: isSelected ? "0 0 0 3px var(--color-brand-ring)" : "none",
                     opacity: selectedRef && !isSelected ? 0.4 : 1,
-                    background: "var(--color-brand-subtle)",
+                    // Translucent highlighter wash, NOT an opaque fill — the box
+                    // sits above the PDF canvas, so the document text under it
+                    // must remain legible (an opaque fill hides the evidence).
+                    background: "var(--color-highlight-evidence)",
                   }}
                 />
               );
