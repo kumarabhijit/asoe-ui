@@ -110,7 +110,10 @@ async function renderPdfAndExtractText(
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         if (ctx) {
-          await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+          // pdfjs-dist v4 RenderParameters is { canvasContext, viewport } — the
+          // `canvas` key is v5-only (and v5's renderer needs a JS method the
+          // target browsers lack; see the version pin in package.json).
+          await page.render({ canvasContext: ctx, viewport }).promise;
           rendered = true;
         }
       } catch (e) {
