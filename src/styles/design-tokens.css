@@ -80,6 +80,7 @@
   --color-brand-subtle:    #F3F1FE;  /* Selected rows, active tab fill, tinted backgrounds */
   --color-brand-muted:     #C4BDEF;  /* Progress tracks, secondary indicators */
   --color-brand-ring:      rgba(90, 75, 214, 0.25);  /* Focus ring glow */
+  --color-highlight-evidence: rgba(90, 75, 214, 0.18);  /* Translucent highlighter wash over document text (evidence overlays must stay see-through) */
 
 
   /* ── SURFACE COLORS ──────────────────────────────────────────────────── */
@@ -292,6 +293,7 @@
   --color-brand-subtle:    rgba(139, 124, 247, 0.12);
   --color-brand-muted:     rgba(139, 124, 247, 0.25);
   --color-brand-ring:      rgba(139, 124, 247, 0.30);
+  --color-highlight-evidence: rgba(139, 124, 247, 0.22);  /* Translucent highlighter wash over document text (evidence overlays must stay see-through) */
 
   /* ── SURFACE COLORS ──────────────────────────────────────────────── */
   --color-surface-page:       #0B0D14;

@@ -149,6 +149,27 @@ describe("AttachmentPreview", () => {
     expect(screen.getByTestId("evidence-safety-bar")).toBeInTheDocument();
   });
 
+  it("paints the spatial overlay with a translucent highlighter wash, never an opaque fill (text under it must stay visible)", async () => {
+    // Regression: the overlay sits above the PDF canvas. An opaque fill (e.g.
+    // var(--color-brand-subtle), which is the solid #F3F1FE in light mode)
+    // paints OVER the evidence text and hides it — the operator saw solid bars
+    // instead of the PO number / Ship-to / Requested date / Material spans. The
+    // fill must be the translucent highlighter token so the text shows through.
+    getBlob.mockResolvedValue(new Blob(["%PDF-1.4\nmock"], { type: "application/pdf" }));
+    const spatial: EvidenceAnchor = {
+      ...poAnchor(),
+      anchor_source: "spatial_extracted",
+      page: 1,
+      bbox: [0.1, 0.2, 0.5, 0.3],
+      confidence: 0.97,
+      rendition_hash: "rh-1",
+    };
+    render(<AttachmentPreview caseId="case-1" attachment={attachment()} anchors={[spatial]} />);
+    const overlay = await screen.findByTestId("spatial-overlay");
+    expect(overlay.style.background).toContain("var(--color-highlight-evidence)");
+    expect(overlay.style.background).not.toContain("brand-subtle");
+  });
+
   it("keeps evidence LOCATED when the canvas paint fails (extraction is decoupled)", async () => {
     // Regression (live browser-e2e failure on PR #237): the page paint and the
     // text-layer extraction share one PDF.js pass. Painting first meant a
