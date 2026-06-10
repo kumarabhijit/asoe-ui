@@ -1,0 +1,116 @@
+<!doctype html>
+<!--
+  Situation-hero before/after study (audit finding #2, council 2026-06-10).
+
+  Question: should $impact · SLA · state consolidate into a single
+  sub-line directly under the Situation headline (matching mockup.html)?
+
+  This is a DESIGN ARTIFACT for sign-off, not a shipped change. It links
+  the real design tokens so the comparison is faithful to production.
+
+  BEFORE = current Modern view: headline-only hero; the $ figure lives in
+           the separate top ImpactBar, SLA + state live in chrome/strip.
+  AFTER  = mockup.html: headline + one consolidated metadata sub-line.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Situation hero — before / after</title>
+  <link rel="stylesheet" href="../../src/styles/design-tokens.css" />
+  <style>
+    body {
+      margin: 0;
+      background: var(--color-surface-page);
+      color: var(--color-text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: var(--space-32, 32px);
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-24, 24px); max-width: 1040px; margin: 0 auto; }
+    .col h3 { font-size: var(--font-size-caption); text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-tertiary); margin: 0 0 var(--space-12, 12px); }
+    .panel {
+      background: var(--color-surface-primary);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    /* Top ImpactBar (always-visible Priority-1 figure) */
+    .impactbar {
+      display: flex; align-items: baseline; gap: var(--space-8, 8px);
+      padding: var(--space-12, 12px) var(--space-16, 16px);
+      background: var(--color-surface-secondary);
+      border-bottom: 1px solid var(--color-border-subtle);
+    }
+    .impactbar .label { font-size: var(--font-size-label, 10px); text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-tertiary); font-weight: 600; }
+    .impactbar .fig { font-size: var(--font-size-subhead, 14px); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .body { padding: var(--space-16, 16px); }
+    /* Situation hero */
+    .situation { display: flex; align-items: flex-start; gap: var(--space-12, 12px); }
+    .situation .rule { margin-top: 3px; height: 26px; width: 3px; border-radius: 99px; background: var(--color-brand); flex: none; }
+    .situation h2 { font-size: var(--font-size-title); font-weight: 700; line-height: 1.15; margin: 0; }
+    .situation .sub { color: var(--color-text-tertiary); font-size: var(--font-size-caption); margin-top: 4px; font-variant-numeric: tabular-nums; }
+    /* where before scatters the same facts */
+    .scatter { margin-top: var(--space-16, 16px); display: flex; flex-wrap: wrap; gap: var(--space-8, 8px); }
+    .chip { font-size: var(--font-size-label, 10px); border: 1px solid var(--color-border-subtle); border-radius: 99px; padding: 3px 10px; color: var(--color-text-tertiary); }
+    .note { max-width: 1040px; margin: var(--space-24, 24px) auto 0; font-size: var(--font-size-caption); color: var(--color-text-tertiary); line-height: 1.5; }
+    .reco { margin-top: var(--space-16,16px); font-size: var(--font-size-caption); color: var(--color-text-secondary); }
+  </style>
+</head>
+<body>
+  <div class="grid">
+    <!-- BEFORE -->
+    <div class="col">
+      <h3>Before — current Modern view</h3>
+      <div class="panel">
+        <div class="impactbar">
+          <span class="label">Impact</span>
+          <span class="fig">$48,040</span>
+          <span class="label" style="margin-left:auto">revenue at risk</span>
+        </div>
+        <div class="body">
+          <div class="situation">
+            <span class="rule" aria-hidden="true"></span>
+            <h2>Duplicate purchase order detected — Acme Beverages</h2>
+          </div>
+          <!-- SLA + state are not adjacent to the situation; they live in
+               the case chrome / context strip, read as scattered chips -->
+          <div class="scatter">
+            <span class="chip">SLA due in 3h 12m</span>
+            <span class="chip">PENDING REVIEW</span>
+          </div>
+          <div class="reco">↓ Recommendation, evidence, diagnostics…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AFTER -->
+    <div class="col">
+      <h3>After — consolidated sub-line (matches mockup)</h3>
+      <div class="panel">
+        <div class="body">
+          <div class="situation">
+            <span class="rule" aria-hidden="true"></span>
+            <div>
+              <h2>Duplicate purchase order detected — Acme Beverages</h2>
+              <div class="sub">$48,040 exposure · SLA due in 3h 12m · PENDING REVIEW</div>
+            </div>
+          </div>
+          <div class="reco">↓ Recommendation, evidence, diagnostics…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="note">
+    The same three facts ($ exposure, SLA, lifecycle state) either scatter
+    across the ImpactBar + context chips (Before) or fold into one
+    decision-context sub-line under the headline (After). The After variant
+    removes the standalone ImpactBar in favour of the sub-line — the figure
+    is shown once, in the operator's reading order, answering "how bad, how
+    urgent, where in the flow" in one glance. All facts remain
+    backend-sourced (impact_metrics, SLA, lifecycle_state); the
+    consolidation is presentational only and would be composed in
+    build_analysis, not the UI.
+  </p>
+</body>
+</html>

@@ -84,3 +84,59 @@ describe("AgentActivityRail — with a trace", () => {
     expect(onContentfulChange).toHaveBeenCalledWith(false);
   });
 });
+
+// Discoverability mode (council 2026-06-10) — the detail surface opts in
+// via `showWhenEmpty` so the rail is visible (loading + empty states)
+// before a trace lands, instead of collapsing to nothing.
+describe("AgentActivityRail — showWhenEmpty (detail surface)", () => {
+  it("renders a loading state while the trace fetch is in flight", async () => {
+    // A deferred trace keeps the rail in its loading state; we settle it
+    // at the end so no pending promise leaks across the hook boundary.
+    let resolveTrace: (v: unknown) => void = () => {};
+    traceMock.mockReturnValue(
+      new Promise((res) => {
+        resolveTrace = res;
+      }),
+    );
+    render(<AgentActivityRail selectedRecordId="exc-1" showWhenEmpty />);
+    expect(
+      await screen.findByRole("region", { name: /agent activity/i }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText(/loading agent activity/i)).toBeInTheDocument();
+    // Settle the fetch (empty trace) so the in-flight promise resolves.
+    resolveTrace({ executed_nodes: [] });
+    await waitFor(() =>
+      expect(screen.queryByText(/loading agent activity/i)).not.toBeInTheDocument(),
+    );
+  });
+
+  it("renders an explicit empty state when the record has no recorded activity", async () => {
+    traceMock.mockResolvedValue({ executed_nodes: [] });
+    render(<AgentActivityRail selectedRecordId="exc-1" showWhenEmpty />);
+    expect(
+      await screen.findByText(/no agent activity recorded for this record yet/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /agent activity/i })).toBeInTheDocument();
+  });
+
+  it("still renders the real stream when a trace IS present", async () => {
+    traceMock.mockResolvedValue({
+      executed_nodes: [{ node: "classify", status: "completed" }],
+      final_status: "RESOLVED",
+    });
+    render(<AgentActivityRail selectedRecordId="exc-1" showWhenEmpty />);
+    expect(
+      await screen.findByRole("region", { name: /agent activity/i }),
+    ).toBeInTheDocument();
+    // The empty-state copy must NOT appear when there is real activity.
+    expect(
+      screen.queryByText(/no agent activity recorded/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders nothing when no record is selected, even with showWhenEmpty", () => {
+    const { container } = render(<AgentActivityRail showWhenEmpty />);
+    expect(container).toBeEmptyDOMElement();
+    expect(traceMock).not.toHaveBeenCalled();
+  });
+});

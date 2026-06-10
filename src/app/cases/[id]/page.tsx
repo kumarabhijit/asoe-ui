@@ -22,8 +22,10 @@ import { useHealth } from "@/hooks/useHealth";
 import { casesApi } from "@/lib/api";
 import type { OrderCase } from "@/types/cases";
 import type { ExceptionDetailResponse } from "@/types/api";
+import { useViewMode } from "@/hooks/useViewMode";
 
 import { CaseDetailPanel } from "../CaseDetailPanel";
+import { AgentActivityRail } from "../AgentActivityRail";
 
 import { NAV_TABS } from "@/config/nav-tabs";
 // NAV_TABS consolidated to src/config/nav-tabs.ts (issue #133, PO #9).
@@ -37,6 +39,9 @@ export default function CaseDetailPage() {
   const { user } = useAuth();
   const { health } = useHealth();
   const handleSignOut = useSignOut();
+  // Cockpit (Modern view) gates the presentational additions; Legacy
+  // stays byte-unchanged (Guardrail #0 / cockpit-refactor).
+  const COCKPIT = useViewMode().mode === "modern";
   const caseId = params?.id;
   const [orderCase, setOrderCase] = useState<OrderCase | null>(null);
   const [loading, setLoading] = useState(true);
@@ -141,13 +146,30 @@ export default function CaseDetailPage() {
         )}
 
         {!loading && orderCase && (
-          <CaseDetailPanel
-            orderCase={orderCase}
-            attachedRecords={records}
-            policyHits={policyHits}
-            selectedRecordId={selectedRecordId}
-            onSelectRecord={handleSelectRecord}
-          />
+          <>
+            {/* Cockpit: surface the Agent Activity stream on the detail
+                route too (council 2026-06-10) — Guardrail #4, the system
+                is the primary actor. `showWhenEmpty` makes the rail
+                DISCOVERABLE here even before a trace lands (loading +
+                empty states), unlike the /cases xl rail which collapses
+                when empty. Only while a record is selected. Modern-gated;
+                Legacy is untouched. */}
+            {COCKPIT && selectedRecordId && (
+              <div className="mb-16 rounded-lg border border-border-subtle overflow-hidden">
+                <AgentActivityRail
+                  selectedRecordId={selectedRecordId}
+                  showWhenEmpty
+                />
+              </div>
+            )}
+            <CaseDetailPanel
+              orderCase={orderCase}
+              attachedRecords={records}
+              policyHits={policyHits}
+              selectedRecordId={selectedRecordId}
+              onSelectRecord={handleSelectRecord}
+            />
+          </>
         )}
       </main>
 
