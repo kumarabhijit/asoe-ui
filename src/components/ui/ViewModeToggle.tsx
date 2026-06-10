@@ -58,7 +58,9 @@ export function ViewModeToggle({ className, align = "end" }: ViewModeToggleProps
   // Stable icon on the server / first paint; reflect the active mode
   // once the stored preference has resolved.
   const TriggerIcon = mounted && mode === "modern" ? Sparkles : LayoutDashboard;
-  const activeLabel = VIEW_OPTIONS.find((o) => o.value === mode)?.label;
+  // `?? "View"` guards the aria-label against rendering the literal
+  // string "undefined" if `mode` ever falls outside VIEW_OPTIONS.
+  const activeLabel = VIEW_OPTIONS.find((o) => o.value === mode)?.label ?? "View";
 
   return (
     <DropdownMenu>
