@@ -98,4 +98,19 @@ test.describe("cockpit (flag on) — /cases", () => {
     );
     expect(gating, JSON.stringify(gating, null, 2)).toEqual([]);
   });
+
+  test("the Situation sub-line carries SLA + state; the ribbon badge relocates (option C)", async ({ page }) => {
+    await openCockpitRecord(page);
+    // exc-002 is PENDING_REVIEW with a mock parent-case SLA seeded at
+    // created_at + 24h (long past) → the live label reads "SLA breached
+    // … ago". The state renders through the governed humanizer.
+    const subline = page.getByText(/^SLA breached .* ago$/);
+    await expect(subline).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByText("Pending Review", { exact: true }).first(),
+    ).toBeVisible({ timeout: 20_000 });
+    // Relocation, not duplication: the embedded HeaderRibbon drops its
+    // "Current State" badge (and with it the now-empty chrome row).
+    await expect(page.getByText("Current State:")).toHaveCount(0);
+  });
 });

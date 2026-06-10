@@ -2616,6 +2616,19 @@ function mockPresentation(id: string): PresentationContract {
       // record at all.
       correlation_id: exc ? `${exc.id}-trace` : null,
     },
+    // Situation hero sub-line facts (audit finding #2, option C) —
+    // mirrors compose_presentation(record, parent_case): the SLA rides
+    // from the record's parent case (None for records without one,
+    // matching the backend's Tier-1 stateless path); the lifecycle
+    // state is re-projected from the record. Null facts are
+    // structurally omitted by the sub-line.
+    situation_context: {
+      sla_due_at: exc?.parent_case_id
+        ? deriveMockCases().find((c) => c.case_id === exc.parent_case_id)
+            ?.sla_due_at ?? null
+        : null,
+      lifecycle_state: exc?.lifecycle_state ?? null,
+    },
   };
 }
 

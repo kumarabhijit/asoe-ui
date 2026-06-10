@@ -272,3 +272,70 @@ describe("cockpit Evidence/Diagnostics restructuring (council 2026-06-10)", () =
     expect(api).toContain("correlation_id: exc ? `${exc.id}-trace`");
   });
 });
+
+describe("Situation hero sub-line (audit finding #2, option C — sign-off 2026-06-10)", () => {
+  const panel = read("app/exceptions/ExceptionDetailPanel.tsx");
+  const subline = read("app/exceptions/SituationSubline.tsx");
+
+  it("SituationSubline is a dumb projector of presentation.situation_context", () => {
+    // Backend-composed membership: SLA timestamp + lifecycle state.
+    expect(subline).toContain("SituationContext");
+    expect(subline).toContain("sla_due_at");
+    expect(subline).toContain("lifecycle_state");
+    // Live label from the SHARED banding rule + the per-minute ticker —
+    // never a backend-prerendered string, never a forked copy of the rule.
+    expect(subline).toContain("slaSnapshotFromDeadline");
+    expect(subline).toContain("useSlaTicker");
+    // Governed plain language for the state, not the raw enum.
+    expect(subline).toContain("humanizeEnumLabel");
+    // No UI compose / fetch (Guardrail #6) and no partial-truth fallbacks.
+    expect(subline).not.toContain("fetch(");
+    expect(subline).not.toContain('"—"');
+    expect(subline).not.toContain('"N/A"');
+  });
+
+  it("the panel mounts the sub-line under the Modern hero, fed the composed contract", () => {
+    // Anchored inside the COCKPIT hero branch; Legacy keeps the classic
+    // compact subhead with no sub-line (additive, flag-gated).
+    expect(panel).toContain("import { SituationSubline }");
+    expect(panel).toMatch(
+      /<SituationSubline\s+context=\{analysis\.presentation\.situation_context\}/,
+    );
+  });
+
+  it("option C: the $ figure keeps its single home in the ImpactBar", () => {
+    // The sub-line must never grow an exposure/$ segment — that is the
+    // exact "second dollar number" the council removed (S1 posture).
+    expect(subline).not.toContain("revenue_at_risk");
+    expect(subline).not.toContain("impact_metrics");
+    expect(panel).toContain("<ImpactBar");
+  });
+
+  it("relocates (not removes) the ribbon state badge when the sub-line carries it", () => {
+    // One fact, one home: the panel derives the suppression strictly
+    // from the rendered sub-line facts; the ribbon drops only the badge
+    // (and, embedded, the now-empty chrome row).
+    expect(panel).toContain("const sublineCarriesState =");
+    expect(panel).toMatch(/suppressLifecycle=\{sublineCarriesState\}/);
+    const ribbon = read("app/exceptions/HeaderRibbon.tsx");
+    expect(ribbon).toContain("suppressLifecycle = false");
+    expect(ribbon).toContain("if (embedded && suppressLifecycle) return null;");
+    expect(ribbon).toContain("{!suppressLifecycle && (");
+  });
+
+  it("mirrors the backend SituationContext contract (Guardrail #3)", () => {
+    const types = read("types/exceptions.ts");
+    expect(types).toContain("export interface SituationContext");
+    expect(types).toMatch(/situation_context: SituationContext;/);
+  });
+
+  it("the mock presentation composer mirrors situation_context", () => {
+    // Mock mirrors compose_presentation(record, parent_case): SLA from
+    // the record's parent case (null without one — the Tier-1 stateless
+    // path), state re-projected from the record.
+    const api = read("lib/api.ts");
+    expect(api).toContain("situation_context: {");
+    expect(api).toMatch(/sla_due_at: exc\?\.parent_case_id/);
+    expect(api).toMatch(/lifecycle_state: exc\?\.lifecycle_state \?\? null/);
+  });
+});

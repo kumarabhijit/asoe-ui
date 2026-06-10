@@ -79,3 +79,49 @@ describe("HeaderRibbon embedded slimming (workspace de-duplication)", () => {
     expect(container.textContent).toContain("$1,000");
   });
 });
+
+// Audit finding #2, option C (sign-off 2026-06-10) — when the Modern
+// Situation sub-line carries the lifecycle state, the ribbon's "Current
+// State" badge would repeat the same fact a few rows below. The panel
+// passes `suppressLifecycle` so the state has ONE home (relocation into
+// the sub-line, not removal). Legacy never sets the prop, so the
+// classic ribbon is untouched (regression cases above stay green).
+describe("HeaderRibbon state relocation (Situation sub-line, option C)", () => {
+  it("drops the Current State badge when the sub-line carries it (standalone)", () => {
+    const { container } = render(
+      <HeaderRibbon
+        detail={exc046}
+        primarySkuLabel="SKU-1"
+        totalPo={1000}
+        delta={0}
+        suppressLifecycle
+      />,
+    );
+    expect(container.textContent).not.toContain("Current State:");
+    expect(screen.queryByText("Resolved")).not.toBeInTheDocument();
+    // The rest of the standalone chrome survives — only the state moved.
+    expect(container.textContent).toContain("Audit Result:");
+    expect(container.textContent).toContain("$1,000");
+  });
+
+  it("renders nothing when embedded AND the state relocated (no empty chrome row)", () => {
+    const { container } = render(
+      <HeaderRibbon
+        detail={exc046}
+        primarySkuLabel="SKU-1"
+        totalPo={1000}
+        delta={0}
+        embedded
+        suppressLifecycle
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("keeps the badge by default (Legacy path byte-unchanged)", () => {
+    const { container } = render(
+      <HeaderRibbon detail={exc046} primarySkuLabel="SKU-1" totalPo={1000} delta={0} />,
+    );
+    expect(container.textContent).toContain("Current State:");
+  });
+});

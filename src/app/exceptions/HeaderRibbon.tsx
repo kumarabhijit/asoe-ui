@@ -39,9 +39,26 @@ interface HeaderRibbonProps {
    * keeps the full chrome.
    */
   embedded?: boolean;
+  /**
+   * Situation sub-line state relocation (audit finding #2, option C —
+   * sign-off 2026-06-10). When the Modern Situation hero renders the
+   * lifecycle state in its sub-line, the "Current State" badge here
+   * would repeat the same fact a few rows below. Suppressing it keeps
+   * one fact in one home (S1/S2 redundancy posture) — relocation, not
+   * removal: the state stays on the Layer-1 surface, just in the
+   * operator's reading order under the headline. Never set in Legacy,
+   * so the classic ribbon is untouched.
+   */
+  suppressLifecycle?: boolean;
 }
 
-export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, totalPo, delta, embedded = false }: HeaderRibbonProps) {
+export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, totalPo, delta, embedded = false, suppressLifecycle = false }: HeaderRibbonProps) {
+  // Embedded mode strips the ribbon down to the lifecycle badge alone
+  // (see `embedded` above) — with that relocated into the sub-line too,
+  // nothing remains, so drop the empty chrome row instead of rendering
+  // a bare border.
+  if (embedded && suppressLifecycle) return null;
+
   return (
     <div className="px-16 py-10 border-b border-border bg-surface-primary shrink-0">
       {/* Breadcrumb row */}
@@ -75,6 +92,9 @@ export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, total
           requested explicit labels so reviewers don't have to learn
           which colored pill means which thing. */}
       <div className="flex items-center gap-10 flex-wrap">
+        {/* Suppressed when the Modern Situation sub-line carries the
+            state (relocation — see `suppressLifecycle` above). */}
+        {!suppressLifecycle && (
         <div className="flex items-center gap-4">
           <span className="text-label font-semibold uppercase tracking-wider text-text-quaternary">
             Current State:
@@ -89,6 +109,7 @@ export function HeaderRibbon({ detail, entityProfile: ep, primarySkuLabel, total
             {humanizeEnumLabel(detail.lifecycle_state)}
           </Badge>
         </div>
+        )}
         {/* S1 finding #5 — when embedded inside `CaseDetailPanel`, the
             case-level Compliance surfaces (slim-header chip + rail or
             inline section) already carry the verdict. Suppress the

@@ -54,6 +54,7 @@ import type {
   SlaBand,
   SlaSnapshot,
 } from "@/types/cases";
+import { slaSnapshotFromDeadline } from "@/lib/sla";
 import type { ExceptionDetailResponse } from "@/types/api";
 
 import { CaseDetailPanel } from "./CaseDetailPanel";
@@ -106,50 +107,15 @@ const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutr
  * Derive the SLA visualisation snapshot for a case. Pure function —
  * tests assert against it directly. Exported because the home page
  * and other case-rendering surfaces (CaseDetailPanel, ChromeBoundary
- * banner) consume it.
+ * banner) consume it. The banding/label logic itself lives in
+ * `lib/sla.ts` (one source — the Situation sub-line shares it); this
+ * is the case-shaped entry point over `sla_deadline`.
  */
 export function slaSnapshot(
   case_: OrderCase,
   now: Date = new Date(),
 ): SlaSnapshot {
-  const deadline = case_.sla_deadline;
-  if (!deadline) {
-    return { band: "none", deadline: null, label: "No SLA set" };
-  }
-  const target = new Date(deadline).getTime();
-  if (Number.isNaN(target)) {
-    return { band: "none", deadline, label: "Invalid SLA" };
-  }
-  const ms = target - now.getTime();
-
-  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
-  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-  let band: SlaBand;
-  let label: string;
-  if (ms < 0) {
-    band = "breached";
-    label = `Breached ${formatDeltaShort(-ms)} ago`;
-  } else if (ms < TWO_HOURS_MS) {
-    band = "at_risk";
-    label = `Due in ${formatDeltaShort(ms)}`;
-  } else if (ms < ONE_DAY_MS) {
-    band = "today";
-    label = `Due in ${formatDeltaShort(ms)}`;
-  } else {
-    band = "comfortable";
-    label = `Due in ${formatDeltaShort(ms)}`;
-  }
-  return { band, deadline, ms_until_deadline: ms, label };
-}
-
-function formatDeltaShort(ms: number): string {
-  const minutes = Math.round(ms / 60_000);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours}h`;
-  const days = Math.round(hours / 24);
-  return `${days}d`;
+  return slaSnapshotFromDeadline(case_.sla_deadline, now);
 }
 
 
