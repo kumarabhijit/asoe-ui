@@ -4,6 +4,7 @@ import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "next-themes";
 import { StatusAnnouncer } from "@/components/ui/StatusAnnouncer";
 import { ToastProvider } from "@/components/ui/Toast";
+import { ViewModeProvider } from "@/hooks/useViewMode";
 import type { ReactNode } from "react";
 
 // StatusAnnouncer mounts at the application root so every route
@@ -19,11 +20,13 @@ import type { ReactNode } from "react";
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-      <SessionProvider>
-        <StatusAnnouncer>
-          <ToastProvider>{children}</ToastProvider>
-        </StatusAnnouncer>
-      </SessionProvider>
+      <ViewModeProvider>
+        <SessionProvider>
+          <StatusAnnouncer>
+            <ToastProvider>{children}</ToastProvider>
+          </StatusAnnouncer>
+        </SessionProvider>
+      </ViewModeProvider>
     </ThemeProvider>
   );
 }

@@ -22,6 +22,8 @@ import { ReviewQualityPanel } from "@/components/ui/ReviewQualityPanel";
 import { NavBar } from "@/components/ui/NavBar";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { ViewModeToggle } from "@/components/ui/ViewModeToggle";
+import { ViewModeProvider } from "@/hooks/useViewMode";
 import { ActionButtonMatrix } from "@/components/ui/ActionButtonMatrix";
 import { ComplianceHitCountChip } from "@/components/ui/ComplianceHitCountChip";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
@@ -240,6 +242,18 @@ describe("a11y sweep: Toast (in provider)", () => {
 describe("a11y sweep: ThemeToggle", () => {
   it("closed", async () =>
     expectNoViolations(withTheme(<ThemeToggle />)));
+});
+
+// ---------------------------------------------------------------------------
+// ViewModeToggle — Legacy/Modern dropdown control mounted in the chrome.
+// ---------------------------------------------------------------------------
+describe("a11y sweep: ViewModeToggle", () => {
+  it("closed", async () =>
+    expectNoViolations(
+      <ViewModeProvider>
+        <ViewModeToggle />
+      </ViewModeProvider>,
+    ));
 });
 
 // ---------------------------------------------------------------------------

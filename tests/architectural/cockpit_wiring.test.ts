@@ -1,12 +1,15 @@
 /**
  * Deliverable lock (Pattern A) — cockpit redesign wiring (cockpit-refactor).
  *
- * The cockpit is an OPT-IN presentational recomposition gated by
- * `cockpitEnabled()` (NEXT_PUBLIC_COCKPIT). These source-greps assert the
- * wiring is actually present (a behavioural test can't catch "the feature
- * was supposed to ship but wasn't built") AND that it stays flag-gated, so
- * the classic layout — and every lock/e2e pinning it — is untouched when
- * the flag is off. Removing any wiring below must fail the build.
+ * The cockpit is an OPT-IN presentational recomposition selected in-UI
+ * via the Legacy/Modern view toggle (`useViewMode`). `cockpitEnabled()`
+ * (NEXT_PUBLIC_COCKPIT) survives only as the *default seed* inside the
+ * provider — Legacy is the default, so the classic layout and every
+ * lock/e2e pinning it is untouched until an operator opts into Modern.
+ * These source-greps assert the wiring is actually present (a
+ * behavioural test can't catch "the feature was supposed to ship but
+ * wasn't built") AND that the mode is read reactively, never inlined as
+ * a module const again. Removing any wiring below must fail the build.
  */
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -16,7 +19,7 @@ const ROOT = join(__dirname, "..", "..");
 const SRC = join(ROOT, "src");
 const read = (rel: string) => readFileSync(join(SRC, rel), "utf-8");
 
-describe("cockpit flag", () => {
+describe("cockpit flag (env default seed)", () => {
   it("flags.ts exports an opt-in cockpitEnabled() (default off)", () => {
     const src = read("lib/flags.ts");
     expect(src).toContain("export function cockpitEnabled()");
@@ -25,16 +28,56 @@ describe("cockpit flag", () => {
   });
 });
 
-describe("confidence ring is flag-gated on the recommendation", () => {
+describe("in-UI Legacy/Modern view toggle", () => {
+  it("useViewMode seeds from the env flag but defaults to Legacy and persists", () => {
+    const hook = read("hooks/useViewMode.tsx");
+    expect(hook).toContain("export function ViewModeProvider");
+    expect(hook).toContain("export function useViewMode()");
+    // Env is the default *seed* only; absent it, Legacy wins.
+    expect(hook).toContain("cockpitEnabled");
+    expect(hook).toMatch(/cockpitEnabled\(\) \? "modern" : "legacy"/);
+    // Per-user choice persists in localStorage (survives reloads).
+    expect(hook).toContain("localStorage");
+    // Hydration-safe: render the env default until mounted.
+    expect(hook).toContain("mounted");
+  });
+
+  it("ViewModeToggle is a NavBar control wired to useViewMode", () => {
+    const toggle = read("components/ui/ViewModeToggle.tsx");
+    expect(toggle).toContain("useViewMode");
+    expect(toggle).toContain("setMode");
+    // Two explicit, governed options (icon + label, a11y radio).
+    expect(toggle).toContain('"legacy"');
+    expect(toggle).toContain('"modern"');
+    expect(toggle).toContain('role="menuitemradio"');
+
+    const nav = read("components/ui/NavBar.tsx");
+    expect(nav).toContain("import { ViewModeToggle }");
+    expect(nav).toContain("<ViewModeToggle />");
+  });
+
+  it("the provider wraps the app so the toggle and pages share one context", () => {
+    const providers = read("app/providers.tsx");
+    expect(providers).toContain("ViewModeProvider");
+    expect(providers).toMatch(/<ViewModeProvider>[\s\S]*<\/ViewModeProvider>/);
+  });
+});
+
+describe("confidence ring is gated on the recommendation by view mode", () => {
   const panel = read("app/exceptions/ExceptionDetailPanel.tsx");
-  it("passes the ring variant only when the cockpit flag is on", () => {
-    expect(panel).toContain("cockpitEnabled");
+  it("passes the ring variant only in the Modern view, read reactively", () => {
+    // The mode is selected in-UI and read via the hook so flipping the
+    // toggle re-renders the ring with no reload. The old module-const
+    // `cockpitEnabled()` read must be gone from the panel.
+    expect(panel).toContain("useViewMode");
+    expect(panel).toMatch(/const COCKPIT = useViewMode\(\)\.mode === "modern";/);
+    expect(panel).not.toContain("cockpitEnabled");
     expect(panel).toMatch(/confidenceVariant=\{COCKPIT \? "ring" : "bar"\}/);
   });
 
-  it("gives the situation a hero treatment only under the cockpit flag", () => {
+  it("gives the situation a hero treatment only in the Modern view", () => {
     // Same governed situation_headline; the classic compact subhead is
-    // preserved for flag-off, so no lock on the classic markup breaks.
+    // preserved for Legacy, so no lock on the classic markup breaks.
     expect(panel).toMatch(/COCKPIT \? \(/);
     expect(panel).toContain("situation_headline");
     expect(panel).toContain("text-subhead font-semibold text-text-primary m-0");
@@ -51,11 +94,12 @@ describe("AgentActivityRail tenant", () => {
     expect(rail).toContain("if (!hasContent) return null;");
   });
 
-  it("is mounted in the /cases rail strictly behind the cockpit flag", () => {
+  it("is mounted in the /cases rail strictly in the Modern view", () => {
     const page = read("app/cases/page.tsx");
     expect(page).toContain("import { AgentActivityRail }");
-    expect(page).toContain("const COCKPIT = cockpitEnabled();");
-    // Gated render — the rail must not appear when the flag is off.
+    expect(page).toContain('const COCKPIT = useViewMode().mode === "modern";');
+    expect(page).not.toContain("cockpitEnabled");
+    // Gated render — the rail must not appear in the Legacy view.
     expect(page).toMatch(/COCKPIT && \(\s*<AgentActivityRail/);
   });
 });

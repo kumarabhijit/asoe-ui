@@ -16,6 +16,7 @@ import {
   DropdownMenuLabel,
 } from "./DropdownMenu";
 import { ThemeToggle } from "./ThemeToggle";
+import { ViewModeToggle } from "./ViewModeToggle";
 import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -113,6 +114,8 @@ export function NavBar({
             {agentCount} Agent{agentCount !== 1 ? "s" : ""} Live
           </Badge>
         )}
+
+        <ViewModeToggle />
 
         <ThemeToggle />
 

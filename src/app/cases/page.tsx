@@ -63,7 +63,8 @@ import { ComplianceHitsRail } from "./ComplianceHitsRail";
 import { RecordPreviewRail } from "./RecordPreviewRail";
 import { NAV_TABS } from "@/config/nav-tabs";
 import { useRowDensity, type RowDensity } from "@/hooks/useRowDensity";
-import { casesRowV2Enabled, cockpitEnabled } from "@/lib/flags";
+import { casesRowV2Enabled } from "@/lib/flags";
+import { useViewMode } from "@/hooks/useViewMode";
 import { AgentActivityRail } from "./AgentActivityRail";
 import { HotkeyCheatsheet } from "@/components/ui/HotkeyCheatsheet";
 
@@ -73,10 +74,6 @@ import { HotkeyCheatsheet } from "@/components/ui/HotkeyCheatsheet";
 // flip ON so gate reviewers see the V2 surface. Resolved at
 // module load so the value is stable across renders.
 const CASES_ROW_V2 = casesRowV2Enabled();
-// Cockpit redesign (cockpit-refactor) — adds the Agent Activity rail
-// tenant to the xl column. OFF by default, so the grid/aside logic and
-// its e2e locks are unchanged unless NEXT_PUBLIC_COCKPIT=1.
-const COCKPIT = cockpitEnabled();
 
 
 /* ── Visual mappings (vendor-neutral; per-source / per-status badge style) ── */
@@ -232,6 +229,13 @@ function CasesWorkspace() {
   const search = useSearchParams();
   const selectedCaseId = search?.get("case") ?? undefined;
   const selectedRecordId = search?.get("record") ?? undefined;
+
+  // Cockpit redesign — adds the Agent Activity rail tenant to the xl
+  // column when the operator selects the Modern view (default Legacy;
+  // env NEXT_PUBLIC_COCKPIT seeds the default). The grid/aside logic
+  // and its e2e locks are unchanged in Legacy. Read reactively so the
+  // toggle recomposes the rail live.
+  const COCKPIT = useViewMode().mode === "modern";
 
   const [filters, setFilters] = useState<CasesFilters>({
     origin: null,
