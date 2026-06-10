@@ -168,6 +168,14 @@ describe("AttachmentPreview", () => {
     const overlay = await screen.findByTestId("spatial-overlay");
     expect(overlay.style.background).toContain("var(--color-highlight-evidence)");
     expect(overlay.style.background).not.toContain("brand-subtle");
+    // Highlighter semantics: the overlay must MULTIPLY with the canvas rather
+    // than paint over it, so text stays legible at any scale/DPI. On a
+    // downscaled mobile canvas the box gets short and the fixed-width border
+    // would otherwise close over the text — multiply keeps dark glyphs visible.
+    expect(overlay.style.mixBlendMode).toBe("multiply");
+    // The blend is scoped to the canvas layer (no bleed into page content).
+    const layer = screen.getByTestId("pdf-canvas-layer");
+    expect(layer.style.isolation).toBe("isolate");
   });
 
   it("keeps evidence LOCATED when the canvas paint fails (extraction is decoupled)", async () => {
