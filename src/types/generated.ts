@@ -556,6 +556,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exceptions/control-tower": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Control Tower */
+        get: operations["control_tower_api_v1_exceptions_control_tower_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exceptions/duplicates/{exception_id}": {
         parameters: {
             query?: never;
@@ -1019,6 +1036,21 @@ export interface components {
             /** Risk Acknowledgment */
             risk_acknowledgment: boolean;
         };
+        /** AgentDomainActivity */
+        AgentDomainActivity: {
+            /** Domain */
+            domain: string;
+            /**
+             * Resolved Today
+             * @default 0
+             */
+            resolved_today: number;
+            /**
+             * Resolving Now
+             * @default 0
+             */
+            resolving_now: number;
+        };
         /**
          * AlternateDeliveryOption
          * @description One ranked alternate delivery option from
@@ -1109,6 +1141,7 @@ export interface components {
             order_entry_extraction?: components["schemas"]["OrderEntryExtraction"] | null;
             overmax_analysis?: components["schemas"]["OverMaxAnalysisData"] | null;
             pallet_analysis?: components["schemas"]["PalletAnalysisData"] | null;
+            precedents?: components["schemas"]["PrecedentsAnalysis"] | null;
             presentation?: components["schemas"]["PresentationContract"] | null;
             price_analysis?: components["schemas"]["PriceAnalysisData"] | null;
             price_hold_analysis?: components["schemas"]["PriceHoldAnalysisData"] | null;
@@ -1700,6 +1733,36 @@ export interface components {
              */
             warning_count: number;
         };
+        /** ControlTowerKpis */
+        ControlTowerKpis: {
+            /** Auto Resolved Pct */
+            auto_resolved_pct?: number | null;
+            /** Avg Resolution Time Seconds */
+            avg_resolution_time_seconds?: number | null;
+            dollar_at_risk?: components["schemas"]["DollarAmount"] | null;
+            /**
+             * Open Needs Human
+             * @default 0
+             */
+            open_needs_human: number;
+        };
+        /**
+         * ControlTowerResponse
+         * @description GET /api/v1/exceptions/control-tower
+         */
+        ControlTowerResponse: {
+            /** Agent Activity */
+            agent_activity?: components["schemas"]["AgentDomainActivity"][];
+            /** Generated At */
+            generated_at: string;
+            kpis?: components["schemas"]["ControlTowerKpis"];
+            /** Mix By Intent */
+            mix_by_intent?: components["schemas"]["IntentDollarMix"][];
+            /** Sla Risk */
+            sla_risk?: components["schemas"]["SlaRiskRow"][];
+            /** Throughput */
+            throughput?: components["schemas"]["ThroughputBucket"][];
+        };
         /**
          * CosignRequest
          * @description POST /api/v1/exceptions/{id}/override/cosign — second-reviewer decision
@@ -1797,6 +1860,18 @@ export interface components {
             reply?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * DollarAmount
+         * @description Integer cents + ISO 4217 currency (mirrors CaseSummary's
+         *     DollarImpact wire shape — no float drift, no currency-less
+         *     partial-truth amounts).
+         */
+        DollarAmount: {
+            /** Amount Cents */
+            amount_cents: number;
+            /** Currency */
+            currency: string;
         };
         /**
          * DraftReply
@@ -2756,6 +2831,12 @@ export interface components {
             /** Qty */
             qty: number;
         };
+        /** IntentDollarMix */
+        IntentDollarMix: {
+            dollar_at_risk: components["schemas"]["DollarAmount"];
+            /** Intent */
+            intent: string;
+        };
         /**
          * KnowledgeGraphEdge
          * @description A directed relationship between two `KnowledgeGraphNode` ids (ADR-042
@@ -3368,6 +3449,56 @@ export interface components {
             value: unknown;
         };
         /**
+         * PrecedentCase
+         * @description One 'Similar past case' row (sign-off 2026-06-10).
+         *
+         *     A pure projection of an already-resolved record the operator can
+         *     consult as precedent. Advisory retrieval ONLY: no recipe, shadow,
+         *     or routing decision ever reads precedents — they are Layer-2
+         *     evidence for the human (presentation_tier: evidence).
+         */
+        PrecedentCase: {
+            /** Case Id */
+            case_id?: string | null;
+            /** Customer Name */
+            customer_name?: string | null;
+            /** Embedding Model */
+            embedding_model?: string | null;
+            /** Intent */
+            intent?: string | null;
+            /**
+             * Match Basis
+             * @enum {string}
+             */
+            match_basis: "semantic" | "correlate";
+            /** Outcome */
+            outcome?: string | null;
+            /** Outcome Summary */
+            outcome_summary?: string | null;
+            /** Record Id */
+            record_id: string;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /** Similarity */
+            similarity?: number | null;
+        };
+        /**
+         * PrecedentsAnalysis
+         * @description `AnalysisResponse.precedents` — the 'Similar past cases' card.
+         *
+         *     Assembled ONLY by the analysis composition path (Verdict
+         *     2026-04-22); the UI is a dumb projector. None on the response when
+         *     no precedent exists (structural omission, never an empty shell).
+         */
+        PrecedentsAnalysis: {
+            /** Generated At */
+            generated_at: string;
+            /** Items */
+            items?: components["schemas"]["PrecedentCase"][];
+            /** Query Basis */
+            query_basis: string;
+        };
+        /**
          * PresentationAudit
          * @description Engine internals — `presentation_tier: audit` (council 2026-06-07).
          *
@@ -3905,6 +4036,18 @@ export interface components {
             /** Sla Due At */
             sla_due_at?: string | null;
         };
+        /** SlaRiskRow */
+        SlaRiskRow: {
+            /** Case Id */
+            case_id: string;
+            /** Customer Name */
+            customer_name?: string | null;
+            dollar_impact?: components["schemas"]["DollarAmount"] | null;
+            /** Intent */
+            intent?: string | null;
+            /** Sla Due At */
+            sla_due_at: string;
+        };
         /**
          * StatsResponse
          * @description GET /api/v1/exceptions/stats — dashboard metrics.
@@ -4057,6 +4200,21 @@ export interface components {
         TenantResetRequest: {
             /** Tenant Id */
             tenant_id?: string | null;
+        };
+        /** ThroughputBucket */
+        ThroughputBucket: {
+            /**
+             * By Agents
+             * @default 0
+             */
+            by_agents: number;
+            /**
+             * By Humans
+             * @default 0
+             */
+            by_humans: number;
+            /** Hour Start */
+            hour_start: string;
         };
         /**
          * TraceResponse
@@ -5201,6 +5359,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExceptionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    control_tower_api_v1_exceptions_control_tower_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ControlTowerResponse"];
                 };
             };
             /** @description Validation Error */

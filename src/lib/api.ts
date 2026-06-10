@@ -22,6 +22,7 @@ import type {
   ChallengeRequest,
   ReanalyzeRequest,
   AdminReleaseRequest,
+  ControlTowerResponse,
   StatsResponse,
   TraceResponse,
   WorkflowRequest,
@@ -41,6 +42,7 @@ import type {
   LifecycleState,
   LineItem,
   OrderAnalysis,
+  PrecedentsAnalysis,
   PresentationContract,
   ReanalysisEntry,
 } from "@/types/exceptions";
@@ -2173,6 +2175,25 @@ export const exceptionsApi = {
     };
   },
 
+  /**
+   * Control Tower payload (dashboard redesign, sign-off 2026-06-10).
+   * Real mode: GET /api/v1/exceptions/control-tower — composed entirely
+   * backend-side (Guardrail #6), dollar fields RBAC-stripped server-side.
+   * Mock mode: mirrors the backend composer over the mock case
+   * summaries where the fixtures support it (KPIs, $ mix, SLA risk);
+   * the per-hour throughput series is deterministic sample data (mock
+   * fixtures carry historical timestamps, so an honest roll-up would
+   * render an empty chart — same demo-fidelity posture as
+   * MOCK_ORDER_ANALYSES).
+   */
+  async controlTower(): Promise<ControlTowerResponse> {
+    if (USE_REAL_API) {
+      return http<ControlTowerResponse>("/api/v1/exceptions/control-tower");
+    }
+    await delay(MOCK_DELAY);
+    return mockControlTower();
+  },
+
   async lineItems(id: string): Promise<LineItem[]> {
     if (USE_REAL_API) {
       // Real backend: GET /api/v1/exceptions/{id}/line-items returns
@@ -2242,7 +2263,15 @@ export const exceptionsApi = {
     // real backend ships `presentation` on the AnalysisResponse; mock
     // mode derives the SAME deterministic projection from the record's
     // intent + recipe so the cockpit behaves identically in preview.
-    return { ...base, presentation: mockPresentation(id) };
+    return {
+      ...base,
+      presentation: mockPresentation(id),
+      // Mock-mode stand-in for `api.precedents_composer`. Mirrors the
+      // CORRELATE fallback exactly (the semantic path needs a live
+      // embedding provider): same intent + same account first, then
+      // same intent, recency-ranked, max 3, no fabricated similarity.
+      precedents: mockPrecedents(id),
+    };
   },
 
   /**
@@ -2629,6 +2658,182 @@ function mockPresentation(id: string): PresentationContract {
         : null,
       lifecycle_state: exc?.lifecycle_state ?? null,
     },
+  };
+}
+
+// Mock-mode backend stand-in for `api.precedents_composer` — mirrors the
+// deterministic CORRELATE fallback (the semantic path requires a live
+// embedding provider, so preview never fabricates similarity scores):
+// resolved/closed records sharing the query's intent, same account
+// first, recency-ranked, capped at 3.
+function mockPrecedents(id: string): PrecedentsAnalysis | null {
+  const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
+  if (!exc?.intent) return null;
+  const TERMINAL = ["RESOLVED", "CLOSED"];
+  const pool = MOCK_EXCEPTIONS.filter(
+    (e) =>
+      e.id !== id &&
+      e.intent === exc.intent &&
+      TERMINAL.includes(e.lifecycle_state),
+  );
+  const byRecency = (a: ExceptionSummary, b: ExceptionSummary) =>
+    (b.updated_at ?? "").localeCompare(a.updated_at ?? "") ||
+    a.id.localeCompare(b.id);
+  const sameAccount = pool
+    .filter((e) => !!exc.account_id && e.account_id === exc.account_id)
+    .sort(byRecency);
+  const others = pool
+    .filter((e) => !sameAccount.includes(e))
+    .sort(byRecency);
+  const items = [...sameAccount, ...others].slice(0, 3).map((e) => ({
+    record_id: e.id,
+    case_id: e.parent_case_id ?? null,
+    customer_name: e.account_name ?? null,
+    intent: e.intent ?? null,
+    resolved_at: e.updated_at ?? null,
+    outcome: e.final_status ?? null,
+    outcome_summary: null,
+    similarity: null,
+    match_basis: "correlate" as const,
+    embedding_model: null,
+  }));
+  if (items.length === 0) return null;
+  return {
+    items,
+    query_basis: `intent=${exc.intent}${exc.account_name ? ` | customer=${exc.account_name}` : ""}`,
+    generated_at: new Date().toISOString(),
+  };
+}
+
+// Mock-mode backend stand-in for `api.control_tower_composer`. Mirrors
+// the backend roll-ups over the mock case summaries where the fixtures
+// support them (KPIs / $ mix / SLA risk: attention-driven membership,
+// single-currency sums, deadline sort incl. breached). The throughput
+// series and the per-domain "today" counts are deterministic SAMPLE data
+// anchored to the current hour — the fixtures carry historical
+// timestamps, so an honest hourly roll-up would always render an empty
+// chart (same demo-fidelity posture as MOCK_ORDER_ANALYSES).
+function mockControlTower(): ControlTowerResponse {
+  const now = new Date();
+  const cases = deriveMockCases();
+  const summaries = deriveMockCaseSummaries();
+  const needsHuman = cases.filter(
+    (c) => mockAttentionState(c.status) === "NEEDS_HUMAN",
+  );
+
+  // KPIs — mirrors `_kpis`: agent-finished share + needs-human $ sum.
+  const terminal = MOCK_EXCEPTIONS.filter((e) =>
+    ["RESOLVED", "CLOSED"].includes(e.lifecycle_state),
+  );
+  const atRiskCents = needsHuman.reduce((sum, c) => {
+    const impact = summaries.get(c.case_id)?.dollar_impact;
+    return impact ? sum + impact.amount_cents : sum;
+  }, 0);
+
+  // Deterministic sample series (newest bucket = current hour).
+  const AGENT_SERIES = [9, 12, 16, 14, 21, 17, 20, 13];
+  const HUMAN_SERIES = [2, 2, 3, 2, 3, 3, 3, 2];
+  const hourStart = new Date(now);
+  hourStart.setUTCMinutes(0, 0, 0);
+  const throughput = AGENT_SERIES.map((agents, i) => {
+    const start = new Date(
+      hourStart.getTime() - (AGENT_SERIES.length - 1 - i) * 3_600_000,
+    );
+    return {
+      hour_start: start.toISOString(),
+      by_agents: agents,
+      by_humans: HUMAN_SERIES[i],
+    };
+  });
+
+  // $ mix by intent — mirrors `_mix_by_intent` over needs-human cases.
+  const mixCents = new Map<string, number>();
+  for (const c of needsHuman) {
+    const s = summaries.get(c.case_id);
+    if (!s?.intent || !s.dollar_impact) continue;
+    mixCents.set(
+      s.intent,
+      (mixCents.get(s.intent) ?? 0) + s.dollar_impact.amount_cents,
+    );
+  }
+  const mix_by_intent = Array.from(mixCents.entries())
+    .map(([intent, cents]) => ({
+      intent,
+      dollar_at_risk: { amount_cents: cents, currency: "USD" },
+    }))
+    .sort(
+      (a, b) =>
+        b.dollar_at_risk.amount_cents - a.dollar_at_risk.amount_cents ||
+        a.intent.localeCompare(b.intent),
+    );
+
+  // Per-domain activity — domains from the record taxonomy; the counts
+  // are sample data (see banner comment).
+  const domains = new Map<string, { working: number; today: number }>();
+  for (const e of MOCK_EXCEPTIONS) {
+    const domain =
+      e.supergroup_code ??
+      (e.intent ? MOCK_SUPERGROUP_BY_INTENT_CODE[`INT_${e.intent}`] : null);
+    if (!domain) continue;
+    const row = domains.get(domain) ?? { working: 0, today: 0 };
+    if (["INGESTED", "CLASSIFYING", "AUDITING"].includes(e.lifecycle_state)) {
+      row.working += 1;
+    } else if (["RESOLVED", "CLOSED"].includes(e.lifecycle_state)) {
+      row.today += 1;
+    }
+    domains.set(domain, row);
+  }
+  const agent_activity = Array.from(domains.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([domain, row]) => ({
+      domain,
+      resolving_now: row.working,
+      resolved_today: row.today,
+    }));
+
+  // SLA risk — mirrors `_sla_risk`: needs-human, parseable deadline,
+  // within +8h (breached included, most urgent first), capped at 8.
+  const horizon = now.getTime() + 8 * 3_600_000;
+  const sla_risk = needsHuman
+    .filter((c) => {
+      const t = c.sla_due_at ? Date.parse(c.sla_due_at) : NaN;
+      return Number.isFinite(t) && t <= horizon;
+    })
+    .sort(
+      (a, b) =>
+        Date.parse(a.sla_due_at!) - Date.parse(b.sla_due_at!) ||
+        a.case_id.localeCompare(b.case_id),
+    )
+    .slice(0, 8)
+    .map((c) => {
+      const s = summaries.get(c.case_id);
+      return {
+        case_id: c.case_id,
+        customer_name: s?.customer_name ?? null,
+        intent: s?.intent ?? null,
+        sla_due_at: c.sla_due_at!,
+        dollar_impact: s?.dollar_impact ?? null,
+      };
+    });
+
+  return {
+    kpis: {
+      auto_resolved_pct:
+        MOCK_EXCEPTIONS.length > 0
+          ? Math.round((terminal.length / MOCK_EXCEPTIONS.length) * 1000) / 10
+          : null,
+      open_needs_human: needsHuman.length,
+      avg_resolution_time_seconds: 186,
+      dollar_at_risk:
+        atRiskCents > 0
+          ? { amount_cents: atRiskCents, currency: "USD" }
+          : null,
+    },
+    throughput,
+    mix_by_intent,
+    agent_activity,
+    sla_risk,
+    generated_at: now.toISOString(),
   };
 }
 

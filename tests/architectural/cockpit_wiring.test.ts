@@ -339,3 +339,101 @@ describe("Situation hero sub-line (audit finding #2, option C — sign-off 2026-
     expect(api).toMatch(/lifecycle_state: exc\?\.lifecycle_state \?\? null/);
   });
 });
+
+describe("'Similar past cases' precedents card (sign-off 2026-06-10)", () => {
+  const section = read("app/exceptions/PrecedentsSection.tsx");
+  const panel = read("app/exceptions/ExceptionDetailPanel.tsx");
+
+  it("PrecedentsSection is a dumb projector of analysis.precedents", () => {
+    expect(section).toContain("PrecedentsAnalysis");
+    // Honesty: similarity renders only on semantic rows; correlate rows
+    // state their deterministic basis — never a fabricated percentage.
+    expect(section).toContain('item.match_basis === "semantic"');
+    // Governed humanizer for the raw outcome token.
+    expect(section).toContain("humanizeEnumLabel(item.outcome)");
+    // No UI similarity logic / fetch / fallback chains (Guardrail #6).
+    expect(section).not.toContain("fetch(");
+    expect(section).not.toMatch(/cosine|embedd?ing\(/i);
+    expect(section).not.toContain('"—"');
+    expect(section).not.toContain('"N/A"');
+  });
+
+  it("mounts Modern-gated so Legacy stays byte-unchanged (additive)", () => {
+    expect(panel).toContain("import { PrecedentsSection }");
+    expect(panel).toMatch(/COCKPIT && analysis\.precedents/);
+  });
+
+  it("mirrors the backend precedents contract (Guardrail #3)", () => {
+    const types = read("types/exceptions.ts");
+    expect(types).toContain("export interface PrecedentCase");
+    expect(types).toContain("export interface PrecedentsAnalysis");
+    expect(types).toMatch(/match_basis: "semantic" \| "correlate";/);
+    expect(types).toMatch(/precedents\?: PrecedentsAnalysis \| null;/);
+  });
+
+  it("the mock mirrors the deterministic correlate fallback only", () => {
+    // The semantic path needs a live embedding provider, so preview
+    // must NEVER fabricate similarity scores.
+    const api = read("lib/api.ts");
+    expect(api).toContain("function mockPrecedents(");
+    expect(api).toMatch(/match_basis: "correlate" as const/);
+    expect(api).toMatch(/similarity: null/);
+  });
+});
+
+describe("Control Tower /dashboard (sign-off 2026-06-10)", () => {
+  const tower = read("app/dashboard/ControlTower.tsx");
+  const page = read("app/dashboard/page.tsx");
+
+  it("the page gates Modern on useViewMode and keeps the Legacy markup", () => {
+    expect(page).toContain('const COCKPIT = useViewMode().mode === "modern";');
+    expect(page).toMatch(/if \(COCKPIT\) \{/);
+    expect(page).toContain("<ControlTower />");
+    // Legacy Performance page still ships, untouched, on the other path.
+    expect(page).toContain("Resolution analytics and agent performance metrics");
+    expect(page).toContain("Recent Activity");
+  });
+
+  it("ControlTower is a dumb projector of the backend-composed payload", () => {
+    // Single API client (no raw fetch), governed labels for raw tokens,
+    // live SLA labels from timestamps via the shared banding rule.
+    expect(tower).toContain("exceptionsApi.controlTower()");
+    // \b so the component's own `refetch()` wrapper doesn't false-match.
+    expect(tower).not.toMatch(/\bfetch\(/);
+    expect(tower).toContain("supergroupLabel(health, a.domain)");
+    expect(tower).toContain("intentLabelFor(");
+    expect(tower).toContain("slaSnapshotFromDeadline(row.sla_due_at, now)");
+    // Money renders through the cents formatter — never hand-rolled math
+    // beyond presentation scaling.
+    expect(tower).toContain("formatCurrency(");
+  });
+
+  it("stays live (Guardrail #4): WS-driven silent refresh, no manual reload", () => {
+    expect(tower).toContain("useWebSocket({");
+    expect(tower).toContain("isCaseInvalidationEvent");
+    expect(tower).toContain("onReconnect: silentRefetch");
+  });
+
+  it("mirrors the backend ControlTowerResponse contract (Guardrail #3)", () => {
+    const types = read("types/api.ts");
+    for (const t of [
+      "export interface ControlTowerResponse",
+      "export interface ControlTowerKpis",
+      "export interface ThroughputBucket",
+      "export interface IntentDollarMix",
+      "export interface AgentDomainActivity",
+      "export interface SlaRiskRow",
+    ]) {
+      expect(types.includes(t), `types/api.ts must carry ${t}`).toBe(true);
+    }
+  });
+
+  it("the mock control tower mirrors the backend roll-up rules", () => {
+    const api = read("lib/api.ts");
+    expect(api).toContain("function mockControlTower(");
+    // Attention-driven membership + the sample-data banner for the
+    // synthesized series (demo fidelity, honestly labelled).
+    expect(api).toMatch(/mockAttentionState\(c\.status\) === "NEEDS_HUMAN"/);
+    expect(api).toContain("deterministic SAMPLE data");
+  });
+});

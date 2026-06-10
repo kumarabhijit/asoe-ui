@@ -99,6 +99,51 @@ test.describe("cockpit (flag on) — /cases", () => {
     expect(gating, JSON.stringify(gating, null, 2)).toEqual([]);
   });
 
+  test("the 'Similar Past Cases' card projects a correlate precedent (sign-off 2026-06-10)", async ({ page }) => {
+    await openCockpitRecord(page);
+    // exc-002 (DUPLICATE_PO) has exactly one terminal same-intent mock
+    // sibling: exc-009 (Walmart, RESOLVED). The card lives in the
+    // Evidence tier; expand its disclosure to project the row.
+    const card = page.getByRole("button", { name: /similar past cases/i }).first();
+    await expect(card).toBeVisible({ timeout: 20_000 });
+    await card.click();
+    const precedentRow = page
+      .locator("li")
+      .filter({ has: page.getByRole("link", { name: /walmart/i }) })
+      .first();
+    await expect(precedentRow).toBeVisible({ timeout: 20_000 });
+    // Correlate provenance: the deterministic basis, never a fabricated
+    // similarity percentage (mock mode has no embedding provider). The
+    // no-percentage check is scoped to the precedent ROW — other
+    // evidence sections legitimately render their own match scores.
+    await expect(precedentRow.getByText("same issue")).toBeVisible();
+    await expect(precedentRow.getByText(/% match/)).toHaveCount(0);
+  });
+
+  test("the Modern /dashboard is the Control Tower (sign-off 2026-06-10)", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await loginAs(page, USERS.MANAGER);
+    await page.goto("/dashboard");
+    await expect(
+      page.getByRole("heading", { name: "Control Tower" }),
+    ).toBeVisible({ timeout: 30_000 });
+    // The decision queue: SLA risk rows deep-link to /cases with money.
+    await expect(page.getByText(/SLA risk — next 8 hours/)).toBeVisible({ timeout: 20_000 });
+    const caseLink = page.locator('a[href^="/cases/"]').first();
+    await expect(caseLink).toBeVisible();
+    // Agent-first framing: the live roster with explicit state text
+    // (mock fixtures carry no in-flight pipeline records, so every
+    // domain reads "idle" with its resolved-today count — dot + text,
+    // never color alone).
+    await expect(page.getByText("Agent activity")).toBeVisible();
+    await expect(page.getByText(/^(working|idle)$/).first()).toBeVisible();
+    await expect(page.getByText(/resolved today/).first()).toBeVisible();
+    // The Legacy Performance chrome must NOT render in Modern.
+    await expect(
+      page.getByText("Resolution analytics and agent performance metrics"),
+    ).toHaveCount(0);
+  });
+
   test("the Situation sub-line carries SLA + state; the ribbon badge relocates (option C)", async ({ page }) => {
     await openCockpitRecord(page);
     // exc-002 is PENDING_REVIEW with a mock parent-case SLA seeded at

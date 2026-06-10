@@ -37,6 +37,8 @@ import type { StatsResponse } from "@/types/api";
 
 import Link from "next/link";
 import { NAV_TABS } from "@/config/nav-tabs";
+import { useViewMode } from "@/hooks/useViewMode";
+import { ControlTower } from "./ControlTower";
 
 // preview-only: there is no recent-activity endpoint in the API client yet.
 // Rendered behind `isMockDataMode()` + a SampleDataTag so it is never read as
@@ -57,6 +59,9 @@ export default function DashboardPage() {
   const { user, visibleTabs } = useAuth();
   const handleSignOut = useSignOut();
   const erp = useErpProfile();
+  // In-UI Legacy/Modern toggle — read reactively so flipping the
+  // toggle swaps the surface with no reload (same pattern as /cases).
+  const COCKPIT = useViewMode().mode === "modern";
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   // Tri-state load handling (mirrors the Settings→Autonomy reference pattern):
@@ -69,7 +74,9 @@ export default function DashboardPage() {
   const userTitle = (user as { title?: string })?.title || "";
   const filteredTabs = visibleTabs.length > 0 ? NAV_TABS.filter((t) => visibleTabs.includes(t.id)) : NAV_TABS;
 
-  useEffect(() => { document.title = "Performance — ASOE"; }, []);
+  useEffect(() => {
+    document.title = COCKPIT ? "Control Tower — ASOE" : "Performance — ASOE";
+  }, [COCKPIT]);
 
   // Initial-load flag so silent live refreshes don't flash a spinner
   // under the operator's cursor. Mirrors the `useCases` pattern that
@@ -115,6 +122,40 @@ export default function DashboardPage() {
   const autoResolvedPct = stats && stats.total_exceptions > 0
     ? Math.round((stats.auto_resolved / stats.total_exceptions) * 100)
     : 0;
+
+  // Modern /dashboard = the Control Tower (sign-off 2026-06-10, study
+  // in design-explorations/control-tower/). Branches AFTER the hooks
+  // (hooks must run unconditionally) and BEFORE the Legacy markup, so
+  // the Legacy Performance page below stays byte-unchanged for
+  // operators who haven't opted into Modern. The stats fetch above is
+  // redundant in this branch (the tower fetches its own composed
+  // payload) — accepted to keep the Legacy path untouched.
+  if (COCKPIT) {
+    return (
+      <div className="min-h-screen bg-surface-page font-sans">
+        <NavBar
+          tabs={filteredTabs}
+          activeTab="dashboard"
+          userName={userName}
+          userInitials={userInitials}
+          userTitle={userTitle}
+          agentCount={health?.allowed_intents?.length || 0}
+          onSignOut={handleSignOut}
+        />
+        <main id="main-content" className="mx-auto max-w-[1440px] px-32 py-24">
+          <div className="mb-24">
+            <h1 className="m-0 text-title font-bold text-text-primary">
+              Control Tower
+            </h1>
+            <p className="mt-4 mb-0 text-body text-text-tertiary">
+              Order-to-cash exceptions · live
+            </p>
+          </div>
+          <ControlTower />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface-page font-sans">
