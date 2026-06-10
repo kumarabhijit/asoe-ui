@@ -30,6 +30,11 @@ interface EvidenceGridProps {
   /** Anchor id for the "Jump to" bar (#4). When the hash targets it, the
    *  section expands (firing onFirstOpen) and scrolls into view. */
   anchorId?: string;
+  /** Visual chrome (council 2026-06-10, cockpit). `default` = the flat
+   *  subtle-surface child (Legacy). `card` = lift onto a surface-primary
+   *  card (border + subtle shadow) to match the Modern Evidence tier's
+   *  card treatment. Visual only — no behavioural change. */
+  variant?: "default" | "card";
 }
 
 export function EvidenceGrid({
@@ -42,6 +47,7 @@ export function EvidenceGrid({
   totalPo,
   onFirstOpen,
   anchorId,
+  variant = "default",
 }: EvidenceGridProps) {
   const [expanded, setExpanded] = useState(false);
   const rootRef = useRef<HTMLElement>(null);
@@ -62,7 +68,15 @@ export function EvidenceGrid({
     <section
       ref={rootRef}
       id={anchorId}
-      className="scroll-mt-[var(--nav-height)] bg-surface-secondary border border-border-subtle rounded-md overflow-hidden"
+      className={cn(
+        "scroll-mt-[var(--nav-height)] rounded-md overflow-hidden",
+        // Cockpit `card` variant lifts the line-item grid onto its own
+        // surface-primary card so it matches the other Modern Evidence
+        // cards; Legacy keeps the flat subtle-surface child.
+        variant === "card"
+          ? "bg-surface-primary border border-border-default shadow-sm"
+          : "bg-surface-secondary border border-border-subtle",
+      )}
     >
       {/* Toggle header — nested level: this card sits inside the Evidence
           group, so it reads as a child (lighter chrome + smaller heading)
