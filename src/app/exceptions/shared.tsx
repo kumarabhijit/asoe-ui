@@ -180,6 +180,7 @@ export function CollapsibleSection({
   onFirstOpen,
   extraAnchorIds,
   level = "section",
+  variant = "default",
 }: {
   title: string;
   /** Stable anchor id (S1 finding #10 follow-on). When set, the section
@@ -205,6 +206,12 @@ export function CollapsibleSection({
    *  Evidence / Diagnostics tier wrappers; `nested` for the sub-sections
    *  stacked inside them; `section` (default) for standalone disclosures. */
   level?: CollapsibleLevel;
+  /** Visual chrome for a `nested` sub-section (council 2026-06-10, cockpit).
+   *  `default` = the flat subtle-surface child (Legacy). `card` = lift the
+   *  child onto its own surface-primary card (border + subtle shadow) while
+   *  keeping the nested header size — the Modern Evidence/Diagnostics
+   *  treatment. No effect on `group`/`section` levels. */
+  variant?: "default" | "card";
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const firedRef = useRef(false);
@@ -270,8 +277,14 @@ export function CollapsibleSection({
         "scroll-mt-[var(--nav-height)] rounded-md overflow-hidden",
         // Nested sub-sections drop the card chrome (no shadow, subtle surface
         // + hairline) so they read as children of the group, not peers of it.
+        // Cockpit `card` variant (2026-06-10) lifts each nested child onto its
+        // own surface-primary card so the Evidence/Diagnostics tiers read as a
+        // stack of cards rather than a flat list — visual only; placement and
+        // header size are unchanged.
         level === "nested"
-          ? "bg-surface-secondary border border-border-subtle"
+          ? variant === "card"
+            ? "bg-surface-primary border border-border-default shadow-sm"
+            : "bg-surface-secondary border border-border-subtle"
           : "bg-surface-primary shadow-sm",
       )}
     >

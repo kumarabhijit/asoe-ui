@@ -500,10 +500,26 @@ export interface OrderAnalysis {
 
 /** Engine internals — `presentation_tier: audit`. Always emitted
  *  (Guardrail #7), shown only in the Diagnostics & Audit surface.
- *  Mirrors `api/schemas.py::PresentationAudit`. */
+ *  Mirrors `api/schemas.py::PresentationAudit`.
+ *
+ *  The provenance bundle the cockpit "Provenance" card projects
+ *  (council 2026-06-10). Every field is a pure projection of an
+ *  already-decided record field; null when the record has no honest
+ *  value, so the UI omits that row (never a fabricated placeholder). */
 export interface PresentationAudit {
   recipe_name?: string | null;
   intent_code?: string | null;
+  /** Originating event kind (e.g. EDI_850_PRICE_MISMATCH). */
+  event_type?: string | null;
+  /** Compliance Shadow verdict (GREEN | YELLOW | RED) as audit provenance. */
+  shadow_verdict?: string | null;
+  /** Taxonomy classification node (`case_taxonomy.yaml` supergroup). */
+  supergroup_code?: string | null;
+  /** Deployed taxonomy version that classified the record; only present
+   *  alongside a supergroup_code classification. */
+  taxonomy_version?: string | null;
+  /** Pipeline trace / correlation id tying the record to its trace. */
+  correlation_id?: string | null;
 }
 
 /** Deterministic presentation contract the UI projects onto the detail

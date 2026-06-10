@@ -150,3 +150,74 @@ describe("cockpit parity — it ADDS, it never hides (Guardrail #7)", () => {
     }
   });
 });
+
+describe("cockpit Evidence/Diagnostics restructuring (council 2026-06-10)", () => {
+  const panel = read("app/exceptions/ExceptionDetailPanel.tsx");
+
+  it("ProvenanceCard is a dumb projector of presentation.audit", () => {
+    const card = read("components/ui/ProvenanceCard.tsx");
+    // Renders the backend-authoritative bundle as given — no compose, no
+    // fetch, no fallback chains (Guardrail #6).
+    expect(card).toContain("PresentationAudit");
+    expect(card).toContain("EvidenceBlock");
+    expect(card).toContain("audit.correlation_id");
+    expect(card).toContain("audit.event_type");
+    // Null bundle → renders nothing.
+    expect(card).toContain("if (!audit) return null");
+    // No partial-truth placeholders.
+    expect(card).not.toContain('"—"');
+    expect(card).not.toContain('"N/A"');
+  });
+
+  it("mounts the Provenance card in the Diagnostics drawer, Modern only", () => {
+    expect(panel).toContain("import { ProvenanceCard }");
+    // Fed analysis.presentation.audit (no UI compose).
+    expect(panel).toMatch(/<ProvenanceCard audit=\{analysis\?\.presentation\?\.audit\} \/>/);
+  });
+
+  it("keeps Knowledge Graph its own section and demotes raw internals to 'Audit only'", () => {
+    // KG kept as its own node (operator adjustment 2026-06-10) — not folded
+    // into the Audit-only group.
+    expect(panel).toContain("knowledgeGraphNode");
+    // Audit-only sub-group gathers the rawest internals (declutter, #7).
+    expect(panel).toContain('title="Audit only"');
+    expect(panel).toContain("otherAuditSections");
+  });
+
+  it("surfaces the draft-reply L1 cue (not a duplicate) jumping to the draft", () => {
+    // A single status line in L1, gated on a real drafted reply, linking to
+    // the draft that lives LAST in Evidence (review-before-send).
+    expect(panel).toMatch(/COCKPIT && analysis\?\.draft_reply/);
+    expect(panel).toContain('href="#section-draft-reply"');
+  });
+
+  it("applies the Modern card variant to nested tier sections (visual only)", () => {
+    // The cockpit lifts nested children onto cards via the additive
+    // CollapsibleSection `variant` — placement unchanged.
+    expect(panel).toMatch(/variant: "card"/);
+    const shared = read("app/exceptions/shared.tsx");
+    expect(shared).toContain('variant?: "default" | "card"');
+  });
+
+  it("mirrors the backend PresentationAudit provenance fields (Guardrail #3)", () => {
+    const types = read("types/exceptions.ts");
+    for (const field of [
+      "event_type",
+      "shadow_verdict",
+      "supergroup_code",
+      "taxonomy_version",
+      "correlation_id",
+    ]) {
+      expect(types.includes(field), `PresentationAudit must mirror ${field}`).toBe(true);
+    }
+  });
+
+  it("the mock presentation composer mirrors the new provenance fields", () => {
+    // Mock-data layer must not drift from the backend bundle shape.
+    const api = read("lib/api.ts");
+    expect(api).toMatch(/event_type: exc\?\.event_type/);
+    expect(api).toMatch(/shadow_verdict: exc\?\.shadow_verdict/);
+    expect(api).toContain("supergroup_code: exc?.supergroup_code");
+    expect(api).toContain("taxonomy_version");
+  });
+});

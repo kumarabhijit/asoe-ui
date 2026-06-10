@@ -61,6 +61,20 @@ test.describe("cockpit (flag on) — /cases", () => {
     ).toBeVisible({ timeout: 20_000 });
   });
 
+  test("the Diagnostics & Audit drawer surfaces the Provenance card + Audit-only group", async ({ page }) => {
+    await openCockpitRecord(page);
+    // The drawer is collapsed by default (engine internals, never L1).
+    const drawer = page.getByRole("button", { name: /diagnostics & audit/i }).first();
+    await expect(drawer).toBeVisible({ timeout: 20_000 });
+    await drawer.click();
+    // Provenance projects the backend presentation.audit bundle.
+    await expect(
+      page.getByRole("region", { name: /provenance/i }),
+    ).toBeVisible({ timeout: 20_000 });
+    // The rawest internals are demoted to a collapsed "Audit only" sub-group.
+    await expect(page.getByText("Audit only").first()).toBeVisible({ timeout: 20_000 });
+  });
+
   test("the cockpit-new surfaces (ring + activity rail) are axe-clean", async ({ page }) => {
     await openCockpitRecord(page);
     await expect(page.locator('[data-variant="ring"]').first()).toBeVisible({ timeout: 20_000 });

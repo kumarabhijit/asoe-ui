@@ -2556,6 +2556,11 @@ const MOCK_SECTION_TIERS: Record<string, "operator" | "evidence" | "audit"> = {
   knowledge_graph: "audit",
 };
 
+// Mock-mode mirror of asoe2 contracts/_generated/taxonomy_constants
+// TAXONOMY_VERSION — the deployed taxonomy snapshot, emitted as audit
+// provenance alongside a classification (supergroup_code).
+const MOCK_TAXONOMY_VERSION = "2026-05-30-v2";
+
 function mockPresentation(id: string): PresentationContract {
   const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
   const intent = exc?.intent ?? null;
@@ -2568,9 +2573,20 @@ function mockPresentation(id: string): PresentationContract {
       ? INTENT_SUMMARY_TEMPLATES[intent]?.one_liner ?? null
       : null,
     show_intent: !!intent && !MOCK_NON_DISCRIMINATING_INTENTS.has(intent),
+    // Provenance bundle (council 2026-06-10) — mirrors
+    // api/presentation_composer.compose_presentation: pure projection of
+    // already-decided record fields; null when absent so the UI omits the
+    // row (never a fabricated value). ExceptionSummary carries no
+    // trace_id, so correlation_id is null in mock mode (the real backend
+    // projects record.trace_id).
     audit: {
       recipe_name: exc?.selected_recipe ?? null,
       intent_code: intent,
+      event_type: exc?.event_type ?? null,
+      shadow_verdict: exc?.shadow_verdict ?? null,
+      supergroup_code: exc?.supergroup_code ?? null,
+      taxonomy_version: exc?.supergroup_code ? MOCK_TAXONOMY_VERSION : null,
+      correlation_id: null,
     },
   };
 }
