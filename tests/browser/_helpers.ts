@@ -15,6 +15,55 @@ import {
 export const BACKEND_URL = process.env.E2E_BACKEND_URL ?? "http://localhost:8000";
 
 /**
+ * Retry a backend `request.*` call that fails with a TRANSIENT
+ * connection error.
+ *
+ * The live-backend browser-e2e job intermittently flakes with
+ * "socket hang up" (undici ECONNRESET) on seed/reset calls: the
+ * single-worker uvicorn dev server occasionally resets a reused
+ * keep-alive socket mid-request, throwing before any HTTP status is
+ * returned. That is infrastructure noise, NOT a product regression —
+ * a bare re-dial on a fresh connection succeeds.
+ *
+ * Scope is deliberately narrow:
+ *   - Only the seam between Playwright's request client and uvicorn is
+ *     retried (the helper functions below), so a flaky disposition /
+ *     override UI assertion is never silently re-run.
+ *   - Only connection-reset signatures are retried. A thrown error
+ *     that doesn't match (or an HTTP error STATUS, which does not
+ *     throw) propagates immediately — real failures stay loud.
+ *
+ * Exponential backoff: 150 / 300 / 600ms, 4 attempts total.
+ */
+const TRANSIENT_NET_ERROR =
+  /socket hang up|ECONNRESET|ECONNREFUSED|EPIPE|fetch failed|terminated|other side closed|read ECONNRESET/i;
+
+export async function withApiRetry<T>(
+  fn: () => Promise<T>,
+  label: string,
+  attempts = 4,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const msg = String((err as Error)?.message ?? err);
+      if (!TRANSIENT_NET_ERROR.test(msg)) throw err;
+      if (attempt < attempts - 1) {
+        await new Promise((r) => setTimeout(r, 150 * 2 ** attempt));
+      }
+    }
+  }
+  throw new Error(
+    `${label} failed after ${attempts} attempts (transient connection error): ${String(
+      (lastErr as Error)?.message ?? lastErr,
+    )}`,
+  );
+}
+
+/**
  * Drive the UI login wizard for a seed user. Returns nothing — the
  * resulting NextAuth session cookie is attached to the Page's context
  * for subsequent navigation.
@@ -54,9 +103,13 @@ export async function backendToken(
   request: APIRequestContext,
   email: string,
 ): Promise<string> {
-  const res = await request.post(`${BACKEND_URL}/api/auth/login`, {
-    data: { email, password: "any-non-empty-password" },
-  });
+  const res = await withApiRetry(
+    () =>
+      request.post(`${BACKEND_URL}/api/auth/login`, {
+        data: { email, password: "any-non-empty-password" },
+      }),
+    `backendToken(${email})`,
+  );
   if (!res.ok()) throw new Error(`login ${email} failed: ${res.status()}`);
   const body = (await res.json()) as { access_token: string };
   return body.access_token;
@@ -79,9 +132,12 @@ export async function exceptionUrl(
   token: string,
   exceptionId: string,
 ): Promise<string> {
-  const res = await request.get(
-    `${BACKEND_URL}/api/v1/exceptions/${exceptionId}`,
-    { headers: { Authorization: `Bearer ${token}` } },
+  const res = await withApiRetry(
+    () =>
+      request.get(`${BACKEND_URL}/api/v1/exceptions/${exceptionId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    `exceptionUrl(${exceptionId})`,
   );
   if (!res.ok()) {
     throw new Error(
@@ -111,17 +167,18 @@ export async function createPendingReviewException(
   token: string,
   orderId = `PO-E2E-${Date.now()}`,
 ): Promise<string> {
-  const res = await request.post(
-    `${BACKEND_URL}/api/v1/exceptions/resolve/explain`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-      data: {
-        order_id: orderId,
-        po_price: 100.0,
-        sap_base_price: 120.0,
-        event_type: "EDI_850_PRICE_MISMATCH",
-      },
-    },
+  const res = await withApiRetry(
+    () =>
+      request.post(`${BACKEND_URL}/api/v1/exceptions/resolve/explain`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: {
+          order_id: orderId,
+          po_price: 100.0,
+          sap_base_price: 120.0,
+          event_type: "EDI_850_PRICE_MISMATCH",
+        },
+      }),
+    `createPendingReviewException(${orderId})`,
   );
   if (!res.ok()) throw new Error(`create pending: ${res.status()} ${await res.text()}`);
   const body = (await res.json()) as { exception_id: string };
@@ -152,27 +209,28 @@ export async function createYellowException(
   token: string,
   orderId = `PO-E2E-${Date.now()}`,
 ): Promise<string> {
-  const res = await request.post(
-    `${BACKEND_URL}/api/v1/exceptions/resolve`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-      data: {
-        order_id: orderId,
-        line_item: 1,
-        po_price: 10.0,
-        sap_base_price: 10.0,
-        event_type: "BACK_ORDER_OOS",
-        retailer_id: "R-70",
-        line_count: 1,
-        sku: "SKU-BO-1",
-        metadata: {
-          ordered_qty: 100,
-          available_qty: 75,
-          unit_price: 10.0,
-          uom: "CS",
+  const res = await withApiRetry(
+    () =>
+      request.post(`${BACKEND_URL}/api/v1/exceptions/resolve`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: {
+          order_id: orderId,
+          line_item: 1,
+          po_price: 10.0,
+          sap_base_price: 10.0,
+          event_type: "BACK_ORDER_OOS",
+          retailer_id: "R-70",
+          line_count: 1,
+          sku: "SKU-BO-1",
+          metadata: {
+            ordered_qty: 100,
+            available_qty: 75,
+            unit_price: 10.0,
+            uom: "CS",
+          },
         },
-      },
-    },
+      }),
+    `createYellowException(${orderId})`,
   );
   if (!res.ok()) throw new Error(`create yellow: ${res.status()} ${await res.text()}`);
   const body = (await res.json()) as { exception_id: string };
@@ -188,10 +246,14 @@ export async function resetTenant(
   request: APIRequestContext,
   token: string,
 ): Promise<void> {
-  await request.post(`${BACKEND_URL}/api/v1/_sandbox/tenant/reset`, {
-    headers: { Authorization: `Bearer ${token}` },
-    data: {},
-  });
+  await withApiRetry(
+    () =>
+      request.post(`${BACKEND_URL}/api/v1/_sandbox/tenant/reset`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: {},
+      }),
+    "resetTenant",
+  );
 }
 
 /**
