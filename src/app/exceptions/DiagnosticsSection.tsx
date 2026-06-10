@@ -23,10 +23,12 @@
 "use client";
 
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
-import { ClipboardCopy, CheckCircle2, GitBranch, ListOrdered } from "lucide-react";
+import { ClipboardCopy, CheckCircle2, GitBranch, ListOrdered, Route } from "lucide-react";
 import { CollapsibleHeader, useHashOpen } from "./shared";
 import { EventsTimeline } from "@/components/ui/EventsTimeline";
+import { DecisionPathStepper } from "@/components/ui/DecisionPathStepper";
 import { useTopology } from "@/hooks/useTopology";
+import { useViewMode } from "@/hooks/useViewMode";
 import { cn } from "@/lib/utils";
 import type { ExceptionDetail } from "@/types/exceptions";
 import type { ExecutedNode, TraceResponse } from "@/types/api";
@@ -107,7 +109,19 @@ export function DiagnosticsSection({ detail, trace, showPreview, anchorId }: Dia
   // default from ADR-027 Phase E was reverted on operator feedback —
   // the timeline answers "where did this halt and why" in one glance,
   // which is the cognitive load even audit users hit first.
-  const [view, setView] = useState<"timeline" | "dag">("timeline");
+  // Cockpit (Modern view) adds a third "Path" view — the agent's
+  // reasoning as a numbered decision path — and defaults to it, so the
+  // reconstruction reads as a sequence first. Legacy is byte-unchanged:
+  // the Path button never mounts and Timeline stays the default
+  // (cockpit-refactor / council 2026-06-10).
+  const COCKPIT = useViewMode().mode === "modern";
+  const [view, setView] = useState<"timeline" | "dag" | "path">(
+    COCKPIT ? "path" : "timeline",
+  );
+  // Guard a mode flip while the Path view is selected: Path is Modern-only,
+  // so when an operator drops to Legacy it falls back to the Timeline
+  // rather than blanking the pipeline.
+  const effectiveView = view === "path" && !COCKPIT ? "timeline" : view;
   const { topology } = useTopology();
   const history = detail.reanalysis_history ?? [];
 
@@ -197,16 +211,25 @@ export function DiagnosticsSection({ detail, trace, showPreview, anchorId }: Dia
                     role="group"
                     aria-label="Pipeline view mode"
                   >
+                    {/* Path — Modern-only third view; Legacy is unchanged. */}
+                    {COCKPIT && (
+                      <ViewToggleButton
+                        label="Path"
+                        icon={<Route size={11} />}
+                        active={effectiveView === "path"}
+                        onClick={() => setView("path")}
+                      />
+                    )}
                     <ViewToggleButton
                       label="Timeline"
                       icon={<ListOrdered size={11} />}
-                      active={view === "timeline"}
+                      active={effectiveView === "timeline"}
                       onClick={() => setView("timeline")}
                     />
                     <ViewToggleButton
                       label="DAG"
                       icon={<GitBranch size={11} />}
-                      active={view === "dag"}
+                      active={effectiveView === "dag"}
                       onClick={() => setView("dag")}
                     />
                   </div>
@@ -219,13 +242,19 @@ export function DiagnosticsSection({ detail, trace, showPreview, anchorId }: Dia
                   </div>
                 )}
 
-                {view === "timeline" && (
+                {effectiveView === "path" && (
+                  <DecisionPathStepper
+                    executedNodes={selectedAttempt.executedNodes}
+                    finalStatus={selectedAttempt.finalStatus}
+                  />
+                )}
+                {effectiveView === "timeline" && (
                   <EventsTimeline
                     executedNodes={selectedAttempt.executedNodes}
                     finalStatus={selectedAttempt.finalStatus}
                   />
                 )}
-                {view === "dag" && topology && (
+                {effectiveView === "dag" && topology && (
                   <Suspense fallback={
                     <div className="text-caption text-text-tertiary px-12 py-16">
                       Loading DAG view…
@@ -238,7 +267,7 @@ export function DiagnosticsSection({ detail, trace, showPreview, anchorId }: Dia
                     />
                   </Suspense>
                 )}
-                {view === "dag" && !topology && (
+                {effectiveView === "dag" && !topology && (
                   <div className="text-caption text-text-tertiary px-12 py-16">
                     Fetching topology…
                   </div>

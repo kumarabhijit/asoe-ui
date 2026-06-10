@@ -127,6 +127,31 @@ describe("AgentActivityRail tenant", () => {
   });
 });
 
+describe("DecisionPathStepper — Modern 'Path' pipeline view", () => {
+  it("is a self-contained pure projector of executed_nodes (Guardrails #6/#1)", () => {
+    const stepper = read("components/ui/DecisionPathStepper.tsx");
+    // Ordered-list semantics + 1-based numbering are the path affordance.
+    expect(stepper).toContain('aria-label="Decision path"');
+    expect(stepper).toContain("<ol");
+    expect(stepper).toContain("humanizeNodeId");
+    // Status as text, never colour alone (the label travels with the icon).
+    expect(stepper).toMatch(/label: "completed"/);
+    expect(stepper).toMatch(/label: "halted"/);
+  });
+
+  it("is mounted in DiagnosticsSection as a Modern-only third view (Legacy unchanged)", () => {
+    const diag = read("app/exceptions/DiagnosticsSection.tsx");
+    expect(diag).toContain("import { DecisionPathStepper }");
+    expect(diag).toContain('const COCKPIT = useViewMode().mode === "modern";');
+    // Modern defaults to Path; Legacy keeps Timeline (byte-unchanged default).
+    expect(diag).toContain('COCKPIT ? "path" : "timeline"');
+    // The Path toggle button mounts only under the flag.
+    expect(diag).toMatch(/COCKPIT && \(\s*<ViewToggleButton\s+label="Path"/);
+    // A mode flip away from Modern falls back to Timeline, never blanks.
+    expect(diag).toContain('view === "path" && !COCKPIT ? "timeline" : view');
+  });
+});
+
 describe("cockpit flag-on browser e2e deliverable (Phase 4)", () => {
   it("ships a dedicated flag-on config, spec, npm script, and CI workflow", () => {
     // A flag-on journey needs its OWN server (the shared mock server can't

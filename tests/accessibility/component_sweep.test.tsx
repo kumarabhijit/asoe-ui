@@ -25,6 +25,7 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { ViewModeToggle } from "@/components/ui/ViewModeToggle";
 import { ViewModeProvider } from "@/hooks/useViewMode";
 import { ProvenanceCard } from "@/components/ui/ProvenanceCard";
+import { DecisionPathStepper } from "@/components/ui/DecisionPathStepper";
 import { ActionButtonMatrix } from "@/components/ui/ActionButtonMatrix";
 import { ComplianceHitCountChip } from "@/components/ui/ComplianceHitCountChip";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
@@ -469,6 +470,16 @@ describe("a11y sweep: EventsTimeline", () => {
   it("populated trace", async () =>
     expectNoViolations(
       <EventsTimeline executedNodes={populated} finalStatus="COMPLETE" />,
+    ));
+
+  // DecisionPathStepper — the Modern "Path" view of the SAME executed
+  // nodes (ordered list; icon + text status per step). Reuses the
+  // EventsTimeline fixture so both projections share one a11y baseline.
+  it("DecisionPathStepper — empty", async () =>
+    expectNoViolations(<DecisionPathStepper executedNodes={[]} />));
+  it("DecisionPathStepper — populated path", async () =>
+    expectNoViolations(
+      <DecisionPathStepper executedNodes={populated} finalStatus="COMPLETE" />,
     ));
 });
 

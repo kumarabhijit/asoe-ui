@@ -1,0 +1,86 @@
+<!doctype html>
+<!--
+  Decision-path stepper preview (cockpit study item, council 2026-06-10).
+  Mirrors src/components/ui/DecisionPathStepper.tsx markup + tokens so the
+  sign-off visual matches the shipped component. The Path view is the
+  Modern default of the Diagnostics → Pipeline section; Timeline/DAG stay
+  one click away (additive — Guardrail #7).
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Decision path — preview</title>
+  <link rel="stylesheet" href="../../src/styles/design-tokens.css" />
+  <style>
+    body { margin: 0; background: var(--color-surface-page); color: var(--color-text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 32px; }
+    .wrap { max-width: 1000px; margin: 0 auto; }
+    h3 { font-size: var(--font-size-caption); text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-tertiary); margin: 0 0 12px; }
+    /* pipeline section shell (Diagnostics) */
+    .section { background: var(--color-surface-secondary); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+    .head { display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-weight: 600; font-size: var(--font-size-subhead); }
+    .head .badge { margin-left: auto; font-size: var(--font-size-label); font-weight: 700; color: var(--color-warning-hover); background: var(--color-warning-subtle); border: 1px solid var(--color-warning-border); border-radius: 99px; padding: 1px 8px; }
+    .body { border-top: 1px solid var(--color-border); padding: 12px 16px; }
+    .toggle { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 12px; }
+    .toggle button { font: inherit; font-size: var(--font-size-label); display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: none; cursor: pointer; background: var(--color-surface-primary); color: var(--color-text-tertiary); }
+    .toggle button.active { background: var(--color-brand); color: #fff; }
+    /* stepper */
+    ol.path { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px 0; list-style: none; padding: 0; margin: 0; }
+    .step { display: flex; align-items: center; gap: 8px; border-radius: var(--radius-md); padding: 6px 10px; border: 1px solid var(--color-border-subtle); background: var(--color-surface-primary); }
+    .step.halt { border-color: color-mix(in srgb, var(--color-error) 40%, transparent); background: color-mix(in srgb, var(--color-error-subtle) 40%, transparent); }
+    .idx { width: 18px; height: 18px; border-radius: 99px; display: flex; align-items: center; justify-content: center; font-size: var(--font-size-label); font-weight: 700; font-family: ui-monospace, Menlo, monospace; background: var(--color-surface-secondary); color: var(--color-text-tertiary); }
+    .idx.halt { background: var(--color-error); color: #fff; }
+    .step .name { font-size: var(--font-size-caption); font-weight: 600; line-height: 1.1; }
+    .step .st { display: flex; align-items: center; gap: 4px; font-size: var(--font-size-label); }
+    .st.ok { color: var(--color-success); }
+    .st.halt { color: var(--color-warning); }
+    .st .vd { color: var(--color-text-tertiary); font-family: ui-monospace, Menlo, monospace; }
+    .chev { display: flex; align-items: center; padding: 0 2px; color: var(--color-text-quaternary); align-self: center; }
+    .result { display: flex; align-items: center; gap: 6px; align-self: center; margin-left: 4px; padding: 6px 10px; border-radius: var(--radius-md); background: var(--color-surface-secondary); }
+    .result .l { font-size: var(--font-size-label); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-quaternary); }
+    .result .v { font-size: var(--font-size-caption); font-family: ui-monospace, Menlo, monospace; font-weight: 600; }
+    .dot { width: 11px; height: 11px; border-radius: 99px; display: inline-block; }
+    svg { width: 14px; height: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h3>Diagnostics → Pipeline · Modern "Path" view (default)</h3>
+    <div class="section">
+      <div class="head">Pipeline <span class="badge">REVIEW REQUIRED</span></div>
+      <div class="body">
+        <div class="toggle">
+          <button class="active">◆ Path</button>
+          <button>☰ Timeline</button>
+          <button>⑃ DAG</button>
+        </div>
+        <ol class="path">
+          <li class="step">
+            <span class="idx">1</span>
+            <span><span class="name">Classify intent</span><br><span class="st ok">✓ completed</span></span>
+          </li>
+          <li class="chev">›</li>
+          <li class="step">
+            <span class="idx">2</span>
+            <span><span class="name">Resolve dependencies</span><br><span class="st ok">✓ completed</span></span>
+          </li>
+          <li class="chev">›</li>
+          <li class="step">
+            <span class="idx">3</span>
+            <span><span class="name">Validate types</span><br><span class="st ok">✓ completed</span></span>
+          </li>
+          <li class="chev">›</li>
+          <li class="step halt">
+            <span class="idx halt">4</span>
+            <span><span class="name">Shadow audit</span><br><span class="st halt">⚠ halted <span class="vd">· YELLOW</span></span></span>
+          </li>
+          <li class="result">
+            <span class="l">Result</span><span class="v">MANUAL_REVIEW_REQUIRED</span>
+          </li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
