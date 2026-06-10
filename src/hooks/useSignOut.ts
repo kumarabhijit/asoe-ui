@@ -19,8 +19,9 @@
 //
 // Behaviour:
 //   1. Emit "Signing out…" through useStatusAnnouncer().
-//   2. Defer next-auth's signOut() to the next microtask so the
-//      announcement settles before navigation.
+//   2. Defer next-auth's signOut() to a macrotask (setTimeout 0) so
+//      the announcement commits AND a paint frame lands before the
+//      redirect tears the page down.
 //
 // Caveat: aria-live="polite" speaks "after the current
 // utterance, not interrupting" — there is no guarantee the SR
@@ -46,10 +47,20 @@ export function useSignOut(options: UseSignOutOptions = {}) {
 
   return useCallback(() => {
     announce("Signing out");
-    // queueMicrotask gives the announcer's own microtask a tick
-    // to commit the message before signOut starts the redirect.
-    queueMicrotask(() => {
+    // Defer signOut() to a macrotask (not just a microtask) so the
+    // "Signing out" announcement is committed to the live region AND
+    // the browser gets a render frame before next-auth tears the page
+    // down. The announcer's own commit runs on a microtask
+    // (StatusAnnouncer.tsx); a microtask-scheduled signOut() runs
+    // before any paint, so on a fast redirect the authenticated page
+    // could navigate before the live region was observable — the race
+    // the hook's caveat predicted, and the source of the
+    // signout-from-each-role e2e flake. setTimeout(0) yields a paint
+    // frame, widening the observable window past assistive-tech (and
+    // the e2e poll) granularity. The redirect is still immediate to
+    // the operator.
+    setTimeout(() => {
       void signOut({ callbackUrl });
-    });
+    }, 0);
   }, [announce, callbackUrl]);
 }

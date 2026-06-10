@@ -45,6 +45,7 @@ import {
   loginAs,
   resetTenant,
   selectComboboxOption,
+  withApiRetry,
 } from "./_helpers";
 
 test.describe.configure({ mode: "serial" });
@@ -82,9 +83,12 @@ test("disposition on the selected record re-projects status in BOTH the queue ro
   );
   // Look up the parent case so we have a stable id to scope queue
   // assertions to. The helper guarantees parent_case_id is set.
-  const lookup = await request.get(
-    `${BACKEND_URL}/api/v1/exceptions/${exceptionId}`,
-    { headers: { Authorization: `Bearer ${token}` } },
+  const lookup = await withApiRetry(
+    () =>
+      request.get(`${BACKEND_URL}/api/v1/exceptions/${exceptionId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    `lookup parent case for ${exceptionId}`,
   );
   expect(lookup.ok()).toBe(true);
   const caseId = (await lookup.json()).parent_case_id as string;
@@ -147,9 +151,12 @@ test("disposition on the selected record re-projects status in BOTH the queue ro
   await expect
     .poll(
       async () => {
-        const res = await request.get(
-          `${BACKEND_URL}/api/v1/exceptions/${exceptionId}`,
-          { headers: { Authorization: `Bearer ${token}` } },
+        const res = await withApiRetry(
+          () =>
+            request.get(`${BACKEND_URL}/api/v1/exceptions/${exceptionId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          `poll lifecycle_state for ${exceptionId}`,
         );
         return res.ok() ? (await res.json()).lifecycle_state : null;
       },

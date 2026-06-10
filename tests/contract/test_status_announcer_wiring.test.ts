@@ -107,6 +107,18 @@ describe("StatusAnnouncer wiring (Q1)", () => {
       announceIdx,
       "announce() must precede signOut() so the SR speaks before the redirect tears down the page",
     ).toBeLessThan(signOutCallIdx);
+    // Stabilization lock (signout-from-each-role e2e flake): the
+    // redirect must be deferred to a MACROTASK (setTimeout), not a
+    // microtask. A microtask-scheduled signOut() runs before any
+    // paint, so a fast redirect could navigate before the live region
+    // committed "Signing out" — the status-announcer timing flake.
+    // setTimeout yields a paint frame so the announcement is reliably
+    // observable to assistive tech and the e2e poll.
+    expect(
+      /setTimeout\(\s*\(\)\s*=>\s*\{[\s\S]*?\bvoid\s+signOut\s*\(/.test(src),
+      "useSignOut must defer signOut() via setTimeout (macrotask) so the " +
+        "'Signing out' announcement commits + paints before the redirect",
+    ).toBe(true);
   });
 
   it("authenticated pages route sign-out through useSignOut", () => {
