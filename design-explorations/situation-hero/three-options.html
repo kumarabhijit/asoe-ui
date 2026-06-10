@@ -1,0 +1,160 @@
+<!doctype html>
+<!--
+  Situation-hero sub-line — THREE-OPTION study (audit finding #2,
+  follow-up to before-after.html, council 2026-06-10).
+
+  The mockup (option B) consolidates "$ · SLA · state" into one sub-line
+  by dropping the Modern ImpactBar — but that bar carries richer impact
+  data (Delta $ + %, fulfillment gap, priority), so "consolidate" partly
+  conflicts with the cockpit's "adds, never hides" rule. This artifact
+  renders all three resolutions of that tension side by side, with the
+  ImpactBar drawn faithfully (multi-cell, not just the $ figure).
+
+  DESIGN ARTIFACT for sign-off, not a shipped change. Links the real
+  design tokens so the comparison is faithful to production. All facts
+  in every option are backend-composed (a `situation_context` projection
+  in compose_presentation / build_analysis); the UI stays a dumb
+  projector either way.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Situation hero sub-line — three options</title>
+  <link rel="stylesheet" href="../../src/styles/design-tokens.css" />
+  <style>
+    body {
+      margin: 0;
+      background: var(--color-surface-page);
+      color: var(--color-text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: var(--space-32, 32px);
+    }
+    .grid { display: grid; grid-template-columns: 1fr; gap: var(--space-24, 24px); max-width: 760px; margin: 0 auto; }
+    .col h3 { font-size: var(--font-size-caption); text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-tertiary); margin: 0 0 var(--space-12, 12px); display: flex; align-items: center; gap: var(--space-8, 8px); }
+    .tag { font-size: var(--font-size-label, 10px); border-radius: 99px; padding: 2px 8px; letter-spacing: .04em; }
+    .tag.reco { background: var(--color-success-subtle, #e6f6ee); color: var(--color-success, #1a7f4e); border: 1px solid var(--color-success, #1a7f4e); }
+    .tag.warn { background: transparent; color: var(--color-warning, #9a6700); border: 1px solid var(--color-warning, #9a6700); }
+    .panel {
+      background: var(--color-surface-primary);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    /* Faithful multi-cell ImpactBar (At risk · Delta · Priority) */
+    .impactbar {
+      display: flex; align-items: stretch; gap: var(--space-24, 24px);
+      padding: var(--space-10, 10px) var(--space-16, 16px);
+      background: var(--color-surface-secondary);
+      border-bottom: 1px solid var(--color-border-subtle);
+    }
+    .cell { display: flex; flex-direction: column; gap: 1px; }
+    .cell .label { font-size: var(--font-size-label, 10px); text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-quaternary); font-weight: 600; }
+    .cell .val { font-size: var(--font-size-caption); font-weight: 600; font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .cell.atrisk .val { font-size: var(--font-size-subhead, 14px); font-weight: 700; color: var(--color-error, #c0392b); }
+    .body { padding: var(--space-16, 16px); }
+    .situation { display: flex; align-items: flex-start; gap: var(--space-12, 12px); }
+    .situation .rule { margin-top: 3px; height: 26px; width: 3px; border-radius: 99px; background: var(--color-brand); flex: none; }
+    .situation h2 { font-size: var(--font-size-title); font-weight: 700; line-height: 1.15; margin: 0; }
+    .situation .sub { color: var(--color-text-tertiary); font-size: var(--font-size-caption); margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .dup { outline: 2px dashed var(--color-warning, #9a6700); outline-offset: 2px; border-radius: 2px; }
+    .reco-line { margin-top: var(--space-16,16px); font-size: var(--font-size-caption); color: var(--color-text-secondary); }
+    .verdict { margin-top: var(--space-8, 8px); font-size: var(--font-size-caption); line-height: 1.5; color: var(--color-text-tertiary); max-width: 760px; }
+    .verdict strong { color: var(--color-text-secondary); }
+    .note { max-width: 760px; margin: var(--space-24, 24px) auto 0; font-size: var(--font-size-caption); color: var(--color-text-tertiary); line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="grid">
+
+    <!-- OPTION A -->
+    <div class="col">
+      <h3>Option A — sub-line + keep ImpactBar <span class="tag warn">$ figure shown twice</span></h3>
+      <div class="panel">
+        <div class="impactbar">
+          <div class="cell atrisk"><span class="label">At risk</span><span class="val dup">$48,040</span></div>
+          <div class="cell"><span class="label">Delta</span><span class="val">+$1,920 (4.2%)</span></div>
+          <div class="cell"><span class="label">Priority</span><span class="val">HIGH</span></div>
+        </div>
+        <div class="body">
+          <div class="situation">
+            <span class="rule" aria-hidden="true"></span>
+            <div>
+              <h2>Duplicate purchase order detected — Acme Beverages</h2>
+              <div class="sub"><span class="dup">$48,040 exposure</span> · SLA due in 3h 12m · Pending Review</div>
+            </div>
+          </div>
+          <div class="reco-line">↓ Recommendation, evidence, diagnostics…</div>
+        </div>
+      </div>
+      <p class="verdict">Nothing lost, full mockup sub-line — but the at-risk figure
+        renders twice on one screen (dashed marks), the exact "second dollar
+        number competing with the ImpactBar" the council removed from
+        HeaderRibbon/ContextStrip (S1 redundancy posture, follow-up 2026-06-09).</p>
+    </div>
+
+    <!-- OPTION B -->
+    <div class="col">
+      <h3>Option B — sub-line replaces ImpactBar (mockup) <span class="tag warn">Delta · fulfillment gap · priority leave L1</span></h3>
+      <div class="panel">
+        <div class="body">
+          <div class="situation">
+            <span class="rule" aria-hidden="true"></span>
+            <div>
+              <h2>Duplicate purchase order detected — Acme Beverages</h2>
+              <div class="sub">$48,040 exposure · SLA due in 3h 12m · Pending Review</div>
+            </div>
+          </div>
+          <div class="reco-line">↓ Recommendation, evidence, diagnostics…</div>
+        </div>
+      </div>
+      <p class="verdict">Matches the mockup exactly — one clean line, figure shown
+        once. But the ImpactBar's other cells (<strong>Delta +$1,920 (4.2%)</strong>,
+        fulfillment gap, priority) lose their always-visible home. They are not
+        audit internals — the delta is the size of the discrepancy the operator
+        is judging — so demoting them collides with "adds, never hides".</p>
+    </div>
+
+    <!-- OPTION C -->
+    <div class="col">
+      <h3>Option C — sub-line carries SLA + state; $ stays in ImpactBar <span class="tag reco">Recommended — no duplication, no loss</span></h3>
+      <div class="panel">
+        <div class="impactbar">
+          <div class="cell atrisk"><span class="label">At risk</span><span class="val">$48,040</span></div>
+          <div class="cell"><span class="label">Delta</span><span class="val">+$1,920 (4.2%)</span></div>
+          <div class="cell"><span class="label">Priority</span><span class="val">HIGH</span></div>
+        </div>
+        <div class="body">
+          <div class="situation">
+            <span class="rule" aria-hidden="true"></span>
+            <div>
+              <h2>Duplicate purchase order detected — Acme Beverages</h2>
+              <div class="sub">SLA due in 3h 12m · Pending Review</div>
+            </div>
+          </div>
+          <div class="reco-line">↓ Recommendation, evidence, diagnostics…</div>
+        </div>
+      </div>
+      <p class="verdict">Reading order becomes: ImpactBar answers <strong>"how
+        bad"</strong> (full quantitative blast radius, kept intact), headline answers
+        <strong>"what happened"</strong>, sub-line answers <strong>"how urgent, where in
+        the flow"</strong>. Every fact rendered exactly once. The sub-line's two facts
+        are the ones with no adjacent home today (SLA + state live in distant
+        chrome); the $ already has its Priority-1 home one row up.</p>
+    </div>
+  </div>
+
+  <p class="note">
+    All options: the sub-line facts are projected backend-side — a
+    <code>situation_context</code> block on the PresentationContract
+    (composed in build_analysis / compose_presentation), carrying
+    <code>sla_due_at</code> (ISO timestamp; the UI's existing SLA ticker
+    renders the live relative label so it never goes stale) and
+    <code>lifecycle_state</code> (rendered through the governed humanizer,
+    "Pending Review", not the raw enum — drawer keeps the raw value).
+    The UI honors what the contract emits and never re-decides which
+    facts ride the sub-line. Legacy view byte-unchanged; Modern gated on
+    useViewMode().mode === "modern".
+  </p>
+</body>
+</html>
