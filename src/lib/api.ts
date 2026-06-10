@@ -2561,9 +2561,32 @@ const MOCK_SECTION_TIERS: Record<string, "operator" | "evidence" | "audit"> = {
 // provenance alongside a classification (supergroup_code).
 const MOCK_TAXONOMY_VERSION = "2026-05-30-v2";
 
+// Inverse of the generated `INTENTS_BY_SUPERGROUP` (intent code →
+// supergroup), built once at module load — the SAME backend-driven
+// source of truth `api.case_resolver.supergroup_for_intent` resolves
+// against, so the mock cannot drift from the taxonomy. The taxonomy
+// keys on `INT_`-prefixed codes; the wire/mock `intent` is the bare
+// form, so callers prefix to look it up.
+const MOCK_SUPERGROUP_BY_INTENT_CODE: Record<string, string> = Object.entries(
+  INTENTS_BY_SUPERGROUP,
+).reduce((acc, [sg, codes]) => {
+  for (const code of codes) acc[code] = sg;
+  return acc;
+}, {} as Record<string, string>);
+
 function mockPresentation(id: string): PresentationContract {
   const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
   const intent = exc?.intent ?? null;
+  // Taxonomy supergroup of the record (council 2026-06-10 Provenance
+  // card). Mirrors `api.presentation_composer.compose_presentation`,
+  // which after the 2026-06-10 persist fix projects the record's
+  // `supergroup_code` (set at create time from `supergroup_for_intent`).
+  // Prefer an explicit supergroup on the summary; else derive from the
+  // generated taxonomy SoT. None when the intent is absent/unmapped, so
+  // the UI structurally omits the Taxonomy row (no fabricated node).
+  const supergroup =
+    exc?.supergroup_code ??
+    (intent ? MOCK_SUPERGROUP_BY_INTENT_CODE[`INT_${intent}`] ?? null : null);
   return {
     section_tiers: MOCK_SECTION_TIERS,
     // Mock-mode stand-in for the backend reusing render_template: the
@@ -2576,17 +2599,22 @@ function mockPresentation(id: string): PresentationContract {
     // Provenance bundle (council 2026-06-10) — mirrors
     // api/presentation_composer.compose_presentation: pure projection of
     // already-decided record fields; null when absent so the UI omits the
-    // row (never a fabricated value). ExceptionSummary carries no
-    // trace_id, so correlation_id is null in mock mode (the real backend
-    // projects record.trace_id).
+    // row (never a fabricated value).
     audit: {
       recipe_name: exc?.selected_recipe ?? null,
       intent_code: intent,
       event_type: exc?.event_type ?? null,
       shadow_verdict: exc?.shadow_verdict ?? null,
-      supergroup_code: exc?.supergroup_code ?? null,
-      taxonomy_version: exc?.supergroup_code ? MOCK_TAXONOMY_VERSION : null,
-      correlation_id: null,
+      supergroup_code: supergroup,
+      taxonomy_version: supergroup ? MOCK_TAXONOMY_VERSION : null,
+      // The real backend projects `record.trace_id` — a REQUIRED field,
+      // so a real record always carries its correlation id. The mock's
+      // record-trace surface keys the same deterministic `${id}-trace`
+      // id (see `exceptionsApi.trace`); reuse it so the preview's
+      // Correlation row mirrors reality instead of dropping a row the
+      // real backend always populates. null only when there is no
+      // record at all.
+      correlation_id: exc ? `${exc.id}-trace` : null,
     },
   };
 }

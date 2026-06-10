@@ -90,8 +90,12 @@ describe("AgentActivityRail tenant", () => {
     expect(rail).toContain("exceptionsApi");
     expect(rail).toContain(".trace(");
     expect(rail).toContain("EventsTimeline");
-    // Null-on-empty contract (no fabricated activity).
-    expect(rail).toContain("if (!hasContent) return null;");
+    // Null-on-empty contract by DEFAULT (no fabricated activity) — the xl
+    // rail tenant still collapses when empty. The detail surface opts into
+    // the discoverable shell via showWhenEmpty (asserted below).
+    expect(rail).toContain(
+      "if (!hasContent && (!showWhenEmpty || !selectedRecordId)) return null;",
+    );
   });
 
   it("is mounted in the /cases rail strictly in the Modern view", () => {
@@ -101,6 +105,25 @@ describe("AgentActivityRail tenant", () => {
     expect(page).not.toContain("cockpitEnabled");
     // Gated render — the rail must not appear in the Legacy view.
     expect(page).toMatch(/COCKPIT && \(\s*<AgentActivityRail/);
+  });
+
+  it("surfaces a DISCOVERABLE empty/loading state on the detail route (Modern)", () => {
+    // council 2026-06-10 — the rail is also mounted on /cases/[id] with
+    // showWhenEmpty so the operator can find WHERE agent activity appears
+    // even before a trace lands. Deliverable lock (Pattern A): a
+    // behavioural test can't catch "the detail mount was supposed to ship
+    // but wasn't built".
+    const rail = read("app/cases/AgentActivityRail.tsx");
+    expect(rail).toContain("showWhenEmpty");
+    expect(rail).toMatch(/Loading agent activity/);
+    expect(rail).toMatch(/No agent activity recorded/);
+
+    const detail = read("app/cases/[id]/page.tsx");
+    expect(detail).toContain("import { AgentActivityRail }");
+    expect(detail).toContain('const COCKPIT = useViewMode().mode === "modern";');
+    // Modern-gated, record-scoped, and discoverable (showWhenEmpty).
+    expect(detail).toMatch(/COCKPIT && selectedRecordId && \(/);
+    expect(detail).toContain("showWhenEmpty");
   });
 });
 
@@ -237,7 +260,15 @@ describe("cockpit Evidence/Diagnostics restructuring (council 2026-06-10)", () =
     const api = read("lib/api.ts");
     expect(api).toMatch(/event_type: exc\?\.event_type/);
     expect(api).toMatch(/shadow_verdict: exc\?\.shadow_verdict/);
-    expect(api).toContain("supergroup_code: exc?.supergroup_code");
+    // council 2026-06-10 — the mock now projects the taxonomy supergroup
+    // (from the generated SoT, mirroring supergroup_for_intent) and the
+    // record's correlation id (the deterministic `${id}-trace`), so the
+    // preview shows the full Provenance card instead of 4 of 6 rows. The
+    // supergroup derivation falls back to an explicit summary value.
+    expect(api).toContain("supergroup_code: supergroup");
+    expect(api).toContain("MOCK_SUPERGROUP_BY_INTENT_CODE");
     expect(api).toContain("taxonomy_version");
+    // Correlation id is no longer hardcoded null — it mirrors record.trace_id.
+    expect(api).toContain("correlation_id: exc ? `${exc.id}-trace`");
   });
 });
