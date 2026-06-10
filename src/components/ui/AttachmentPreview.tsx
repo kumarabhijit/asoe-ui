@@ -340,7 +340,13 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
         )}
 
         {loadState === "ready" && format === "pdf" && (
-          <div className="relative inline-block max-w-full" data-testid="pdf-canvas-layer">
+          <div
+            className="relative inline-block max-w-full"
+            data-testid="pdf-canvas-layer"
+            // `isolation: isolate` scopes the overlays' multiply blend to this
+            // layer (canvas + boxes) so it never mixes with page content behind.
+            style={{ isolation: "isolate" }}
+          >
             <canvas ref={canvasRef} aria-label={`PDF preview of ${attachment.name}`} className="max-w-full" />
             {/* Spatial bbox overlays (ADR-045) — best-effort, drawn only for
                 VERIFIED spatial anchors on this page AND only once the page has
@@ -376,6 +382,13 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
                     // sits above the PDF canvas, so the document text under it
                     // must remain legible (an opaque fill hides the evidence).
                     background: "var(--color-highlight-evidence)",
+                    // Composite like a real highlighter: multiply the wash AND
+                    // the border with the canvas instead of painting over it, so
+                    // black text shows through at ANY scale/DPI. On a downscaled
+                    // mobile canvas the box gets short and the fixed-width border
+                    // would otherwise close over the tiny text; multiply keeps
+                    // dark glyphs dark (text × tint = text), never hidden.
+                    mixBlendMode: "multiply",
                   }}
                 />
               );
