@@ -1,0 +1,204 @@
+<!doctype html>
+<!--
+  Cockpit Evidence/Diagnostics layout proposal — Modern view.
+  Sign-off mockup ONLY (not the implementation). Uses the production
+  design tokens (../../src/styles/design-tokens.css) so colours, spacing,
+  radii and the dark theme are byte-faithful to the shipped app.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="../../src/styles/design-tokens.css" />
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--color-surface-page);
+    color: var(--color-text-primary);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: var(--font-size-body);
+    line-height: 1.5;
+    padding: var(--space-24);
+  }
+  .pane { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-16); }
+
+  /* tier label chip on the left edge of each tier */
+  .tier-tag {
+    position: absolute; left: -64px; top: 2px; width: 56px; text-align: right;
+    font-size: var(--font-size-label); text-transform: uppercase; letter-spacing: .06em;
+    color: var(--color-text-quaternary); font-weight: 700;
+  }
+  .rel { position: relative; }
+
+  /* ── Situation hero (L1) ── */
+  .situation { display: flex; align-items: flex-start; gap: var(--space-12); }
+  .situation .accent { margin-top: 3px; height: 26px; width: 3px; border-radius: 99px; background: var(--color-brand); flex: none; }
+  .situation h2 { font-size: var(--font-size-title); font-weight: 700; line-height: 1.2; }
+  .situation .sub { color: var(--color-text-tertiary); font-size: var(--font-size-caption); margin-top: 2px; }
+
+  /* ── Card primitive ── */
+  .card {
+    background: var(--color-surface-primary);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    padding: var(--space-16);
+  }
+
+  /* ── Recommendation (L1) ── */
+  .rec { display: flex; gap: var(--space-20); align-items: center; }
+  .ring { position: relative; height: 96px; width: 96px; flex: none; border-radius: 50%;
+          background: conic-gradient(var(--color-success) 88%, var(--color-surface-tertiary) 0); }
+  .ring .hole { position: absolute; inset: 9px; border-radius: 50%; background: var(--color-surface-primary);
+                display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring .pct { font-size: var(--font-size-mono-metric); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .ring .band { font-size: var(--font-size-label); text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-tertiary); }
+  .rec .body { flex: 1; min-width: 0; }
+  .rec .eyebrow { font-size: var(--font-size-label); text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-tertiary); font-weight: 700; }
+  .rec h3 { font-size: var(--font-size-heading); font-weight: 600; margin: 2px 0 4px; }
+  .rec p { color: var(--color-text-secondary); font-size: var(--font-size-body); }
+  .rec .cal { color: var(--color-text-tertiary); font-size: var(--font-size-caption); margin-top: 6px; }
+  .actions { display: flex; gap: var(--space-8); margin-top: var(--space-12); }
+  .btn { border: 1px solid var(--color-border-default); background: var(--color-surface-primary); color: var(--color-text-primary);
+         border-radius: var(--radius-md); padding: 8px 14px; font-size: var(--font-size-body); font-weight: 600; cursor: pointer; }
+  .btn.brand { background: var(--color-brand); border-color: var(--color-brand); color: var(--color-text-inverse); }
+
+  /* ── Disclosure (tier group) ── */
+  .disc { border: 1px solid var(--color-border-default); border-radius: var(--radius-md); background: var(--color-surface-primary); overflow: hidden; }
+  .disc > .head { display: flex; align-items: center; gap: var(--space-10); padding: 12px var(--space-16); cursor: pointer; }
+  .disc > .head .chev { color: var(--color-text-tertiary); transition: transform .15s; }
+  .disc.closed > .head .chev { transform: rotate(-90deg); }
+  .disc > .head .title { font-size: var(--font-size-heading); font-weight: 600; flex: 1; }
+  .disc > .head .count { font-size: var(--font-size-label); font-weight: 700; color: var(--color-text-tertiary);
+                         background: var(--color-surface-secondary); border-radius: 99px; padding: 2px 8px; }
+  .disc > .body { padding: 0 var(--space-16) var(--space-16); display: flex; flex-direction: column; gap: var(--space-12); }
+  .disc.closed > .body { display: none; }
+
+  /* nested card inside a tier (Modern = card, not flat row) */
+  .nested { background: var(--color-surface-secondary); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-sm); padding: var(--space-12); }
+  .nested .nhead { display: flex; align-items: center; gap: var(--space-8); font-size: var(--font-size-subhead); font-weight: 600; margin-bottom: var(--space-8); }
+  .muted { color: var(--color-text-tertiary); font-size: var(--font-size-caption); }
+
+  /* delta table */
+  table.delta { width: 100%; border-collapse: collapse; font-size: var(--font-size-caption); }
+  table.delta th { text-align: left; color: var(--color-text-tertiary); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--color-border-subtle); text-transform: uppercase; letter-spacing: .04em; font-size: var(--font-size-label); }
+  table.delta td { padding: 5px 6px; border-bottom: 1px solid var(--color-border-subtle); font-variant-numeric: tabular-nums; }
+  table.delta td.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .neg { color: var(--color-error); font-weight: 600; }
+
+  /* ── Provenance key/value card ── */
+  .prov { display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px; align-items: baseline; }
+  .prov dt { font-size: var(--font-size-label); text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-tertiary); font-weight: 700; }
+  .prov dd { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: var(--font-size-mono-sm); color: var(--color-text-primary); }
+  .pill { display: inline-block; font-size: var(--font-size-label); font-weight: 700; letter-spacing: .04em; padding: 1px 8px; border-radius: 99px;
+          background: var(--color-warning-subtle); color: var(--color-warning-hover); border: 1px solid var(--color-warning-border); font-family: inherit; }
+
+  .badge-new { font-size: var(--font-size-label); font-weight: 700; color: var(--color-brand); background: var(--color-brand-subtle); border-radius: 99px; padding: 1px 8px; letter-spacing: .04em; }
+  .sub-disc { border: 1px dashed var(--color-border-strong); border-radius: var(--radius-sm); }
+  .sub-disc .head { display: flex; align-items: center; gap: var(--space-8); padding: 10px var(--space-12); cursor: pointer; }
+  .sub-disc .head .chev { transform: rotate(-90deg); color: var(--color-text-tertiary); }
+  .sub-disc .head .t { font-weight: 600; font-size: var(--font-size-subhead); }
+  svg { flex: none; }
+</style>
+</head>
+<body>
+  <div class="pane">
+
+    <!-- TIER 1 · SITUATION -->
+    <div class="rel situation">
+      <span class="tier-tag">L1</span>
+      <span class="accent"></span>
+      <div>
+        <h2>Duplicate purchase order detected — Acme Beverages</h2>
+        <div class="sub">$48,040 exposure · SLA due in 3h 12m · PENDING REVIEW</div>
+      </div>
+    </div>
+
+    <!-- TIER 2 · RECOMMENDATION -->
+    <div class="rel card rec">
+      <span class="tier-tag">L1</span>
+      <div class="ring"><div class="hole"><span class="pct">88%</span><span class="band">High</span></div></div>
+      <div class="body">
+        <div class="eyebrow">Recommendation</div>
+        <h3>Request clarification from buyer</h3>
+        <p>PO EML-PO-2026-0042 matches an order received 4 days ago (832 of 940 lines identical). Below the auto-resolve threshold — route to a human.</p>
+        <div class="cal">Model score — not a calibrated probability.</div>
+        <div class="actions">
+          <button class="btn brand">Approve · Request clarification</button>
+          <button class="btn">Choose different action ▾</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIER 3 · EVIDENCE -->
+    <div class="rel disc">
+      <span class="tier-tag">L2 · Evidence</span>
+      <div class="head">
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        <span class="title">Evidence</span>
+        <span class="count">2</span>
+      </div>
+      <div class="body">
+        <div class="nested">
+          <div class="nhead">Price &amp; credit comparison</div>
+          <table class="delta">
+            <tr><th>SKU</th><th>ERP</th><th>PO</th><th>Δ</th></tr>
+            <tr><td>CS BEV-COLA-12PK</td><td class="mono">$39.00</td><td class="mono">$39.00</td><td class="mono">—</td></tr>
+            <tr><td>CS BEV-LEMON-6PK</td><td class="mono">$21.40</td><td class="mono">$21.40</td><td class="mono">—</td></tr>
+            <tr><td>CS BEV-ORNG-6PK</td><td class="mono">$31.40</td><td class="mono">$34.10</td><td class="mono neg">+$2.70</td></tr>
+          </table>
+        </div>
+        <div class="nested">
+          <div class="nhead">Order comparison — 832 / 940 lines identical</div>
+          <div class="muted">Matched against ORD-2026-0019 (received 2026-05-20). 108 lines differ in quantity; pricing parity on 938 lines.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIER 4 · DIAGNOSTICS & AUDIT -->
+    <div class="rel disc">
+      <span class="tier-tag">L2 · Drawer</span>
+      <div class="head">
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        <span class="title">Diagnostics &amp; Audit</span>
+        <span class="count">3</span>
+      </div>
+      <div class="body">
+
+        <!-- NEW provenance card -->
+        <div class="nested">
+          <div class="nhead">Provenance <span class="badge-new">NEW</span></div>
+          <dl class="prov">
+            <dt>Recipe</dt><dd>ManualOrderIntakeRecipe</dd>
+            <dt>Raw intent</dt><dd>DUPLICATE_PO</dd>
+            <dt>Event type</dt><dd>EDI_850_PRICE_MISMATCH</dd>
+            <dt>Shadow verdict</dt><dd><span class="pill">YELLOW</span></dd>
+            <dt>Taxonomy</dt><dd>cpg.beverage.dup-po</dd>
+            <dt>Correlation</dt><dd>8c9f-f828-41d0-9a2b</dd>
+          </dl>
+        </div>
+
+        <!-- Knowledge Graph — own collapsed section (outside Audit only) -->
+        <div class="sub-disc">
+          <div class="head">
+            <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            <span class="t">Knowledge Graph</span>
+            <span class="muted" style="margin-left:auto">entity projection · 14 nodes</span>
+          </div>
+        </div>
+
+        <!-- Audit only — rawest internals, collapsed -->
+        <div class="sub-disc">
+          <div class="head">
+            <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            <span class="t">Audit only</span>
+            <span class="muted" style="margin-left:auto">raw trace · EDI 850 reconstruction</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
