@@ -522,6 +522,26 @@ export interface PresentationAudit {
   correlation_id?: string | null;
 }
 
+/** Facts that ride the Situation hero sub-line (audit finding #2,
+ *  option C — sign-off 2026-06-10). Mirrors
+ *  `api/schemas.py::SituationContext`.
+ *
+ *  Sub-line membership is backend-owned (Guardrail #0/#6): the composer
+ *  re-projects the chosen facts here and the UI renders them as given.
+ *  Option C carries SLA + lifecycle state only — the $ figure keeps its
+ *  single Priority-1 home in `impact_metrics` / ImpactBar. Null fields
+ *  are structurally omitted (no placeholder, no fabricated text). */
+export interface SituationContext {
+  /** Parent-case SLA timestamp (ISO 8601) — a timestamp, never a
+   *  pre-rendered relative label, so the SLA ticker renders a live
+   *  "due in 3h" that cannot go stale. */
+  sla_due_at?: string | null;
+  /** The record's lifecycle state, re-projected for the sub-line.
+   *  Rendered through the governed humanizer ("Pending Review"); the
+   *  raw enum stays available in the Diagnostics & Audit drawer. */
+  lifecycle_state?: string | null;
+}
+
 /** Deterministic presentation contract the UI projects onto the detail
  *  surface. Mirrors `api/schemas.py::PresentationContract`. */
 export interface PresentationContract {
@@ -540,6 +560,10 @@ export interface PresentationContract {
    *  fail-open to "evidence". */
   section_tiers?: Record<string, "operator" | "evidence" | "audit">;
   audit: PresentationAudit;
+  /** Situation hero sub-line facts (audit finding #2, option C). The
+   *  composer decides WHICH facts ride the sub-line; the UI projects
+   *  them as given and never re-decides membership. */
+  situation_context: SituationContext;
 }
 
 /* ── Order Entry section (ADR-042 Phase 3) — mirrors api/schemas.py ── */

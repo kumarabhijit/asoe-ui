@@ -60,6 +60,7 @@ import { COSIGN_LIFECYCLE_STATE, CollapsibleSection, HITL_LIFECYCLE_STATES, Laye
 import { HeaderRibbon } from "./HeaderRibbon";
 import { ContextStrip } from "./ContextStrip";
 import { ImpactBar } from "./ImpactBar";
+import { SituationSubline } from "./SituationSubline";
 import { AgentAnalysisSection } from "./AgentAnalysisSection";
 import { DuplicateDetectionSection } from "./DuplicateDetectionSection";
 import { OrderComparisonSection } from "./OrderComparisonSection";
@@ -748,6 +749,19 @@ export default function ExceptionDetailPanel({
   const evidenceAnchorIds = ["section-line-items", ...evidenceMembers.map((s) => s.anchorId).filter((a): a is string => !!a)];
   const auditAnchorIds = ["section-trace", ...auditMembers.map((s) => s.anchorId).filter((a): a is string => !!a)];
 
+  // Situation sub-line state relocation (audit finding #2, option C —
+  // sign-off 2026-06-10). True exactly when the Modern sub-line renders
+  // the lifecycle state: the hero must be present (the sub-line is
+  // anchored under the headline) AND the backend composed a state into
+  // `situation_context`. The HeaderRibbon then suppresses its "Current
+  // State" badge so the fact has ONE home (S1/S2 redundancy posture) —
+  // relocation, not removal. Legacy never sets this (COCKPIT false), so
+  // the classic ribbon is byte-unchanged.
+  const sublineCarriesState =
+    COCKPIT &&
+    !!analysis?.presentation?.situation_headline &&
+    !!analysis?.presentation?.situation_context?.lifecycle_state;
+
   /* ── Render ──────────────────────────────────────────────────────── */
 
   return (
@@ -766,6 +780,7 @@ export default function ExceptionDetailPanel({
         totalPo={totalPo}
         delta={delta}
         embedded={embedded}
+        suppressLifecycle={sublineCarriesState}
       />
 
       {/* ━━ 1b. Impact Bar (Priority-1 financial impact) ━━━━━━━━━━━━━
@@ -813,9 +828,20 @@ export default function ExceptionDetailPanel({
             COCKPIT ? (
               <div className="flex items-start gap-12">
                 <span aria-hidden className="mt-1 h-[26px] w-[3px] rounded-full bg-brand shrink-0" />
-                <h2 className="text-title font-bold text-text-primary m-0 leading-tight">
-                  {analysis.presentation.situation_headline}
-                </h2>
+                <div className="min-w-0">
+                  <h2 className="text-title font-bold text-text-primary m-0 leading-tight">
+                    {analysis.presentation.situation_headline}
+                  </h2>
+                  {/* Decision-context sub-line (audit finding #2, option C
+                      — sign-off 2026-06-10): SLA + lifecycle state, as
+                      composed by the backend `situation_context`. The $
+                      figure stays in the ImpactBar (no duplication). The
+                      ribbon's state badge is suppressed above when this
+                      renders the state — relocation, not removal. */}
+                  <SituationSubline
+                    context={analysis.presentation.situation_context}
+                  />
+                </div>
               </div>
             ) : (
               <h2 className="text-subhead font-semibold text-text-primary m-0">

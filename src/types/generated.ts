@@ -3419,6 +3419,7 @@ export interface components {
              * @default false
              */
             show_intent: boolean;
+            situation_context?: components["schemas"]["SituationContext"];
             /** Situation Headline */
             situation_headline?: string | null;
         };
@@ -3880,6 +3881,29 @@ export interface components {
             reject_reason_code?: string | null;
             /** Validation Failures */
             validation_failures?: string[] | null;
+        };
+        /**
+         * SituationContext
+         * @description Facts that ride the Situation hero sub-line (audit finding #2,
+         *     sign-off 2026-06-10, option C).
+         *
+         *     Which facts appear directly under the Situation headline is a
+         *     backend placement decision, not per-session UI taste (asoe-ui
+         *     Guardrail #0/#6) — this block IS that decision: the composer
+         *     re-projects the chosen record/case fields here and the UI renders
+         *     them as given. Option C deliberately carries SLA + lifecycle state
+         *     only; the $ figure keeps its Priority-1 home in the ImpactBar so
+         *     no fact is rendered twice and nothing leaves Layer 1.
+         *
+         *     Every field is a pure projection of an already-decided value and is
+         *     None when the source has no honest value — the UI structurally
+         *     omits that segment (no placeholder, no fabricated text).
+         */
+        SituationContext: {
+            /** Lifecycle State */
+            lifecycle_state?: string | null;
+            /** Sla Due At */
+            sla_due_at?: string | null;
         };
         /**
          * StatsResponse
