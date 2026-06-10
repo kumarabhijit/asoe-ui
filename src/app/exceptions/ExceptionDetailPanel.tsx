@@ -722,6 +722,17 @@ export default function ExceptionDetailPanel({
   const operatorSections = operatorMembers.map((s) => s.node);
   const evidenceSections = evidenceMembers.map((s) => asNested(s.node));
   const auditSections = auditMembers.map((s) => asNested(s.node));
+  // Cockpit review-before-send (council 2026-06-10): the AI Draft Reply is
+  // the resolution action for a reply-driven case, so in Modern view it
+  // renders LAST in Evidence — after the source/evidence AND the line-item
+  // grid — so the Send control is terminal (the operator reviews, then
+  // sends). Legacy keeps the original order (draft among the sections,
+  // before the grid) byte-unchanged.
+  const evidenceSectionsNoDraft = evidenceMembers
+    .filter((s) => s.key !== "draft_reply")
+    .map((s) => asNested(s.node));
+  const draftReplyNode = evidenceMembers.find((s) => s.key === "draft_reply")?.node;
+  const draftReplyNested = draftReplyNode ? asNested(draftReplyNode) : null;
   // Cockpit Diagnostics & Audit split (council 2026-06-10): the Knowledge
   // Graph keeps its own collapsed section; the rawest internals (other
   // audit-tier sections + the trace) move into an "Audit only" sub-group.
@@ -1164,7 +1175,11 @@ export default function ExceptionDetailPanel({
             extraAnchorIds={evidenceAnchorIds}
           >
             <div className="flex flex-col gap-16">
-              {evidenceSections}
+              {/* Modern: evidence sections (minus the draft) → line-item grid
+                  → Draft Reply LAST, so Send is the terminal control after a
+                  full review (review-before-send). Legacy: the original order
+                  (all sections incl. draft, then grid) — byte-unchanged. */}
+              {COCKPIT ? evidenceSectionsNoDraft : evidenceSections}
               <EvidenceGrid
                 lineItems={lineItems}
                 analysis={analysis}
@@ -1175,7 +1190,9 @@ export default function ExceptionDetailPanel({
                 totalPo={totalPo}
                 onFirstOpen={ensureLineItemsLoaded}
                 anchorId="section-line-items"
+                variant={COCKPIT ? "card" : "default"}
               />
+              {COCKPIT && draftReplyNested}
             </div>
           </CollapsibleSection>
 

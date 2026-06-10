@@ -191,6 +191,26 @@ describe("cockpit Evidence/Diagnostics restructuring (council 2026-06-10)", () =
     expect(panel).toContain('href="#section-draft-reply"');
   });
 
+  it("renders the draft reply LAST in Evidence (Modern) so Send is terminal", () => {
+    // Review-before-send: in Modern the draft is split out of the section
+    // list and rendered AFTER the line-item grid; Legacy keeps the original
+    // order (evidenceSections incl. draft, then grid) byte-unchanged.
+    expect(panel).toContain("evidenceSectionsNoDraft");
+    expect(panel).toContain("draftReplyNested");
+    // Ordering: the grid is mounted before the draft node within Evidence.
+    expect(panel).toMatch(/<EvidenceGrid[\s\S]*?\{COCKPIT && draftReplyNested\}/);
+    // Legacy path still renders the original combined section list.
+    expect(panel).toMatch(/COCKPIT \? evidenceSectionsNoDraft : evidenceSections/);
+  });
+
+  it("cards the line-item grid in Modern (visual parity with evidence cards)", () => {
+    // EvidenceGrid takes the same additive `variant` as CollapsibleSection.
+    expect(panel).toMatch(/variant=\{COCKPIT \? "card" : "default"\}/);
+    const grid = read("app/exceptions/EvidenceGrid.tsx");
+    expect(grid).toContain('variant?: "default" | "card"');
+    expect(grid).toContain("bg-surface-primary border border-border-default shadow-sm");
+  });
+
   it("applies the Modern card variant to nested tier sections (visual only)", () => {
     // The cockpit lifts nested children onto cards via the additive
     // CollapsibleSection `variant` — placement unchanged.

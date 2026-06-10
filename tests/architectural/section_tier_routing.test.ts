@@ -35,12 +35,18 @@ describe("section_tier routing", () => {
 
   it("renders the evidence + audit tiers inline in their stacked surfaces", () => {
     // Stacked-collapsible layout (main 2026-06-08, tabs retired):
-    // evidence-tier sections stack above EvidenceGrid inside the
-    // evidence group.
-    const evidenceIdx = PANEL.indexOf("{evidenceSections}");
+    // evidence-tier sections stack above EvidenceGrid inside the evidence
+    // group. The cockpit review-before-send reorder (council 2026-06-10)
+    // wraps them in a ternary (Modern uses evidenceSectionsNoDraft, Legacy
+    // evidenceSections) and renders the draft AFTER the grid — assert the
+    // ternary marker precedes the grid, and the draft follows it.
+    const evidenceIdx = PANEL.indexOf("COCKPIT ? evidenceSectionsNoDraft : evidenceSections");
     const gridIdx = PANEL.indexOf("<EvidenceGrid");
     expect(evidenceIdx).toBeGreaterThan(-1);
     expect(evidenceIdx).toBeLessThan(gridIdx);
+    // Draft reply renders LAST (after the grid) in Modern — Send terminal.
+    const draftIdx = PANEL.indexOf("{COCKPIT && draftReplyNested}");
+    expect(draftIdx).toBeGreaterThan(gridIdx);
 
     // Audit-tier sections stack above the raw trace (DiagnosticsSection)
     // inside the Diagnostics group. The cockpit (Modern) splits this tier
