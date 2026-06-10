@@ -3371,16 +3371,34 @@ export interface components {
          * PresentationAudit
          * @description Engine internals — `presentation_tier: audit` (council 2026-06-07).
          *
-         *     The recipe that ran and the raw intent enum. These reconstruct HOW
-         *     the system decided; they are never operator-facing Layer 1 — they
-         *     live in the Diagnostics & Audit surface. Emitted (Guardrail #7:
-         *     available, not removed), just not shown front-and-center.
+         *     The provenance bundle that reconstructs HOW the system decided: the
+         *     recipe that ran, the raw intent enum, and (council 2026-06-10) the
+         *     originating event, shadow verdict, taxonomy classification + version,
+         *     and the trace correlation id — the "Provenance" card in the
+         *     Diagnostics & Audit drawer. These are never operator-facing Layer 1;
+         *     they are emitted (Guardrail #7: available, not removed), just not
+         *     shown front-and-center.
+         *
+         *     Every field is a pure projection of an already-decided record field
+         *     (Verdict 2026-04-22: the composer assembles, recipes do not) and is
+         *     None when the record has no honest value, so the UI structurally
+         *     omits that row rather than fabricating a placeholder.
          */
         PresentationAudit: {
+            /** Correlation Id */
+            correlation_id?: string | null;
+            /** Event Type */
+            event_type?: string | null;
             /** Intent Code */
             intent_code?: string | null;
             /** Recipe Name */
             recipe_name?: string | null;
+            /** Shadow Verdict */
+            shadow_verdict?: string | null;
+            /** Supergroup Code */
+            supergroup_code?: string | null;
+            /** Taxonomy Version */
+            taxonomy_version?: string | null;
         };
         /**
          * PresentationContract

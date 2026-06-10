@@ -132,7 +132,13 @@ describe("Evidence + Diagnostics are single grouped disclosures (no flat stack, 
     // is visible. Regression = every header flat at one size.
     expect(panel).toMatch(/title="Evidence"\s+id="section-evidence"\s+level="group"/);
     expect(panel).toMatch(/title="Diagnostics & Audit"\s+id="section-diagnostics"\s+level="group"/);
-    expect(panel).toContain('cloneElement(node as ReactElement<{ level?: CollapsibleLevel }>, { level: "nested" })');
+    // asNested demotes evidence/audit children to `nested` in BOTH view
+    // modes; the cockpit (Modern) additionally lifts them onto cards via the
+    // `variant` (council 2026-06-10). The nested demotion must survive.
+    expect(panel).toContain("cloneElement(");
+    expect(panel).toMatch(
+      /COCKPIT \? \{ level: "nested", variant: "card" \} : \{ level: "nested" \}/,
+    );
   });
 });
 
@@ -143,7 +149,14 @@ describe("Single Diagnostics & Audit surface — no duplicate drawer (council 20
   it("ExceptionDetailPanel exposes auditExtras and renders it inside the Diagnostics group", () => {
     expect(panel).toContain("auditExtras?: ReactNode");
     // Rendered inside the Diagnostics & Audit group, after the trace pane.
-    expect(panel).toMatch(/<DiagnosticsSection[\s\S]*?\/>\s*\{\/\*[\s\S]*?\*\/\}\s*\{auditExtras\}/);
+    // The cockpit (council 2026-06-10) branches the group body (Modern vs
+    // Legacy), so a trace pane precedes {auditExtras} on either path; the
+    // "Single Diagnostics & Audit surface" comment sits immediately before
+    // it. Assert the trace→auditExtras order and the single-surface comment.
+    expect(panel).toMatch(/<DiagnosticsSection[\s\S]*?\{auditExtras\}/);
+    expect(panel).toMatch(
+      /\{\/\* Single Diagnostics & Audit surface[\s\S]*?\*\/\}\s*\{auditExtras\}/,
+    );
   });
 
   it("/cases workspace injects provenance into the panel and gates its own drawer on !selectedRecord", () => {

@@ -24,6 +24,7 @@ import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { ViewModeToggle } from "@/components/ui/ViewModeToggle";
 import { ViewModeProvider } from "@/hooks/useViewMode";
+import { ProvenanceCard } from "@/components/ui/ProvenanceCard";
 import { ActionButtonMatrix } from "@/components/ui/ActionButtonMatrix";
 import { ComplianceHitCountChip } from "@/components/ui/ComplianceHitCountChip";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
@@ -253,6 +254,31 @@ describe("a11y sweep: ViewModeToggle", () => {
       <ViewModeProvider>
         <ViewModeToggle />
       </ViewModeProvider>,
+    ));
+});
+
+// ---------------------------------------------------------------------------
+// ProvenanceCard — Diagnostics & Audit provenance projector. Labelled
+// key/value list; the shadow-verdict row carries a token-driven Badge.
+// ---------------------------------------------------------------------------
+describe("a11y sweep: ProvenanceCard", () => {
+  it("full bundle", async () =>
+    expectNoViolations(
+      <ProvenanceCard
+        audit={{
+          recipe_name: "DuplicatePORecipe",
+          intent_code: "DUPLICATE_PO",
+          event_type: "EDI_850_DUPLICATE_PO",
+          shadow_verdict: "YELLOW",
+          supergroup_code: "cpg.beverage.dup-po",
+          taxonomy_version: "2026-05-30-v2",
+          correlation_id: "8c9f-f828-41d0-9a2b",
+        }}
+      />,
+    ));
+  it("partial bundle", async () =>
+    expectNoViolations(
+      <ProvenanceCard audit={{ recipe_name: "R", event_type: "E" }} />,
     ));
 });
 

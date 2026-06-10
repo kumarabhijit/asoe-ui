@@ -36,15 +36,25 @@ describe("section_tier routing", () => {
   it("renders the evidence + audit tiers inline in their stacked surfaces", () => {
     // Stacked-collapsible layout (main 2026-06-08, tabs retired):
     // evidence-tier sections stack above EvidenceGrid inside the
-    // evidence anchor; audit-tier above DiagnosticsSection inside the
-    // diagnostics anchor.
+    // evidence group.
     const evidenceIdx = PANEL.indexOf("{evidenceSections}");
     const gridIdx = PANEL.indexOf("<EvidenceGrid");
-    const auditIdx = PANEL.indexOf("{auditSections}");
-    const diagIdx = PANEL.indexOf("<DiagnosticsSection");
     expect(evidenceIdx).toBeGreaterThan(-1);
-    expect(auditIdx).toBeGreaterThan(-1);
     expect(evidenceIdx).toBeLessThan(gridIdx);
-    expect(auditIdx).toBeLessThan(diagIdx);
+
+    // Audit-tier sections stack above the raw trace (DiagnosticsSection)
+    // inside the Diagnostics group. The cockpit (Modern) splits this tier
+    // into otherAuditSections + an "Audit only" group; Legacy keeps the
+    // flat {auditSections}. BOTH branches place the audit sections before
+    // their DiagnosticsSection — assert per branch (there are now two
+    // DiagnosticsSection occurrences, one per branch).
+    const legacyAuditIdx = PANEL.indexOf("{auditSections}");
+    const modernAuditIdx = PANEL.indexOf("{otherAuditSections}");
+    expect(legacyAuditIdx).toBeGreaterThan(-1);
+    expect(modernAuditIdx).toBeGreaterThan(-1);
+    // Modern: otherAuditSections precede the FIRST DiagnosticsSection.
+    expect(modernAuditIdx).toBeLessThan(PANEL.indexOf("<DiagnosticsSection"));
+    // Legacy: {auditSections} precede the LAST DiagnosticsSection.
+    expect(legacyAuditIdx).toBeLessThan(PANEL.lastIndexOf("<DiagnosticsSection"));
   });
 });

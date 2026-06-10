@@ -31,7 +31,7 @@
 
 import { useState, useEffect, useRef, useCallback, cloneElement, type MutableRefObject, type ReactNode, type ReactElement } from "react";
 import { signIn } from "next-auth/react";
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RotateCcw } from "lucide-react";
 import {
   AgentReasoningCard,
   type ExecutionError,
@@ -82,6 +82,7 @@ import { KnowledgeGraphSection } from "./KnowledgeGraphSection";
 import { DraftReplySection } from "./DraftReplySection";
 import { EvidenceGrid } from "./EvidenceGrid";
 import { DiagnosticsSection } from "./DiagnosticsSection";
+import { ProvenanceCard } from "@/components/ui/ProvenanceCard";
 
 /**
  * Convenience predicate over the shared `HITL_LIFECYCLE_STATES`
@@ -710,11 +711,26 @@ export default function ExceptionDetailPanel({
   // follow-up 2026-06-09 — the group header must visibly outrank its children
   // instead of every header sitting flat). cloneElement injects the level in
   // one place rather than threading it through all ~19 section builders.
+  // Cockpit (Modern) lifts each nested child onto its own card (variant);
+  // Legacy keeps the flat subtle-surface child. Placement + header size
+  // unchanged — visual only (Guardrail #0 relaxation: UI owns treatment).
   const asNested = (node: ReactNode) =>
-    cloneElement(node as ReactElement<{ level?: CollapsibleLevel }>, { level: "nested" });
+    cloneElement(
+      node as ReactElement<{ level?: CollapsibleLevel; variant?: "default" | "card" }>,
+      COCKPIT ? { level: "nested", variant: "card" } : { level: "nested" },
+    );
   const operatorSections = operatorMembers.map((s) => s.node);
   const evidenceSections = evidenceMembers.map((s) => asNested(s.node));
   const auditSections = auditMembers.map((s) => asNested(s.node));
+  // Cockpit Diagnostics & Audit split (council 2026-06-10): the Knowledge
+  // Graph keeps its own collapsed section; the rawest internals (other
+  // audit-tier sections + the trace) move into an "Audit only" sub-group.
+  // Placement stays backend-driven (these are all section_tiers: audit);
+  // only the in-drawer grouping is the UI's.
+  const knowledgeGraphNode = auditMembers.find((s) => s.key === "knowledge_graph")?.node;
+  const otherAuditSections = auditMembers
+    .filter((s) => s.key !== "knowledge_graph")
+    .map((s) => asNested(s.node));
   // Descendant anchor ids per group (stacked-group layout 2026-06-09) — so a
   // deep link to a child's anchor opens the enclosing group (Refinement 2).
   // The grid/trace anchors live on EvidenceGrid / DiagnosticsSection.
@@ -1079,6 +1095,24 @@ export default function ExceptionDetailPanel({
             </div>
           )}
 
+          {/* Cockpit draft-reply cue (council 2026-06-10). When a reply is
+              drafted, sending it IS the resolution — but the operator must
+              review the source email + attachments + evidence FIRST, so the
+              editable draft + Send render as the LAST evidence card, never
+              above the evidence. This is a single status LINE (not a copy of
+              the reply — no redundancy) that signals the draft exists and
+              jumps to it; the Evidence group opens on the hash via its
+              descendant-anchor wiring. Modern view only. */}
+          {COCKPIT && analysis?.draft_reply && (
+            <a
+              href="#section-draft-reply"
+              className="inline-flex items-center gap-6 text-caption font-semibold text-text-brand no-underline hover:underline rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+            >
+              <CheckCircle2 size={14} aria-hidden />
+              Reply drafted by agent — review &amp; send below
+            </a>
+          )}
+
           {/* Agent Analysis: Problem / Root Cause / Recommendation
               narrative. Collapsed by default per the TRB ruling on PO
               request #4. Auto-expands when the exception sits in a
@@ -1163,13 +1197,53 @@ export default function ExceptionDetailPanel({
             onFirstOpen={ensureTraceLoaded}
           >
             <div className="flex flex-col gap-16">
-              {auditSections}
-              <DiagnosticsSection
-                detail={detail}
-                trace={trace}
-                showPreview={showPreview}
-                anchorId="section-trace"
-              />
+              {COCKPIT ? (
+                <>
+                  {/* Provenance key/value card — the projected
+                      presentation.audit bundle (council 2026-06-10). Dumb
+                      projector; renders nothing when the bundle is empty. */}
+                  <ProvenanceCard audit={analysis?.presentation?.audit} />
+                  {/* Knowledge Graph keeps its OWN collapsed section (operator
+                      adjustment 2026-06-10) — not folded into "Audit only". */}
+                  {knowledgeGraphNode}
+                  {/* Audit only — the rawest engine internals (other audit-tier
+                      sections + the trace), one level deeper so the drawer's
+                      top stays the readable Provenance + KG. Always present
+                      (it holds the trace). Declutter goal (Guardrail #7:
+                      demote, never remove). */}
+                  <CollapsibleSection
+                    title="Audit only"
+                    level="nested"
+                    variant="card"
+                    defaultOpen={false}
+                    // The trace now lives one level deeper, so a deep link to
+                    // #section-trace must open this sub-group too; lazy-load
+                    // the trace on first open (idempotent with the outer group).
+                    extraAnchorIds={["section-trace"]}
+                    onFirstOpen={ensureTraceLoaded}
+                  >
+                    <div className="flex flex-col gap-16">
+                      {otherAuditSections}
+                      <DiagnosticsSection
+                        detail={detail}
+                        trace={trace}
+                        showPreview={showPreview}
+                        anchorId="section-trace"
+                      />
+                    </div>
+                  </CollapsibleSection>
+                </>
+              ) : (
+                <>
+                  {auditSections}
+                  <DiagnosticsSection
+                    detail={detail}
+                    trace={trace}
+                    showPreview={showPreview}
+                    anchorId="section-trace"
+                  />
+                </>
+              )}
               {/* Single Diagnostics & Audit surface — case-level provenance
                   injected by the /cases workspace lands here, not in a second
                   drawer below the panel (the duplicate the operator flagged). */}
