@@ -1,15 +1,18 @@
 /**
  * Deliverable lock (Pattern A) — cockpit redesign wiring (cockpit-refactor).
  *
- * The cockpit is an OPT-IN presentational recomposition selected in-UI
- * via the Legacy/Modern view toggle (`useViewMode`). `cockpitEnabled()`
+ * The cockpit is a presentational recomposition selected in-UI via the
+ * Legacy/Modern view toggle (`useViewMode`). `cockpitEnabled()`
  * (NEXT_PUBLIC_COCKPIT) survives only as the *default seed* inside the
- * provider — Legacy is the default, so the classic layout and every
- * lock/e2e pinning it is untouched until an operator opts into Modern.
- * These source-greps assert the wiring is actually present (a
- * behavioural test can't catch "the feature was supposed to ship but
- * wasn't built") AND that the mode is read reactively, never inlined as
- * a module const again. Removing any wiring below must fail the build.
+ * provider — Modern is the org-wide default since 2026-06-11, with
+ * NEXT_PUBLIC_COCKPIT=0 as the env escape hatch back to Legacy, and a
+ * stored per-user toggle choice always winning over the seed. The
+ * legacy-journey e2e suites pin their mode explicitly in their
+ * playwright configs. These source-greps assert the wiring is actually
+ * present (a behavioural test can't catch "the feature was supposed to
+ * ship but wasn't built") AND that the mode is read reactively, never
+ * inlined as a module const again. Removing any wiring below must fail
+ * the build.
  */
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -20,11 +23,22 @@ const SRC = join(ROOT, "src");
 const read = (rel: string) => readFileSync(join(SRC, rel), "utf-8");
 
 describe("cockpit flag (env default seed)", () => {
-  it("flags.ts exports an opt-in cockpitEnabled() (default off)", () => {
+  it("flags.ts exports cockpitEnabled() — default ON with the =0 escape hatch", () => {
     const src = read("lib/flags.ts");
     expect(src).toContain("export function cockpitEnabled()");
-    // Opt-in: returns true only on explicit NEXT_PUBLIC_COCKPIT === "1".
-    expect(src).toMatch(/NEXT_PUBLIC_COCKPIT === "1"/);
+    // Default ON (product direction 2026-06-11); NEXT_PUBLIC_COCKPIT=0
+    // is the env rollback — same pattern as casesRowV2Enabled.
+    expect(src).toMatch(/NEXT_PUBLIC_COCKPIT === "0"\) return false/);
+    expect(src).not.toMatch(/NEXT_PUBLIC_COCKPIT === "1"/);
+  });
+
+  it("the legacy-journey e2e suites pin their mode explicitly", () => {
+    // With Modern as the code default, the legacy specs only stay
+    // meaningful if their dev servers force Legacy.
+    const live = readFileSync(join(ROOT, "playwright.config.ts"), "utf-8");
+    const mock = readFileSync(join(ROOT, "playwright.mock.config.ts"), "utf-8");
+    expect(live).toMatch(/NEXT_PUBLIC_COCKPIT:\s*"0"/);
+    expect(mock).toMatch(/NEXT_PUBLIC_COCKPIT:\s*"0"/);
   });
 });
 

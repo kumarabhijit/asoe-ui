@@ -82,6 +82,11 @@ export default defineConfig({
         NEXTAUTH_SECRET: "test-secret-browser-e2e-only",
         NEXT_PUBLIC_API_URL: BACKEND_URL,
         NEXT_PUBLIC_USE_REAL_API: "1",
+        // The Modern cockpit became the org-wide DEFAULT (flags.ts,
+        // 2026-06-11). This suite's specs are the legacy-journey
+        // coverage, so the mode is pinned explicitly; the cockpit
+        // composition is covered by playwright.cockpit.config.ts.
+        NEXT_PUBLIC_COCKPIT: "0",
       },
       stdout: "pipe",
       stderr: "pipe",

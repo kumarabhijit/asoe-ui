@@ -62,6 +62,12 @@ export default defineConfig({
         NEXTAUTH_SECRET: "test-secret-browser-e2e-mock-only",
         // Deliberately NO NEXT_PUBLIC_USE_REAL_API — api.ts runs its
         // mock branches, exactly like the Vercel preview.
+        // The Modern cockpit became the org-wide DEFAULT (flags.ts,
+        // 2026-06-11). This suite's specs (incl. the Legacy→Modern
+        // toggle journey) are written against an env-default-Legacy
+        // server, so the mode is pinned explicitly; the cockpit
+        // composition is covered by playwright.cockpit.config.ts.
+        NEXT_PUBLIC_COCKPIT: "0",
       },
       stdout: "pipe",
       stderr: "pipe",

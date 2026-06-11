@@ -37,15 +37,21 @@ export function casesRowV2Enabled(): boolean {
 //
 // Gates the agent-first "decision cockpit" composition: a confidence
 // ring on the Recommendation, the persistent Agent Activity rail, and
-// the cockpit center layout. OPT-IN — default OFF in every tier so the
-// existing layout (and every architecture lock + e2e that pins it) is
-// byte-for-byte unchanged until the surface is reviewed. Flip
-// `NEXT_PUBLIC_COCKPIT=1` (Vercel preview env var) to demo it; no code
-// change is needed to roll forward or back.
+// the cockpit center layout. DEFAULT ON (product direction 2026-06-11):
+// the Modern view is the org-wide default seed for `useViewMode`; a
+// stored per-user choice from the NavBar Legacy/Modern toggle still
+// wins, and `NEXT_PUBLIC_COCKPIT=0` is the env escape hatch to roll
+// the default back without a code change — the same rollback pattern
+// as `casesRowV2Enabled` above. The browser-e2e suites pin their mode
+// explicitly: `playwright.config.ts` / `playwright.mock.config.ts` run
+// the legacy-journey specs with NEXT_PUBLIC_COCKPIT=0, and
+// `playwright.cockpit.config.ts` runs the cockpit specs with =1,
+// which now matches the production default.
 //
 // Design principle: nothing about the cockpit touches data fetching,
 // action handlers, RBAC, or backend contracts — it is a presentational
 // recomposition of the same data the classic layout consumes.
 export function cockpitEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_COCKPIT === "1";
+  if (process.env.NEXT_PUBLIC_COCKPIT === "0") return false;
+  return true;
 }

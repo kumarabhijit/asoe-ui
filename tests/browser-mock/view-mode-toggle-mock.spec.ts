@@ -6,8 +6,10 @@
  * "in-UI Legacy/Modern view toggle") pins: an operator can switch into
  * the Modern cockpit *from the NavBar*, with NO environment change.
  *
- * It runs under `playwright.mock.config.ts`, whose dev server sets NO
- * NEXT_PUBLIC_COCKPIT — so the env default is Legacy. The cockpit
+ * It runs under `playwright.mock.config.ts`, whose dev server pins
+ * NEXT_PUBLIC_COCKPIT=0 — so the env default is Legacy here even though
+ * the production default flipped to Modern (flags.ts, 2026-06-11): this
+ * journey specifically proves the in-UI escape from Legacy. The cockpit
  * surfaces (confidence ring, Agent Activity rail) are therefore absent
  * on load and appear ONLY after the toggle is flipped to Modern. That
  * is the whole point: the switch lives in the UI, not in Vercel.
