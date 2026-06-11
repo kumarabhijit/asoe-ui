@@ -930,6 +930,8 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       { line_id: "L3", diagnosis: "50 CS ordered, layer qty 12. 4 full layers = 48, 2 loose. Partial pallet.", resolution: "ROUND_DOWN", risk: "LOW", waterfall: [] },
     ],
     pallet_analysis: {
+      // Lines mix Broken Layer + Partial Pallet → recipe classifies MIXED_VIOLATION.
+      classification: "MIXED_VIOLATION",
       total_ordered_cases: 305,
       loose_cases_total: 37,
       at_risk_total: 1301.50,
@@ -1669,6 +1671,7 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       { line_id: "L2", diagnosis: "2,000 CS ordered, layer qty 60. 33 full layers = 1,980, 20 loose. Broken layer.", resolution: "ROUND_DOWN", risk: "LOW", waterfall: [] },
     ],
     pallet_analysis: {
+      classification: "BROKEN_LAYER",
       total_ordered_cases: 4_000,
       loose_cases_total: 40,
       at_risk_total: 520.00,

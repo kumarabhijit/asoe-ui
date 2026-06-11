@@ -37,6 +37,16 @@ describe("Batch 5 — route error.tsx boundaries do not leak the raw error.messa
       expect(src).toContain("<BoundaryError");
     });
   }
+
+  it("a root-segment error.tsx covers routes without their own boundary", () => {
+    // Phase 2 UX overhaul (2026-06-11): segments without a boundary
+    // (login, 403, auth callback, root redirect) white-screened on a
+    // thrown error. The root boundary is the catch-all; same
+    // no-raw-message rule as the per-route boundaries.
+    const src = read("src/app/error.tsx");
+    expect(src).not.toMatch(/error\??\.message/);
+    expect(src).toContain("<BoundaryError");
+  });
 });
 
 describe("Batch 5 — /cases/[id] reaches not-found.tsx and drops hardcoded chrome", () => {

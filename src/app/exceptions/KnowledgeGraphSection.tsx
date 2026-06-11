@@ -126,7 +126,7 @@ export function KnowledgeGraphSection({ data }: KnowledgeGraphSectionProps) {
                   y={p.y - NODE_R - 4}
                   textAnchor="middle"
                   className="text-label"
-                  style={{ fill: "var(--color-text-tertiary)", fontSize: 9 }}
+                  style={{ fill: "var(--color-text-tertiary)", fontSize: "var(--font-size-label)" }}
                 >
                   {n.label}
                 </text>

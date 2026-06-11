@@ -99,18 +99,29 @@ describe("/cases workspace — HITL action propagation invariants", () => {
     ).toMatch(/refreshCaseDetail\(\)/);
 
     // refreshCaseDetail must re-fetch the case AND its records — both
-    // panes (header status, RecordListPane) depend on them.
+    // panes (header status, RecordListPane) depend on them. Since the
+    // Phase 2 dedup it delegates to the shared `loadCaseDetail`
+    // helper, which owns both fetches.
     const refresh = pageSrc.match(
       /const refreshCaseDetail = useCallback\([\s\S]*?\}, \[[^\]]*\]\)/,
     );
     expect(refresh, "refreshCaseDetail useCallback not found").not.toBeNull();
     expect(
       refresh![0],
-      "refreshCaseDetail must re-fetch the OrderCase",
+      "refreshCaseDetail must delegate to the shared loadCaseDetail",
+    ).toMatch(/loadCaseDetail\(/);
+
+    const helper = pageSrc.match(
+      /const loadCaseDetail = useCallback\([\s\S]*?\},\s*\n\s*\[[^\]]*\],?\s*\n?\s*\)/,
+    );
+    expect(helper, "shared loadCaseDetail helper not found").not.toBeNull();
+    expect(
+      helper![0],
+      "loadCaseDetail must re-fetch the OrderCase",
     ).toMatch(/casesApi\.get\(/);
     expect(
-      refresh![0],
-      "refreshCaseDetail must re-fetch the case's child records",
+      helper![0],
+      "loadCaseDetail must re-fetch the case's child records",
     ).toMatch(/casesApi\.getRecords\(/);
   });
 });

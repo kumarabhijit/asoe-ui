@@ -48,20 +48,22 @@ describe("/cases workspace — case-switch race invariants", () => {
   const src = readFileSync(PAGE_PATH, "utf-8");
 
   it("clears orderCase + records eagerly when selectedCaseId changes", () => {
-    // Locate the useEffect keyed on [selectedCaseId]. The body must
-    // include explicit `setOrderCase(null)` and `setRecords([])` BEFORE
-    // the casesApi.get(selectedCaseId) call.
+    // Locate the useEffect keyed on selectedCaseId (the fetch itself
+    // lives in the shared `loadCaseDetail` helper since the Phase 2
+    // dedup — the effect kicks it off). The body must include explicit
+    // `setOrderCase(null)` and `setRecords([])` BEFORE the
+    // loadCaseDetail(selectedCaseId, ...) kick-off.
     const effectBody = src.match(
-      /useEffect\(\(\)[\s\S]*?\}, \[selectedCaseId\]\)/,
+      /useEffect\(\(\)[\s\S]*?\}, \[selectedCaseId, loadCaseDetail\]\)/,
     );
     expect(
       effectBody,
-      "useEffect keyed on [selectedCaseId] not found",
+      "useEffect keyed on [selectedCaseId, loadCaseDetail] not found",
     ).not.toBeNull();
     const body = effectBody![0];
 
     const clearIdx = body.indexOf("setOrderCase(null)");
-    const fetchIdx = body.search(/casesApi\.get\(\s*selectedCaseId\s*\)/);
+    const fetchIdx = body.search(/loadCaseDetail\(\s*selectedCaseId\s*,/);
     expect(
       clearIdx,
       "setOrderCase(null) missing — stale prior-case data leaks " +
@@ -69,17 +71,33 @@ describe("/cases workspace — case-switch race invariants", () => {
     ).toBeGreaterThan(-1);
     expect(
       fetchIdx,
-      "casesApi.get(selectedCaseId) call not found",
+      "loadCaseDetail(selectedCaseId, ...) kick-off not found",
     ).toBeGreaterThan(-1);
     expect(
       clearIdx,
-      "setOrderCase(null) must come BEFORE casesApi.get(...)",
+      "setOrderCase(null) must come BEFORE loadCaseDetail(...)",
     ).toBeLessThan(fetchIdx);
 
     expect(
       body,
       "setRecords([]) missing — same race shape as setOrderCase",
     ).toMatch(/setRecords\(\s*\[\s*\]\s*\)/);
+
+    // The effect must pass a staleness guard so a superseded fetch
+    // can't write its results over the newer selection's state, and
+    // the helper must honor it before every state write.
+    expect(
+      body,
+      "loadCaseDetail must receive the `() => cancelled` staleness guard",
+    ).toMatch(/loadCaseDetail\(\s*selectedCaseId\s*,\s*\(\)\s*=>\s*cancelled\s*\)/);
+    const helper = src.match(
+      /const loadCaseDetail = useCallback\([\s\S]*?\},\s*\n\s*\[[^\]]*\],?\s*\n?\s*\)/,
+    );
+    expect(helper, "shared loadCaseDetail helper not found").not.toBeNull();
+    expect(
+      helper![0],
+      "loadCaseDetail must check isStale() before writing state",
+    ).toMatch(/if \(isStale\(\)\) return/);
   });
 
   it("only renders CaseDetailPanel when orderCase.case_id matches URL", () => {

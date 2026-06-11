@@ -52,9 +52,18 @@ export interface WSEvent {
 
 /* ── Payload types ─────────────────────────────────────────────────── */
 
+/**
+ * Mirrors `PipelineProgressPayload` in asoe2/api/events.py.
+ *
+ * ADR-027 Phase B batches one event per record state change, carrying
+ * the full executed-nodes list to date in `executed_nodes` (the UI
+ * reconciles idempotently against the full list). The per-node fields
+ * (`node`, `status`, `duration_ms`, `data`) are the legacy unbatched
+ * shape — optional on the wire and unused on the Phase B path.
+ */
 export interface PipelineProgressPayload {
-  node: PipelineNode;
-  status: NodeStatus;
+  node?: PipelineNode;
+  status?: NodeStatus;
   duration_ms?: number;
   data?: {
     intent?: string;
@@ -65,6 +74,9 @@ export interface PipelineProgressPayload {
     final_status?: string;
     explanation?: string;
   };
+  /** Phase B batched form — full executed-nodes list to date. */
+  executed_nodes?: Array<Record<string, unknown>>;
+  final_status?: string;
 }
 
 export interface ExceptionUpdatePayload {
@@ -98,7 +110,9 @@ export interface ReanalysisStartedPayload {
 /* ── Case-level events (ADR-038 §H.6 / Phase 28.5) ─────────────────── */
 
 export interface CaseOpenedPayload {
-  source: string;
+  /** Mirrors `CaseOpenedPayload.origin` in asoe2/api/events.py
+   *  (the OrderCase origin enum value, e.g. CUSTOMER / EDI). */
+  origin: string;
   source_channel: string;
   status: string;
   sla_deadline?: string;

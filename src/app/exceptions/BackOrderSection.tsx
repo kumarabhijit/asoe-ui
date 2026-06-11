@@ -198,8 +198,14 @@ export function BackOrderSection({ data, resolvedAction = null }: BackOrderSecti
                   </div>
                   <div className="text-caption text-text-primary">
                     <span className="font-mono font-bold">{production.qty.toLocaleString()} {data.uom}</span>
-                    <span className="text-text-tertiary"> due </span>
-                    <span className="font-mono">{new Date(production.date).toLocaleDateString()}</span>
+                    {/* `date` is Optional on the wire (InboundOrder) —
+                        omit the sub-field rather than render Invalid Date. */}
+                    {production.date && (
+                      <>
+                        <span className="text-text-tertiary"> due </span>
+                        <span className="font-mono">{new Date(production.date).toLocaleDateString()}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               );
@@ -221,11 +227,22 @@ export function BackOrderSection({ data, resolvedAction = null }: BackOrderSecti
                     <span className="text-label font-bold uppercase tracking-wider">Inbound PO</span>
                   </div>
                   <div className="text-caption text-text-primary">
-                    <span className="font-mono font-bold">{ipo.po_num}</span>
-                    <span className="text-text-tertiary"> — </span>
+                    {/* `po_num` / `eta` are Optional on the wire
+                        (InboundOrder) — omit absent sub-fields rather
+                        than render undefined / Invalid Date. */}
+                    {ipo.po_num && (
+                      <>
+                        <span className="font-mono font-bold">{ipo.po_num}</span>
+                        <span className="text-text-tertiary"> — </span>
+                      </>
+                    )}
                     <span className="font-mono">{ipo.qty.toLocaleString()} {data.uom}</span>
-                    <span className="text-text-tertiary"> ETA </span>
-                    <span className="font-mono">{new Date(ipo.eta).toLocaleDateString()}</span>
+                    {ipo.eta && (
+                      <>
+                        <span className="text-text-tertiary"> ETA </span>
+                        <span className="font-mono">{new Date(ipo.eta).toLocaleDateString()}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               );
