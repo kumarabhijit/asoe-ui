@@ -175,6 +175,51 @@ test.describe("ADR-043 — attachment preview & evidence highlighting", () => {
     await expect(poRow(page)).toHaveAttribute("data-status", "ambiguous");
   });
 
+  test("a located text-derived anchor draws an in-document highlight (email-content evidence)", async ({ page, request }) => {
+    // Regression (bug report 2026-06-11): text-derived anchors — the
+    // email-content evidence like the From: header, which never has
+    // backend-recorded geometry — verified as LOCATED in the safety bar but
+    // drew NO highlight inside the PDF. Phase 1.5 derives a best-effort box
+    // from the PDF.js text layer when the anchor uniquely locates on the
+    // previewed page.
+    const fromAnchor: AnchorSpec = {
+      text: "From: buyer@southeast-distrib.example",
+      label: "Customer",
+      supports_ref: "order_entry.customer",
+    };
+    const token = await backendToken(request, USERS.MANAGER);
+    await resetTenant(request, token);
+    const exId = await seedAttachmentWithAnchors(request, token, {
+      documentText:
+        `Purchase Order ${SE_EXAMPLE.poText}. Email context: ${fromAnchor.text}. ` +
+        "Standard supply agreement applies to this order.",
+      attachmentName: SE_EXAMPLE.attachmentName,
+      attachmentMime: SE_EXAMPLE.attachmentMime,
+      anchors: [SE_EXAMPLE.anchors[0], fromAnchor],
+    });
+    await loginAs(page, USERS.MANAGER);
+
+    await openPreview(request, token, page, exId);
+
+    // The email-content anchor is LOCATED…
+    const row = page
+      .locator('[data-testid="evidence-safety-bar"] li')
+      .filter({ hasText: "Customer" })
+      .first();
+    await expect(row).toHaveAttribute("data-status", "located");
+
+    // …and now ALSO has an in-document highlight box over the PDF canvas
+    // (text-layer-derived; spatial boxes remain backend-recorded only).
+    const overlay = page.locator(
+      '[data-testid="text-layer-overlay"][data-supports-ref="order_entry.customer"]',
+    );
+    await expect(overlay).toBeVisible({ timeout: 15_000 });
+
+    // Selecting the row foregrounds the box (field↔source link).
+    await row.getByRole("button").first().click();
+    await expect(overlay).toHaveAttribute("data-selected", "true");
+  });
+
   test("the preview shows the non-dismissable 'highlight is not authorization' banner", async ({ page, request }) => {
     const token = await backendToken(request, USERS.MANAGER);
     await resetTenant(request, token);
