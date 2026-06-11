@@ -92,17 +92,15 @@ export interface RequestOptions {
 }
 
 /* ── Reanalyze (YELLOW/RED/FAILED — manager+) ─────────────────────── */
-
-export interface ReanalyzeRequest {
-  /** Mandatory free-text justification (SOX audit trail). */
-  reason: string;
-}
-
 /* ── Challenge (GREEN tier — analyst+) ────────────────────────────── */
 
-export interface ChallengeRequest {
-  challenge_reason: string;
-}
+// Phase 3 consolidation (2026-06-11): these two were hand-written here
+// AND re-exported from the generated OpenAPI types in ./contracts —
+// two import paths for the same contract, free to drift. The generated
+// shape is the single source; this re-export keeps existing importers
+// working. (Reanalyze carries the mandatory free-text justification —
+// SOX audit trail; Challenge carries challenge_reason.)
+export type { ChallengeRequest, ReanalyzeRequest } from "./contracts";
 
 /* ── Admin Release (RED tier — admin only) ────────────────────────── */
 

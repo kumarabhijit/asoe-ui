@@ -26,9 +26,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   CheckCircle2,
-  Clock,
   Mail,
-  PackageCheck,
 } from "lucide-react";
 
 import { useSignOut } from "@/hooks/useSignOut";
@@ -52,9 +50,9 @@ import type {
   CaseStatus,
   Origin,
   OrderCase,
-  SlaBand,
   SlaSnapshot,
 } from "@/types/cases";
+import { ORIGIN_LABEL } from "./caseChrome";
 import { slaSnapshotFromDeadline } from "@/lib/sla";
 import type { ExceptionDetailResponse } from "@/types/api";
 
@@ -80,28 +78,9 @@ const CASES_ROW_V2 = casesRowV2Enabled();
 
 /* ── Visual mappings (vendor-neutral; per-source / per-status badge style) ── */
 
-// Origin chrome — KEEP the "Customer Inbox" label per requirements
-// §4 Q7. The internal field flipped from CaseSource to Origin but
-// the partner-facing chrome stays.
-const ORIGIN_LABEL: Record<Origin | "default", string> = {
-  CUSTOMER: "Customer Inbox",
-  API: "API",
-  default: "Unknown origin",
-};
-
-const ORIGIN_ICON: Record<Origin | "default", React.ReactNode> = {
-  CUSTOMER: <Mail size={12} aria-hidden />,
-  API: <PackageCheck size={12} aria-hidden />,
-  default: <Clock size={12} aria-hidden />,
-};
-
-const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutral"> = {
-  breached: "error",
-  at_risk: "warning",
-  today: "warning",
-  comfortable: "success",
-  none: "neutral",
-};
+// Origin chrome + SLA band variants are shared across the four /cases
+// surfaces — see ./caseChrome.tsx (Phase 3 consolidation). The
+// "Customer Inbox" label policy (requirements §4 Q7) lives there.
 
 
 /**

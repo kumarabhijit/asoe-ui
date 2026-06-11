@@ -25,11 +25,19 @@ const PAGE = readFileSync(
   "utf-8",
 );
 
+const CHROME = readFileSync(
+  join(__dirname, "..", "..", "src", "app", "cases", "caseChrome.tsx"),
+  "utf-8",
+);
+
 describe("Customer Inbox lens deliverable (page.tsx)", () => {
   it("renders a 'Customer Inbox' label as the visible partner chrome", () => {
     // The label lives on ORIGIN_LABEL["CUSTOMER"] (per requirements
     // §4 Q7 — keep the visible chrome stable through the pivot).
-    expect(PAGE).toMatch(/CUSTOMER:\s*"Customer Inbox"/);
+    // Phase 3 consolidation: the map moved to the shared caseChrome
+    // module; the page must still consume it for the chip label.
+    expect(CHROME).toMatch(/CUSTOMER:\s*"Customer Inbox"/);
+    expect(PAGE).toMatch(/ORIGIN_LABEL\[/);
   });
 
   it("the lens value is the typed CUSTOMER origin (no bare literal in JSX)", () => {
