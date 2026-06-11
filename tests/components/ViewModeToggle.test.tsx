@@ -34,7 +34,7 @@ describe("ViewModeToggle", () => {
   it("exposes the active view in the aria-label after mount", async () => {
     renderToggle();
     const trigger = await screen.findByRole("button", {
-      name: /change view \(current: legacy view\)/i,
+      name: /change view \(current: modern view\)/i,
     });
     expect(trigger).toBeInTheDocument();
   });
@@ -47,7 +47,7 @@ describe("ViewModeToggle", () => {
     expect(screen.getByText("Modern view")).toBeInTheDocument();
   });
 
-  it("marks Legacy as the checked radio by default (env flag off)", async () => {
+  it("marks Modern as the checked radio by default (org-wide default, 2026-06-11)", async () => {
     const user = userEvent.setup();
     renderToggle();
     await user.click(screen.getByRole("button", { name: /change view/i }));
@@ -55,24 +55,24 @@ describe("ViewModeToggle", () => {
       name: /legacy view/i,
     });
     const modern = screen.getByRole("menuitemradio", { name: /modern view/i });
-    expect(legacy).toHaveAttribute("aria-checked", "true");
-    expect(modern).toHaveAttribute("aria-checked", "false");
+    expect(modern).toHaveAttribute("aria-checked", "true");
+    expect(legacy).toHaveAttribute("aria-checked", "false");
   });
 
-  it("persists Modern when selected and reflects it on reopen", async () => {
+  it("persists Legacy when selected and reflects it on reopen (user choice beats the default)", async () => {
     const user = userEvent.setup();
     renderToggle();
     await user.click(screen.getByRole("button", { name: /change view/i }));
     await user.click(
-      await screen.findByRole("menuitemradio", { name: /modern view/i }),
+      await screen.findByRole("menuitemradio", { name: /legacy view/i }),
     );
-    expect(window.localStorage.getItem(STORAGE_KEY)).toBe("modern");
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe("legacy");
 
     // Reopen — the active radio now reflects the stored choice.
     await user.click(screen.getByRole("button", { name: /change view/i }));
-    const modern = await screen.findByRole("menuitemradio", {
-      name: /modern view/i,
+    const legacy = await screen.findByRole("menuitemradio", {
+      name: /legacy view/i,
     });
-    expect(modern).toHaveAttribute("aria-checked", "true");
+    expect(legacy).toHaveAttribute("aria-checked", "true");
   });
 });
