@@ -1,0 +1,177 @@
+<!doctype html>
+<!--
+  /dashboard redesign — "Control Tower" study (sign-off artifact, 2026-06-10).
+
+  Replaces the current Performance page (count-based BI tiles, platform
+  plumbing rows, sample activity feed) with an operator control tower
+  answering, top to bottom: how much is the system handling on its own,
+  where do I need to step in next, and what is it costing us right now.
+
+  Acceptance criteria from the operator (sign-off Q&A):
+    1. Agent-first   — live agent activity panel; "agents handled N" framing.
+    2. Decision value — SLA-risk queue with $ at stake; rows deep-link to cases.
+    3. Right KPIs    — auto-resolution rate, $ at risk, time vs manual.
+    4. Cockpit visual language — tokens, density, hierarchy of newer surfaces.
+
+  DESIGN ARTIFACT ONLY. All figures are illustrative; every cell maps to a
+  backend-composed field (proposed ControlTowerResponse) — no UI math.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Control Tower — /dashboard redesign</title>
+  <link rel="stylesheet" href="../../src/styles/design-tokens.css" />
+  <style>
+    body { margin: 0; background: var(--color-surface-page); color: var(--color-text-primary);
+           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           padding: var(--space-32, 32px); }
+    .wrap { max-width: 1180px; margin: 0 auto; }
+    h1 { font-size: var(--font-size-title); margin: 0 0 4px; }
+    .sub { color: var(--color-text-tertiary); font-size: var(--font-size-caption); margin: 0 0 var(--space-24, 24px); }
+    .card { background: var(--color-surface-primary); border: 1px solid var(--color-border-subtle);
+            border-radius: var(--radius-lg); padding: var(--space-16, 16px); }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-16, 16px); margin-bottom: var(--space-16, 16px); }
+    .kpi .label { font-size: var(--font-size-label, 10px); text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-tertiary); font-weight: 600; }
+    .kpi .val { font-size: 26px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .kpi .delta { font-size: var(--font-size-caption); margin-top: 4px; }
+    .up { color: var(--color-success); } .down { color: var(--color-error); } .warn { color: var(--color-warning); }
+    .grid2 { display: grid; grid-template-columns: 7fr 5fr; gap: var(--space-16, 16px); margin-bottom: var(--space-16, 16px); }
+    .card h3 { margin: 0 0 var(--space-12, 12px); font-size: var(--font-size-subhead); display: flex; align-items: center; gap: 8px; }
+    .hint { font-size: var(--font-size-label, 10px); color: var(--color-text-quaternary); font-weight: 500; margin-left: auto; text-transform: uppercase; letter-spacing: .04em; }
+    .bars { display: flex; align-items: flex-end; gap: 10px; height: 120px; padding-top: 8px; }
+    .bcol { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; }
+    .b-h { background: var(--color-border-default); border-radius: 3px 3px 0 0; }
+    .b-a { background: var(--color-brand); border-radius: 3px 3px 0 0; }
+    .bx { text-align: center; font-size: var(--font-size-label, 10px); color: var(--color-text-quaternary); margin-top: 6px; }
+    .legend { display: flex; gap: 16px; font-size: var(--font-size-label, 10px); color: var(--color-text-tertiary); margin-top: 10px; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 99px; margin-right: 5px; }
+    .mix .row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .mix .name { flex: 0 0 150px; font-size: var(--font-size-caption); color: var(--color-text-secondary); }
+    .mix .track { flex: 1; height: 7px; background: var(--color-surface-tertiary); border-radius: 99px; overflow: hidden; }
+    .mix .fill { height: 100%; border-radius: 99px; }
+    .mix .amt { flex: 0 0 56px; text-align: right; font-family: ui-monospace, Menlo, monospace; font-size: var(--font-size-caption); font-weight: 600; }
+    .roster .agent { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--color-border-subtle); }
+    .roster .agent:last-child { border-bottom: 0; }
+    .pulse { width: 8px; height: 8px; border-radius: 99px; background: var(--color-success); }
+    .idle  { background: var(--color-border-default); }
+    .roster .who { flex: 1; }
+    .roster .who .n { font-size: var(--font-size-caption); font-weight: 600; }
+    .roster .who .d { font-size: var(--font-size-label, 10px); color: var(--color-text-tertiary); }
+    .roster .state { font-size: var(--font-size-label, 10px); color: var(--color-success); font-weight: 600; }
+    .roster .state.off { color: var(--color-text-quaternary); }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: var(--font-size-label, 10px); text-transform: uppercase; letter-spacing: .05em;
+         color: var(--color-text-quaternary); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--color-border-subtle); }
+    td { padding: 9px 8px; font-size: var(--font-size-caption); border-bottom: 1px solid var(--color-border-subtle); }
+    tr:last-child td { border-bottom: 0; }
+    td.mono { font-family: ui-monospace, Menlo, monospace; font-weight: 600; }
+    .due-warn { color: var(--color-warning); font-weight: 700; }
+    .due-err { color: var(--color-error); font-weight: 700; }
+    a.case { color: var(--color-brand); text-decoration: none; font-weight: 600; }
+    .note { max-width: 1180px; margin: var(--space-24, 24px) auto 0; font-size: var(--font-size-caption); color: var(--color-text-tertiary); line-height: 1.55; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Control Tower</h1>
+    <p class="sub">Order-to-cash exceptions · last 24 hours · live</p>
+
+    <!-- KPI band — the four numbers that matter (criterion 3) -->
+    <div class="kpis">
+      <div class="card kpi">
+        <div class="label">Auto-resolved by agents</div>
+        <div class="val">86%</div>
+        <div class="delta up">▲ 4.2 pts vs last week</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Open · needs you</div>
+        <div class="val">23</div>
+        <div class="delta warn">▲ 6 since 9am</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Avg time to resolve</div>
+        <div class="val">3.1<span style="font-size:14px">m</span></div>
+        <div class="delta up">▼ 38% vs manual baseline</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">$ at risk now</div>
+        <div class="val" style="color:var(--color-warning)">$214k</div>
+        <div class="delta" style="color:var(--color-text-tertiary)">across 23 open exceptions</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <!-- Throughput: the agents-are-working story (criterion 1) -->
+      <div class="card">
+        <h3>Resolution throughput <span class="hint">agents vs humans · per hour</span></h3>
+        <div class="bars">
+          <div class="bcol"><div class="b-h" style="height:8px"></div><div class="b-a" style="height:38px"></div><div class="bx">08</div></div>
+          <div class="bcol"><div class="b-h" style="height:10px"></div><div class="b-a" style="height:52px"></div><div class="bx">09</div></div>
+          <div class="bcol"><div class="b-h" style="height:12px"></div><div class="b-a" style="height:70px"></div><div class="bx">10</div></div>
+          <div class="bcol"><div class="b-h" style="height:9px"></div><div class="b-a" style="height:62px"></div><div class="bx">11</div></div>
+          <div class="bcol"><div class="b-h" style="height:14px"></div><div class="b-a" style="height:92px"></div><div class="bx">12</div></div>
+          <div class="bcol"><div class="b-h" style="height:11px"></div><div class="b-a" style="height:74px"></div><div class="bx">13</div></div>
+          <div class="bcol"><div class="b-h" style="height:13px"></div><div class="b-a" style="height:90px"></div><div class="bx">14</div></div>
+          <div class="bcol"><div class="b-h" style="height:8px"></div><div class="b-a" style="height:58px"></div><div class="bx">15</div></div>
+        </div>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--color-brand)"></span>Resolved by agents</span>
+          <span><span class="dot" style="background:var(--color-border-default)"></span>Routed to humans</span>
+        </div>
+      </div>
+
+      <!-- Exception mix in $ (criterion 2/3: money, not counts) -->
+      <div class="card mix">
+        <h3>Exception mix <span class="hint">by $ at risk</span></h3>
+        <div class="row"><span class="name">Pricing variance</span><div class="track"><div class="fill" style="width:84%;background:var(--color-brand)"></div></div><span class="amt">$86k</span></div>
+        <div class="row"><span class="name">Credit block</span><div class="track"><div class="fill" style="width:60%;background:var(--color-error)"></div></div><span class="amt">$61k</span></div>
+        <div class="row"><span class="name">Duplicate PO</span><div class="track"><div class="fill" style="width:34%;background:var(--color-warning)"></div></div><span class="amt">$34k</span></div>
+        <div class="row"><span class="name">Manual order intake</span><div class="track"><div class="fill" style="width:22%;background:var(--color-cat-blue,#3b82f6)"></div></div><span class="amt">$22k</span></div>
+        <div class="row"><span class="name">Back-order / OOS</span><div class="track"><div class="fill" style="width:11%;background:var(--color-success)"></div></div><span class="amt">$11k</span></div>
+      </div>
+    </div>
+
+    <div class="grid2" style="grid-template-columns: 5fr 7fr;">
+      <!-- Live agent activity (criterion 1) — domains from the governed
+           intent taxonomy; counts from the runtime roll-up. -->
+      <div class="card roster">
+        <h3>Agent activity <span class="hint">live</span></h3>
+        <div class="agent"><span class="pulse"></span><span class="who"><span class="n">Pricing agent</span><br/><span class="d">Resolving 3 · 1,204 today</span></span><span class="state">working</span></div>
+        <div class="agent"><span class="pulse"></span><span class="who"><span class="n">Intake agent</span><br/><span class="d">Resolving 5 · 880 today</span></span><span class="state">working</span></div>
+        <div class="agent"><span class="pulse"></span><span class="who"><span class="n">Credit agent</span><br/><span class="d">Resolving 2 · 410 today</span></span><span class="state">working</span></div>
+        <div class="agent"><span class="pulse"></span><span class="who"><span class="n">Dedup agent</span><br/><span class="d">Resolving 1 · 318 today</span></span><span class="state">working</span></div>
+        <div class="agent"><span class="pulse idle"></span><span class="who"><span class="n">Fulfilment agent</span><br/><span class="d">Idle · 256 today</span></span><span class="state off">idle</span></div>
+      </div>
+
+      <!-- The decision queue (criterion 2): where to intervene NEXT,
+           with money + deadline; rows deep-link to the case workspace. -->
+      <div class="card">
+        <h3>SLA risk — next 8 hours <span class="hint">needs human · by deadline</span></h3>
+        <table>
+          <thead><tr><th>Customer</th><th>Type</th><th>Due in</th><th>$ at risk</th></tr></thead>
+          <tbody>
+            <tr><td><a class="case" href="#">Kroger</a></td><td>Credit block</td><td class="mono due-err">1h 03m</td><td class="mono">$12,100</td></tr>
+            <tr><td><a class="case" href="#">Southeast Beverage</a></td><td>Manual intake</td><td class="mono due-warn">4h 12m</td><td class="mono">$18,400</td></tr>
+            <tr><td><a class="case" href="#">Sysco</a></td><td>Pricing variance</td><td class="mono due-warn">5h 40m</td><td class="mono">$9,250</td></tr>
+            <tr><td><a class="case" href="#">US Foods</a></td><td>Duplicate PO</td><td class="mono">7h 18m</td><td class="mono">$4,800</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <p class="note">
+    Every figure is a projection of a proposed backend-composed
+    <code>ControlTowerResponse</code> (extends the stats surface): KPI band,
+    per-hour throughput series, per-intent $ mix, per-domain agent activity
+    roll-up, and the SLA-risk rows (CaseSummary-shaped, deep-linking to
+    /cases). $ fields honor the existing CaseSummary RBAC strip — roles
+    without dollar_impact visibility get the band without money. No UI-side
+    aggregation (Guardrail #6); deltas ("vs last week") are emitted only when
+    the backend can honestly compute them, else structurally omitted.
+    Platform-health rows move to Settings; the sample activity feed is
+    replaced by the live agent roll-up.
+  </p>
+</body>
+</html>

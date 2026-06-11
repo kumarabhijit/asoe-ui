@@ -126,6 +126,70 @@ export interface StatsResponse {
   by_shadow_verdict: Record<string, number>;
 }
 
+/* ── Control Tower (dashboard redesign, sign-off 2026-06-10) ───────────
+ * Mirrors api/schemas.py::ControlTowerResponse — the operator dashboard
+ * payload, composed ENTIRELY backend-side (Guardrail #6: the UI does no
+ * aggregation/math). Optional fields are null/empty when the backend
+ * cannot honestly compute them (no fabricated zeros, no dishonest
+ * mixed-currency sums); dollar fields are RBAC-stripped server-side for
+ * callers without exceptions:approve / exceptions:override. */
+
+/** Integer cents + ISO 4217 currency (same wire shape as the
+ *  CaseSummary dollar_impact — no float drift). */
+export interface DollarAmount {
+  amount_cents: number;
+  currency: string;
+}
+
+export interface ControlTowerKpis {
+  /** Share of records agents finished alone (RESOLVED/CLOSED, no human
+   *  resolved_by). Null when the tenant has no records. */
+  auto_resolved_pct?: number | null;
+  open_needs_human: number;
+  avg_resolution_time_seconds?: number | null;
+  /** Summed impact across NEEDS_HUMAN cases; null when nothing
+   *  contributes, currencies mix, or RBAC strips dollars. */
+  dollar_at_risk?: DollarAmount | null;
+}
+
+export interface ThroughputBucket {
+  /** ISO 8601 start of the hour bucket (UTC). */
+  hour_start: string;
+  by_agents: number;
+  by_humans: number;
+}
+
+export interface IntentDollarMix {
+  intent: string;
+  dollar_at_risk: DollarAmount;
+}
+
+export interface AgentDomainActivity {
+  /** Taxonomy supergroup code — render the governed label, never the
+   *  raw token (Guardrail #2). */
+  domain: string;
+  resolving_now: number;
+  resolved_today: number;
+}
+
+export interface SlaRiskRow {
+  case_id: string;
+  customer_name?: string | null;
+  intent?: string | null;
+  /** ISO timestamp — the SLA ticker renders the live "due in" label. */
+  sla_due_at: string;
+  dollar_impact?: DollarAmount | null;
+}
+
+export interface ControlTowerResponse {
+  kpis: ControlTowerKpis;
+  throughput: ThroughputBucket[];
+  mix_by_intent: IntentDollarMix[];
+  agent_activity: AgentDomainActivity[];
+  sla_risk: SlaRiskRow[];
+  generated_at: string;
+}
+
 /* ── Trace ─────────────────────────────────────────────────────────── */
 
 /** A recommended SAP transaction-level step. Human-facing only —

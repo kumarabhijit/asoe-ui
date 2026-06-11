@@ -496,6 +496,12 @@ export interface OrderAnalysis {
    *  `api/schemas.py::AnalysisResponse.presentation`. Optional only so a
    *  pre-3b stored payload deserialises. */
   presentation?: PresentationContract | null;
+
+  /** 'Similar past cases' (sign-off 2026-06-10) — advisory precedents
+   *  for the operator, evidence tier. Null when no precedent exists
+   *  (structural omission). Mirrors
+   *  `api/schemas.py::AnalysisResponse.precedents`. */
+  precedents?: PrecedentsAnalysis | null;
 }
 
 /** Engine internals — `presentation_tier: audit`. Always emitted
@@ -564,6 +570,41 @@ export interface PresentationContract {
    *  composer decides WHICH facts ride the sub-line; the UI projects
    *  them as given and never re-decides membership. */
   situation_context: SituationContext;
+}
+
+/* ── 'Similar past cases' precedents (sign-off 2026-06-10) ──────────────
+ * Mirrors api/schemas.py::PrecedentCase / PrecedentsAnalysis. Advisory
+ * retrieval for the operator ONLY (evidence tier, Layer 2) — no recipe,
+ * shadow, or routing decision reads precedents. Assembled by the backend
+ * precedents composer; the UI card is a dumb projector (Guardrail #6). */
+
+export interface PrecedentCase {
+  record_id: string;
+  case_id?: string | null;
+  customer_name?: string | null;
+  intent?: string | null;
+  resolved_at?: string | null;
+  /** How the precedent ended — resolved_action when a human acted, else
+   *  the terminal final_status. Rendered through the governed humanizer. */
+  outcome?: string | null;
+  /** Operator-authored resolution notes; null = structurally omitted. */
+  outcome_summary?: string | null;
+  /** Cosine similarity (0..1) for semantic matches; null for correlate
+   *  matches — a fabricated score would be partial-truth. */
+  similarity?: number | null;
+  /** Provenance of the match: pgvector cosine vs the deterministic
+   *  same-intent/same-customer fallback. */
+  match_basis: "semantic" | "correlate";
+  /** Embedding model id for audit provenance; null for correlate. */
+  embedding_model?: string | null;
+}
+
+export interface PrecedentsAnalysis {
+  items: PrecedentCase[];
+  /** The exact rendered document the match ran against — audit
+   *  reconstruction of WHAT was compared. */
+  query_basis: string;
+  generated_at: string;
 }
 
 /* ── Order Entry section (ADR-042 Phase 3) — mirrors api/schemas.py ── */

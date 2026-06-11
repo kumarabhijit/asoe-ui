@@ -61,6 +61,7 @@ import { HeaderRibbon } from "./HeaderRibbon";
 import { ContextStrip } from "./ContextStrip";
 import { ImpactBar } from "./ImpactBar";
 import { SituationSubline } from "./SituationSubline";
+import { PrecedentsSection } from "./PrecedentsSection";
 import { AgentAnalysisSection } from "./AgentAnalysisSection";
 import { DuplicateDetectionSection } from "./DuplicateDetectionSection";
 import { OrderComparisonSection } from "./OrderComparisonSection";
@@ -697,6 +698,17 @@ export default function ExceptionDetailPanel({
     if (analysis.draft_reply) enrichmentSections.push({ key: "draft_reply", anchorId: "section-draft-reply", node: (
       <CollapsibleSection key="draft_reply" title="AI Draft Reply" id="section-draft-reply" defaultOpen>
         <DraftReplySection data={analysis.draft_reply} sourceSectionId={analysis.email_source ? "section-source-email" : undefined} onSubmitEdit={handleEditDraftReply} canEdit={hasPermission("exceptions:approve")} />
+      </CollapsibleSection>
+    ) });
+    /* 'Similar past cases' (sign-off 2026-06-10) — backend-composed
+       precedents, evidence tier (section_tiers routes placement).
+       Modern-gated mount: a new section appearing in Legacy would
+       break the Legacy-stays-byte-unchanged ground rule; the additive
+       COCKPIT && gate matches the parity lock (no classic surface is
+       hidden — one is added). */
+    if (COCKPIT && analysis.precedents) enrichmentSections.push({ key: "precedents", node: (
+      <CollapsibleSection key="precedents" title="Similar Past Cases">
+        <PrecedentsSection data={analysis.precedents} />
       </CollapsibleSection>
     ) });
   }

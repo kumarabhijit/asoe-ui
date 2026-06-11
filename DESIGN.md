@@ -227,6 +227,7 @@ ExceptionDetailPanel (mounted inline inside CaseDetailPanel's right pane)
 | 3 | `AgentAnalysisSection` | `AgentAnalysisSection.tsx` | Problem / Root Cause / Recommendation narratives — **collapsible**, collapsed by default; auto-expands when `detail.lifecycle_state` is in `HUMAN_IN_THE_LOOP_STATES` (PENDING_REVIEW / ESCALATED / PENDING_ADMIN_REVIEW / PENDING_COSIGN / BLOCKED). Each prose block (Problem / Root Cause / Recommendation) renders only when the matching `OrderAnalysis` field is present (Guardrail #6 structural omission). |
 | 3+ | `DuplicateDetectionSection` | `DuplicateDetectionSection.tsx` | Data-presence enrichment: original vs duplicate order, detection method, confidence, autonomy |
 | 3+ | `OrderComparisonSection` | `OrderComparisonSection.tsx` | Data-presence enrichment: side-by-side order comparison with matching/differing field badges |
+| 3+ | `PrecedentsSection` | `PrecedentsSection.tsx` | 'Similar past cases' (sign-off 2026-06-10): Modern-only evidence-tier card projecting the backend-composed `analysis.precedents` — semantic rows carry a match score + embedding-model provenance, correlate rows state their deterministic basis (no fabricated percentage); rows deep-link to the precedent's case. Advisory only — never gates an action. |
 | 3+ | `PriceAnalysisSection` | `PriceAnalysisSection.tsx` | Data-presence enrichment: price delta bars (ERP vs PO), metric tiles, collapsible SAP context card |
 | 3+ | `BackOrderSection` | `BackOrderSection.tsx` | Data-presence enrichment: GapBar (ordered vs available), DC inventory snapshot, substitute SKUs, ranked resolution options with multi-dimensional scoring |
 | 3+ | `OverMaxSection` | `OverMaxSection.tsx` | Data-presence enrichment: exceedance bar (ordered vs max), order lines table, AI trim plan (TRIM/SKIP/OK actions) |
@@ -323,6 +324,8 @@ Page Content (max-width 1440px)
 ```
 
 **Data flow:** `exceptionsApi.stats()` + `healthApi.get()` → state → render.
+
+**Modern view — Control Tower (sign-off 2026-06-10, study in `design-explorations/control-tower/`):** when `useViewMode().mode === "modern"`, `/dashboard` renders the `ControlTower` component (`dashboard/ControlTower.tsx`) instead — KPI band (auto-resolved %, open·needs-you, avg time, $ at risk), agents-vs-humans hourly throughput, exception mix by $ at risk, live per-domain agent roster, and the SLA-risk decision queue (next 8h, deep-links to `/cases`, live "due in" labels via `lib/sla.ts` + `useSlaTicker`). Dumb projector of the backend-composed `ControlTowerResponse` (`exceptionsApi.controlTower()`; Guardrail #6 — no UI aggregation); null/empty payload surfaces are structurally omitted (the backend RBAC-strips dollars, so a money-less payload renders the tower without $ surfaces); domain/intent tokens render through `supergroupLabel` / `intentLabelFor` (Guardrail #2). The Legacy Performance page above stays byte-unchanged.
 
 ### Login (`/login`) — Centered Card
 
