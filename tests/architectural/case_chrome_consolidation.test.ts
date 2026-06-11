@@ -41,3 +41,19 @@ describe("case chrome — single source in caseChrome.tsx", () => {
     });
   }
 });
+
+describe("case chrome — unknown-origin fallback (Guardrail #1 default)", () => {
+  // A new backend Origin value must render the `default` glyph/label,
+  // never undefined/blank chrome. (Review finding 2026-06-11: the
+  // structural lock above can't catch a deleted `default` entry.)
+  it("originIcon returns the default glyph for unknown origins", async () => {
+    const { originIcon } = await import("@/app/cases/caseChrome");
+    expect(originIcon("SOME_FUTURE_ORIGIN")).toBeTruthy();
+    expect(originIcon(undefined)).toBeTruthy();
+  });
+
+  it("ORIGIN_LABEL carries a default entry for unknown origins", async () => {
+    const { ORIGIN_LABEL } = await import("@/app/cases/caseChrome");
+    expect(ORIGIN_LABEL.default).toBeTruthy();
+  });
+});
