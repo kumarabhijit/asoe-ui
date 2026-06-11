@@ -114,6 +114,28 @@ from the data**, not just labelled:
 Plus 25 PRNG-generated **clean orders** (no exception) so exception-rate
 queries and dashboards have a realistic denominator.
 
+## Sample intake emails (`emails/`)
+
+Nine RFC 5322 `.eml` fixtures for testing the email-intake pipeline
+(extraction, classification, duplicate detection, change analysis),
+generated alongside the SQL. `emails/manifest.json` carries the
+machine-readable expectations (scenario, expected classification,
+referenced PO, linked `zemail_intake` id).
+
+| Scenario | Fixtures |
+| --- | --- |
+| **New order** | `msg-2026-0001` (ambiguous ship-to → clarification band), `msg-2026-0008` (clean, CSV attachment → happy path), `test-new-0003` (forwarded chain, no PO number, prose quantities → low confidence) |
+| **Duplicate PO** | `test-dup-0001` (same-channel resend of msg-2026-0001), `test-dup-0002` (cross-channel: PO-88421 already arrived via EDI as SO `0000001042`) |
+| **Order change** | `msg-2026-0002` (qty reduction), `msg-2026-0003` (expedite with freight condition), `msg-2026-0004` (urgent full cancellation), `msg-2026-0005` (SKU substitution with repricing condition) |
+
+Fixtures whose `Message-ID` carries a `MSG-2026-*` id are the source
+messages of the matching `zemail_intake` rows — feed one to the pipeline
+and the replica already shows the post-processing state. `TEST-*`
+fixtures are extra stimuli with **no** replica row: they are inputs the
+pipeline has not seen yet (the two duplicates and the messy forward).
+Files use CRLF line endings per RFC 5322 (`.gitattributes` marks them
+`-text`).
+
 ## Joining back to the UI
 
 `zasoe_exception_link` is the demo entry point — one row per UI exception:

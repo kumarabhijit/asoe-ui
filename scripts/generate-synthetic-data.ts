@@ -434,7 +434,7 @@ const ORDER_SEEDS: readonly OrderSeed[] = [
     note: "Expired ZPROM/155 promo: PO priced at $13.20, pricing run reverted to base $14.88. Resolved — SAP shows corrected price, staging keeps as-received.",
   },
   {
-    excIds: ["exc-002"], bstnk: "PO-88419", kunnr: K, shipTo: "0000207815",
+    uiOrderId: "SO-1040", excIds: ["exc-002"], bstnk: "PO-88419", kunnr: K, shipTo: "0000207815",
     erdat: "2026-04-09", vdatu: "2026-04-18", gbstk: "B",
     lines: [
       { matnr: "SKU-1180", qty: 500, netpr: 9.6, werks: "5200" },
@@ -480,7 +480,7 @@ const ORDER_SEEDS: readonly OrderSeed[] = [
     note: "New SKU-0099 has no PR00 record (A304 row absent); contract rate ZA01/621 approved.",
   },
   {
-    excIds: ["exc-006"], bstnk: "PO-91203", kunnr: K, shipTo: "0000520871",
+    uiOrderId: "SO-5008", excIds: ["exc-006"], bstnk: "PO-91203", kunnr: K, shipTo: "0000520871",
     erdat: "2026-04-07", vdatu: "2026-04-15", gbstk: "C",
     lines: [
       { matnr: "SKU-7701", qty: 410, netpr: 8.96, werks: "6100" },
@@ -513,7 +513,7 @@ const ORDER_SEEDS: readonly OrderSeed[] = [
     note: "Expired ZTEA/730 promo auto-replaced by Q1 reload ZTEA/731; closed.",
   },
   {
-    excIds: ["exc-009"], bstnk: "PO-55100", kunnr: W, shipTo: "0000330210",
+    uiOrderId: "SO-8098", excIds: ["exc-009"], bstnk: "PO-55100", kunnr: W, shipTo: "0000330210",
     erdat: "2026-04-11", vdatu: "2026-04-19", gbstk: "B",
     lines: [{ matnr: "SKU-4410", qty: 60, netpr: 8.4, werks: "2500" }],
     note: "Original order for exact-duplicate pair exc-009 (in fulfilment).",
@@ -812,6 +812,351 @@ const EMAIL_SUBJECTS: Record<string, string> = {
   "exc-046": "New order — EDI-PO-2026-7781",
   "exc-047": "General question — holiday delivery schedule",
 };
+
+/* ── sample intake emails (.eml test fixtures) ───────────────────────── */
+// RFC 5322 messages for testing the email-intake pipeline (extraction,
+// classification, duplicate detection, change analysis). Fixtures whose
+// Message-ID carries a MSG-2026-* id are the source messages of the
+// matching zemail_intake rows; TEST-* fixtures are extra stimuli (e.g.
+// duplicates) that have no replica row yet — they are what you FEED the
+// pipeline, not what it already processed. Expectations live in
+// emails/manifest.json, not in the messages themselves.
+
+const INTAKE_MAILBOX = "orders@acme-cpg.example.com";
+
+function rfc2822Date(iso: string): string {
+  // toUTCString: "Thu, 30 Apr 2026 10:12:00 GMT" -> RFC 5322 wants +0000
+  return new Date(iso).toUTCString().replace(/GMT$/, "+0000");
+}
+
+interface EmailAttachment {
+  filename: string;
+  contentType: string;
+  content: string; // utf-8 source; base64-encoded on emission
+}
+
+interface EmailFixture {
+  file: string;
+  scenario: "NEW_ORDER" | "DUPLICATE_PO" | "ORDER_CHANGE";
+  expectedClassification: string;
+  /** zemail_intake row this message is the source of (null for TEST-*). */
+  zemailMsgId: string | null;
+  refPo: string;
+  msgIdLocal: string;
+  fromName: string;
+  from: string;
+  date: string; // ISO instant
+  subject: string;
+  body: string;
+  attachment?: EmailAttachment;
+  note: string;
+}
+
+const EMAIL_FIXTURES: readonly EmailFixture[] = [
+  {
+    file: "msg-2026-0001-new-order-sebev.eml",
+    scenario: "NEW_ORDER",
+    expectedClassification: "EMAIL_ORDER_ENTRY_REQUEST",
+    zemailMsgId: "MSG-2026-0001",
+    refPo: "EML-PO-2026-0042",
+    msgIdLocal: "MSG-2026-0001",
+    fromName: "Dana Whitfield",
+    from: "po@sebev.example.com",
+    date: "2026-04-30T10:12:00Z",
+    subject: "PO 2026-0042 — May order for Atlanta DC",
+    body: `Hi team,
+
+Please enter the following order against our account. PO number is
+2026-0042, terms as per our standing agreement.
+
+  Item                          Cases   Unit price
+  SKU-1180  24-pk Water           400      $9.60
+  SKU-1181  12-pk Sparkling       240     $11.40
+  SKU-7800  Organic Kombucha 6pk   72     $21.50
+
+Requested delivery: week of May 11th, to our Atlanta warehouse.
+
+Thanks,
+Dana Whitfield
+Purchasing — Southeast Beverage Distributors
+(404) 555-0173`,
+    note: "Standard-review band (exc-026): clean line items but the ship-to is ambiguous — 'our Atlanta warehouse' matches two addresses on file, so extraction should land in REQUEST_CLARIFICATION.",
+  },
+  {
+    file: "msg-2026-0008-new-order-kroger.eml",
+    scenario: "NEW_ORDER",
+    expectedClassification: "EMAIL_ORDER_ENTRY_REQUEST",
+    zemailMsgId: "MSG-2026-0008",
+    refPo: "EDI-PO-2026-7781",
+    msgIdLocal: "MSG-2026-0008",
+    fromName: "Kroger Procurement",
+    from: "po@kroger.example.com",
+    date: "2026-05-22T07:10:00Z",
+    subject: "New order — EDI-PO-2026-7781",
+    body: `Hello,
+
+Our EDI link is down for maintenance this morning; please process the
+attached purchase order manually.
+
+PO number:    EDI-PO-2026-7781
+Ship-to:      Kroger Dallas DC, 4500 Commerce St, Dallas TX 75201
+Requested DD: 2026-05-30
+
+Line details are in the attached CSV.
+
+Regards,
+Kroger Procurement Operations`,
+    attachment: {
+      filename: "EDI-PO-2026-7781.csv",
+      contentType: "text/csv",
+      content: `po_number,line,sku,description,qty_cases,unit_price\nEDI-PO-2026-7781,1,SKU-1180,24-pk Water,250,9.60\n`,
+    },
+    note: "Happy path (exc-046): unambiguous structured order with CSV attachment — should auto-post (the replica shows it as VBAK 0000090016, zemail COMPLETED).",
+  },
+  {
+    file: "test-dup-0001-resend-sebev.eml",
+    scenario: "DUPLICATE_PO",
+    expectedClassification: "EMAIL_ORDER_ENTRY_REQUEST",
+    zemailMsgId: null,
+    refPo: "EML-PO-2026-0042",
+    msgIdLocal: "TEST-DUP-0001",
+    fromName: "Dana Whitfield",
+    from: "po@sebev.example.com",
+    date: "2026-05-01T08:45:00Z",
+    subject: "RE: PO 2026-0042 — May order for Atlanta DC",
+    body: `Hi again,
+
+I didn't get a confirmation yesterday so I'm resending our PO 2026-0042
+just in case it didn't go through. Same details as before:
+
+  Item                          Cases   Unit price
+  SKU-1180  24-pk Water           400      $9.60
+  SKU-1181  12-pk Sparkling       240     $11.40
+  SKU-7800  Organic Kombucha 6pk   72     $21.50
+
+Please confirm receipt.
+
+Dana Whitfield
+Purchasing — Southeast Beverage Distributors`,
+    note: "Same-channel duplicate: identical PO number and lines as msg-2026-0001, sent ~22h later. Should be flagged duplicate against the pending intake, NOT entered as a second order.",
+  },
+  {
+    file: "test-dup-0002-crosschannel-kroger.eml",
+    scenario: "DUPLICATE_PO",
+    expectedClassification: "EMAIL_ORDER_ENTRY_REQUEST",
+    zemailMsgId: null,
+    refPo: "PO-88421",
+    msgIdLocal: "TEST-DUP-0002",
+    fromName: "Kroger Procurement",
+    from: "po@kroger.example.com",
+    date: "2026-04-12T09:30:00Z",
+    subject: "PO 88421 — please confirm entry",
+    body: `Hi,
+
+We had EDI transmission alarms on our side yesterday. To be safe,
+please make sure PO 88421 is entered:
+
+PO number: PO-88421
+Ship-to:   QuickMart Distribution, Dallas TX
+
+  Line  SKU       Description       Cases   Unit price
+  1     SKU-1180  24-pk Water         500      $9.62
+  2     SKU-1181  12-pk Sparkling     200     $10.00
+
+Disregard if already in your system.
+
+Kroger Procurement Operations`,
+    note: "Cross-channel duplicate: PO-88421 already arrived via EDI on 04-11 (zedi_850_in / SO 0000001042, itself a suspected duplicate of PO-88419). The email must match the existing order, not create a third.",
+  },
+  {
+    file: "msg-2026-0002-change-qty-sebev.eml",
+    scenario: "ORDER_CHANGE",
+    expectedClassification: "EMAIL_ORDER_CHANGE_REQUEST",
+    zemailMsgId: "MSG-2026-0002",
+    refPo: "PO-SED-2026-0418",
+    msgIdLocal: "MSG-2026-0002",
+    fromName: "Dana Whitfield",
+    from: "po@sebev.example.com",
+    date: "2026-05-18T09:02:00Z",
+    subject: "Change request: please reduce quantity on PO-SED-2026-0418",
+    body: `Hi team,
+
+Our demand forecast for the water line came down. On open order
+PO-SED-2026-0418, please reduce:
+
+  SKU-1180  24-pk Water:  600 cases  ->  480 cases
+
+Everything else on the PO stays as-is. Please confirm the change and
+the updated invoice total.
+
+Thanks,
+Dana Whitfield
+Purchasing — Southeast Beverage Distributors`,
+    note: "Quantity reduction (exc-040) against open order VBAK 0000090012 (600 cases of SKU-1180 in the replica).",
+  },
+  {
+    file: "msg-2026-0003-change-expedite-sebev.eml",
+    scenario: "ORDER_CHANGE",
+    expectedClassification: "EMAIL_ORDER_CHANGE_REQUEST",
+    zemailMsgId: "MSG-2026-0003",
+    refPo: "PO-SED-2026-0502",
+    msgIdLocal: "MSG-2026-0003",
+    fromName: "Dana Whitfield",
+    from: "po@sebev.example.com",
+    date: "2026-05-18T11:20:00Z",
+    subject: "Expedite request — PO-SED-2026-0502",
+    body: `Hello,
+
+We have a regional promotion starting earlier than planned. Can you
+expedite PO-SED-2026-0502 (144 cases of SKU-7800 Organic Kombucha)?
+
+  Current requested delivery: 2026-05-26
+  Needed by:                  2026-05-19
+
+We will accept reasonable expedited-freight charges — please quote
+before shipping if the uplift exceeds $300.
+
+Thanks,
+Dana Whitfield
+Southeast Beverage Distributors`,
+    note: "Expedite (exc-041): pull-in of the requested delivery date with a conditional freight approval the change analysis should surface.",
+  },
+  {
+    file: "msg-2026-0004-change-cancel-walmart.eml",
+    scenario: "ORDER_CHANGE",
+    expectedClassification: "EMAIL_ORDER_CHANGE_REQUEST",
+    zemailMsgId: "MSG-2026-0004",
+    refPo: "PO-WMT-2026-1101",
+    msgIdLocal: "MSG-2026-0004",
+    fromName: "Walmart Replenishment",
+    from: "orders@buying.walmart.example.com",
+    date: "2026-05-19T08:15:00Z",
+    subject: "URGENT: cancel PO-WMT-2026-1101 in full",
+    body: `URGENT — please action today.
+
+Cancel purchase order PO-WMT-2026-1101 in full, effective immediately
+(500 cases, SKU-0042 12-pk Cola). The category reset this PO supported
+has been postponed to Q3.
+
+Do NOT ship any portion of this order. If any part has already left
+your DC, reply with shipment details immediately so we can refuse at
+the gate rather than process a return.
+
+Walmart Replenishment Team
+Ref: reset postponement notice RPN-2026-118`,
+    note: "Full cancellation (exc-042, RED/escalated): high-value cancel with a no-partial-ship constraint; should escalate rather than auto-apply.",
+  },
+  {
+    file: "msg-2026-0005-change-sku-sub-kroger.eml",
+    scenario: "ORDER_CHANGE",
+    expectedClassification: "EMAIL_ORDER_CHANGE_REQUEST",
+    zemailMsgId: "MSG-2026-0005",
+    refPo: "PO-KR-2026-0907",
+    msgIdLocal: "MSG-2026-0005",
+    fromName: "Kroger Procurement",
+    from: "po@kroger.example.com",
+    date: "2026-05-19T13:40:00Z",
+    subject: "SKU substitution on PO-KR-2026-0907",
+    body: `Hi,
+
+On open order PO-KR-2026-0907 we'd like to substitute:
+
+  Remove:  SKU-6110  Premium Lager 24pk   220 cases @ $19.80
+  Add:     SKU-6120  Craft Lager 12pk     440 cases @  $9.95
+
+Intent is to keep roughly the same retail unit volume (the 12pk is
+half the count of the 24pk). Please reprice at the current contract
+rate for SKU-6120 and confirm availability before applying.
+
+Kroger Procurement Operations`,
+    note: "SKU substitution (exc-043): remove/add pair with a repricing condition — change analysis should pair the lines, not treat them as one cancel plus one new order.",
+  },
+  {
+    file: "test-new-0003-messy-order.eml",
+    scenario: "NEW_ORDER",
+    expectedClassification: "EMAIL_ORDER_ENTRY_REQUEST",
+    zemailMsgId: null,
+    refPo: "(none given)",
+    msgIdLocal: "TEST-NEW-0003",
+    fromName: "Marco Reyes",
+    from: "purchasing@sunrisebev.example.com",
+    date: "2026-05-23T16:42:00Z",
+    subject: "Fwd: order for next week",
+    body: `fyi see below, can you get this in?
+
+---------- Forwarded message ----------
+From: Pat (Store Ops) <pat.ops@sunrisebev.example.com>
+Date: Fri, May 22, 2026 at 4:15 PM
+Subject: order for next week
+
+Marco - we're running low again. can you order twenty cases of the
+24-pack water and ten of the 12-pack sparkling? same as last time.
+need it before the holiday weekend if possible
+
+thx
+Pat
+
+--
+Marco Reyes
+Sunrise Beverages Co | Miami FL`,
+    note: "Messy intake: forwarded chain, no PO number, prose quantities ('twenty cases'), vague SKUs ('same as last time'). Should land in a low-confidence band and request clarification, not auto-post.",
+  },
+];
+
+function buildEml(f: EmailFixture): string {
+  const domain = f.from.split("@")[1];
+  const headers: string[] = [
+    `From: ${f.fromName} <${f.from}>`,
+    `To: ACME CPG Order Desk <${INTAKE_MAILBOX}>`,
+    `Subject: ${f.subject}`,
+    `Date: ${rfc2822Date(f.date)}`,
+    `Message-ID: <${f.msgIdLocal}@${domain}>`,
+    "MIME-Version: 1.0",
+  ];
+  let body: string;
+  if (f.attachment) {
+    const boundary = `=_asoe_${f.msgIdLocal.toLowerCase()}`;
+    const b64 = Buffer.from(f.attachment.content, "utf-8").toString("base64");
+    const b64Wrapped = b64.replace(/(.{76})/g, "$1\n").trimEnd();
+    headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+    body = [
+      `--${boundary}`,
+      'Content-Type: text/plain; charset="utf-8"',
+      "Content-Transfer-Encoding: 8bit",
+      "",
+      f.body,
+      "",
+      `--${boundary}`,
+      `Content-Type: ${f.attachment.contentType}; name="${f.attachment.filename}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename="${f.attachment.filename}"`,
+      "",
+      b64Wrapped,
+      `--${boundary}--`,
+      "",
+    ].join("\n");
+  } else {
+    headers.push('Content-Type: text/plain; charset="utf-8"');
+    headers.push("Content-Transfer-Encoding: 8bit");
+    body = `${f.body}\n`;
+  }
+  // RFC 5322 line endings.
+  return `${headers.join("\n")}\n\n${body}`.replace(/\n/g, "\r\n");
+}
+
+function emailManifest(): string {
+  const entries = EMAIL_FIXTURES.map((f) => ({
+    file: f.file,
+    scenario: f.scenario,
+    expected_classification: f.expectedClassification,
+    ref_po: f.refPo,
+    zemail_msg_id: f.zemailMsgId,
+    from: f.from,
+    date: f.date,
+    note: f.note,
+  }));
+  return `${JSON.stringify(entries, null, 2)}\n`;
+}
 
 /* ── lineage notes (coverage-asserted against MOCK_EXCEPTIONS) ───────── */
 // Every exception id MUST appear here. Adding a mock exception without a
@@ -1703,6 +2048,13 @@ function main(): void {
     writeFileSync(join(OUT_DIR, name), content);
   }
 
+  const emailDir = join(OUT_DIR, "emails");
+  mkdirSync(emailDir, { recursive: true });
+  for (const fixture of EMAIL_FIXTURES) {
+    writeFileSync(join(emailDir, fixture.file), buildEml(fixture));
+  }
+  writeFileSync(join(emailDir, "manifest.json"), emailManifest());
+
   const ediCount = intake.ids.ediByExcId.size;
   const emailCount = intake.ids.emailByExcId.size;
   console.log(
@@ -1712,7 +2064,8 @@ function main(): void {
       `  customers          : ${CUSTOMERS.length}\n` +
       `  materials          : ${MATERIALS.length}\n` +
       `  EDI staging msgs   : ${ediCount}\n` +
-      `  email intake msgs  : ${emailCount}`,
+      `  email intake msgs  : ${emailCount}\n` +
+      `  email fixtures     : ${EMAIL_FIXTURES.length} (.eml + manifest.json)`,
   );
 }
 
