@@ -48,20 +48,22 @@ describe("/cases workspace — case-switch race invariants", () => {
   const src = readFileSync(PAGE_PATH, "utf-8");
 
   it("clears orderCase + records eagerly when selectedCaseId changes", () => {
-    // Locate the useEffect keyed on [selectedCaseId]. The body must
-    // include explicit `setOrderCase(null)` and `setRecords([])` BEFORE
-    // the casesApi.get(selectedCaseId) call.
+    // Locate the useEffect keyed on selectedCaseId (the fetch itself
+    // lives in the shared `loadCaseDetail` helper since the Phase 2
+    // dedup — the effect kicks it off). The body must include explicit
+    // `setOrderCase(null)` and `setRecords([])` BEFORE the
+    // loadCaseDetail(selectedCaseId, ...) kick-off.
     const effectBody = src.match(
-      /useEffect\(\(\)[\s\S]*?\}, \[selectedCaseId\]\)/,
+      /useEffect\(\(\)[\s\S]*?\}, \[selectedCaseId, loadCaseDetail\]\)/,
     );
     expect(
       effectBody,
-      "useEffect keyed on [selectedCaseId] not found",
+      "useEffect keyed on [selectedCaseId, loadCaseDetail] not found",
     ).not.toBeNull();
     const body = effectBody![0];
 
     const clearIdx = body.indexOf("setOrderCase(null)");
-    const fetchIdx = body.search(/casesApi\.get\(\s*selectedCaseId\s*\)/);
+    const fetchIdx = body.search(/loadCaseDetail\(\s*selectedCaseId\s*,/);
     expect(
       clearIdx,
       "setOrderCase(null) missing — stale prior-case data leaks " +
@@ -69,17 +71,33 @@ describe("/cases workspace — case-switch race invariants", () => {
     ).toBeGreaterThan(-1);
     expect(
       fetchIdx,
-      "casesApi.get(selectedCaseId) call not found",
+      "loadCaseDetail(selectedCaseId, ...) kick-off not found",
     ).toBeGreaterThan(-1);
     expect(
       clearIdx,
-      "setOrderCase(null) must come BEFORE casesApi.get(...)",
+      "setOrderCase(null) must come BEFORE loadCaseDetail(...)",
     ).toBeLessThan(fetchIdx);
 
     expect(
       body,
       "setRecords([]) missing — same race shape as setOrderCase",
     ).toMatch(/setRecords\(\s*\[\s*\]\s*\)/);
+
+    // The effect must pass a staleness guard so a superseded fetch
+    // can't write its results over the newer selection's state, and
+    // the helper must honor it before every state write.
+    expect(
+      body,
+      "loadCaseDetail must receive the `() => cancelled` staleness guard",
+    ).toMatch(/loadCaseDetail\(\s*selectedCaseId\s*,\s*\(\)\s*=>\s*cancelled\s*\)/);
+    const helper = src.match(
+      /const loadCaseDetail = useCallback\([\s\S]*?\},\s*\n\s*\[[^\]]*\],?\s*\n?\s*\)/,
+    );
+    expect(helper, "shared loadCaseDetail helper not found").not.toBeNull();
+    expect(
+      helper![0],
+      "loadCaseDetail must check isStale() before writing state",
+    ).toMatch(/if \(isStale\(\)\) return/);
   });
 
   it("only renders CaseDetailPanel when orderCase.case_id matches URL", () => {
@@ -324,5 +342,64 @@ describe("/cases workspace — case-switch race invariants", () => {
       "pin-selection branch missing — selected case can vanish " +
         "from the queue when filter / WS refetch excludes it",
     ).toMatch(/isPinned:\s*true/);
+  });
+});
+
+// ── Phase 2 error-surfacing contract (2026-06-11) ───────────────────
+//
+// Regression context: a `casesApi.get()` failure was an unhandled
+// promise rejection that left the detail pane blank, and a
+// `getRecords()` failure silently rendered an empty records list — a
+// failed load was indistinguishable from an empty case. Pattern A
+// source lock; the failure path cannot be driven in mock-mode
+// Playwright (mock mode bypasses the network), so the source lock IS
+// the regression gate, paired with the loadCaseDetail unit-level
+// invariants in the case-switch suite above.
+describe("/cases workspace — fetch-failure surfacing", () => {
+  const src = readFileSync(PAGE_PATH, "utf-8");
+
+  it("case-level fetch failure is captured into detailError and toasted", () => {
+    const helper = src.match(
+      /const loadCaseDetail = useCallback\([\s\S]*?\},\s*\n\s*\[[^\]]*\],?\s*\n?\s*\)/,
+    );
+    expect(helper, "shared loadCaseDetail helper not found").not.toBeNull();
+    const body = helper![0];
+    expect(
+      body,
+      "catch block must surface the failure via setDetailError",
+    ).toMatch(/catch[\s\S]*?setDetailError\(/);
+    expect(
+      body,
+      "catch block must toast the failure (refresh path has no pane alert)",
+    ).toMatch(/catch[\s\S]*?addToast\(\s*"error"/);
+  });
+
+  it("records fetch failure is surfaced, not silently swallowed", () => {
+    const helper = src.match(
+      /const loadCaseDetail = useCallback\([\s\S]*?\},\s*\n\s*\[[^\]]*\],?\s*\n?\s*\)/,
+    )![0];
+    expect(
+      helper,
+      "getRecords().catch must mark the failure (recordsFailed) so it can be surfaced",
+    ).toMatch(/recordsFailed = true/);
+    expect(
+      helper,
+      "records failure must be toasted to the operator",
+    ).toMatch(/recordsFailed[\s\S]*?addToast\(/);
+  });
+
+  it("renders an alert branch for a failed case load (not a blank pane)", () => {
+    expect(
+      src,
+      "detailError must render a role=alert branch when no case rendered",
+    ).toMatch(/detailError[\s\S]{0,200}role="alert"/);
+  });
+
+  it("selection change resets detailError so stale errors don't leak across cases", () => {
+    const effect = src.match(
+      /useEffect\(\(\)[\s\S]*?\}, \[selectedCaseId, loadCaseDetail\]\)/,
+    );
+    expect(effect).not.toBeNull();
+    expect(effect![0]).toMatch(/setDetailError\(null\)/);
   });
 });

@@ -14,6 +14,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import type { WSEvent } from "@/types/websocket";
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
@@ -21,7 +22,13 @@ type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 interface UseWebSocketOptions {
   /** WebSocket URL (default: derived from NEXT_PUBLIC_API_URL) */
   url?: string;
-  /** JWT access token for authentication */
+  /** JWT access token for authentication. Defaults to the session
+   *  token from `useAuth()` — callers only pass this to override.
+   *  (Regression guard: three call sites once omitted it, and since
+   *  `connect()` requires a token, those surfaces silently never
+   *  connected — no live refresh AND no polling fallback, because
+   *  the fallback only arms after failed reconnects of a socket
+   *  that was actually attempted.) */
   token?: string;
   /** Whether to connect (set false to disable) */
   enabled?: boolean;
@@ -90,6 +97,12 @@ export function useWebSocket({
   const [lastEvent, setLastEvent] = useState<WSEvent | null>(null);
   const [reconnectCount, setReconnectCount] = useState(0);
 
+  // Session token fallback — when the session is still loading,
+  // `accessToken` is undefined and `connect()` no-ops; the effect
+  // re-runs once the token materialises.
+  const { accessToken } = useAuth();
+  const effectiveToken = token ?? accessToken;
+
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -106,7 +119,7 @@ export function useWebSocket({
   const hasOpenedOnceRef = useRef(false);
 
   const connect = useCallback(() => {
-    if (!token || !enabled) return;
+    if (!effectiveToken || !enabled) return;
 
     const wsUrl = url || getWsUrl();
     setStatus("connecting");
@@ -119,7 +132,7 @@ export function useWebSocket({
         // Send auth message per Section 8.1
         const authMsg: { type: string; token: string; last_seen?: string } = {
           type: "auth",
-          token,
+          token: effectiveToken,
         };
         if (lastSeenRef.current) {
           authMsg.last_seen = lastSeenRef.current;
@@ -172,7 +185,7 @@ export function useWebSocket({
     } catch {
       setStatus("error");
     }
-  }, [token, enabled, url]);
+  }, [effectiveToken, enabled, url]);
 
   useEffect(() => {
     connect();

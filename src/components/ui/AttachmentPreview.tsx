@@ -15,9 +15,12 @@
  * Bytes are read via `attachmentsApi` (the single API client) — this component
  * never touches `fetch` itself.
  *
- * NOTE: precise pixel overlays on the PDF canvas are ADR-045 (spatial) territory;
- * Phase-1 PDF highlighting verifies anchors against the extracted text layer and
- * reports status via the safety bar. PDF.js rendering is browser-only: the page
+ * NOTE: precise pixel overlays on the PDF canvas are ADR-045 (spatial) territory
+ * for backend-recorded geometry; text-derived anchors additionally get a
+ * best-effort box derived from the PDF.js text layer (Phase 1.5) when their
+ * text uniquely locates on the previewed page — the email-content anchors
+ * (e.g. the From: header) have no document geometry and previously showed no
+ * in-document highlight at all. PDF.js rendering is browser-only: the page
  * is painted in a dedicated effect once the canvas has mounted, and the spatial
  * overlays draw ONLY when that paint succeeded — if PDF.js can't render, the
  * canvas (and its boxes) are suppressed and the safety bar remains authoritative.
@@ -39,6 +42,11 @@ import { AttachmentDownloadButton } from "@/components/ui/AttachmentDownloadButt
 import { detectPreviewFormat, type PreviewFormat } from "@/lib/previewFormat";
 import { resolveAnchorStatus, type AnchorStatus } from "@/lib/evidenceAnchor";
 import { spatialOverlays } from "@/lib/spatialOverlay";
+import {
+  textLayerBoxes,
+  type PageSize,
+  type TextItemGeometry,
+} from "@/lib/textLayerHighlight";
 import { useEvidenceSelection } from "@/hooks/useEvidenceSelection";
 import { cn } from "@/lib/utils";
 import type { EmailAttachmentManifestEntry, EvidenceAnchor } from "@/types/exceptions";
@@ -72,9 +80,17 @@ const STATUS_META: Record<
 async function renderPdfAndExtractText(
   bytes: Uint8Array,
   canvas: HTMLCanvasElement | null,
-): Promise<{ text: string | null; rendered: boolean }> {
+): Promise<{
+  text: string | null;
+  rendered: boolean;
+  /** Page-1 text items WITH geometry + the page size — the input for the
+   *  text-layer-derived highlight boxes (Phase 1.5). Null when extraction
+   *  failed; boxes are then skipped and the safety bar stands alone. */
+  pageGeometry: { items: TextItemGeometry[]; size: PageSize } | null;
+}> {
   let text: string | null = null;
   let rendered = false;
+  let pageGeometry: { items: TextItemGeometry[]; size: PageSize } | null = null;
   try {
     const pdfjs = await import("pdfjs-dist");
     // Bundled worker, no CDN (ADR-043 §2.1).
@@ -99,6 +115,24 @@ async function renderPdfAndExtractText(
       const pg = p === 1 ? page : await doc.getPage(p);
       const content = await pg.getTextContent();
       acc += content.items.map((it) => ("str" in it ? it.str : "")).join(" ") + " ";
+      if (p === PREVIEW_PAGE) {
+        // Keep the previewed page's item geometry (text matrix + run
+        // width/height in user space) for the derived highlight boxes.
+        const view = page.getViewport({ scale: 1 });
+        pageGeometry = {
+          items: content.items.map((it) =>
+            "str" in it
+              ? {
+                  str: it.str,
+                  transform: (it as { transform?: number[] }).transform,
+                  width: (it as { width?: number }).width,
+                  height: (it as { height?: number }).height,
+                }
+              : { str: "" },
+          ),
+          size: { width: view.width, height: view.height },
+        };
+      }
     }
     text = acc;
 
@@ -121,13 +155,13 @@ async function renderPdfAndExtractText(
         console.error("[AttachmentPreview] PDF canvas paint failed:", e);
       }
     }
-    return { text, rendered };
+    return { text, rendered, pageGeometry };
   } catch (e) {
     // Document open / text extraction failed — degrade to position-unconfirmed
     // but surface the reason for debugging the live deployment.
     // eslint-disable-next-line no-console
     console.error("[AttachmentPreview] PDF open/extract failed:", e);
-    return { text, rendered };
+    return { text, rendered, pageGeometry };
   }
 }
 
@@ -147,6 +181,12 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
   // that actually painted — never as floating boxes over a blank canvas.
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
   const [pageRendered, setPageRendered] = useState(false);
+  // Page-1 text-item geometry — input for the text-layer-derived highlight
+  // boxes (Phase 1.5). Null until extraction succeeds.
+  const [pageGeometry, setPageGeometry] = useState<{
+    items: TextItemGeometry[];
+    size: PageSize;
+  } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const attachmentId = attachment.attachment_id ?? null;
@@ -168,6 +208,7 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
     setFormat(undefined);
     setPdfBytes(null);
     setPageRendered(false);
+    setPageGeometry(null);
 
     (async () => {
       try {
@@ -230,13 +271,14 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
       // (re-render / dev double-invoke), so hand PDF.js a fresh copy each time;
       // the state copy stays intact and re-extraction never hits a detached
       // buffer.
-      const { text, rendered } = await renderPdfAndExtractText(
+      const { text, rendered, pageGeometry: geom } = await renderPdfAndExtractText(
         new Uint8Array(pdfBytes),
         canvasRef.current,
       );
       if (cancelled) return;
       setDocText(text);
       setPageRendered(rendered);
+      setPageGeometry(geom);
     })();
     return () => {
       cancelled = true;
@@ -252,6 +294,22 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
       onHighlightShown?.();
     }
   }, [anchors.length, loadState, onHighlightShown]);
+
+  // Overlay geometry: backend-recorded bboxes (ADR-045, authoritative) plus
+  // best-effort text-layer boxes for the text-derived anchors (Phase 1.5 —
+  // e.g. email-content evidence with no document geometry). A ref with a
+  // spatial box never also gets a derived one.
+  const spatial = spatialOverlays(anchors, PREVIEW_PAGE);
+  const spatialRefs = new Set(spatial.map((o) => o.supportsRef));
+  const derived = pageGeometry
+    ? textLayerBoxes(pageGeometry.items, pageGeometry.size, docText, anchors).filter(
+        (b) => !spatialRefs.has(b.supportsRef),
+      )
+    : [];
+  const overlays = [
+    ...spatial.map((o) => ({ ...o, kind: "spatial" as const })),
+    ...derived.map((o) => ({ ...o, kind: "text-layer" as const })),
+  ];
 
   return (
     <section
@@ -348,19 +406,21 @@ export function AttachmentPreview({ caseId, attachment, anchors, onHighlightShow
             style={{ isolation: "isolate" }}
           >
             <canvas ref={canvasRef} aria-label={`PDF preview of ${attachment.name}`} className="max-w-full" />
-            {/* Spatial bbox overlays (ADR-045) — best-effort, drawn only for
-                VERIFIED spatial anchors on this page AND only once the page has
-                actually painted (`pageRendered`). Without that guard the boxes
-                would float over a blank canvas when PDF.js can't render, which
-                reads as garbled bars rather than highlights. The safety bar
-                above stays the authoritative surface; a degraded/text anchor
-                has no box. */}
-            {pageRendered && spatialOverlays(anchors, PREVIEW_PAGE).map((o) => {
+            {/* In-document highlight overlays, drawn only once the page has
+                actually painted (`pageRendered`) — without that guard the
+                boxes would float over a blank canvas when PDF.js can't
+                render, which reads as garbled bars rather than highlights.
+                Two sources, one treatment: backend-recorded spatial bboxes
+                (ADR-045) and best-effort text-layer boxes for text-derived
+                anchors that uniquely locate on this page (Phase 1.5). The
+                safety bar above stays the authoritative surface; an
+                ambiguous/unlocated anchor has no box. */}
+            {pageRendered && overlays.map((o) => {
               const isSelected = selectedRef === o.supportsRef;
               return (
                 <div
                   key={o.supportsRef}
-                  data-testid="spatial-overlay"
+                  data-testid={o.kind === "spatial" ? "spatial-overlay" : "text-layer-overlay"}
                   data-supports-ref={o.supportsRef}
                   data-selected={isSelected || undefined}
                   aria-hidden

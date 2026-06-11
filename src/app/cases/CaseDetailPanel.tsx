@@ -24,7 +24,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Mail, PackageCheck, Clock, ChevronRight, ChevronDown } from "lucide-react";
+import { Clock, ChevronRight, ChevronDown } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { ClassificationHistoryPanel } from "@/components/cases/ClassificationHistoryPanel";
@@ -41,30 +41,11 @@ import ExceptionDetailPanel from "../exceptions/ExceptionDetailPanel";
 import { RecordListPane } from "./RecordListPane";
 
 import { slaSnapshot } from "./page";
+import { ORIGIN_LABEL, SLA_BAND_VARIANT, originIcon } from "./caseChrome";
 
-const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutral"> = {
-  breached: "error",
-  at_risk: "warning",
-  today: "warning",
-  comfortable: "success",
-  none: "neutral",
-};
-
-
-// Origin chrome — KEEP the "Customer Inbox" label per requirements
-// §4 Q7 even though the internal field flipped from CaseSource to
-// Origin. Partners read the visible chrome, not the field name.
-const ORIGIN_ICON: Record<Origin | "default", React.ReactNode> = {
-  CUSTOMER: <Mail size={14} aria-hidden />,
-  API: <PackageCheck size={14} aria-hidden />,
-  default: <Clock size={14} aria-hidden />,
-};
-
-const ORIGIN_LABEL: Record<Origin | "default", string> = {
-  CUSTOMER: "Customer Inbox",
-  API: "API",
-  default: "Unknown origin",
-};
+// Origin chrome + SLA band variants are shared across the four /cases
+// surfaces — see ./caseChrome.tsx (Phase 3 consolidation). The
+// "Customer Inbox" label policy (requirements §4 Q7) lives there.
 
 // STATUS_LABEL is imported from src/lib/cases.ts — the consolidated
 // shared map per Phase 28.5.x §D1.
@@ -368,7 +349,7 @@ export function CaseDetailPanel({
               testing-library text queries see them as discrete
               nodes. */}
           <Badge variant="neutral" size="sm">
-            {ORIGIN_ICON[orderCase.origin as Origin] ?? ORIGIN_ICON.default}
+            {originIcon(orderCase.origin, 14)}
             <span className="ml-4">
               {ORIGIN_LABEL[orderCase.origin as Origin] ?? ORIGIN_LABEL.default}
             </span>

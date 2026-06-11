@@ -22,7 +22,7 @@
 
 "use client";
 
-import { AlertTriangle, Clock, Mail, PackageCheck } from "lucide-react";
+import { AlertTriangle, Clock } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
@@ -30,33 +30,11 @@ import { VerdictDot } from "@/components/ui/VerdictDot";
 import { cn } from "@/lib/utils";
 import { STATUS_LABEL, formatCaseId, formatSupergroupCode } from "@/lib/cases";
 import type { CaseListItem, CaseSummaryDollarImpact } from "@/lib/api";
-import type { Origin, SlaBand, SlaSnapshot } from "@/types/cases";
+import type { Origin, SlaSnapshot } from "@/types/cases";
 import { formatCurrency, formatCurrencyForA11y } from "@/lib/format";
 import type { RowDensity } from "@/hooks/useRowDensity";
 import { reportRowClick } from "@/lib/telemetry";
-
-const ORIGIN_LABEL: Record<Origin | "default", string> = {
-  CUSTOMER: "Customer Inbox",
-  API: "API",
-  default: "Unknown origin",
-};
-
-const ORIGIN_ICON: Record<Origin | "default", React.ReactNode> = {
-  CUSTOMER: <Mail size={12} aria-hidden />,
-  API: <PackageCheck size={12} aria-hidden />,
-  default: <Clock size={12} aria-hidden />,
-};
-
-const SLA_BAND_VARIANT: Record<
-  SlaBand,
-  "error" | "warning" | "success" | "neutral"
-> = {
-  breached: "error",
-  at_risk: "warning",
-  today: "warning",
-  comfortable: "success",
-  none: "neutral",
-};
+import { ORIGIN_LABEL, SLA_BAND_VARIANT, originIcon } from "./caseChrome";
 
 export interface CasesQueueRowV2Props {
   case_: CaseListItem;
@@ -130,7 +108,7 @@ export function CasesQueueRowV2({
         {/* Line 1 — chips. */}
         <div className="flex items-center flex-wrap gap-4">
           <Badge variant="neutral" size="sm">
-            {ORIGIN_ICON[case_.origin as Origin] ?? ORIGIN_ICON.default}
+            {originIcon(case_.origin)}
             <span className="ml-4">
               {ORIGIN_LABEL[case_.origin as Origin] ?? ORIGIN_LABEL.default}
             </span>

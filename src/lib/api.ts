@@ -339,8 +339,10 @@ export function __resetMockIdempotencyCache(): void {
 /** Tab visibility computed from permissions — mirrors api/users.py compute_visible_tabs.
  *  Issue #133 — added "home" (anyone who can read exceptions can see
  *  the operational landing surface) and retired "inbox" (the route
- *  is now a server redirect into /cases?source=manual_order). */
-function computeVisibleTabs(permissions: string[]): string[] {
+ *  is now a server redirect into /cases?source=manual_order).
+ *  Exported as a test seam: tests/architectural/rbac_mirror_parity.test.ts
+ *  diffs this mirror against asoe2/api/users.py::_PERMISSION_TAB_MAP. */
+export function computeVisibleTabs(permissions: string[]): string[] {
   const ps = new Set(permissions);
   const tabs: string[] = [];
   if (ps.has("exceptions:read")) { tabs.push("home", "exceptions", "cases"); }

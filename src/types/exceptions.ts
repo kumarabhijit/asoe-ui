@@ -1206,11 +1206,21 @@ export interface BackOrderAnalysisData {
   /** Substitute SKU options */
   substitutes: SubstituteSKU[];
   /** Inbound production order (if any) */
-  production?: { qty: number; date: string };
+  production?: InboundOrder | null;
   /** Inbound purchase order (if any) */
-  inbound_po?: { qty: number; eta: string; po_num: string } | null;
+  inbound_po?: InboundOrder | null;
   /** Ranked resolution options with multi-dimensional scoring */
   resolution_options: ResolutionOption[];
+}
+
+/** Inbound production / PO entry. Mirrors `InboundOrder` in
+ *  asoe2/api/schemas.py field-for-field: `date` / `eta` / `po_num`
+ *  are Optional on the backend and may be absent on the wire. */
+export interface InboundOrder {
+  qty: number;
+  date?: string | null;
+  eta?: string | null;
+  po_num?: string | null;
 }
 
 /** Warehouse inventory snapshot */
@@ -1420,8 +1430,9 @@ export interface PalletAnalysisData {
   loose_cases_total: number;
   /** Number of order lines — audit-bearing. */
   order_line_count: number;
-  /** Recipe classification (BROKEN_LAYER / PARTIAL_PALLET / MIXED_VIOLATION) — audit-bearing. */
-  classification?: string;
+  /** Recipe classification (BROKEN_LAYER / PARTIAL_PALLET / MIXED_VIOLATION) — audit-bearing.
+   *  Required: mirrors `PalletAnalysisData.classification: str` in asoe2/api/schemas.py. */
+  classification: string;
   /** Per-line pallet alignment details — audit-bearing. */
   lines: PalletLine[];
   /** AI-suggested plan for pallet alignment — audit-bearing. */

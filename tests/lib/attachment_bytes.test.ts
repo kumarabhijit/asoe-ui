@@ -56,3 +56,72 @@ describe("mockAttachmentBlob", () => {
     expect(await blob.text()).toContain("field,value");
   });
 });
+
+// ── General (non-evidence) text + uniqueness locks (2026-06-11) ────────────
+//
+// Bug-report follow-on: a mock PDF that contained ONLY evidence lines made
+// every line look highlighted — no visual discrimination between evidence and
+// ordinary content. The builders now wrap evidence in general boilerplate.
+// The flip side is a safety property: filler must never duplicate an evidence
+// span, or the safety bar flips LOCATED → AMBIGUOUS.
+
+const SE_EVIDENCE = [
+  "PO# EML-PO-2026-0042",
+  "From: buyer@southeast-distrib.example",
+  "ship to Atlanta DC",
+  "need by May 24",
+  "Cola 12pk x 600",
+];
+
+function countIn(haystack: string, needle: string): number {
+  let n = 0;
+  let i = haystack.indexOf(needle);
+  while (i !== -1) {
+    n += 1;
+    i = haystack.indexOf(needle, i + needle.length);
+  }
+  return n;
+}
+
+describe("mockAttachmentBlob — general text vs evidence discrimination", () => {
+  it("the simple PDF layout contains general non-evidence text", async () => {
+    const blob = mockAttachmentBlob({
+      caseId: "c", attachmentId: "a", mimeType: "application/pdf",
+      fileName: "cancellation_request.pdf",
+      evidenceText: SE_EVIDENCE,
+    });
+    const body = await blob.text();
+    expect(body).toContain("for your review");
+    expect(body).toContain("terms and conditions remain unchanged");
+  });
+
+  it("the PO_8842 layout contains general non-evidence text and labels the email-context band", async () => {
+    const blob = mockAttachmentBlob({
+      caseId: "c", attachmentId: "a", mimeType: "application/pdf",
+      fileName: "PO_8842.pdf",
+      evidenceText: SE_EVIDENCE,
+    });
+    const body = await blob.text();
+    expect(body).toContain("Terms: Net 30");
+    expect(body).toContain("Standard supply agreement");
+    // The non-geometry (email-content) evidence band is labelled so the
+    // operator can tell document content from email-derived context.
+    expect(body).toContain("Email context:");
+  });
+
+  it("every evidence span appears EXACTLY once in both layouts (filler must not create AMBIGUOUS)", async () => {
+    for (const fileName of ["PO_8842.pdf", "cancellation_request.pdf"]) {
+      const blob = mockAttachmentBlob({
+        caseId: "c", attachmentId: "a", mimeType: "application/pdf",
+        fileName, evidenceText: SE_EVIDENCE,
+      });
+      const body = await blob.text();
+      for (const span of SE_EVIDENCE) {
+        expect(
+          countIn(body, span),
+          `'${span}' must appear exactly once in ${fileName}`,
+        ).toBe(1);
+      }
+    }
+  });
+});

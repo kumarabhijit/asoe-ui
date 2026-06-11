@@ -22,7 +22,21 @@ import { attachmentsApi } from "@/lib/api";
 // the safety bar's authoritative input) and the canvas paint (page.render —
 // cosmetic, gated to the spatial overlays). `pdf.renderShouldReject` lets a
 // test fail ONLY the paint, to prove extraction/location survives it.
-const pdf = vi.hoisted(() => ({ renderShouldReject: false }));
+// `pdf.textItems` is per-test overridable: the default carries text-matrix
+// geometry (transform/width/height) like a real extractor, so the Phase-1.5
+// text-layer-derived highlight path is exercisable; a geometry-less override
+// proves graceful degradation.
+const pdf = vi.hoisted(() => ({
+  renderShouldReject: false,
+  textItems: [
+    {
+      str: "PO-2026-0042 ship to Atlanta DC",
+      transform: [12, 0, 0, 12, 64, 720],
+      width: 220,
+      height: 12,
+    },
+  ] as Array<{ str: string; transform?: number[]; width?: number; height?: number }>,
+}));
 vi.mock("pdfjs-dist", () => ({
   GlobalWorkerOptions: { workerSrc: "" },
   getDocument: () => ({
@@ -36,8 +50,7 @@ vi.mock("pdfjs-dist", () => ({
               ? Promise.reject(new Error("paint failed"))
               : Promise.resolve(),
           }),
-          getTextContent: () =>
-            Promise.resolve({ items: [{ str: "PO-2026-0042 ship to Atlanta DC" }] }),
+          getTextContent: () => Promise.resolve({ items: pdf.textItems }),
         }),
     }),
   }),
@@ -78,6 +91,14 @@ const textBlob = (s: string) => new Blob([s], { type: "text/plain" });
 beforeEach(() => {
   getBlob.mockReset();
   pdf.renderShouldReject = false;
+  pdf.textItems = [
+    {
+      str: "PO-2026-0042 ship to Atlanta DC",
+      transform: [12, 0, 0, 12, 64, 720],
+      width: 220,
+      height: 12,
+    },
+  ];
   // jsdom has no real 2D context; give the canvas a truthy one so the deferred
   // PDF paint succeeds and the page-rendered gate opens for the overlay tests.
   setCanvasContext({});
@@ -229,11 +250,62 @@ describe("AttachmentPreview", () => {
     expect(screen.queryByTestId("spatial-overlay")).toBeNull();
   });
 
-  it("draws no overlay for a text-derived anchor (safety bar only)", async () => {
+  // ── Phase 1.5 — text-layer-derived highlights for text-derived anchors ──
+  // Regression (bug report 2026-06-11): a LOCATED text-derived anchor (e.g.
+  // the email-content From: evidence) showed a verified safety-bar row but NO
+  // in-document highlight; only spatial anchors drew boxes. The fix derives a
+  // best-effort box from the PDF.js text layer when the anchor uniquely
+  // locates on the previewed page. These tests fail on the parent commit.
+
+  it("draws a text-layer-derived overlay for a LOCATED text-derived anchor", async () => {
     getBlob.mockResolvedValue(new Blob(["%PDF-1.4\nmock"], { type: "application/pdf" }));
     render(<AttachmentPreview caseId="case-1" attachment={attachment()} anchors={[poAnchor()]} />);
     await screen.findByTestId("pdf-canvas-layer");
+    const overlay = await screen.findByTestId("text-layer-overlay");
+    expect(overlay.getAttribute("data-supports-ref")).toBe("order_entry.po_number");
+    // Never double-badged as a spatial (backend-recorded) box.
     expect(screen.queryByTestId("spatial-overlay")).toBeNull();
+  });
+
+  it("draws no overlay for an UNLOCATED text-derived anchor (safety bar only)", async () => {
+    getBlob.mockResolvedValue(new Blob(["%PDF-1.4\nmock"], { type: "application/pdf" }));
+    render(
+      <AttachmentPreview
+        caseId="case-1"
+        attachment={attachment()}
+        anchors={[poAnchor("missing-from-document")]}
+      />,
+    );
+    await screen.findByTestId("pdf-canvas-layer");
+    expect(screen.queryByTestId("text-layer-overlay")).toBeNull();
+    expect(screen.queryByTestId("spatial-overlay")).toBeNull();
+  });
+
+  it("degrades to safety-bar-only when the text layer has no geometry", async () => {
+    pdf.textItems = [{ str: "PO-2026-0042 ship to Atlanta DC" }];
+    getBlob.mockResolvedValue(new Blob(["%PDF-1.4\nmock"], { type: "application/pdf" }));
+    render(<AttachmentPreview caseId="case-1" attachment={attachment()} anchors={[poAnchor()]} />);
+    await screen.findByTestId("pdf-canvas-layer");
+    // Still LOCATED (the safety bar reads the text layer)…
+    await waitFor(() =>
+      expect(screen.getByTestId("evidence-safety-bar").querySelector("li")?.getAttribute("data-status")).toBe("located"),
+    );
+    // …but no derived box without geometry — never a wrong one.
+    expect(screen.queryByTestId("text-layer-overlay")).toBeNull();
+  });
+
+  it("field↔source: selecting a safety-bar row emphasises the text-layer overlay", async () => {
+    getBlob.mockResolvedValue(new Blob(["%PDF-1.4\nmock"], { type: "application/pdf" }));
+    render(
+      <EvidenceSelectionProvider>
+        <AttachmentPreview caseId="case-1" attachment={attachment()} anchors={[poAnchor()]} />
+      </EvidenceSelectionProvider>,
+    );
+    const row = await screen.findByRole("button", { name: /PO number/i });
+    const overlay = await screen.findByTestId("text-layer-overlay");
+    expect(overlay.getAttribute("data-selected")).toBeNull();
+    fireEvent.click(row);
+    expect(overlay.getAttribute("data-selected")).toBe("true");
   });
 
   it("field↔source: selecting a safety-bar row toggles aria-pressed and emphasises the matching overlay", async () => {

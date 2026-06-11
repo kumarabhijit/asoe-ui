@@ -26,14 +26,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   CheckCircle2,
-  Clock,
   Mail,
-  PackageCheck,
 } from "lucide-react";
 
 import { useSignOut } from "@/hooks/useSignOut";
 import { Badge } from "@/components/ui/Badge";
 import { NavBar } from "@/components/ui/NavBar";
+import { useToast } from "@/components/ui/Toast";
 import { ALLOWED_CASE_ORIGINS, casesApi, type CaseListItem } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
@@ -51,9 +50,9 @@ import type {
   CaseStatus,
   Origin,
   OrderCase,
-  SlaBand,
   SlaSnapshot,
 } from "@/types/cases";
+import { ORIGIN_LABEL } from "./caseChrome";
 import { slaSnapshotFromDeadline } from "@/lib/sla";
 import type { ExceptionDetailResponse } from "@/types/api";
 
@@ -79,28 +78,9 @@ const CASES_ROW_V2 = casesRowV2Enabled();
 
 /* ── Visual mappings (vendor-neutral; per-source / per-status badge style) ── */
 
-// Origin chrome — KEEP the "Customer Inbox" label per requirements
-// §4 Q7. The internal field flipped from CaseSource to Origin but
-// the partner-facing chrome stays.
-const ORIGIN_LABEL: Record<Origin | "default", string> = {
-  CUSTOMER: "Customer Inbox",
-  API: "API",
-  default: "Unknown origin",
-};
-
-const ORIGIN_ICON: Record<Origin | "default", React.ReactNode> = {
-  CUSTOMER: <Mail size={12} aria-hidden />,
-  API: <PackageCheck size={12} aria-hidden />,
-  default: <Clock size={12} aria-hidden />,
-};
-
-const SLA_BAND_VARIANT: Record<SlaBand, "error" | "warning" | "success" | "neutral"> = {
-  breached: "error",
-  at_risk: "warning",
-  today: "warning",
-  comfortable: "success",
-  none: "neutral",
-};
+// Origin chrome + SLA band variants are shared across the four /cases
+// surfaces — see ./caseChrome.tsx (Phase 3 consolidation). The
+// "Customer Inbox" label policy (requirements §4 Q7) lives there.
 
 
 /**
@@ -192,6 +172,7 @@ function WorkspaceFallback() {
  */
 function CasesWorkspace() {
   const router = useRouter();
+  const { addToast } = useToast();
   const search = useSearchParams();
   const selectedCaseId = search?.get("case") ?? undefined;
   const selectedRecordId = search?.get("record") ?? undefined;
@@ -216,6 +197,11 @@ function CasesWorkspace() {
   const [policyHits, setPolicyHits] = useState<string[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailMissing, setDetailMissing] = useState(false);
+  // Case-level fetch failure (network / 5xx / auth) — distinct from
+  // `detailMissing` (the case genuinely doesn't exist). Rendered as
+  // an alert in the detail pane so a failed load is never mistaken
+  // for an empty case.
+  const [detailError, setDetailError] = useState<string | null>(null);
   // PO finding 2026-05-28 round-2 #1 — dynamically collapse the
   // xl audit rail when none of its tenants have content. Each
   // tenant reports its contentful state (ComplianceHitsRail's
@@ -279,12 +265,64 @@ function CasesWorkspace() {
   });
 
   /* ── Load the selected case's detail ────────────────────────── */
+  /* ── Shared case-detail fetch ───────────────────────────────── */
+  // Single fetch path for BOTH the selection-change effect and the
+  // post-action refresh. The two previously duplicated this block
+  // and their error contracts had started to drift; worse, a
+  // `casesApi.get` failure was an unhandled rejection that left the
+  // pane blank, and a `getRecords` failure silently rendered an
+  // empty records list. Now: get() failure → `detailError` + toast;
+  // getRecords() failure → case still renders, failure toasted.
+  // `isStale` guards the fast case-switch race — a superseded fetch
+  // must not write its results over the newer selection's state.
+  const loadCaseDetail = useCallback(
+    async (caseId: string, isStale: () => boolean = () => false) => {
+      let recordsFailed = false;
+      try {
+        const [c, r] = await Promise.all([
+          casesApi.get(caseId),
+          casesApi.getRecords(caseId).catch(() => {
+            recordsFailed = true;
+            return {
+              items: [] as ExceptionDetailResponse[],
+              total: 0,
+              aggregated_policy_hits: [] as string[],
+            };
+          }),
+        ]);
+        if (isStale()) return;
+        if (c) {
+          setOrderCase(c);
+          setRecords(r.items);
+          setPolicyHits(r.aggregated_policy_hits);
+        } else {
+          setDetailMissing(true);
+        }
+        setDetailError(null);
+        if (recordsFailed) {
+          addToast(
+            "error",
+            "Couldn't load this case's records — showing the case without them. Re-select the case to retry.",
+          );
+        }
+      } catch (err) {
+        if (isStale()) return;
+        const message =
+          err instanceof Error ? err.message : "Failed to load case";
+        setDetailError(message);
+        addToast("error", `Couldn't load case ${caseId} — ${message}`);
+      }
+    },
+    [addToast],
+  );
+
   useEffect(() => {
     if (!selectedCaseId) {
       setOrderCase(null);
       setRecords([]);
       setPolicyHits([]);
       setDetailMissing(false);
+      setDetailError(null);
       return;
     }
     // Clear the prior case's data BEFORE the new fetch starts.
@@ -300,33 +338,16 @@ function CasesWorkspace() {
     setRecords([]);
     setPolicyHits([]);
     setDetailMissing(false);
+    setDetailError(null);
     let cancelled = false;
     setDetailLoading(true);
-    Promise.all([
-      casesApi.get(selectedCaseId),
-      casesApi.getRecords(selectedCaseId).catch(() => ({
-        items: [] as ExceptionDetailResponse[],
-        total: 0,
-        aggregated_policy_hits: [] as string[],
-      })),
-    ])
-      .then(([c, r]) => {
-        if (cancelled) return;
-        if (c) {
-          setOrderCase(c);
-          setRecords(r.items);
-          setPolicyHits(r.aggregated_policy_hits);
-        } else {
-          setDetailMissing(true);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setDetailLoading(false);
-      });
+    void loadCaseDetail(selectedCaseId, () => cancelled).finally(() => {
+      if (!cancelled) setDetailLoading(false);
+    });
     return () => {
       cancelled = true;
     };
-  }, [selectedCaseId]);
+  }, [selectedCaseId, loadCaseDetail]);
 
   /* ── Post-action refresh ────────────────────────────────────── */
   // A HITL action on the inline-mounted record mutates that record's
@@ -340,20 +361,8 @@ function CasesWorkspace() {
   const refreshCaseDetail = useCallback(async () => {
     const caseId = selectedCaseId;
     if (!caseId) return;
-    const [c, r] = await Promise.all([
-      casesApi.get(caseId),
-      casesApi.getRecords(caseId).catch(() => ({
-        items: [] as ExceptionDetailResponse[],
-        total: 0,
-        aggregated_policy_hits: [] as string[],
-      })),
-    ]);
-    if (c) {
-      setOrderCase(c);
-      setRecords(r.items);
-      setPolicyHits(r.aggregated_policy_hits);
-    }
-  }, [selectedCaseId]);
+    await loadCaseDetail(caseId);
+  }, [selectedCaseId, loadCaseDetail]);
 
   const handleRecordActionComplete = useCallback(() => {
     // S2 sprint 2026-05-28 finding #11 — next-case auto-advance.
@@ -707,13 +716,37 @@ function CasesWorkspace() {
           </div>
         )}
         {selectedCaseId && detailLoading && (
-          <div role="status" className="text-text-tertiary py-24" aria-live="polite">
-            Loading case…
+          <div role="status" aria-live="polite" className="py-16 flex flex-col gap-12">
+            <span className="sr-only">Loading case…</span>
+            {/* Header, status line, then two record cards — mirrors the
+                CaseDetailPanel anatomy so the swap doesn't reflow. */}
+            <div className="skeleton h-24 w-2/5" aria-hidden />
+            <div className="skeleton h-16 w-3/5" aria-hidden />
+            <div className="skeleton h-64 w-full" aria-hidden />
+            <div className="skeleton h-64 w-full" aria-hidden />
           </div>
         )}
         {selectedCaseId && !detailLoading && detailMissing && (
           <div role="status" className="text-text-tertiary py-24">
             Case not found: <code>{selectedCaseId}</code>
+          </div>
+        )}
+        {/* Case-level fetch failure — only when nothing is rendered
+            yet; a refresh failure on an already-rendered panel is
+            surfaced via toast so the operator keeps their context. */}
+        {selectedCaseId
+          && !detailLoading
+          && !detailMissing
+          && detailError
+          && !orderCase && (
+          <div role="alert" className="py-24 flex flex-col items-start gap-8">
+            <div className="flex items-center gap-8">
+              <AlertTriangle size={16} className="text-error shrink-0" aria-hidden />
+              <span className="text-body font-semibold text-text-primary">
+                Couldn&apos;t load this case
+              </span>
+            </div>
+            <p className="text-caption text-text-tertiary">{detailError}</p>
           </div>
         )}
         {/* Render guard against fast case-switch race: don't show the
