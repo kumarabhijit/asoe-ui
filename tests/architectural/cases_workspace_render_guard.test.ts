@@ -344,3 +344,62 @@ describe("/cases workspace — case-switch race invariants", () => {
     ).toMatch(/isPinned:\s*true/);
   });
 });
+
+// ── Phase 2 error-surfacing contract (2026-06-11) ───────────────────
+//
+// Regression context: a `casesApi.get()` failure was an unhandled
+// promise rejection that left the detail pane blank, and a
+// `getRecords()` failure silently rendered an empty records list — a
+// failed load was indistinguishable from an empty case. Pattern A
+// source lock; the failure path cannot be driven in mock-mode
+// Playwright (mock mode bypasses the network), so the source lock IS
+// the regression gate, paired with the loadCaseDetail unit-level
+// invariants in the case-switch suite above.
+describe("/cases workspace — fetch-failure surfacing", () => {
+  const src = readFileSync(PAGE_PATH, "utf-8");
+
+  it("case-level fetch failure is captured into detailError and toasted", () => {
+    const helper = src.match(
+      /const loadCaseDetail = useCallback\([\s\S]*?\},\s*\n\s*\[[^\]]*\],?\s*\n?\s*\)/,
+    );
+    expect(helper, "shared loadCaseDetail helper not found").not.toBeNull();
+    const body = helper![0];
+    expect(
+      body,
+      "catch block must surface the failure via setDetailError",
+    ).toMatch(/catch[\s\S]*?setDetailError\(/);
+    expect(
+      body,
+      "catch block must toast the failure (refresh path has no pane alert)",
+    ).toMatch(/catch[\s\S]*?addToast\(\s*"error"/);
+  });
+
+  it("records fetch failure is surfaced, not silently swallowed", () => {
+    const helper = src.match(
+      /const loadCaseDetail = useCallback\([\s\S]*?\},\s*\n\s*\[[^\]]*\],?\s*\n?\s*\)/,
+    )![0];
+    expect(
+      helper,
+      "getRecords().catch must mark the failure (recordsFailed) so it can be surfaced",
+    ).toMatch(/recordsFailed = true/);
+    expect(
+      helper,
+      "records failure must be toasted to the operator",
+    ).toMatch(/recordsFailed[\s\S]*?addToast\(/);
+  });
+
+  it("renders an alert branch for a failed case load (not a blank pane)", () => {
+    expect(
+      src,
+      "detailError must render a role=alert branch when no case rendered",
+    ).toMatch(/detailError[\s\S]{0,200}role="alert"/);
+  });
+
+  it("selection change resets detailError so stale errors don't leak across cases", () => {
+    const effect = src.match(
+      /useEffect\(\(\)[\s\S]*?\}, \[selectedCaseId, loadCaseDetail\]\)/,
+    );
+    expect(effect).not.toBeNull();
+    expect(effect![0]).toMatch(/setDetailError\(null\)/);
+  });
+});
