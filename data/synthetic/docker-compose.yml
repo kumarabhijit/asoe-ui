@@ -1,0 +1,31 @@
+# Local sandbox: SAP -> Azure PostgreSQL replica.
+#
+#   npm run sandbox:db:up     start + auto-load all data (first boot)
+#   npm run sandbox:db:psql   open a psql shell into the replica
+#   npm run sandbox:db:down   stop and wipe (next `up` reloads fresh)
+#
+# The official postgres image executes the *.sql files mounted in
+# /docker-entrypoint-initdb.d in alphabetical order on first boot —
+# exactly the 00_ -> 40_ load order this dataset requires. Non-SQL
+# files (README.md, emails/, this file) are ignored by the entrypoint.
+#
+# Port 5433 on the host to avoid colliding with a local PostgreSQL.
+# Credentials are throwaway demo values; this is synthetic data.
+
+services:
+  sap-replica-db:
+    image: postgres:16-alpine
+    container_name: asoe-sap-replica
+    environment:
+      POSTGRES_USER: asoe
+      POSTGRES_PASSWORD: asoe
+      POSTGRES_DB: asoe_replica
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asoe -d asoe_replica"]
+      interval: 2s
+      timeout: 3s
+      retries: 15

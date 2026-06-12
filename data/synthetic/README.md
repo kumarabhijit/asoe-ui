@@ -21,6 +21,31 @@ All customers, orders, prices and documents are **fictitious**.
 | `30_intake_channels.sql` | Inbound EDI 850 staging + customer-inbox email staging |
 | `40_asoe_lineage.sql` | `zasoe_exception_link` — maps each UI exception to its SAP documents |
 
+## Local sandbox
+
+One command spins up a loaded replica in Docker (no manual psql steps —
+the postgres image auto-runs the numbered SQL files in order on first
+boot):
+
+```bash
+npm run sandbox:db:up     # postgres:16 on localhost:5433, fully loaded
+npm run sandbox:db:psql   # open a psql shell into it
+npm run sandbox:db:down   # stop + wipe (next `up` reloads fresh)
+```
+
+Connection string: `postgresql://asoe:asoe@localhost:5433/asoe_replica`
+(throwaway demo credentials — the data is synthetic). To pick up
+regenerated SQL, run `sandbox:db:down` then `sandbox:db:up`.
+
+Scope note: this database is the **ERP layer behind the backend** — for
+asoe2 development, intake-pipeline testing (pair it with `emails/`), and
+demo SQL. The UI's own local sandbox keeps using the mock layer in
+`src/lib/mock-data/` (the same fixture universe this dataset was derived
+from); the UI never queries the database directly (CLAUDE.md Guardrails
+#1/#6 — the UI consumes composed backend payloads only).
+
+## Loading manually
+
 ```bash
 # local / CI
 psql "$CONN" -v ON_ERROR_STOP=1 -f 00_schema.sql -f 10_master_data.sql \
