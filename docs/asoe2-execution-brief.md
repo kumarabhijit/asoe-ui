@@ -19,7 +19,39 @@ before it lands (see §5).
   sandbox seed (`tests/sandbox/seed.py`) + stub gateways. Do **not** introduce
   raw SAP tables. The "replicate SAP → Azure Postgres" pattern is a separate,
   deferred ADR (`ASOE_SAP_DRIVER=azure_replica`), not this work.
-- **UI mocks generate from the catalog** (asoe-ui side, separate session).
+- **UI mocks generate from the catalog** (asoe-ui side; same multi-repo
+  session — see the guardrails in §1a).
+
+## 1a. Cross-repo execution guardrails (multi-repo session)
+
+This work runs in **one session with both `asoe2` and `asoe-ui` on disk**.
+That convenience introduces a specific failure mode — code that works in the
+session but breaks in CI/Vercel where only one repo exists. Honor these:
+
+1. **No build/test-time dependency `asoe-ui` → `asoe2`.** Do **not** have
+   `asoe-ui` read `../asoe2/fixtures/scenarios/catalog.yaml` at build or test
+   time — it works locally but breaks the Vercel build and CI (asoe2 isn't
+   present there). Instead **vendor a committed snapshot** of `catalog.yaml`
+   into asoe-ui plus a `verify:` drift gate; the only place that reads across
+   repos is the sync step. Same shape as the existing `generate-types`
+   (OpenAPI) and `verify:reason-tags` mechanisms.
+2. **Generate-then-diff, never overwrite.** Do not regenerate `MOCK_*` until
+   `catalog.yaml` is authored, reconciled (§5), **and rich enough to reproduce
+   today's `MOCK_ORDER_ANALYSES` fidelity** (~1,900 lines of hand-authored
+   evidence the coarse schema doesn't yet carry). Generate, diff against the
+   current mocks, and adopt **only at parity**. Keep
+   `tests/architectural/case_pivot_mock_wiring.test.ts` and
+   `mock_verdict_coverage.test.ts` green and preserve the `parent_case_id`
+   wiring — losing it re-introduces the bug those locks guard.
+3. **Per-repo branches; no `main` pushes without explicit approval.** Cut a
+   fresh asoe2 feature branch; never cross-push between repos. After PR #250
+   merges, do the asoe-ui Phase 5/6 work on a **new branch off the updated
+   `main`**, not the merged `claude/peaceful-pasteur-bw2fex`.
+4. **Enums stay governed (Guardrail #2).** The catalog's `intent` /
+   `lifecycle` / `shadow_verdict` values must be drawn from and validate
+   against asoe2's taxonomy + `/health`; asoe-ui keeps sourcing dropdowns from
+   `useHealth`, never from the catalog. The catalog must not become a second,
+   drifting enum authority.
 
 ## 2. Architecture facts (confirmed by reading asoe2 main)
 
