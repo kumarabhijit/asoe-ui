@@ -189,6 +189,32 @@ This converts `MOCK_*` from a parallel hand-authored source into a checked
 derivative, removing the inversion (today the SAP fixtures were generated *from*
 `MOCK_EXCEPTIONS`, two hops downstream of the real source).
 
+### 7a. Sibling analysis-fixture pipeline (`MOCK_ORDER_ANALYSES`)
+
+`catalog.yaml` carries only the coarse summary disposition (intent, lifecycle,
+shadow verdict). The per-record `OrderAnalysis` *evidence* the operator consumes
+is far richer than the catalog schema, so it lives in a **sibling** asoe2
+fixture, keyed by exc-id and DISTINCT from the SAP-seed `scenarios:`:
+
+1. `asoe2/fixtures/scenarios/analyses.yaml` — source of truth, validated against
+   `api/schemas.py::AnalysisResponse` + its `*AnalysisData` sub-models by
+   `asoe2/tests/test_scenario_analyses_fixture.py`.
+2. `scripts/sync-scenario-analyses.mjs` — the only cross-repo read; vendors the
+   fixture to `tests/contract/snapshots/scenario_analyses.yaml`.
+3. `scripts/gen-scenario-analyses.ts` — projects the snapshot to
+   `src/lib/mock-data/__generated__/scenario_analyses.ts` (`SCENARIO_ANALYSES`).
+4. `src/lib/mock-data/order-analyses.ts` deep-clones `SCENARIO_ANALYSES` into
+   `MOCK_ORDER_ANALYSES`; `api.ts` is unchanged. The `primary_section`
+   presentation hint stays a runtime stamp (not fixture data), and the clone
+   keeps the generated seed immutable under runtime mutation.
+5. `npm run verify:scenario-analyses` — regenerate + `git diff --exit-code`
+   drift gate (same pattern as `verify:scenario-catalog`).
+
+This proceeds as a **vertical slice per intent family** (slice 1:
+`PRICE_HOLD_RELEASE` — exc-017 / exc-018). `scripts/author-scenario-analyses.ts`
+losslessly round-trips the prior hand-authored mock into the fixture so the
+dependent locks stay byte-green by construction — never hand-transcribe.
+
 ---
 
 ## 8. Per-mode data matrix (target)
