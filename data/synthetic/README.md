@@ -1,5 +1,22 @@
 # Synthetic SAP → Azure PostgreSQL replica
 
+> ## ⚠️ SUPERSEDED — relocating to asoe2. Do not extend.
+>
+> This directory (raw SAP-table Postgres replica + generator + sandbox
+> compose) models a layer **asoe2 does not consume**. asoe2 reads SAP
+> *live via OData* (`gateways/sap_live.py`); its sandbox double is a
+> **domain-shaped** 8-table seed (`tests/sandbox/seed.py`), not raw
+> `vbak`/`vbap`/`konv` tables. This dataset is therefore the wrong *shape*
+> and the wrong *repo*, kept here only as a working reference and as the
+> draft replica target for a deferred ADR (the `azure_replica` driver).
+>
+> **Do not build on this.** The scenario *semantics* (the 41 cases) are
+> being re-authored into asoe2's domain seed. See:
+> - [`docs/synthetic-data-placement-rfc.md`](../../docs/synthetic-data-placement-rfc.md) — the decision and migration plan
+> - [`docs/asoe2-execution-brief.md`](../../docs/asoe2-execution-brief.md) — the asoe2-session handoff
+>
+> It builds and loads cleanly, so it is safe to merge; it is just frozen.
+
 Demo-scale synthetic dataset modelling the slice of an **SAP S/4HANA SD
 system** that a CDC replication pipeline (SAP SLT / Azure Data Factory)
 would land in an **Azure Database for PostgreSQL** schema named

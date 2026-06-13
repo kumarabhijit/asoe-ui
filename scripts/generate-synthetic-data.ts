@@ -1,3 +1,16 @@
+// ⚠️ SUPERSEDED — relocating to asoe2. Do not extend.
+//
+// This generator emits a raw SAP-table Postgres replica, a layer asoe2
+// does NOT consume: asoe2 reads SAP live via OData (gateways/sap_live.py)
+// and its sandbox double is a domain-shaped 8-table seed
+// (tests/sandbox/seed.py), not vbak/vbap/konv. The scenario semantics are
+// being re-authored into that seed; see docs/synthetic-data-placement-rfc.md
+// and docs/asoe2-execution-brief.md. Kept here only as a working reference
+// and as the draft replica target for the deferred azure_replica ADR.
+// Frozen: builds/loads cleanly (safe to merge) but should not be built on.
+//
+// ----------------------------------------------------------------------
+//
 // Synthetic SAP -> Azure PostgreSQL replica dataset generator.
 //
 // Emits the SQL scripts under `data/synthetic/` that model the slice of an
