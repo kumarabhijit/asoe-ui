@@ -46,7 +46,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useHealth } from "@/hooks/useHealth";
 import { useExceptionActions } from "@/hooks/useExceptionActions";
 import { EvidenceSelectionProvider } from "@/hooks/useEvidenceSelection";
-import { exceptionsApi } from "@/lib/api";
+import { exceptionsApi, isApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { OverrideChooserDialog } from "./OverrideChooserDialog";
 import type {
@@ -209,19 +209,28 @@ export default function ExceptionDetailPanel({
 
   /* ── Data Fetching ───────────────────────────────────────────────── */
 
-  // Classifies an error from the http() wrapper into the three states the
-  // detail panel renders. The wrapper's Error.message format is
-  // "<CODE>: <human message>" (api.ts:155-159), so we can string-match
-  // the code prefix without parsing JSON.
+  // Classifies an error from the api client into the three states the
+  // detail panel renders. Prefer the structured ApiError (stable `code`
+  // + HTTP `status`); fall back to message string-matching for non-HTTP
+  // throws (e.g. mock-only validation errors that aren't ApiError).
   const classifyFetchError = (err: unknown) => {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.startsWith("UNAUTHORIZED") || msg.includes("HTTP_401") || msg.startsWith("INVALID_TOKEN")) {
-      return { kind: "unauthorized" as const, message: msg };
+    const message = err instanceof Error ? err.message : String(err);
+    if (isApiError(err)) {
+      if (err.status === 401 || err.code === "UNAUTHORIZED" || err.code === "INVALID_TOKEN") {
+        return { kind: "unauthorized" as const, message };
+      }
+      if (err.status === 404 || err.code === "NOT_FOUND") {
+        return { kind: "not_found" as const, message };
+      }
+      return { kind: "other" as const, message };
     }
-    if (msg.startsWith("NOT_FOUND") || msg.includes("HTTP_404")) {
-      return { kind: "not_found" as const, message: msg };
+    if (message.startsWith("UNAUTHORIZED") || message.includes("HTTP_401") || message.startsWith("INVALID_TOKEN")) {
+      return { kind: "unauthorized" as const, message };
     }
-    return { kind: "other" as const, message: msg };
+    if (message.startsWith("NOT_FOUND") || message.includes("HTTP_404")) {
+      return { kind: "not_found" as const, message };
+    }
+    return { kind: "other" as const, message };
   };
 
   // Lazy-fetch state (PO request #4 — defer non-critical payloads until

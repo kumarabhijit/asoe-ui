@@ -261,6 +261,16 @@ export function AgentReasoningCard({
                 {new Date(executionError.failedAt).toLocaleString()}
               </p>
             )}
+            {/* Recovery guidance — point the operator at the next step
+                instead of leaving them on a dead-end failure banner. The
+                actual recovery controls (Re-analyze / Escalate) render in
+                the ActionButtonMatrix below, gated by RBAC; re-running a
+                halted pipeline is the permission-gated, reason-captured
+                reanalyze path (never an unguarded retry). */}
+            <p className="text-caption text-text-secondary m-0 mt-8">
+              Re-run the pipeline or escalate for triage using the actions
+              below.
+            </p>
           </div>
         )}
 

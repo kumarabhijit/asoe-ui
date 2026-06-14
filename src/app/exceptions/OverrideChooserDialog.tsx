@@ -161,6 +161,19 @@ export function OverrideChooserDialog({
   const canSubmit =
     !submitting && action.length > 0 && reasonTag.length > 0 && notesOk;
 
+  // ADR-045 CP3 — "disabled is never silent": surface, inline, exactly
+  // which mandatory field is blocking Confirm so the operator isn't left
+  // guessing why the button is inert. Ordered to match the form's
+  // top-to-bottom flow. `undefined` once the form is submittable.
+  const blockedReason =
+    action.length === 0
+      ? "Choose a resolution action."
+      : reasonTag.length === 0
+        ? "Choose a reason category."
+        : !notesOk
+          ? "Notes are required for the selected reason."
+          : undefined;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent aria-label="Override exception">
@@ -188,6 +201,9 @@ export function OverrideChooserDialog({
               placeholder="Select an action…"
               filterPlaceholder="Filter actions…"
             />
+            {action.length === 0 && (
+              <span className="text-label text-text-tertiary">Required.</span>
+            )}
           </label>
           <label className="flex flex-col gap-4 text-caption text-text-secondary">
             Reason category
@@ -200,6 +216,9 @@ export function OverrideChooserDialog({
               placeholder="Select a reason…"
               filterPlaceholder="Filter reasons…"
             />
+            {reasonTag.length === 0 && (
+              <span className="text-label text-text-tertiary">Required.</span>
+            )}
           </label>
           <label className="flex flex-col gap-4 text-caption text-text-secondary">
             Notes {notesRequired ? "(required)" : "(optional)"}
@@ -216,8 +235,25 @@ export function OverrideChooserDialog({
               aria-required={notesRequired}
               className="w-full rounded-md border border-border bg-surface-primary px-8 py-6 text-caption text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-ring"
             />
+            {reasonTag.length > 0 && notesRequired && notes.trim().length === 0 && (
+              <span className="text-label text-text-tertiary">
+                Required for this reason.
+              </span>
+            )}
           </label>
         </div>
+        {/* Consolidated, aria-live explanation of why Confirm is disabled —
+            mirrors ActionButtonMatrix's submitBlockedReason() so a disabled
+            control is never silent (ADR-045 CP3). */}
+        {blockedReason && (
+          <p
+            role="status"
+            aria-live="polite"
+            className="m-0 mt-8 text-caption text-text-tertiary"
+          >
+            {blockedReason}
+          </p>
+        )}
         <DialogFooter>
           <Button
             variant="ghost"
@@ -232,6 +268,7 @@ export function OverrideChooserDialog({
             size="sm"
             onClick={onSubmit}
             disabled={!canSubmit}
+            title={blockedReason}
           >
             {submitting ? "Overriding…" : "Confirm Override"}
           </Button>

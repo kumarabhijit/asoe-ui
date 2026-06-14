@@ -30,6 +30,7 @@ import { ComplianceHitCountChip } from "@/components/ui/ComplianceHitCountChip";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { VerdictDot } from "@/components/ui/VerdictDot";
 import { BoundaryError } from "@/components/ui/BoundaryError";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { GapBar } from "@/components/ui/GapBar";
 import { SampleDataTag } from "@/components/ui/ScaffoldDataBanner";
 import { EventsTimeline } from "@/components/ui/EventsTimeline";
@@ -367,6 +368,21 @@ describe("a11y sweep: GapBar", () => {
   it("excess (over-case)", async () =>
     expectNoViolations(
       <GapBar primaryQty={150} primaryLabel="Ordered" secondaryQty={100} secondaryLabel="Max" uom="CS" mode="excess" />,
+    ));
+});
+
+// ---------------------------------------------------------------------------
+// Skeleton — shared loading-placeholder primitive. aria-hidden, no content;
+// the loading surface owns the role="status" + sr-only label.
+// ---------------------------------------------------------------------------
+describe("a11y sweep: Skeleton", () => {
+  it("default", async () => expectNoViolations(<Skeleton className="h-24 w-64" />));
+  it("inside a status region", async () =>
+    expectNoViolations(
+      <div role="status" aria-live="polite">
+        <span className="sr-only">Loading…</span>
+        <Skeleton className="h-48 w-full" />
+      </div>,
     ));
 });
 
