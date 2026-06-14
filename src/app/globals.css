@@ -140,7 +140,7 @@ body {
 .skeleton {
   background: var(--color-surface-secondary);
   border-radius: var(--radius-sm);
-  animation: asoe-skeleton-pulse 1.5s ease-in-out infinite;
+  animation: asoe-skeleton-pulse var(--dur-skeleton) ease-in-out infinite;
 }
 
 /* ── Agent active pulse ────────────────────────────────────────────── */
@@ -154,6 +154,6 @@ body {
   height: 8px;
   border-radius: var(--radius-full);
   background: var(--color-success);
-  animation: asoe-pulse 1.4s ease-in-out infinite;
+  animation: asoe-pulse var(--dur-pulse) ease-in-out infinite;
 }
 

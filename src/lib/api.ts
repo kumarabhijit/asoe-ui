@@ -211,6 +211,35 @@ interface HttpOptions {
  * Error whose `message` is `"<CODE>: <human message>"`. Idempotency-Key
  * is propagated when provided.
  */
+/**
+ * Structured API error. Carries the backend error envelope's `code`
+ * (Section 6.3) and the HTTP `status` alongside the human message, so
+ * consumers can branch on a stable code instead of string-matching the
+ * message (which `ExceptionDetailPanel` previously did).
+ *
+ * `message` is kept in the legacy "<CODE>: <message>" shape so existing
+ * `err instanceof Error ? err.message` call sites render unchanged.
+ */
+export class ApiError extends Error {
+  readonly code: string;
+  readonly status: number;
+  /** The human-readable message without the `<CODE>: ` prefix. */
+  readonly detail: string;
+
+  constructor(code: string, detail: string, status: number) {
+    super(`${code}: ${detail}`);
+    this.name = "ApiError";
+    this.code = code;
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+/** Type guard for {@link ApiError}. */
+export function isApiError(err: unknown): err is ApiError {
+  return err instanceof ApiError;
+}
+
 async function http<T>(path: string, options: HttpOptions = {}): Promise<T> {
   const qs = options.query
     ? "?" + new URLSearchParams(
@@ -241,7 +270,7 @@ async function http<T>(path: string, options: HttpOptions = {}): Promise<T> {
     const envelope = parsed as { error?: { code?: string; message?: string } };
     const code = envelope?.error?.code ?? `HTTP_${res.status}`;
     const message = envelope?.error?.message ?? res.statusText;
-    throw new Error(`${code}: ${message}`);
+    throw new ApiError(code, message, res.status);
   }
   return parsed as T;
 }
@@ -1554,7 +1583,10 @@ export const exceptionsApi = {
     }
     await delay(MOCK_DELAY);
     const exc = MOCK_EXCEPTIONS.find((e) => e.id === id);
-    if (!exc) throw new Error("Exception not found");
+    // Throw a structured ApiError so mock-mode detail fetches classify
+    // into the not_found UX state the same way the real backend's 404
+    // does (ExceptionDetailPanel.classifyFetchError branches on .status).
+    if (!exc) throw new ApiError("NOT_FOUND", "Exception not found", 404);
     // Four-eyes: if a pending override was staged in a prior override()
     // call, surface it here so a page reload or peer-user navigation
     // shows the PENDING_COSIGN banner.

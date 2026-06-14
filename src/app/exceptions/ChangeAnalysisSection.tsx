@@ -17,7 +17,7 @@ import { GitCompareArrows, CircleCheck, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
-import { humanizeEnumLabel } from "@/lib/format";
+import { humanizeEnumLabel, fmtMoney } from "@/lib/format";
 import type {
   ChangeAnalysis,
   ConstraintCheck,
@@ -48,16 +48,9 @@ function statusVariant(status: string): "success" | "warning" | "info" | "neutra
   }
 }
 
-function formatUsd(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(value);
-}
-
 function formatDelta(value: number): string {
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
-  return `${sign}${formatUsd(Math.abs(value))}`;
+  return `${sign}${fmtMoney(Math.abs(value))}`;
 }
 
 export function ChangeAnalysisSection({ data }: ChangeAnalysisSectionProps) {
@@ -159,7 +152,7 @@ function DecisionPanel({ decision }: { decision: ChangeAnalysis["decision"] }) {
           {(v) => (
             <span className="text-caption text-text-secondary">
               Revenue impact{" "}
-              <span className="font-mono text-text-primary">{formatUsd(Number(v))}</span>
+              <span className="font-mono text-text-primary">{fmtMoney(Number(v))}</span>
             </span>
           )}
         </EvidenceBlock>

@@ -222,6 +222,13 @@
   --ease-in-out:  cubic-bezier(0.45, 0, 0.55, 1);    /* Expand/collapse */
   --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);  /* Toast bounce */
 
+  /* Looping indicators (skeleton shimmer, agent pulse). Tokenized so the
+     loading vocabulary stays consistent and tunable in one place, per
+     Guardrail #2 (the global prefers-reduced-motion rule in globals.css
+     still neutralizes these). */
+  --dur-skeleton: 1.5s;   /* .skeleton pulse cycle */
+  --dur-pulse:    1.4s;   /* .agent-active-dot pulse cycle */
+
 
   /* ── LAYOUT ──────────────────────────────────────────────────────────── */
   --nav-height:     56px;

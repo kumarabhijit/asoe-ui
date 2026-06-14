@@ -37,6 +37,7 @@ import { ConfidenceDisplay, type ConfidenceVariant } from "./ConfidenceDisplay";
 import { ActionButtonMatrix } from "./ActionButtonMatrix";
 import { PolicyHitBadge } from "./PolicyHitBadge";
 import { cn } from "@/lib/utils";
+import { humanizeNodeId } from "@/lib/format";
 import { useIntentLabel } from "@/hooks/useErpProfile";
 import type { ShadowVerdict } from "@/types/exceptions";
 
@@ -164,16 +165,6 @@ const VERDICT_CONFIG: Record<ShadowVerdict, { label: string; icon: ReactNode }> 
   RED: { label: "Blocked by Policy", icon: <ShieldX size={14} /> },
 };
 
-/** Title-case snake_case node ids for display. Node names are sourced
- *  from the compiled-graph topology (open set per Guardrail #2), not
- *  from a closed UI enum — so this is a pure transform, not a mapping. */
-function humanizeNode(id: string): string {
-  return id
-    .split("_")
-    .map((p) => (p.length === 0 ? "" : p[0].toUpperCase() + p.slice(1)))
-    .join(" ");
-}
-
 /** Human-friendly rendering of an AllowedResolutionAction code for the
  *  Approve-button tooltip. ALLOW_BOTH → "Allow both". The action code itself
  *  is still passed to the backend unchanged — this is a display-layer
@@ -249,7 +240,7 @@ export function AgentReasoningCard({
               <XCircle size={14} className="text-error shrink-0" />
               <span className="text-label font-semibold text-error uppercase tracking-wider">
                 {executionError.node
-                  ? `Failed at ${humanizeNode(executionError.node)}`
+                  ? `Failed at ${humanizeNodeId(executionError.node)}`
                   : "Pipeline failure"}
               </span>
             </div>
@@ -261,6 +252,16 @@ export function AgentReasoningCard({
                 {new Date(executionError.failedAt).toLocaleString()}
               </p>
             )}
+            {/* Recovery guidance — point the operator at the next step
+                instead of leaving them on a dead-end failure banner. The
+                actual recovery controls (Re-analyze / Escalate) render in
+                the ActionButtonMatrix below, gated by RBAC; re-running a
+                halted pipeline is the permission-gated, reason-captured
+                reanalyze path (never an unguarded retry). */}
+            <p className="text-caption text-text-secondary m-0 mt-8">
+              Re-run the pipeline or escalate for triage using the actions
+              below.
+            </p>
           </div>
         )}
 

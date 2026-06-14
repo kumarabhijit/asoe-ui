@@ -62,6 +62,7 @@ src/
 │   ├── Card.tsx                  # Borderless shadow-elevated container
 │   ├── CaseViewBanner.tsx        # Banner identifying /inbox or /exceptions as filtered views of /cases (legacy — /exceptions retired in P4)
 │   ├── ChromeBoundary.tsx        # Authenticated-route NavBar + sign-out wrapper
+│   ├── Skeleton.tsx              # Shared loading-placeholder primitive (.skeleton class, aria-hidden)
 │   ├── ConfidenceDisplay.tsx     # Canonical cross-case confidence renderer (scale-normalised, banded, calibration-honest)
 │   ├── ReviewQualityPanel.tsx    # Autonomy/Review-Quality console — automation-bias review-scrutiny SLIs (real data) + honest "no source yet" cards
 │   ├── EvidenceBlock.tsx         # Audit-bearing field renderer enforcing the three presence states
@@ -155,10 +156,13 @@ src/
 | `HotkeyCheatsheet` | Tailwind + custom dialog | S2 #5 `?` overlay listing every binding in `src/lib/hotkeys.ts` (the single hotkey registry). Self-contained — owns its own `?`/Escape via `useHotkeys`; mounted once on `/cases`. Pairs with `useFocusRestoreOnClose` so focus returns to wherever the operator was before `?`. | `src/app/cases/page.tsx` |
 | `SlaBandAnnouncer` | sr-only `aria-live` | S3 #B announces SLA band TRANSITIONS for the selected case (`comfortable → at_risk → breached`, or recovery back). Silent on per-minute label ticks and on case-switch re-baselines. Mounted once on `CaseDetailPanel`. WCAG 4.1.3. | `CaseDetailPanel` |
 | `ImpactBar` | Tailwind | Priority-1 financial-impact strip (`impact_metrics`) rendered always-visible under `HeaderRibbon`. Dumb projector (Guardrail #6): structural omission for absent metrics, no dash/placeholder fallback; null when no metrics. Owns the impact half of the old two-pane `ContextStrip` so the figure is not rendered twice. | `ExceptionDetailPanel` |
+| `Skeleton` | Tailwind + `.skeleton` | Shared loading-placeholder primitive replacing hand-rolled `<div className="skeleton h-… w-…">`. `aria-hidden` (conveys nothing to AT); the surrounding loading surface owns `role="status"` + an sr-only label. Pulse tokenized via `--dur-skeleton`, neutralized under prefers-reduced-motion. | route `loading.tsx` (inbox, settings), future async surfaces |
 
 **Styling approach (Phase 8.9):** All components use Tailwind utility classes via the design token mapping in `tailwind.config.ts`. CVA (`class-variance-authority`) is used for multi-variant components (Button, Badge). `cn()` utility (`src/lib/utils.ts`) merges Tailwind classes with conflict resolution. Only 18 inline `style={{}}` objects remain across the entire codebase — all are data-driven dynamic values (avatar colors, bar widths, chart colors).
 
 **Badge variant mappers** (`Badge.tsx`): `verdictVariant()`, `lifecycleVariant()`, `rootCauseVariant()`, `categoryVariant()`, `inboxStatusVariant()` — all follow the same pattern: map API-provided strings to CSS variants with a `default` fallback.
+
+**Shared section helpers (consolidation):** the enrichment sections share one `Field` / `FieldLabel` label-over-value renderer in `app/exceptions/shared.tsx` (`Field` accepts an optional `icon`, used by EmailSourceSection) — these were five byte-identical local copies. `ChangeAnalysisSection`'s `SectionLabel` (heavier `mb-8` heading) and `PipelineDAG`'s null-eliding `Field` / `ProvenanceCard`'s `Row` are deliberately distinct and stay local. Currency/timestamp/node-id formatters are single-sourced in `src/lib/format.ts` — `fmtMoney` (with cents), `fmtMoneyRounded` (whole-dollar), `formatTimestamp`, `humanizeNodeId`. A source-grep lock (`tests/architectural/shared_helpers_consolidation.test.ts`) fails the build if a local copy is reintroduced.
 
 **PricingWaterfall vs WaterfallStepper:** WaterfallStepper visualizes the 11-node pipeline execution (WebSocket-driven). PricingWaterfall visualizes pricing condition chains for line items (API data-driven). They share a timeline visual metaphor but differ in data model and purpose.
 

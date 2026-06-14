@@ -27,6 +27,11 @@ import type { components } from "./generated";
 export type EscalateRequest = components["schemas"]["EscalateRequest"];
 export type CosignRequest = components["schemas"]["CosignRequest"];
 export type DispositionRequest = components["schemas"]["DispositionRequest"];
-export type HealthResponse = components["schemas"]["HealthResponse"];
+// HealthResponse intentionally NOT aliased here. The canonical UI type is the
+// JSDoc-rich, transition-tolerant interface in `./exceptions` (looser
+// `lifecycle_states: string[]`, optional fields with "[] until backend ships"
+// fallbacks) which every consumer imports. Drift against the backend schema is
+// gated on `./generated` by the OpenAPI drift tests. A second alias here was
+// dead code (no importer) and a divergence risk — removed (consolidation).
 export type ChallengeRequest = components["schemas"]["ChallengeRequest"];
 export type ReanalyzeRequest = components["schemas"]["ReanalyzeRequest"];

@@ -20,16 +20,11 @@ import type {
   OrderEntryExtraction,
   OrderEntryValidationFlag,
 } from "@/types/exceptions";
+import { fmtMoney } from "@/lib/format";
+import { Field } from "./shared";
 
 interface OrderEntrySectionProps {
   data: OrderEntryExtraction;
-}
-
-function formatUsd(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(value);
 }
 
 function flagClasses(severity: string): string {
@@ -108,7 +103,7 @@ export function OrderEntrySection({ data }: OrderEntrySectionProps) {
               <EvidenceBlock tier="audit-bearing" value={li.unit_price}>
                 {(v) => (
                   <span className="font-mono text-body text-text-secondary w-80 text-right">
-                    {formatUsd(Number(v))}
+                    {fmtMoney(Number(v))}
                   </span>
                 )}
               </EvidenceBlock>
@@ -164,29 +159,3 @@ export function OrderEntrySection({ data }: OrderEntrySectionProps) {
   );
 }
 
-function Field({
-  label,
-  value,
-  monospace = false,
-}: {
-  label: string;
-  value: string;
-  monospace?: boolean;
-}) {
-  return (
-    <div>
-      <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
-        {label}
-      </div>
-      <div
-        className={
-          monospace
-            ? "font-mono text-body text-text-primary break-all"
-            : "text-body text-text-primary"
-        }
-      >
-        {value}
-      </div>
-    </div>
-  );
-}

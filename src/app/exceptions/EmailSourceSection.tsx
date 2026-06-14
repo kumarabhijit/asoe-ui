@@ -29,6 +29,7 @@ import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { AttachmentPreview } from "@/components/ui/AttachmentPreview";
 import { AttachmentDownloadButton } from "@/components/ui/AttachmentDownloadButton";
 import type { EmailSourceData } from "@/types/exceptions";
+import { Field } from "./shared";
 
 interface EmailSourceSectionProps {
   data: EmailSourceData;
@@ -229,32 +230,3 @@ export function EmailSourceSection({ data, caseId, onHighlightShown }: EmailSour
   );
 }
 
-function Field({
-  label,
-  value,
-  icon,
-  monospace = false,
-}: {
-  label: string;
-  value: string;
-  icon?: React.ReactNode;
-  monospace?: boolean;
-}) {
-  return (
-    <div>
-      <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4 flex items-center gap-6">
-        {icon}
-        {label}
-      </div>
-      <div
-        className={
-          monospace
-            ? "font-mono text-body text-text-primary break-all"
-            : "text-body text-text-primary"
-        }
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
