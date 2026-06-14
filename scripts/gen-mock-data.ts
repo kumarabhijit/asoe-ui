@@ -61,11 +61,37 @@ function customerName(cat: Catalog, retailerId?: string): string | undefined {
   return cat.entities.customers.find((c) => c.retailer_id === retailerId)?.name;
 }
 
+// Deterministic intent -> recipe projection, mirroring asoe2's
+// `propose_recipe` (constraints/fallback_backend.py). selected_recipe is the
+// audit-tier provenance field the Diagnostics drawer renders (recipe_name);
+// the backend's build_analysis carries it, so the catalog projection must too,
+// else the provenance row reads blank (mock_presentation_provenance.test.ts).
+// MASS_PRICING_ERROR blocks at shadow with no recipe -> intentionally absent.
+const RECIPE_BY_INTENT: Record<string, string> = {
+  CONTRACTUAL_CORRECTION: "PriceAdjustmentRecipe.py",
+  CREDIT_BLOCK: "CreditHoldReleaseRecipe.py",
+  DUPLICATE_PO: "DuplicatePORecipe.py",
+  BACK_ORDER: "BackOrderResolutionRecipe.py",
+  OVER_MAX: "OverMaxTrimRecipe.py",
+  MIN_ORDER_QTY: "MOQRoundUpRecipe.py",
+  PALLET_CONFIG: "PalletAlignmentRecipe.py",
+  DELIVERY_DELAY: "DeliveryDelayResolutionRecipe.py",
+  PRICE_HOLD_RELEASE: "PriceHoldReleaseRecipe.py",
+  EDI_MISMATCH: "EdiMismatchRecipe.py",
+  MANUAL_ORDER_INTAKE: "EmailOrderEntryRecipe.py",
+};
+
 /** Project a scenario/email entry onto an ExceptionSummary-shaped object.
- *  Returns null when the entry carries no UI disposition (`lifecycle`). */
+ *  Returns null when the entry carries no UI disposition (`lifecycle`), or
+ *  when it is a backend-only test fixture (`fixture: test-*.eml`) — the
+ *  duplicate/messy-input scenarios exist for backend coverage and have no UI
+ *  substrate (inbox bundles / line items), so they are not part of the served
+ *  demo queue. */
 function toSummary(cat: Catalog, entry: Json, isEmail: boolean): Json | null {
   const lifecycle = entry.lifecycle as string | undefined;
   if (!lifecycle) return null;
+  const fixture = entry.fixture as string | undefined;
+  if (typeof fixture === "string" && fixture.startsWith("test-")) return null;
   const id = entry.id as string;
   const retailerId = entry.retailer_id as string | undefined;
   const accountName =
@@ -90,6 +116,8 @@ function toSummary(cat: Catalog, entry: Json, isEmail: boolean): Json | null {
   if (entry.shadow_verdict) summary.shadow_verdict = entry.shadow_verdict;
   if (retailerId) summary.account_id = `acct-${retailerId}`;
   if (accountName) summary.account_name = accountName;
+  const recipe = RECIPE_BY_INTENT[entry.intent as string];
+  if (recipe) summary.selected_recipe = recipe;
   return summary;
 }
 

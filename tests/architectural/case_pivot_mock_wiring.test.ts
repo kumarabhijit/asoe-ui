@@ -168,7 +168,16 @@ describe("case-pivot mock wiring", () => {
     expect(detail.id).toBe(single!.record_id);
   });
 
-  it("multi-issue cases surface N>1 records to the picker", async () => {
+  // DEFERRED (parity flip, Step 3): the served queue is now the
+  // catalog-generated CATALOG_EXCEPTIONS, which projects one case per
+  // scenario (parent_case_id = case-for-${id}) — matching the asoe2
+  // sandbox bootstrap, which materialises one case per catalog scenario.
+  // The hand-authored multi-record demo cases (case-multi-WMT-Q1RESET
+  // etc.) are intentionally gone. Re-enabling RecordListPane picker
+  // coverage requires the catalog to express multi-record cases (several
+  // scenarios sharing an order_id) AND gen-mock-data.ts grouping
+  // parent_case_id by order_id — tracked with the email-path follow-up.
+  it.skip("multi-issue cases surface N>1 records to the picker", async () => {
     // Companion to the single-record auto-mount lock above. The
     // RecordListPane is the case-detail picker the operator uses
     // when one PO carries several coincident exceptions

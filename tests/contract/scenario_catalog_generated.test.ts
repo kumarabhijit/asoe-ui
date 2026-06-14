@@ -31,6 +31,7 @@ const SNAPSHOT = resolve(__dirname, "snapshots/scenario_catalog.yaml");
 interface CatEntry {
   id: string;
   lifecycle?: string;
+  fixture?: string;
 }
 interface Catalog {
   scenarios: CatEntry[];
@@ -40,7 +41,14 @@ interface Catalog {
 function dispositionedIds(): string[] {
   const cat = parse(readFileSync(SNAPSHOT, "utf-8")) as Catalog;
   const all = [...(cat.scenarios ?? []), ...(cat.email_scenarios ?? [])];
-  return all.filter((e) => e.lifecycle).map((e) => e.id).sort();
+  return all
+    .filter((e) => e.lifecycle)
+    // Mirror gen-mock-data.ts: backend-only test fixtures (fixture:
+    // test-*.eml) are not projected into the served demo queue — they
+    // have no UI substrate (inbox bundles / line items).
+    .filter((e) => !(typeof e.fixture === "string" && e.fixture.startsWith("test-")))
+    .map((e) => e.id)
+    .sort();
 }
 
 describe("catalog-generated mock artifact", () => {
