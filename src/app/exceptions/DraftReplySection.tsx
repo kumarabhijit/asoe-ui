@@ -31,6 +31,8 @@ import type {
   DraftReplyEdit,
   DraftReplyRevision,
 } from "@/types/exceptions";
+import { formatTimestamp } from "@/lib/format";
+import { Field, FieldLabel } from "./shared";
 
 interface DraftReplySectionProps {
   data: DraftReply;
@@ -397,41 +399,3 @@ function VersionHistory({
   );
 }
 
-/** ISO-8601 → locale string; passthrough if it doesn't parse. */
-function formatTimestamp(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
-      {children}
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  monospace = false,
-}: {
-  label: string;
-  value: string;
-  monospace?: boolean;
-}) {
-  return (
-    <div>
-      <FieldLabel>{label}</FieldLabel>
-      <div
-        className={
-          monospace
-            ? "font-mono text-body text-text-primary break-all"
-            : "text-body text-text-primary"
-        }
-      >
-        {value}
-      </div>
-    </div>
-  );
-}

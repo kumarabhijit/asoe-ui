@@ -162,6 +162,8 @@ src/
 
 **Badge variant mappers** (`Badge.tsx`): `verdictVariant()`, `lifecycleVariant()`, `rootCauseVariant()`, `categoryVariant()`, `inboxStatusVariant()` — all follow the same pattern: map API-provided strings to CSS variants with a `default` fallback.
 
+**Shared section helpers (consolidation):** the enrichment sections share one `Field` / `FieldLabel` label-over-value renderer in `app/exceptions/shared.tsx` (`Field` accepts an optional `icon`, used by EmailSourceSection) — these were five byte-identical local copies. `ChangeAnalysisSection`'s `SectionLabel` (heavier `mb-8` heading) and `PipelineDAG`'s null-eliding `Field` / `ProvenanceCard`'s `Row` are deliberately distinct and stay local. Currency/timestamp/node-id formatters are single-sourced in `src/lib/format.ts` — `fmtMoney` (with cents), `fmtMoneyRounded` (whole-dollar), `formatTimestamp`, `humanizeNodeId`. A source-grep lock (`tests/architectural/shared_helpers_consolidation.test.ts`) fails the build if a local copy is reintroduced.
+
 **PricingWaterfall vs WaterfallStepper:** WaterfallStepper visualizes the 11-node pipeline execution (WebSocket-driven). PricingWaterfall visualizes pricing condition chains for line items (API data-driven). They share a timeline visual metaphor but differ in data model and purpose.
 
 **Shadcn components installed:** Select, DropdownMenu, Dialog (Radix primitives + Tailwind styling). **Pending:** DataTable (Tanstack Table), Tooltip.

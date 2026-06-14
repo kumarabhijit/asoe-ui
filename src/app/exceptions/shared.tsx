@@ -317,3 +317,62 @@ export function CollapsibleSection({
 export function fmtPrice(n: number): string {
   return `$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
+/**
+ * Uppercase micro-label for a field/value pair. Was copy-pasted as a local
+ * `FieldLabel` (DraftReplySection) — consolidated here. Note `SectionLabel`
+ * (ChangeAnalysisSection, `mb-8`) is a deliberately different heading variant
+ * and stays local.
+ */
+export function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Label-over-value field renderer shared by the enrichment sections
+ * (OrderEntry / SapData / Edi850 / DraftReply, and EmailSource via the
+ * optional `icon`). Five byte-identical copies were collapsed into this one —
+ * the markup and Tailwind classes are preserved exactly, so the rendered DOM
+ * is unchanged. `icon` only adds the flex layout when supplied, keeping the
+ * non-icon DOM identical to the original plain copies. Distinct renderers
+ * (PipelineDAG's null-eliding `Field`, ProvenanceCard's `Row`) are NOT folded
+ * in — they have different element/typography contracts.
+ */
+export function Field({
+  label,
+  value,
+  monospace = false,
+  icon,
+}: {
+  label: string;
+  value: string;
+  monospace?: boolean;
+  icon?: ReactNode;
+}) {
+  return (
+    <div>
+      <div
+        className={cn(
+          "text-label font-bold uppercase tracking-wider text-text-quaternary mb-4",
+          icon && "flex items-center gap-6",
+        )}
+      >
+        {icon}
+        {label}
+      </div>
+      <div
+        className={
+          monospace
+            ? "font-mono text-body text-text-primary break-all"
+            : "text-body text-text-primary"
+        }
+      >
+        {value}
+      </div>
+    </div>
+  );
+}

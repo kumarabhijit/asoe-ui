@@ -22,6 +22,8 @@ import type {
   Edi850Party,
   Edi850Segment,
 } from "@/types/exceptions";
+import { fmtMoney } from "@/lib/format";
+import { Field } from "./shared";
 
 interface Edi850SectionProps {
   data: Edi850Document;
@@ -52,13 +54,6 @@ function groupClass(group: string): string {
     default:
       return "text-text-tertiary";
   }
-}
-
-function formatUsd(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(value);
 }
 
 export function Edi850Section({ data }: Edi850SectionProps) {
@@ -187,7 +182,7 @@ function DecodedView({ data }: { data: Edi850Document }) {
           <Field label="Total Qty" value={String(totals.total_quantity)} monospace />
           <EvidenceBlock tier="contextual" value={totals.total_amount}>
             {(v) => (
-              <Field label="Total Amount" value={formatUsd(Number(v))} monospace />
+              <Field label="Total Amount" value={fmtMoney(Number(v))} monospace />
             )}
           </EvidenceBlock>
         </div>
@@ -239,14 +234,14 @@ function LineRow({ line }: { line: Edi850LineItem }) {
       <EvidenceBlock tier="contextual" value={line.unit_price}>
         {(v) => (
           <span className="font-mono text-body text-text-secondary w-80 text-right">
-            {formatUsd(Number(v))}
+            {fmtMoney(Number(v))}
           </span>
         )}
       </EvidenceBlock>
       <EvidenceBlock tier="contextual" value={line.extended_amount}>
         {(v) => (
           <span className="font-mono text-body text-text-primary w-96 text-right">
-            {formatUsd(Number(v))}
+            {fmtMoney(Number(v))}
           </span>
         )}
       </EvidenceBlock>
@@ -333,29 +328,3 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-function Field({
-  label,
-  value,
-  monospace = false,
-}: {
-  label: string;
-  value: string;
-  monospace?: boolean;
-}) {
-  return (
-    <div>
-      <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
-        {label}
-      </div>
-      <div
-        className={
-          monospace
-            ? "font-mono text-body text-text-primary break-all"
-            : "text-body text-text-primary"
-        }
-      >
-        {value}
-      </div>
-    </div>
-  );
-}

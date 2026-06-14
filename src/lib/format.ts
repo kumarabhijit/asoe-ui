@@ -61,6 +61,21 @@ export function fmtSignedPrice(n: number, locale = "en-US"): string {
 }
 
 /**
+ * Whole-dollar USD (no cents): "$4,147", "-$3". For summary figures where
+ * cents are noise (e.g. the SAP credit-exposure card). Canonical replacement
+ * for SapDataSection's local `formatUsd` (which set maximumFractionDigits: 0).
+ * For the WITH-cents form (the other three sections' `formatUsd`) use the
+ * existing `fmtMoney` above — its `signDisplay: "auto"` matches the old output.
+ */
+export function fmtMoneyRounded(n: number, locale = "en-US"): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
+}
+
+/**
  * Title-case a snake_case pipeline node / graph id for display.
  * `build_analysis` → "Build Analysis". No closed enum mapping
  * (Guardrail #2) — purely mechanical. Shared by PipelineDAG and

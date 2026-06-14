@@ -16,17 +16,11 @@ import { Database, FileText } from "lucide-react";
 
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import type { SapDataAnalysisData } from "@/types/exceptions";
+import { fmtMoneyRounded } from "@/lib/format";
+import { Field } from "./shared";
 
 interface SapDataSectionProps {
   data: SapDataAnalysisData;
-}
-
-function formatUsd(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 export function SapDataSection({ data }: SapDataSectionProps) {
@@ -51,7 +45,7 @@ export function SapDataSection({ data }: SapDataSectionProps) {
       <div className="mt-12">
         <EvidenceBlock tier="audit-bearing" value={data.order_value_usd}>
           {(value) => (
-            <Field label="Order value" value={formatUsd(Number(value))} monospace />
+            <Field label="Order value" value={fmtMoneyRounded(Number(value))} monospace />
           )}
         </EvidenceBlock>
       </div>
@@ -74,29 +68,3 @@ export function SapDataSection({ data }: SapDataSectionProps) {
   );
 }
 
-function Field({
-  label,
-  value,
-  monospace = false,
-}: {
-  label: string;
-  value: string;
-  monospace?: boolean;
-}) {
-  return (
-    <div>
-      <div className="text-label font-bold uppercase tracking-wider text-text-quaternary mb-4">
-        {label}
-      </div>
-      <div
-        className={
-          monospace
-            ? "font-mono text-body text-text-primary break-all"
-            : "text-body text-text-primary"
-        }
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
