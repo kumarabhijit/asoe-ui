@@ -208,27 +208,6 @@ export interface ExceptionSummary {
    *  under (e.g. `SG_BLOCK_PRICING`). Typed `SupergroupCode` in
    *  `src/generated/taxonomy.ts`. */
   supergroup_code?: string;
-  /** Phase 2 §6 — set when the child's classification diverges
-   *  from the parent case's supergroup. Redacted to `null` on
-   *  partner-role responses. */
-  divergence_reason?: string | null;
-  /** Phase 2 §8.5 — the SAP block field this child record carries.
-   *  `LIFSK`/`LIFSP` = delivery-block header/item, `FAKSK`/`FAKSP`
-   *  = billing-block header/item, `ABGRU` = order-reject code,
-   *  `CMGST` = credit-management status, `Z_CUSTOM` = tenant
-   *  custom field. `null` for non-SAP records. */
-  sap_block_field?:
-    | "LIFSK"
-    | "LIFSP"
-    | "FAKSK"
-    | "FAKSP"
-    | "ABGRU"
-    | "CMGST"
-    | "Z_CUSTOM"
-    | null;
-  /** Phase 2 §8.5 — whether the SAP block applies to the order
-   *  header or a specific line item. `null` when not applicable. */
-  scope?: "HEADER" | "ITEM" | null;
   lifecycle_state: LifecycleState;
   shadow_verdict?: ShadowVerdict;
   selected_recipe?: string;
@@ -243,11 +222,6 @@ export interface ExceptionSummary {
    *  to a case. None on Tier-1 stateless records and pre-Phase-H.3
    *  legacy rows. UI uses this for the "View case" deeplink. */
   parent_case_id?: string | null;
-  /** Phase 2 §8.5 — raw SAP block reason code (`LIFSK=Z1`, `ABGRU=42`,
-   *  …) for records whose parent case has origin=API. Distinct from
-   *  `intent` (the classified business intent recipes dispatch on).
-   *  `null` on customer-origin records and pre-ADR-041 legacy rows. */
-  sap_block_code?: string | null;
 }
 
 /** One append-only entry in an exception's reanalysis audit trail.
@@ -276,6 +250,35 @@ export interface ReanalysisEntry {
 /** ExceptionDetail — full detail view (GET /api/v1/exceptions/{id}) */
 export interface ExceptionDetail extends ExceptionSummary {
   trace_id?: string;
+  /** Phase 2 §6 — set when the child's classification diverges
+   *  from the parent case's supergroup. Redacted to `null` on
+   *  partner-role responses. Detail-only: the list endpoint
+   *  (`ExceptionSummary`) does not project it. */
+  divergence_reason?: string | null;
+  /** Phase 2 §8.5 — the SAP block field this child record carries.
+   *  `LIFSK`/`LIFSP` = delivery-block header/item, `FAKSK`/`FAKSP`
+   *  = billing-block header/item, `ABGRU` = order-reject code,
+   *  `CMGST` = credit-management status, `Z_CUSTOM` = tenant
+   *  custom field. `null` for non-SAP records. Detail-only. */
+  sap_block_field?:
+    | "LIFSK"
+    | "LIFSP"
+    | "FAKSK"
+    | "FAKSP"
+    | "ABGRU"
+    | "CMGST"
+    | "Z_CUSTOM"
+    | null;
+  /** Phase 2 §8.5 — raw SAP block reason code (`LIFSK=Z1`, `ABGRU=42`,
+   *  …) for records whose parent case has origin=API. Distinct from
+   *  `intent` (the classified business intent recipes dispatch on).
+   *  `null` on customer-origin records and pre-ADR-041 legacy rows.
+   *  Detail-only. */
+  sap_block_code?: string | null;
+  /** Phase 2 §8.5 — whether the SAP block applies to the order
+   *  header or a specific line item. `null` when not applicable.
+   *  Detail-only. */
+  scope?: "HEADER" | "ITEM" | null;
   resolution_data: Record<string, unknown>;
   resolved_by?: string;
   resolved_action?: string;
@@ -1059,8 +1062,11 @@ export interface EmailOrderEntryAnalysisData {
    *  provenance. Mirrors `api/schemas.py`; null until projected. */
   composite_confidence_signal?: ConfidenceSignal | null;
   classification: EmailOrderEntryClassification;
-  /** Recipe-recommended action — must be a member of ResolutionAction. */
-  recommended_action: ResolutionAction;
+  /** Recipe-recommended action. Carries a ResolutionAction value, but typed
+   *  `string` to mirror the backend (`api/schemas.py` declares `str`) and to
+   *  tolerate unknown values per Guardrail #2 — consistent with the sibling
+   *  `recommended_action` fields on the other *AnalysisData interfaces. */
+  recommended_action: string;
   // L4 (full autonomy) is valid for email-order-entry only — parity with
   // generated.ts::EmailOrderEntryAnalysisData (ADR-042 Phase-0). EDI-mismatch
   // stays L1–L3. Locked by tests/architectural/autonomy_union_parity.test.ts.

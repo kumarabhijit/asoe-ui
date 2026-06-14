@@ -2527,6 +2527,8 @@ export interface components {
             resolved_action?: string | null;
             /** Resolved By */
             resolved_by?: string | null;
+            /** Sap Block Code */
+            sap_block_code?: string | null;
             /** Sap Block Field */
             sap_block_field?: string | null;
             /** Scope */
