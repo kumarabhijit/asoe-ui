@@ -1272,8 +1272,12 @@ export interface ResolutionOption {
   };
   /** SAP transaction steps to execute */
   sap_steps: string[];
-  /** Whether this is the recommended ("top pick") option */
-  recommended: boolean;
+  /** Whether this is the recommended ("top pick") option.
+   *  Optional: the backend `ResolutionOption` (api/schemas.py, extra="forbid")
+   *  does NOT carry this — options arrive ranked best-first, so the top pick
+   *  is derivable from order/`composite_score`. Mirrors the backend contract
+   *  (Guardrail #3); UI sections truthiness-guard its absence. */
+  recommended?: boolean;
 }
 
 /* ── Over Max enrichment types ───────────────────────────────────────── */
