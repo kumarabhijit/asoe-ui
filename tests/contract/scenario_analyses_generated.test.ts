@@ -106,14 +106,18 @@ describe("scenario-analysis pipeline — runtime completeness (Pattern B)", () =
     expect(escalate?.hold_status).toBe("HELD");
   });
 
-  it("the runtime presentation hint is stamped on the migrated records", () => {
-    // primary_section is intentionally absent from the fixture (it is a
-    // deterministic read-path stamp); order-analyses.ts must re-derive it.
+  it("the presentation hint is stamped into the generated fixture", () => {
+    // Post parity-flip (Step 3) api.ts serves SCENARIO_ANALYSES directly, so
+    // primary_section is stamped at GENERATION time (gen-scenario-analyses.ts),
+    // mirroring the backend read path — it must be present in the artifact
+    // itself, not re-derived at runtime.
     for (const id of MIGRATED_IDS) {
-      expect(MOCK_ORDER_ANALYSES[id].primary_section).toBe("price_hold_analysis");
       expect(
         (SCENARIO_ANALYSES[id] as unknown as Record<string, unknown>).primary_section,
-      ).toBeUndefined();
+      ).toBe("price_hold_analysis");
+      // order-analyses.ts spreads the artifact; its runtime stamp is a no-op
+      // when the hint is already present, so the served value is unchanged.
+      expect(MOCK_ORDER_ANALYSES[id].primary_section).toBe("price_hold_analysis");
     }
   });
 });

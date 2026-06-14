@@ -27,12 +27,16 @@ import { test, expect, type Page } from "@playwright/test";
 
 import { loginAs, USERS } from "../browser/_helpers";
 
-// Deterministic seeds from src/lib/mock-data/exceptions.ts:
-//   exc-002 — DUPLICATE_PO, YELLOW, PENDING_REVIEW. Its order analysis
-//             recommends BLOCK_AND_NOTIFY (→ "Block and notify" button).
+// Deterministic seeds from the catalog-generated queue (CATALOG_EXCEPTIONS):
+//   exc-018 — PRICE_HOLD_RELEASE, YELLOW, PENDING_REVIEW. Its order analysis
+//             recommends ESCALATE (→ "Escalate to manager" button). Post
+//             parity-flip the old exc-002 duplicate is GREEN-shadow (the
+//             shadow passes; the recipe routes to review via autonomy), and
+//             AgentReasoningCard treats GREEN as passive — no Approve. A
+//             genuinely-YELLOW record is needed to exercise the Approve path.
 //   exc-007 — CREDIT_BLOCK, YELLOW, PENDING_REVIEW. Analysis → ALLOW_BOTH.
-const APPROVE_CASE = "case-for-exc-002";
-const APPROVE_RECORD = "exc-002";
+const APPROVE_CASE = "case-for-exc-018";
+const APPROVE_RECORD = "exc-018";
 const OVERRIDE_CASE = "case-for-exc-007";
 const OVERRIDE_RECORD = "exc-007";
 
@@ -89,11 +93,11 @@ test.describe("mock-mode HITL actions", () => {
     ).toBeVisible();
 
     // The primary action button carries the recipe's recommendation as
-    // its label — for exc-002 that's BLOCK_AND_NOTIFY → "Block and
-    // notify". Before the fix this label was the bare fallback and the
-    // click dead-ended on a "No recipe recommendation" warning toast.
+    // its label — for exc-018 that's ESCALATE → "Escalate to manager".
+    // Before the fix this label was the bare fallback and the click
+    // dead-ended on a "No recipe recommendation" warning toast.
     const approve = workspace(page)
-      .getByRole("button", { name: /block and notify/i })
+      .getByRole("button", { name: /escalate to manager/i })
       .first();
     await expect(
       approve,

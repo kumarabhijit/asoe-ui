@@ -38,6 +38,31 @@ interface AnalysesFile {
   analyses: Record<string, Record<string, unknown>>;
 }
 
+// Presentation-hint precedence — mirrors the backend read path
+// (api/routes/exceptions.py) and the prior order-analyses.ts runtime stamp.
+// A mock record carries a single primary enrichment field, so "first present
+// in precedence order" resolves to that one field. Stamped HERE (not at
+// runtime) because the parity flip serves SCENARIO_ANALYSES directly from
+// api.ts — order-analyses.ts no longer enriches the served payload.
+const PRIMARY_SECTION_KEYS = [
+  "price_hold_analysis",
+  "edi_mismatch_analysis",
+  "price_analysis",
+  "duplicate_detection",
+  "order_comparison",
+  "backorder_analysis",
+  "overmax_analysis",
+  "moq_analysis",
+  "pallet_analysis",
+  "delivery_delay_analysis",
+] as const;
+
+function stampPrimarySection(a: Record<string, unknown>): void {
+  if (a.primary_section) return;
+  const present = PRIMARY_SECTION_KEYS.find((k) => a[k] != null);
+  if (present) a.primary_section = present;
+}
+
 function main(): void {
   const file = parse(readFileSync(SNAPSHOT, "utf-8")) as AnalysesFile;
   const analyses = file.analyses ?? {};
@@ -46,7 +71,9 @@ function main(): void {
   // diffs the output).
   const sorted: Record<string, unknown> = {};
   for (const id of Object.keys(analyses).sort()) {
-    sorted[id] = analyses[id];
+    const entry = analyses[id] as Record<string, unknown>;
+    stampPrimarySection(entry);
+    sorted[id] = entry;
   }
   const count = Object.keys(sorted).length;
 
@@ -59,8 +86,8 @@ function main(): void {
     "// CONSUMED by the app: src/lib/mock-data/order-analyses.ts spreads",
     "// SCENARIO_ANALYSES into MOCK_ORDER_ANALYSES. Migrated intent families",
     "// are sourced here instead of hand-authored inline. The `primary_section`",
-    "// presentation hint is stamped at runtime by order-analyses.ts (mirroring",
-    "// the backend read path), so it is intentionally absent from this fixture.",
+    "// presentation hint is stamped into this artifact at generation time",
+    "// (mirroring the backend read path) since api.ts serves it directly.",
     "",
     'import type { OrderAnalysis } from "@/types/exceptions";',
     "",

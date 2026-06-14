@@ -6,8 +6,8 @@
 // CONSUMED by the app: src/lib/mock-data/order-analyses.ts spreads
 // SCENARIO_ANALYSES into MOCK_ORDER_ANALYSES. Migrated intent families
 // are sourced here instead of hand-authored inline. The `primary_section`
-// presentation hint is stamped at runtime by order-analyses.ts (mirroring
-// the backend read path), so it is intentionally absent from this fixture.
+// presentation hint is stamped into this artifact at generation time
+// (mirroring the backend read path) since api.ts serves it directly.
 
 import type { OrderAnalysis } from "@/types/exceptions";
 
@@ -123,7 +123,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
         "risk": "LOW",
         "waterfall": []
       }
-    ]
+    ],
+    "primary_section": "price_analysis"
   },
   "exc-002": {
     "diagnosis": "PO #PO-88421 matches existing PO #PO-88419 received 36 hours prior. Identical line items, quantities, and ship-to address. Likely EDI retransmission or buyer system retry.",
@@ -252,7 +253,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
         "po_number",
         "unit_prices"
       ]
-    }
+    },
+    "primary_section": "duplicate_detection"
   },
   "exc-003": {
     "diagnosis": "Customer credit exposure ($142,500) exceeds approved credit limit ($125,000) by $17,500 (14%). Four line items totalling $13,782 would push exposure to $156,282. Credit hold applied per policy CREDIT-001.",
@@ -398,7 +400,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
         "risk": "LOW",
         "waterfall": []
       }
-    ]
+    ],
+    "primary_section": "price_analysis"
   },
   "exc-005": {
     "diagnosis": "Single line item — ERP base price not loaded for new SKU-0099. PO price matches contracted rate.",
@@ -555,7 +558,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
         "po_number",
         "total_value"
       ]
-    }
+    },
+    "primary_section": "duplicate_detection"
   },
   "exc-007": {
     "diagnosis": "Customer approaching credit limit. Current exposure $93,200 against $100,000 limit. This order ($5,040) would bring exposure to $98,240 — within limit but triggering the 90% warning threshold.",
@@ -732,7 +736,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
       "differing_fields": [
         "po_number"
       ]
-    }
+    },
+    "primary_section": "duplicate_detection"
   },
   "exc-010": {
     "diagnosis": "Customer ordered 800 CS of Premium Lager but only 480 CS available at primary DC. Gap of 320 CS (40%). Alternate DC in Denver has 200 CS with 3-day transit. Production order for 500 CS due in 8 days.",
@@ -921,7 +926,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
           ]
         }
       ]
-    }
+    },
+    "primary_section": "backorder_analysis"
   },
   "exc-011": {
     "diagnosis": "Customer ordered 200 CS of Craft IPA. Only 140 CS available at primary DC. Alternate DC in Chicago has 120 CS with 2-day transit. Auto-resolved via split shipment.",
@@ -1007,7 +1013,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
           ]
         }
       ]
-    }
+    },
+    "primary_section": "backorder_analysis"
   },
   "exc-012": {
     "diagnosis": "Total order quantity (2,600 CS) exceeds contract maximum (2,000 CS) by 600 CS (30%). Three line items, two exceeding per-line maximums. SAP block V4080 applied.",
@@ -1120,7 +1127,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
       ],
       "trimmed_total": 1988,
       "delta_total": 612
-    }
+    },
+    "primary_section": "overmax_analysis"
   },
   "exc-013": {
     "diagnosis": "Order for 65 CS total (2 SKUs) is below the minimum order quantity of 100 CS for this distribution channel. SAP V4082 block applied. Two lines: one can be rounded up to MOQ, one needs escalation due to KNMT waiver requirement.",
@@ -1195,7 +1203,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
           "action": "ESCALATE"
         }
       ]
-    }
+    },
+    "primary_section": "moq_analysis"
   },
   "exc-014": {
     "diagnosis": "Order has 3 SKUs with pallet alignment violations. 2 broken layers and 1 partial pallet. Total 37 loose cases requiring manual handling — estimated 1.5 extra labor hours and 8.2% freight waste.",
@@ -1322,7 +1331,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
           "reason": "Round down to full layers (12 CS/layer × 4)"
         }
       ]
-    }
+    },
+    "primary_section": "pallet_analysis"
   },
   "exc-016": {
     "diagnosis": "Shipment is 6 days behind the contracted delivery window. Root cause is a carrier hub closure in the Southwest corridor. SLA breach is imminent; three alternate routing options available.",
@@ -1398,7 +1408,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
           "recommended": false
         }
       ]
-    }
+    },
+    "primary_section": "delivery_delay_analysis"
   },
   "exc-017": {
     "diagnosis": "Inbound PO PO-PHR-001 landed with a pricing block because line 1's PO price ($101.00) deviates +1.0% from the SAP base ($100.00) at Plant 4100. Variance is within the 2.0% auto-release tolerance; pricing block released automatically and order proceeds to delivery.",
@@ -1467,7 +1478,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
       "hard_block_pct": 0.1,
       "action": "AUTO_RELEASE",
       "reason": "Variance +1.0% within tolerance (+2.0%); block released per PriceHoldReleaseRecipe."
-    }
+    },
+    "primary_section": "price_hold_analysis"
   },
   "exc-018": {
     "diagnosis": "Inbound PO PO-PHR-002 from Kroger is held on pricing-block check: line 1's PO price ($105.00) deviates +5.0% from the SAP base ($100.00). Above the 2.0% auto-release tolerance, below the 10.0% hard-block ceiling — PriceHoldReleaseRecipe escalated to a manager for review.",
@@ -1545,7 +1557,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
       "hard_block_pct": 0.1,
       "action": "ESCALATE",
       "reason": "Variance +5.0% above tolerance (+2.0%); under hard-block (+10.0%). Manager review required."
-    }
+    },
+    "primary_section": "price_hold_analysis"
   },
   "exc-019": {
     "diagnosis": "Target PO PO-EDM-SKU-001 references material SKU-999-UNKNOWN on line 1 — not present in the SAP material master (MARA). Inbound-order validation hard-rejected the line; buyer notification dispatched automatically.",
@@ -1588,7 +1601,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
       "expected_value": "SKU-001",
       "received_value": "SKU-999-UNKNOWN",
       "notification_template": "edi_line_mismatch_blocked"
-    }
+    },
+    "primary_section": "edi_mismatch_analysis"
   },
   "exc-020": {
     "diagnosis": "Costco PO PO-EDM-QTY-001 received quantity 144 CS on line 1 instead of the contract-aligned 120 CS (+20%). Variance exceeds pallet-break tolerance; EdiMismatchRecipe flagged for buyer confirmation before release.",
@@ -1631,7 +1645,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
       "expected_value": 120,
       "received_value": 144,
       "notification_template": "edi_line_mismatch_inquiry"
-    }
+    },
+    "primary_section": "edi_mismatch_analysis"
   },
   "exc-021": {
     "diagnosis": "Inbound EDI 850 line 1 arrived with a price mismatch: received $95.00 against contract base $100.00 (−5.0%). The asoe2 classifier routed the event to CONTRACTUAL_CORRECTION so PriceAdjustmentRecipe owns the resolution. Variance is within the 15% discount ceiling — GREEN shadow verdict, auto-override applied via YK07 customer-match condition.",
@@ -1716,7 +1731,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
       "root_cause_category": "CUSTOMER_CONCESSION",
       "contract_ref": "4600019910",
       "promotion_ref": "ZCUST/404 (Q2 2026 concession)"
-    }
+    },
+    "primary_section": "price_analysis"
   },
   "exc-026": {
     "diagnosis": "Non-EDI PO from Southeast Beverage Distributors. Extracted four lines at composite confidence 0.88. All non-disable-able floor checks passed; ambiguous ship-to ('Atlanta DC' resolves to two warehouses) blocks one-click approve. Recipe recommends REQUEST_CLARIFICATION.",
@@ -2400,7 +2416,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
       "hard_block_pct": 0.1,
       "action": "ESCALATE",
       "reason": "Variance +5.5% above tolerance (+2.0%); under hard-block (+10.0%). Category manager review required pending Q1 JBP uplift confirmation."
-    }
+    },
+    "primary_section": "price_hold_analysis"
   },
   "exc-028": {
     "diagnosis": "Walmart ordered 1,600 CS of the Q1-reset SKU but Bentonville DC had only 1,280 CS on hand (320 CS / 20% gap). Agent split the shipment: 1,280 CS ex-Bentonville released for outbound; 320 CS ex-Memphis NDC on the 2-day transfer lane. Planogram window preserved; freight uplift $102.40 within the GREEN tolerance band.",
@@ -2514,7 +2531,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
           ]
         }
       ]
-    }
+    },
+    "primary_section": "backorder_analysis"
   },
   "exc-029": {
     "diagnosis": "PO PO-WMT-Q1-RESET-001-R2 arrived 18h after the original PO-WMT-Q1-RESET-001 with identical line items, quantities, and ship-to. RED — DuplicatePORecipe auto-blocked the retransmission; a courtesy 855 ack was queued against the original PO and Walmart's EDI ops were notified. No human action required for THIS record; the original PO remains in pricing review on its sibling exc-027.",
@@ -2620,7 +2638,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
         "po_number",
         "received_at"
       ]
-    }
+    },
+    "primary_section": "duplicate_detection"
   },
   "exc-030": {
     "diagnosis": "Costco end-of-quarter PO totals 4,000 CS, exceeding the contract maximum of 3,000 CS by 1,000 CS (33%). Two SKUs blew through their per-line ceilings. SAP V4080 applied. The EOQ closeout is a known seasonal spike — last year saw the same buyer over-pull by 28%.",
@@ -2710,7 +2729,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
       ],
       "trimmed_total": 3000,
       "delta_total": 1000
-    }
+    },
+    "primary_section": "overmax_analysis"
   },
   "exc-031": {
     "diagnosis": "Two SKUs on the same Costco EOQ PO arrived with quantities that didn't tile to Costco's club-pack pallet spec (300 CS/pallet, 60 CS/layer). PalletAlignmentRecipe rounded both SKUs down to 1,800 CS / 6 full pallets each. Plan is locked in and waiting on the sibling OVER_MAX decision (exc-030) before SAP write-back fires.",
@@ -2807,7 +2827,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
           "reason": "Round down to 6 full pallets. Aligns with EOQ trim plan."
         }
       ]
-    }
+    },
+    "primary_section": "pallet_analysis"
   },
   "exc-032": {
     "diagnosis": "Kroger's WK-15 replenishment PO totals 70 CS across two SKUs, below the 100 CS MOQ for the DSD channel. SAP V4082 applied. One SKU rounds cleanly to MOQ; the other is below 50% and requires a KNMT waiver.",
@@ -2882,7 +2903,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
           "action": "ESCALATE"
         }
       ]
-    }
+    },
+    "primary_section": "moq_analysis"
   },
   "exc-033": {
     "diagnosis": "Kroger WK-15 PO was 5 days behind plan after a DHL equipment failure at the Indianapolis cross-dock. DeliveryDelayResolutionRecipe re-routed the load via FedEx Express on the Chicago → Cincinnati direct lane. ETA recovered to within 1 day of plan; freight uplift $480 within the GREEN auto-route tolerance band.",
@@ -2958,7 +2980,8 @@ export const SCENARIO_ANALYSES: Record<string, OrderAnalysis> = {
           "recommended": false
         }
       ]
-    }
+    },
+    "primary_section": "delivery_delay_analysis"
   },
   "exc-040": {
     "diagnosis": "Buyer requests a quantity reduction on line 001 (600 → 420 CS). Mid-fulfilment change; supply + logistics clear, GOLD-tier approval required.",
