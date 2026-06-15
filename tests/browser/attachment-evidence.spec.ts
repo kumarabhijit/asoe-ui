@@ -3,10 +3,10 @@
  * (ADR-043). Given/When/Then over the live sandbox backend, asserting against
  * re-fetched state + the honest safety-bar surface.
  *
- * The seed + assertion data MIRROR the mock fixtures in
- * `src/lib/mock-data/inbox-sections.ts` (SE_EMAIL / SE_ENTITIES) — same
- * attachment (PO_8842.pdf) and the same entity-derived anchors an operator sees
- * in mock mode — so the journeys exercise the canonical example end-to-end.
+ * The seed + assertion data MIRROR the catalog-generated mock analysis for
+ * exc-026 (SCENARIO_ANALYSES -> MOCK_ORDER_ANALYSES) — same attachment
+ * (PO_8842.pdf) and the same entity-derived anchors an operator sees in mock
+ * mode — so the journeys exercise the canonical example end-to-end.
  *
  * These run against the live sandbox backend (uvicorn webServer) and the
  * `POST /api/v1/_sandbox/seed/email-attachment-anchors` seed endpoint, which
