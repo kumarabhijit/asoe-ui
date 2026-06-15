@@ -105,11 +105,13 @@ test.describe("cockpit (flag on) — /cases", () => {
 
   test("the 'Similar Past Cases' card projects a correlate precedent (sign-off 2026-06-10)", async ({ page }) => {
     // Post parity-flip the served queue is graph-truthful: DUPLICATE_PO
-    // never auto-resolves, so exc-002 has no RESOLVED same-intent
-    // precedent. Use exc-027 (PRICE_HOLD_RELEASE, Walmart, PENDING_REVIEW)
-    // whose terminal same-intent same-account sibling exc-017 (Walmart,
-    // RESOLVED) is the correlate precedent the card projects.
-    await openCockpitRecord(page, "case-for-exc-027", "exc-027");
+    // never auto-resolves, so exc-002 has no RESOLVED same-intent precedent.
+    // Use exc-018 (PRICE_HOLD_RELEASE, PENDING_REVIEW) — a single-record case
+    // whose terminal same-intent sibling exc-017 (Walmart, RESOLVED) is the
+    // correlate precedent the card projects. (exc-027 is also PRICE_HOLD but
+    // now lives on the multi-record Walmart Q1-reset case, which doesn't
+    // auto-mount a record.)
+    await openCockpitRecord(page, "case-for-exc-018", "exc-018");
     // The card lives in the Evidence tier; expand its disclosure to
     // project the row.
     const card = page.getByRole("button", { name: /similar past cases/i }).first();

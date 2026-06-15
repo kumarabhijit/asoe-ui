@@ -62,9 +62,21 @@ describe("catalog-generated mock artifact", () => {
     expect(generated).toEqual(dispositionedIds());
   });
 
-  it("preserves the case-pivot parent_case_id wiring on every row", () => {
+  it("carries a parent_case_id on every row; rows on one PO share a case", () => {
+    // Case-pivot invariant: every record has a parent case. The backend
+    // groups records onto one case by order_id (api/case_resolver.py
+    // materialise_for_event), so the projection mirrors it — scenarios
+    // sharing an order_id resolve onto a single multi-record case, singletons
+    // keep their per-id case.
+    const casesByOrder = new Map<string, Set<string>>();
     for (const e of CATALOG_EXCEPTIONS) {
-      expect(e.parent_case_id).toBe(`case-for-${e.id}`);
+      expect(e.parent_case_id).toBeTruthy();
+      const oid = e.order_id as string;
+      if (!casesByOrder.has(oid)) casesByOrder.set(oid, new Set());
+      casesByOrder.get(oid)!.add(e.parent_case_id as string);
+    }
+    for (const [, caseIds] of casesByOrder) {
+      expect(caseIds.size).toBe(1);
     }
   });
 

@@ -132,6 +132,23 @@ function main(): void {
     const r = toSummary(cat, s, true);
     if (r) rows.push(r);
   }
+  // Case-pivot parent assignment. The backend groups records onto one case
+  // by customer PO — api/case_resolver.py `materialise_for_event` keys the
+  // case on `order_id` — so the mock mirrors it: scenarios sharing an
+  // order_id form ONE multi-record case (e.g. the Walmart Q1-reset PO
+  // carrying a price-hold + back-order + duplicate); singletons keep their
+  // per-id case. The "every record has a parent case" invariant holds either
+  // way (tests/architectural/case_pivot_mock_wiring.test.ts).
+  const orderCount = new Map<string, number>();
+  for (const r of rows) {
+    const oid = r.order_id as string;
+    orderCount.set(oid, (orderCount.get(oid) ?? 0) + 1);
+  }
+  for (const r of rows) {
+    const oid = r.order_id as string;
+    r.parent_case_id =
+      (orderCount.get(oid) ?? 0) > 1 ? `case-for-${oid}` : `case-for-${r.id}`;
+  }
   // Stable order: by id, so the emitted file is deterministic.
   rows.sort((a, b) => String(a.id).localeCompare(String(b.id)));
 
