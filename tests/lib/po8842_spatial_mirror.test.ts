@@ -23,7 +23,7 @@ import {
   isPo8842,
   po8842FieldByRef,
 } from "@/lib/mock-data/po8842-spatial";
-import { INBOX_SECTION_BUNDLES } from "@/lib/mock-data/inbox-sections";
+import { MOCK_ORDER_ANALYSES } from "@/lib/mock-data/order-analyses";
 import { mockAttachmentBlob } from "@/lib/mock-data/attachment-bytes";
 import { spatialOverlays } from "@/lib/spatialOverlay";
 import type { EvidenceAnchor } from "@/types/exceptions";
@@ -56,7 +56,7 @@ describe("PO_8842 spatial mirror — parity with the backend recorded fixture", 
 });
 
 describe("PO_8842 spatial mirror — wired onto exc-026's email source", () => {
-  const anchors = INBOX_SECTION_BUNDLES["exc-026"].email_source?.evidence_anchors ?? [];
+  const anchors = MOCK_ORDER_ANALYSES["exc-026"]?.email_source?.evidence_anchors ?? [];
 
   it("emits a verified spatial anchor per located field, bound to PO_8842.pdf", () => {
     const spatial = anchors.filter((a) => a.anchor_source === "spatial_extracted");
@@ -80,7 +80,7 @@ describe("PO_8842 spatial mirror — wired onto exc-026's email source", () => {
 });
 
 describe("PO_8842 spatial mirror — render path", () => {
-  const anchors = INBOX_SECTION_BUNDLES["exc-026"].email_source?.evidence_anchors ?? [];
+  const anchors = MOCK_ORDER_ANALYSES["exc-026"]?.email_source?.evidence_anchors ?? [];
 
   it("projects the spatial anchors to page-1 overlay rectangles", () => {
     const overlays = spatialOverlays(anchors as EvidenceAnchor[], 1);

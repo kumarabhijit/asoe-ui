@@ -11,16 +11,21 @@
  *   2. The entity section consumes the shared selection.
  *   3. The panel mounts the provider (keyed by exceptionId so a record switch
  *      drops a stale highlight).
- *   4. Mock invariant — the mock entity's evidence_ref stays in lockstep with
- *      the anchor ref the mock derives for the same entity (order_entry.${key}),
- *      so the cross-link is exercisable end-to-end in mock/dev without the UI
- *      ever deriving a pairing (Guardrail #6).
+ *   4. Mock invariant — the catalog-generated analysis carries the pairing
+ *      pre-baked: every inbox entity's evidence_ref and the email_source
+ *      anchor's supports_ref use the same `order_entry.${key}` vocabulary, so
+ *      the cross-link is exercisable end-to-end in mock/dev without the UI
+ *      ever deriving a pairing (Guardrail #6). The composer
+ *      (asoe2 `build_evidence_anchors`) is the sole assembler; the mock just
+ *      consumes its projection via SCENARIO_ANALYSES → MOCK_ORDER_ANALYSES.
  *
  * Verify by removing any wired side locally — this must fail.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
+
+import { MOCK_ORDER_ANALYSES } from "@/lib/mock-data/order-analyses";
 
 const ROOT = join(__dirname, "..", "..");
 const read = (...p: string[]) => readFileSync(join(ROOT, ...p), "utf-8");
@@ -50,15 +55,26 @@ describe("field↔source linking deliverable", () => {
   });
 
   it("mock entity evidence_ref stays in lockstep with the derived anchor ref", () => {
-    const src = read("src", "lib", "mock-data", "inbox-sections.ts");
-    // The anchor ref the mock derives (shared by text-derived + spatial anchors).
-    expect(src).toContain("const supports_ref = `order_entry.${e.key}`");
-    // Every keyed mock entity that declares evidence_ref must use the same
-    // order_entry.${key} shape (no divergent vocabulary).
-    const refs = [...src.matchAll(/evidence_ref:\s*"([^"]+)"/g)].map((m) => m[1]);
-    expect(refs.length).toBeGreaterThan(0);
-    for (const ref of refs) {
+    // The pairing is pre-baked into the catalog-generated analysis: an inbox
+    // entity's evidence_ref must reconcile with an email_source anchor's
+    // supports_ref, both in the `order_entry.${key}` vocabulary (no divergent
+    // shape the UI would have to bridge — Guardrail #6).
+    const entityRefs: string[] = [];
+    const anchorRefs = new Set<string>();
+    for (const analysis of Object.values(MOCK_ORDER_ANALYSES)) {
+      for (const e of analysis.entities_analysis?.extracted ?? []) {
+        if (e.evidence_ref) entityRefs.push(e.evidence_ref);
+      }
+      for (const a of analysis.email_source?.evidence_anchors ?? []) {
+        if (a.supports_ref) anchorRefs.add(a.supports_ref);
+      }
+    }
+    expect(entityRefs.length).toBeGreaterThan(0);
+    for (const ref of entityRefs) {
+      // Same vocabulary as the anchors …
       expect(ref.startsWith("order_entry.")).toBe(true);
+      // … and an actual anchor exists for it (the cross-link is exercisable).
+      expect(anchorRefs.has(ref), `no anchor for entity ref ${ref}`).toBe(true);
     }
   });
 });

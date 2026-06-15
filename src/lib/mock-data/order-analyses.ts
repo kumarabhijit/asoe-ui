@@ -14,7 +14,6 @@
 // preview mode.
 
 import type { OrderAnalysis } from "@/types/exceptions";
-import { INBOX_SECTION_BUNDLES } from "./inbox-sections";
 import { SCENARIO_ANALYSES } from "./__generated__/scenario_analyses";
 
 export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
@@ -1205,61 +1204,6 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       promotion_ref: "ZCUST/404 (Q2 2026 concession)",
     },
   },
-  // MANUAL_ORDER_INTAKE (ADR-034 Phase C) — STANDARD_REVIEW band record.
-  // Renders EmailOrderEntrySection via OrderAnalysis.email_order_entry_analysis.
-  // The four floor checks all pass; one ambiguous ship-to triggers
-  // REQUEST_CLARIFICATION.
-  "exc-026": {
-    diagnosis: "Non-EDI PO from Southeast Beverage Distributors. Extracted four lines at composite confidence 0.88. All non-disable-able floor checks passed; ambiguous ship-to ('Atlanta DC' resolves to two warehouses) blocks one-click approve. Recipe recommends REQUEST_CLARIFICATION.",
-    confidence: 88,
-    risk: "LOW",
-    resolution: "REQUEST_CLARIFICATION",
-    root_cause: "Buyer's PDF cover letter listed ship-to as 'Atlanta DC' which matches two physical warehouses (Atlanta-North, Atlanta-South). Confidence on that single field dropped to 0.62, pulling composite below the 0.95 auto-approve threshold.",
-    recommendation: "Send the templated clarification email asking the buyer to confirm Atlanta-North vs Atlanta-South. Auto-approve once a single match is selected.",
-    entity_profile: {
-      customer_name: "Southeast Beverage Distributors",
-      bp_number: "BP-SBD-0042",
-      customer_tier: "Mid-Market",
-      vip_status: false,
-      credit_standing: "Good",
-      location: "Plant 2200 — Atlanta DC",
-      region: "Southeast",
-    },
-    impact_metrics: {
-      revenue_at_risk: 18_400.00,
-      delta_amount: 0,
-      delta_percentage: 0,
-      sla_priority: "MEDIUM",
-      sla_deadline: "2026-04-30T18:00:00Z",
-      affected_lines: 4,
-    },
-    lines: [
-      { line_id: "L1", diagnosis: "SKU-1101 — extracted at 0.97, customer SKU mapping confirmed.", resolution: "AUTO_APPROVE", risk: "LOW", waterfall: [] },
-      { line_id: "L2", diagnosis: "SKU-1102 — extracted at 0.96, customer SKU mapping confirmed.", resolution: "AUTO_APPROVE", risk: "LOW", waterfall: [] },
-      { line_id: "L3", diagnosis: "SKU-1108 — extracted at 0.91, fuzzy SKU match against customer master.", resolution: "AUTO_APPROVE", risk: "LOW", waterfall: [] },
-      { line_id: "L4", diagnosis: "Ship-to 'Atlanta DC' — confidence 0.62; matches two warehouses.", resolution: "REQUEST_CLARIFICATION", risk: "MEDIUM", waterfall: [] },
-    ],
-    email_order_entry_analysis: {
-      composite_confidence: 0.88,
-      classification: "STANDARD_REVIEW",
-      recommended_action: "REQUEST_CLARIFICATION",
-      autonomy_level: "L2",
-      validation_failures: ["ambiguous_ship_to"],
-      floor_breaches: [],
-      reject_reason_code: null,
-      floor_status: {
-        sender_authorized: true,
-        customer_resolved: true,
-        duplicate_po_clear: true,
-        credit_clear: true,
-      },
-      notification_template: "email_order_clarification_request",
-    },
-    // ADR-034 Phase G email_source + ADR-043 attachment evidence anchors are
-    // merged in from INBOX_SECTION_BUNDLES (inbox-sections.ts) so the manifest
-    // entries carry attachment_id/sha256 (preview + download) and evidence
-    // anchors derived from the extracted entities.
-  },
 
   /* ── Multi-issue case fixtures ────────────────────────────────────
      Three CPG-realistic clusters: one PO produces N coincident
@@ -1735,84 +1679,7 @@ export const MOCK_ORDER_ANALYSES: Record<string, OrderAnalysis> = {
       ],
     },
   },
-
-  /* ── ADR-042 Customer-Inbox order-change requests (sections merged below) ── */
-  "exc-040": {
-    diagnosis: "Buyer requests a quantity reduction on line 001 (600 → 420 CS). Mid-fulfilment change; supply + logistics clear, GOLD-tier approval required.",
-    confidence: 86,
-    risk: "LOW",
-    resolution: "Approve the reduction and re-confirm the order.",
-    recommendation: "Approve as requested",
-    lines: [],
-  },
-  "exc-041": {
-    diagnosis: "Buyer requests an expedite (delivery 2026-05-24 → 2026-05-20). SLA window tight and carrier capacity constrained.",
-    confidence: 74,
-    risk: "MEDIUM",
-    resolution: "Expedite via upgraded carrier service to hold the window.",
-    recommendation: "Expedite shipping",
-    lines: [],
-  },
-  "exc-042": {
-    diagnosis: "Buyer requests a full cancellation on an order already late in fulfilment (stage 4/5, picked). High-risk; revenue impact above the four-eyes threshold.",
-    confidence: 45,
-    risk: "HIGH",
-    resolution: "Reject the cancellation and escalate to a supply planner.",
-    recommendation: "Reject / escalate to planner",
-    lines: [],
-  },
-  "exc-043": {
-    diagnosis: "Buyer requests a SKU substitution (BEV-LEMON-6PK → BEV-LEMON-12PK). ATP partially covers the substitute.",
-    confidence: 78,
-    risk: "MEDIUM",
-    resolution: "Partial-fulfil the available 12-pack and backorder the balance.",
-    recommendation: "Partial fulfilment",
-    lines: [],
-  },
-
-  /* ── ADR-042 inquiry / complaint / happy-path (sections merged below) ── */
-  "exc-044": {
-    diagnosis: "Buyer A/P inquiry on the status of order SO-5100012344 and invoice INV-2026-8841. Both settled; an informational reply is all that's needed.",
-    confidence: 96,
-    risk: "LOW",
-    resolution: "Send the order-status response confirming delivery + cleared invoice.",
-    recommendation: "Send status response",
-    lines: [],
-  },
-  "exc-045": {
-    diagnosis: "Buyer complaint: short shipment on SO-5100012501 (received 380 of 480 CS). Replacement shipment + goodwill credit under review; escalated to Customer Care.",
-    confidence: 90,
-    risk: "HIGH",
-    resolution: "Acknowledge, open the replacement shipment, and route the credit for approval.",
-    recommendation: "Acknowledge + open replacement",
-    lines: [],
-  },
-  "exc-046": {
-    diagnosis: "EDI 850 order from Kroger, 0.97 extraction confidence, all floor checks green — auto-validated, confirmed in SAP, and resolved without human review.",
-    confidence: 97,
-    risk: "LOW",
-    resolution: "Auto-confirmed sales order SO-5100012799; no action required.",
-    recommendation: "Auto-resolved",
-    lines: [],
-  },
-  "exc-047": {
-    diagnosis: "Uncategorised inbound email (trade-show booth invitation) — not an order-desk matter. Classified OTHER; routed to Marketing.",
-    confidence: 82,
-    risk: "LOW",
-    resolution: "Route to the Marketing team; no order action.",
-    recommendation: "Route to team",
-    lines: [],
-  },
 };
-
-// ADR-042 — merge the rich Customer-Inbox evidence section bundles onto their
-// cases (keeps the heavy section payloads in inbox-sections.ts and out of this
-// already-large fixtures file). Spread, so a case's existing fields are kept.
-for (const [id, sections] of Object.entries(INBOX_SECTION_BUNDLES)) {
-  if (MOCK_ORDER_ANALYSES[id]) {
-    Object.assign(MOCK_ORDER_ANALYSES[id], sections);
-  }
-}
 
 // Presentation hint — stamp `primary_section` so preview mode auto-expands
 // the primary comparison delta, mirroring the backend read path
