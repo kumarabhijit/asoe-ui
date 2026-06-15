@@ -25,9 +25,12 @@ import { test, expect } from "@playwright/test";
 
 import { loginAs, USERS } from "../browser/_helpers";
 
-// A known multi-record case in the mock fixtures (3 attached records),
-// so the middle record-list pane renders with several rows.
-const MULTI_RECORD_CASE = "case-multi-WMT-Q1RESET";
+// A known multi-record case in the catalog-generated queue: the Walmart
+// Q1-reset PO (exc-027 price-hold + exc-028 back-order + exc-029 duplicate)
+// shares order_id PO-WMT-Q1-RESET-001, so the backend (and the mock,
+// mirroring it) group all three onto one case. The middle record-list pane
+// renders with several rows.
+const MULTI_RECORD_CASE = "case-for-PO-WMT-Q1-RESET-001";
 
 test.describe("/cases usability (mock mode)", () => {
   test.beforeEach(async ({ page }) => {
@@ -86,15 +89,7 @@ test.describe("/cases usability (mock mode)", () => {
     await page.waitForURL(/case=/, { timeout: 15_000 });
   });
 
-  // DEFERRED (parity flip, Step 3): these exercise the multi-record
-  // RecordListPane via MULTI_RECORD_CASE. The served queue is now the
-  // catalog-generated CATALOG_EXCEPTIONS, which projects one case per
-  // scenario (every catalog scenario has a unique order_id, and the
-  // backend bootstrap groups by order_id) — so no multi-record case
-  // exists and the "select a record" radiogroup never renders. Re-enable
-  // when the catalog expresses a multi-record case (scenarios sharing an
-  // order_id) + gen-mock-data groups parent_case_id by order_id.
-  test.skip("the record-list pane is a single Tab stop with arrow-key selection", async ({
+  test("the record-list pane is a single Tab stop with arrow-key selection", async ({
     page,
   }) => {
     await page.goto(`/cases?case=${MULTI_RECORD_CASE}`);
@@ -140,8 +135,7 @@ test.describe("/cases usability (mock mode)", () => {
     expect(["auto", "scroll"]).toContain(overflowY);
   });
 
-  // (see deferral note above)
-  test.skip("the record-list picker is stacked inside the detail pane", async ({
+  test("the record-list picker is stacked inside the detail pane", async ({
     page,
   }) => {
     // Two-pane layout: there is no dedicated record-list column — the
@@ -167,8 +161,7 @@ test.describe("/cases usability (mock mode)", () => {
     expect(docScrolls).toBe(false);
   });
 
-  // (see deferral note above)
-  test.skip("F6 cycles into the detail pane and the pane shows a focus ring", async ({
+  test("F6 cycles into the detail pane and the pane shows a focus ring", async ({
     page,
   }) => {
     // F6 jumps focus queue → detail (two-pane workspace). The detail
@@ -210,8 +203,7 @@ test.describe("/cases usability (mock mode)", () => {
     expect(shadowFocused).not.toBe(shadowUnfocused);
   });
 
-  // (see deferral note above)
-  test.skip("arrow keys scroll the focused detail pane (queue does not hijack them)", async ({
+  test("arrow keys scroll the focused detail pane (queue does not hijack them)", async ({
     page,
   }) => {
     // Bug report: keyboard scrolling in a pane "sometimes works and
