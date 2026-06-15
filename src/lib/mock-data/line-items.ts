@@ -133,8 +133,9 @@ export const MOCK_LINE_ITEMS: Record<string, LineItem[]> = {
   // ── ADR-042 Customer Inbox — change-request / inquiry / complaint / happy
   // path lines so the "Evidence Detail" pane (EvidenceGrid.tsx) is populated
   // for every MANUAL_ORDER_INTAKE case, not just the canonical EML-PO-2026-0042.
-  // Each row mirrors the order context already in INBOX_SECTION_BUNDLES so the
-  // line table and the order-entry / KG tabs reconcile.
+  // Each row mirrors the order context the catalog-generated analysis carries
+  // (SCENARIO_ANALYSES → MOCK_ORDER_ANALYSES) so the line table and the
+  // order-entry / KG tabs reconcile.
   "exc-040": [
     { line_id: "L1", sku: "BEV-COLA-12PK", description: "Cola 12-pack case (reduce 600 → 420)", uom: "CS", quantity: 600, erp_price: 8.64, po_price: 8.64, root_cause: "CHANGE_QTY_REDUCTION" },
     { line_id: "L2", sku: "BEV-LEMON-6PK", description: "Lemon 6-pack case", uom: "CS", quantity: 240, erp_price: 7.20, po_price: 7.20 },
