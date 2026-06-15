@@ -23,15 +23,19 @@ import { loginAs, USERS } from "../browser/_helpers";
 const CASE = "case-for-exc-002";
 const RECORD = "exc-002";
 
-async function openCockpitRecord(page: Page) {
+async function openCockpitRecord(
+  page: Page,
+  caseId: string = CASE,
+  recordId: string = RECORD,
+) {
   // ≥ xl (1280px) so the rail's third column is active.
   await page.setViewportSize({ width: 1440, height: 900 });
   await loginAs(page, USERS.MANAGER);
   await page.goto("/cases");
-  const row = page.locator(`#case-row-${CASE}`);
+  const row = page.locator(`#case-row-${caseId}`);
   await expect(row).toBeVisible({ timeout: 30_000 });
   await row.click();
-  await page.waitForURL(new RegExp(`record=${RECORD}`), { timeout: 20_000 });
+  await page.waitForURL(new RegExp(`record=${recordId}`), { timeout: 20_000 });
 }
 
 test.describe("cockpit (flag on) — /cases", () => {
@@ -100,10 +104,14 @@ test.describe("cockpit (flag on) — /cases", () => {
   });
 
   test("the 'Similar Past Cases' card projects a correlate precedent (sign-off 2026-06-10)", async ({ page }) => {
-    await openCockpitRecord(page);
-    // exc-002 (DUPLICATE_PO) has exactly one terminal same-intent mock
-    // sibling: exc-009 (Walmart, RESOLVED). The card lives in the
-    // Evidence tier; expand its disclosure to project the row.
+    // Post parity-flip the served queue is graph-truthful: DUPLICATE_PO
+    // never auto-resolves, so exc-002 has no RESOLVED same-intent
+    // precedent. Use exc-027 (PRICE_HOLD_RELEASE, Walmart, PENDING_REVIEW)
+    // whose terminal same-intent same-account sibling exc-017 (Walmart,
+    // RESOLVED) is the correlate precedent the card projects.
+    await openCockpitRecord(page, "case-for-exc-027", "exc-027");
+    // The card lives in the Evidence tier; expand its disclosure to
+    // project the row.
     const card = page.getByRole("button", { name: /similar past cases/i }).first();
     await expect(card).toBeVisible({ timeout: 20_000 });
     await card.click();

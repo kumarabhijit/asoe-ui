@@ -24,7 +24,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-001",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-11",
-    "account_name": "Walmart Inc."
+    "account_name": "Walmart Inc.",
+    "selected_recipe": "PriceAdjustmentRecipe.py"
   },
   {
     "id": "exc-002",
@@ -38,7 +39,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-002",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-12",
-    "account_name": "Kroger Co."
+    "account_name": "Kroger Co.",
+    "selected_recipe": "DuplicatePORecipe.py"
   },
   {
     "id": "exc-003",
@@ -52,7 +54,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-003",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-13",
-    "account_name": "Target Corp."
+    "account_name": "Target Corp.",
+    "selected_recipe": "CreditHoldReleaseRecipe.py"
   },
   {
     "id": "exc-004",
@@ -80,7 +83,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-005",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-11",
-    "account_name": "Walmart Inc."
+    "account_name": "Walmart Inc.",
+    "selected_recipe": "PriceAdjustmentRecipe.py"
   },
   {
     "id": "exc-006",
@@ -94,7 +98,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-006",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-12",
-    "account_name": "Kroger Co."
+    "account_name": "Kroger Co.",
+    "selected_recipe": "DuplicatePORecipe.py"
   },
   {
     "id": "exc-007",
@@ -108,7 +113,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-007",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-13",
-    "account_name": "Target Corp."
+    "account_name": "Target Corp.",
+    "selected_recipe": "CreditHoldReleaseRecipe.py"
   },
   {
     "id": "exc-008",
@@ -122,7 +128,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-008",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-14",
-    "account_name": "Costco Wholesale"
+    "account_name": "Costco Wholesale",
+    "selected_recipe": "PriceAdjustmentRecipe.py"
   },
   {
     "id": "exc-009",
@@ -136,7 +143,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-009",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-11",
-    "account_name": "Walmart Inc."
+    "account_name": "Walmart Inc.",
+    "selected_recipe": "DuplicatePORecipe.py"
   },
   {
     "id": "exc-010",
@@ -150,7 +158,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-010",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-12",
-    "account_name": "Kroger Co."
+    "account_name": "Kroger Co.",
+    "selected_recipe": "BackOrderResolutionRecipe.py"
   },
   {
     "id": "exc-011",
@@ -164,7 +173,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-011",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-13",
-    "account_name": "Target Corp."
+    "account_name": "Target Corp.",
+    "selected_recipe": "BackOrderResolutionRecipe.py"
   },
   {
     "id": "exc-012",
@@ -178,7 +188,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-012",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-14",
-    "account_name": "Costco Wholesale"
+    "account_name": "Costco Wholesale",
+    "selected_recipe": "OverMaxTrimRecipe.py"
   },
   {
     "id": "exc-013",
@@ -192,7 +203,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-013",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-11",
-    "account_name": "Walmart Inc."
+    "account_name": "Walmart Inc.",
+    "selected_recipe": "MOQRoundUpRecipe.py"
   },
   {
     "id": "exc-014",
@@ -206,7 +218,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-014",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-12",
-    "account_name": "Kroger Co."
+    "account_name": "Kroger Co.",
+    "selected_recipe": "PalletAlignmentRecipe.py"
   },
   {
     "id": "exc-015",
@@ -220,7 +233,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-015",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-11",
-    "account_name": "Walmart Inc."
+    "account_name": "Walmart Inc.",
+    "selected_recipe": "PriceAdjustmentRecipe.py"
   },
   {
     "id": "exc-016",
@@ -234,7 +248,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-016",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-13",
-    "account_name": "Target Corp."
+    "account_name": "Target Corp.",
+    "selected_recipe": "DeliveryDelayResolutionRecipe.py"
   },
   {
     "id": "exc-017",
@@ -248,7 +263,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-017",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-11",
-    "account_name": "Walmart Inc."
+    "account_name": "Walmart Inc.",
+    "selected_recipe": "PriceHoldReleaseRecipe.py"
   },
   {
     "id": "exc-018",
@@ -262,7 +278,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-018",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-12",
-    "account_name": "Kroger Co."
+    "account_name": "Kroger Co.",
+    "selected_recipe": "PriceHoldReleaseRecipe.py"
   },
   {
     "id": "exc-019",
@@ -276,7 +293,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-019",
     "shadow_verdict": "RED",
     "account_id": "acct-R-13",
-    "account_name": "Target Corp."
+    "account_name": "Target Corp.",
+    "selected_recipe": "EdiMismatchRecipe.py"
   },
   {
     "id": "exc-020",
@@ -290,7 +308,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-020",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-14",
-    "account_name": "Costco Wholesale"
+    "account_name": "Costco Wholesale",
+    "selected_recipe": "EdiMismatchRecipe.py"
   },
   {
     "id": "exc-021",
@@ -304,7 +323,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-021",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-11",
-    "account_name": "Walmart Inc."
+    "account_name": "Walmart Inc.",
+    "selected_recipe": "PriceAdjustmentRecipe.py"
   },
   {
     "id": "exc-022",
@@ -346,7 +366,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-024",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-13",
-    "account_name": "Target Corp."
+    "account_name": "Target Corp.",
+    "selected_recipe": "DuplicatePORecipe.py"
   },
   {
     "id": "exc-025",
@@ -360,7 +381,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-025",
     "shadow_verdict": "RED",
     "account_id": "acct-R-14",
-    "account_name": "Costco Wholesale"
+    "account_name": "Costco Wholesale",
+    "selected_recipe": "PriceHoldReleaseRecipe.py"
   },
   {
     "id": "exc-026",
@@ -374,7 +396,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-026",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-15",
-    "account_name": "Southeast Beverage Distributors"
+    "account_name": "Southeast Beverage Distributors",
+    "selected_recipe": "EmailOrderEntryRecipe.py"
   },
   {
     "id": "exc-027",
@@ -388,7 +411,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-027",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-11",
-    "account_name": "Walmart Inc."
+    "account_name": "Walmart Inc.",
+    "selected_recipe": "PriceHoldReleaseRecipe.py"
   },
   {
     "id": "exc-028",
@@ -402,7 +426,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-028",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-11",
-    "account_name": "Walmart Inc."
+    "account_name": "Walmart Inc.",
+    "selected_recipe": "BackOrderResolutionRecipe.py"
   },
   {
     "id": "exc-029",
@@ -416,7 +441,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-029",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-11",
-    "account_name": "Walmart Inc."
+    "account_name": "Walmart Inc.",
+    "selected_recipe": "DuplicatePORecipe.py"
   },
   {
     "id": "exc-030",
@@ -430,7 +456,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-030",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-14",
-    "account_name": "Costco Wholesale"
+    "account_name": "Costco Wholesale",
+    "selected_recipe": "OverMaxTrimRecipe.py"
   },
   {
     "id": "exc-031",
@@ -444,7 +471,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-031",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-14",
-    "account_name": "Costco Wholesale"
+    "account_name": "Costco Wholesale",
+    "selected_recipe": "PalletAlignmentRecipe.py"
   },
   {
     "id": "exc-032",
@@ -458,7 +486,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-032",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-12",
-    "account_name": "Kroger Co."
+    "account_name": "Kroger Co.",
+    "selected_recipe": "MOQRoundUpRecipe.py"
   },
   {
     "id": "exc-033",
@@ -472,7 +501,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-033",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-12",
-    "account_name": "Kroger Co."
+    "account_name": "Kroger Co.",
+    "selected_recipe": "DeliveryDelayResolutionRecipe.py"
   },
   {
     "id": "exc-040",
@@ -486,7 +516,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-040",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-15",
-    "account_name": "Southeast Beverage Distributors"
+    "account_name": "Southeast Beverage Distributors",
+    "selected_recipe": "EmailOrderEntryRecipe.py"
   },
   {
     "id": "exc-041",
@@ -500,7 +531,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-041",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-15",
-    "account_name": "Southeast Beverage Distributors"
+    "account_name": "Southeast Beverage Distributors",
+    "selected_recipe": "EmailOrderEntryRecipe.py"
   },
   {
     "id": "exc-042",
@@ -514,7 +546,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-042",
     "shadow_verdict": "RED",
     "account_id": "acct-R-11",
-    "account_name": "Walmart Inc."
+    "account_name": "Walmart Inc.",
+    "selected_recipe": "EmailOrderEntryRecipe.py"
   },
   {
     "id": "exc-043",
@@ -528,7 +561,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-043",
     "shadow_verdict": "YELLOW",
     "account_id": "acct-R-12",
-    "account_name": "Kroger Co."
+    "account_name": "Kroger Co.",
+    "selected_recipe": "EmailOrderEntryRecipe.py"
   },
   {
     "id": "exc-044",
@@ -542,7 +576,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-044",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-15",
-    "account_name": "Southeast Beverage Distributors"
+    "account_name": "Southeast Beverage Distributors",
+    "selected_recipe": "EmailOrderEntryRecipe.py"
   },
   {
     "id": "exc-045",
@@ -556,7 +591,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-045",
     "shadow_verdict": "RED",
     "account_id": "acct-R-11",
-    "account_name": "Walmart Inc."
+    "account_name": "Walmart Inc.",
+    "selected_recipe": "EmailOrderEntryRecipe.py"
   },
   {
     "id": "exc-046",
@@ -570,7 +606,8 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-046",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-12",
-    "account_name": "Kroger Co."
+    "account_name": "Kroger Co.",
+    "selected_recipe": "EmailOrderEntryRecipe.py"
   },
   {
     "id": "exc-047",
@@ -584,49 +621,9 @@ export const CATALOG_EXCEPTIONS: ExceptionSummary[] = [
     "parent_case_id": "case-for-exc-047",
     "shadow_verdict": "GREEN",
     "account_id": "acct-R-15",
-    "account_name": "Southeast Beverage Distributors"
-  },
-  {
-    "id": "exc-dup-crosschannel",
-    "tenant_id": "acme-corp",
-    "order_id": "PO-88421",
-    "event_type": "EMAIL_ORDER_ENTRY_REQUEST",
-    "intent": "MANUAL_ORDER_INTAKE",
-    "lifecycle_state": "PENDING_REVIEW",
-    "created_at": "2026-04-12T09:30:00Z",
-    "updated_at": "2026-04-12T09:30:00Z",
-    "parent_case_id": "case-for-exc-dup-crosschannel",
-    "shadow_verdict": "YELLOW",
-    "account_id": "acct-R-12",
-    "account_name": "Kroger Co."
-  },
-  {
-    "id": "exc-dup-resend",
-    "tenant_id": "acme-corp",
-    "order_id": "EML-PO-2026-0042",
-    "event_type": "EMAIL_ORDER_ENTRY_REQUEST",
-    "intent": "MANUAL_ORDER_INTAKE",
-    "lifecycle_state": "PENDING_REVIEW",
-    "created_at": "2026-05-01T08:45:00Z",
-    "updated_at": "2026-05-01T08:45:00Z",
-    "parent_case_id": "case-for-exc-dup-resend",
-    "shadow_verdict": "YELLOW",
-    "account_id": "acct-R-15",
-    "account_name": "Southeast Beverage Distributors"
-  },
-  {
-    "id": "exc-messy",
-    "tenant_id": "acme-corp",
-    "order_id": "exc-messy",
-    "event_type": "EMAIL_ORDER_ENTRY_REQUEST",
-    "intent": "MANUAL_ORDER_INTAKE",
-    "lifecycle_state": "PENDING_REVIEW",
-    "created_at": "2026-05-23T16:42:00Z",
-    "updated_at": "2026-05-23T16:42:00Z",
-    "parent_case_id": "case-for-exc-messy",
-    "shadow_verdict": "YELLOW",
-    "account_name": "Sunrise Beverage"
+    "account_name": "Southeast Beverage Distributors",
+    "selected_recipe": "EmailOrderEntryRecipe.py"
   }
 ];
 
-export const CATALOG_EXCEPTION_COUNT = 44 as const;
+export const CATALOG_EXCEPTION_COUNT = 41 as const;

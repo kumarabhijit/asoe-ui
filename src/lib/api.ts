@@ -66,7 +66,14 @@ import {
 // `USE_REAL_API` branch on `exceptionsApi.orderAnalysis` doesn't
 // touch this — it hits `/api/v1/exceptions/{id}/analysis`
 // directly.
-import { MOCK_ORDER_ANALYSES } from "./mock-data/order-analyses";
+// PARITY FLIP (Step 3): serve the catalog-generated SCENARIO_ANALYSES
+// (projected from asoe2/fixtures/scenarios/analyses.yaml) so the mock
+// detail view mirrors the backend AnalysisResponse. order-analyses.ts
+// remains the authoring source for the migration tool + the presentation
+// helpers (mockPresentation/mockPrecedents live in this file). Records
+// without a catalog analysis (terminal BLOCKED/FAILED + email extras)
+// resolve to null — orderAnalysis() already returns null gracefully.
+import { SCENARIO_ANALYSES as MOCK_ORDER_ANALYSES } from "./mock-data/__generated__/scenario_analyses";
 import {
   MOCK_EXCEPTIONS,
   persistMockExceptionMutation,
@@ -423,7 +430,7 @@ const MOCK_USERS: Record<string, AuthUser> = {
     title: "CS Analyst", avatar_initials: "JO",
     roles: ["analyst"], org: "acme-corp",
     permissions: ROLE_PERMISSIONS.analyst,
-    assigned_accounts: ["acct-walmart", "acct-kroger"],
+    assigned_accounts: ["acct-R-11", "acct-R-12"], // Walmart, Kroger (catalog acct-${retailer_id})
     visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.analyst),
   },
   "priya.nair@acme-corp.com": {
@@ -432,7 +439,7 @@ const MOCK_USERS: Record<string, AuthUser> = {
     title: "Trade Analyst", avatar_initials: "PN",
     roles: ["analyst"], org: "acme-corp",
     permissions: ROLE_PERMISSIONS.analyst,
-    assigned_accounts: ["acct-target", "acct-costco"],
+    assigned_accounts: ["acct-R-13", "acct-R-14"], // Target, Costco
     visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.analyst),
   },
   "tom.bradley@walmart.com": {
@@ -441,7 +448,7 @@ const MOCK_USERS: Record<string, AuthUser> = {
     title: "Walmart Buyer Rep", avatar_initials: "TB",
     roles: ["partner"], org: "acme-corp",
     permissions: ROLE_PERMISSIONS.partner,
-    assigned_accounts: ["acct-walmart"],
+    assigned_accounts: ["acct-R-11"], // Walmart
     visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.partner),
   },
   "lisa.huang@kroger.com": {
@@ -450,7 +457,7 @@ const MOCK_USERS: Record<string, AuthUser> = {
     title: "Kroger Buyer Rep", avatar_initials: "LH",
     roles: ["partner"], org: "acme-corp",
     permissions: ROLE_PERMISSIONS.partner,
-    assigned_accounts: ["acct-kroger"],
+    assigned_accounts: ["acct-R-12"], // Kroger
     visible_tabs: computeVisibleTabs(ROLE_PERMISSIONS.partner),
   },
 };
@@ -803,9 +810,9 @@ function _redBlockedTrace(
   ];
 }
 
-function _failedClassifyTrace(): import("@/types/api").ExecutedNode[] {
+function _failedClassifyTrace(orderId = "SO-13400"): import("@/types/api").ExecutedNode[] {
   return [
-    _node("ingest", 0, 4, { decision: { order_id: "SO-13400" } }),
+    _node("ingest", 0, 4, { decision: { order_id: orderId } }),
     _node("classify", 4, 412, {
       status: "halted",
       decision: {
@@ -829,9 +836,9 @@ function _failedClassifyTrace(): import("@/types/api").ExecutedNode[] {
    gate's only conditional terminal verdict is `breach`. Halts before
    recipe selection, so trace_data carries no recipe and shadow never
    runs. */
-function _circuitBreakerBreachTrace(): import("@/types/api").ExecutedNode[] {
+function _circuitBreakerBreachTrace(orderId = "SO-CB-001"): import("@/types/api").ExecutedNode[] {
   return [
-    _node("ingest", 0, 4, { decision: { order_id: "SO-CB-001", request_trace_id: "tr-cb-001" } }),
+    _node("ingest", 0, 4, { decision: { order_id: orderId, request_trace_id: "tr-cb-001" } }),
     _node("classify", 4, 21, {
       decision: { intent: "MASS_PRICING_ERROR", confidence: 0.88 },
       exit_verdict: "ok",
@@ -862,9 +869,9 @@ function _circuitBreakerBreachTrace(): import("@/types/api").ExecutedNode[] {
    emits the `no_recipe` verdict; the run continues to shadow_audit
    only if shadow has been wired ahead of select_recipe — which it
    isn't. So this halts at select_recipe directly. */
-function _noRecipeTrace(): import("@/types/api").ExecutedNode[] {
+function _noRecipeTrace(orderId = "SO-NR-001"): import("@/types/api").ExecutedNode[] {
   return [
-    _node("ingest", 0, 4, { decision: { order_id: "SO-NR-001", request_trace_id: "tr-nr-001" } }),
+    _node("ingest", 0, 4, { decision: { order_id: orderId, request_trace_id: "tr-nr-001" } }),
     _node("classify", 4, 18, {
       decision: { intent: "MASS_PRICING_ERROR", confidence: 0.93 },
       exit_verdict: "ok",
@@ -892,9 +899,9 @@ function _noRecipeTrace(): import("@/types/api").ExecutedNode[] {
    shadow never runs because the audit-bearing evidence couldn't be
    captured. The single sub_span carries the failed gateway's
    timing + status. */
-function _requiredGwFailTrace(): import("@/types/api").ExecutedNode[] {
+function _requiredGwFailTrace(orderId = "SO-GW-001"): import("@/types/api").ExecutedNode[] {
   return [
-    _node("ingest", 0, 4, { decision: { order_id: "SO-GW-001", request_trace_id: "tr-gw-001" } }),
+    _node("ingest", 0, 4, { decision: { order_id: orderId, request_trace_id: "tr-gw-001" } }),
     _node("classify", 4, 28, {
       decision: { intent: "DUPLICATE_PO", confidence: 0.89 },
       exit_verdict: "ok",
@@ -945,9 +952,9 @@ function _requiredGwFailTrace(): import("@/types/api").ExecutedNode[] {
    a routing bug, not a business exception. validate_types short-
    circuits with `invocation_fail` rather than letting the recipe
    throw at execution time. */
-function _invocationFailTrace(): import("@/types/api").ExecutedNode[] {
+function _invocationFailTrace(orderId = "PO-PHR-BAD"): import("@/types/api").ExecutedNode[] {
   return [
-    _node("ingest", 0, 4, { decision: { order_id: "PO-PHR-BAD", request_trace_id: "tr-vt-001" } }),
+    _node("ingest", 0, 4, { decision: { order_id: orderId, request_trace_id: "tr-vt-001" } }),
     _node("classify", 4, 26, {
       decision: { intent: "PRICE_HOLD_RELEASE", confidence: 0.84 },
       exit_verdict: "ok",
@@ -1025,7 +1032,7 @@ function _defaultExecutedNodes(
   // classify" cause) so unknown FAILED records still show a real
   // halt path rather than empty.
   if (exc.lifecycle_state === "FAILED") {
-    return _failedClassifyTrace();
+    return _failedClassifyTrace(_overridesFromId("exc-015").orderId);
   }
 
   // RED-shadowed records halt at shadow_audit with the RED verdict.
@@ -1181,7 +1188,7 @@ const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
   // FAILED at classify — cross-check disagreement halt (Phase D
   // acceptance trace #4 — the SMK-CB-001 canonical case).
   "exc-015": {
-    executed_nodes: _failedClassifyTrace(),
+    executed_nodes: _failedClassifyTrace(_overridesFromId("exc-015").orderId),
   },
   // ADR-027 Phase A.0 — every conditional-gate terminal verdict
   // gets at least one mock so the timeline/DAG views can be
@@ -1190,19 +1197,19 @@ const MOCK_TRACE_ENRICHMENT: Record<string, Partial<TraceResponse>> = {
   // _VERDICT_LABELS registry entry in asoe2/orchestration/graph.py.
   // halt at validate_circuit_breaker (verdict: breach)
   "exc-022": {
-    executed_nodes: _circuitBreakerBreachTrace(),
+    executed_nodes: _circuitBreakerBreachTrace(_overridesFromId("exc-022").orderId),
   },
   // halt at select_recipe (verdict: no_recipe)
   "exc-023": {
-    executed_nodes: _noRecipeTrace(),
+    executed_nodes: _noRecipeTrace(_overridesFromId("exc-023").orderId),
   },
   // halt at resolve_dependencies (verdict: required_gw_fail)
   "exc-024": {
-    executed_nodes: _requiredGwFailTrace(),
+    executed_nodes: _requiredGwFailTrace(_overridesFromId("exc-024").orderId),
   },
   // halt at validate_types (verdict: invocation_fail)
   "exc-025": {
-    executed_nodes: _invocationFailTrace(),
+    executed_nodes: _invocationFailTrace(_overridesFromId("exc-025").orderId),
   },
   // MANUAL_ORDER_INTAKE (ADR-034) — STANDARD_REVIEW band, REQUEST_CLARIFICATION
   // action driven by ambiguous ship-to. Reuses the YELLOW-HITL trace shape;
