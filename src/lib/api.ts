@@ -83,7 +83,7 @@ import {
   deriveMockCases,
   deriveMockCaseSummaries,
 } from "./mock-data/cases";
-import { MOCK_LINE_ITEMS } from "./mock-data/line-items";
+import { SCENARIO_LINE_ITEMS } from "./mock-data/__generated__/scenario_line_items";
 import { mockAttachmentBlob } from "./mock-data/attachment-bytes";
 import type { AttentionState, OrderCase } from "@/types/cases";
 
@@ -2247,7 +2247,7 @@ export const exceptionsApi = {
       return resp.data ?? [];
     }
     await delay(MOCK_DELAY);
-    return MOCK_LINE_ITEMS[id] ?? [];
+    return SCENARIO_LINE_ITEMS[id] ?? [];
   },
 
   /**
