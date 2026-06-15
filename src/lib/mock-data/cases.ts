@@ -30,6 +30,7 @@ import {
 } from "@/generated/taxonomy";
 
 import { MOCK_EXCEPTIONS } from "./exceptions";
+import { MOCK_ORDER_ANALYSES } from "./order-analyses";
 
 
 // Inverse of the generated `INTENTS_BY_SUPERGROUP` (intent code →
@@ -357,7 +358,11 @@ export const INTENT_SUMMARY_TEMPLATES: Record<string, MockSummaryTemplate> = {
   MANUAL_ORDER_INTAKE: {
     sku_code: null,
     sku_title: null,
-    one_liner: "New email order — buyer requested $9.80 contract price",
+    // Fallback only — `mockProblemOneLiner` renders the per-record email
+    // subject for inbox records (mirroring the backend `_email_order_template`).
+    // This generic string is used solely when a record carries no email_source
+    // subject, so it must stay honest (no invented price/quantity).
+    one_liner: "Customer email — awaiting review",
     impact_cents: 156000,
   },
   // Intents intentionally without templates (grandfather-clause
@@ -402,7 +407,27 @@ export interface MockCaseSummary {
 }
 
 /**
- * Project every grouped case onto its CaseSummary mock fields.
+ * The mock-mode `problem_one_liner` / `situation_headline` for a record.
+ *
+ * `INTENT_SUMMARY_TEMPLATES` is keyed by *intent*, which is fine for intents
+ * that appear once per case — but every customer-inbox record shares
+ * `intent: MANUAL_ORDER_INTAKE`, so the static template collapses all of them
+ * onto one identical headline. The backend doesn't: its
+ * `_email_order_template` (api/case_summary_templates.py) renders the
+ * *per-record* email subject. Mirror that here — prefer the record's email
+ * subject when present, falling back to the per-intent template for non-email
+ * (EDI) records, which is the existing behaviour for them.
+ */
+export function mockProblemOneLiner(
+  excId: string,
+  intent: string | null | undefined,
+): string | null {
+  const subject = MOCK_ORDER_ANALYSES[excId]?.email_source?.subject;
+  if (subject) return subject;
+  return intent ? INTENT_SUMMARY_TEMPLATES[intent]?.one_liner ?? null : null;
+}
+
+/**
  * Returns a Map keyed on case_id so the api.ts list serialiser can
  * splice the result into each `CaseListItem` row.
  *
@@ -443,7 +468,7 @@ export function deriveMockCaseSummaries(): Map<string, MockCaseSummary> {
       customer_name: customerName,
       top_line_sku_code: template?.sku_code ?? null,
       top_line_sku_title: template?.sku_title ?? null,
-      problem_one_liner: template?.one_liner ?? null,
+      problem_one_liner: mockProblemOneLiner(lead.id, intent),
       intent,
       child_intents: childIntents,
       dollar_impact: template?.impact_cents != null

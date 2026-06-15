@@ -79,7 +79,7 @@ import {
   persistMockExceptionMutation,
 } from "./mock-data/exceptions";
 import {
-  INTENT_SUMMARY_TEMPLATES,
+  mockProblemOneLiner,
   deriveMockCases,
   deriveMockCaseSummaries,
 } from "./mock-data/cases";
@@ -2660,11 +2660,11 @@ function mockPresentation(id: string): PresentationContract {
   return {
     section_tiers: MOCK_SECTION_TIERS,
     // Mock-mode stand-in for the backend reusing render_template: the
-    // governed per-intent one-liner is the plain-language Situation
-    // headline. Null when the intent has no template (honest omission).
-    situation_headline: intent
-      ? INTENT_SUMMARY_TEMPLATES[intent]?.one_liner ?? null
-      : null,
+    // plain-language Situation headline. Per-record (the email subject for
+    // inbox records, else the per-intent template) so customer-inbox records
+    // don't all collapse onto one MANUAL_ORDER_INTAKE template string. Null
+    // when neither is available (honest omission).
+    situation_headline: mockProblemOneLiner(id, intent),
     show_intent: !!intent && !MOCK_NON_DISCRIMINATING_INTENTS.has(intent),
     // Provenance bundle (council 2026-06-10) — mirrors
     // api/presentation_composer.compose_presentation: pure projection of
