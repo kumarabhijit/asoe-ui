@@ -343,7 +343,9 @@ export const INTENT_SUMMARY_TEMPLATES: Record<string, MockSummaryTemplate> = {
     one_liner: "Over max by 240 cases (8.3% over allocation)",
     impact_cents: 408000,
   },
-  MOQ_UPLIFT: {
+  // Keyed by the Intent enum value (asoe2 contracts/models.py::Intent). The
+  // backend INTENT_TEMPLATES registers _moq_uplift_template under this intent.
+  MIN_ORDER_QTY: {
     sku_code: "BEV-COLA-12PK",
     sku_title: "Cola 12-pack",
     one_liner: "Below MOQ by 36 cases (ordered 64 vs 100 required)",
@@ -363,7 +365,11 @@ export const INTENT_SUMMARY_TEMPLATES: Record<string, MockSummaryTemplate> = {
     // This generic string is used solely when a record carries no email_source
     // subject, so it must stay honest (no invented price/quantity).
     one_liner: "Customer email — awaiting review",
-    impact_cents: 156000,
+    // No honest per-record dollar impact at intake: ManualOrderIntakeRecipe
+    // emits no financial_impact, so the backend `_dollar_impact_of` returns
+    // None for inbox records. Null here (collapse the cell) rather than a
+    // fabricated, identical figure across every inbox row.
+    impact_cents: null,
   },
   // Intents intentionally without templates (grandfather-clause
   // parity with the backend recipe gaps):
@@ -424,7 +430,23 @@ export function mockProblemOneLiner(
 ): string | null {
   const subject = MOCK_ORDER_ANALYSES[excId]?.email_source?.subject;
   if (subject) return subject;
-  return intent ? INTENT_SUMMARY_TEMPLATES[intent]?.one_liner ?? null : null;
+  const templated = intent ? INTENT_SUMMARY_TEMPLATES[intent]?.one_liner ?? null : null;
+  if (templated) return templated;
+  // Fallback — the per-record diagnosis (first sentence, trimmed) for intents
+  // whose template renders none (the grandfathered set: PALLET_CONFIG,
+  // PRICE_HOLD_RELEASE, EDI_MISMATCH). Mirrors the backend composer fallback so
+  // the operator always sees a plain-language Situation line instead of a blank.
+  return diagnosisOneLiner(MOCK_ORDER_ANALYSES[excId]?.diagnosis);
+}
+
+/** First sentence of a diagnosis, trimmed to a headline length (no fabrication
+ *  — the real per-record diagnosis is the source). Null when absent. */
+function diagnosisOneLiner(diagnosis: string | null | undefined): string | null {
+  if (!diagnosis) return null;
+  const firstSentence = diagnosis.split(/(?<=[.!?])\s/)[0]?.trim() ?? diagnosis.trim();
+  const MAX = 110;
+  if (firstSentence.length <= MAX) return firstSentence;
+  return firstSentence.slice(0, MAX - 1).trimEnd() + "…";
 }
 
 /**
